@@ -37,8 +37,8 @@
 			<ul class="clean-links">
 				<li><a href="/admin/docs/ceo-message"><span class="icon">✉️</span> CEO Ground Truth</a></li>
 				<li><a href="/admin/docs/brand"><span class="icon">ᜃ</span> Brand & Heritage</a></li>
-				<li><a href="/admin/docs/master_data"><span class="icon">🔑</span> Master Data Constants</a></li>
-				<li><a href="/admin/docs/strategy"><span class="icon">♟️</span> Growth Strategy</a></li>
+				<li><a href="/admin/docs/product-catalog"><span class="icon">📦</span> Product Catalog (Source of Truth)</a></li>
+					<li><a href="/admin/docs/strategy"><span class="icon">♟️</span> Growth Strategy</a></li>
 				<li><a href="/admin/docs/gtm"><span class="icon">🚀</span> Go-to-Market Plan</a></li>
 				<li><a href="/admin/docs/architecture"><span class="icon">🏗️</span> System Architecture</a></li>
 			</ul>
@@ -48,6 +48,8 @@
 			<h3>Sales & Revenue</h3>
 			<ul class="clean-links">
 				<li><a href="/admin/docs/sales"><span class="icon">💰</span> Sales Guide</a></li>
+				<li><a href="/admin/docs/lgu-strategy"><span class="icon">🏛️</span> LGU Market Strategy (PWD/Senior)</a></li>
+				<li><a href="/admin/docs/attendance-pricing"><span class="icon">📊</span> Attendance System Pricing</a></li>
 				<li><a href="/admin/docs/revenue"><span class="icon">💹</span> Revenue Projections</a></li>
 				<li><a href="/admin/docs/sms-pricing"><span class="icon">💬</span> SMS Pricing & Setup</a></li>
 				<li><a href="/admin/docs/proposal"><span class="icon">📄</span> Client Proposals</a></li>

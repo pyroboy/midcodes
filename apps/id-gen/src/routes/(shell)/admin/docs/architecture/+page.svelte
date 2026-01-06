@@ -1,227 +1,723 @@
 <script lang="ts">
-    import type { PageData } from './$types';
-
-    let { data }: { data: PageData } = $props();
+  import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
 </script>
 
 <svelte:head>
-    <title>Technical Architecture & Security | Kanaya Admin</title>
+  <title>System Architecture | Kanaya Admin</title>
 </svelte:head>
 
-<div class="docs-container">
-    <header class="docs-header">
-        <div class="header-top">
-            <h1>System Architecture & Security Protocols</h1>
-            <span class="badge">Developer Docs</span>
-        </div>
-        <p class="meta">Stack: Svelte 5 • Cloudflare Workers • PostgreSQL • NFC</p>
-        <p class="subject">Subject: Database Schema, Encryption Keys, and API Documentation</p>
-    </header>
+<div class="container mx-auto py-8 max-w-5xl">
+  <header class="mb-8">
+    <h1 class="text-4xl font-bold mb-2">SYSTEM ARCHITECTURE</h1>
+    <p class="text-muted-foreground">Technical Documentation | Stack, Security, Database & API</p>
+    <div class="inline-block mt-3 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm font-semibold">
+      Developer Reference | January 2026
+    </div>
+  </header>
 
-    <nav class="toc">
-        <h2>System Blueprints</h2>
-        <ol>
-            <li><a href="#stack">1. The Tech Stack</a></li>
-            <li><a href="#security">2. NFC Security & Encryption</a></li>
-            <li><a href="#database">3. Database Schema (PostgreSQL)</a></li>
-            <li><a href="#canvas">4. Image Rendering Engine (The SaaS Core)</a></li>
-            <li><a href="#offline">5. Offline/PWA Protocols</a></li>
-        </ol>
-    </nav>
+  <!-- TABLE OF CONTENTS -->
+  <nav class="mb-10 p-4 bg-muted rounded-lg">
+    <h2 class="text-lg font-bold mb-3">System Blueprints</h2>
+    <ol class="grid md:grid-cols-2 gap-2 text-sm">
+      <li><a href="#stack" class="text-blue-600 hover:underline">1. Technology Stack</a></li>
+      <li><a href="#auth" class="text-blue-600 hover:underline">2. Authentication & RBAC</a></li>
+      <li><a href="#database" class="text-blue-600 hover:underline">3. Database Schema</a></li>
+      <li><a href="#storage" class="text-blue-600 hover:underline">4. Asset Storage (R2)</a></li>
+      <li><a href="#canvas" class="text-blue-600 hover:underline">5. ID Card Canvas Engine</a></li>
+      <li><a href="#security" class="text-blue-600 hover:underline">6. NFC/QR Security</a></li>
+      <li><a href="#api" class="text-blue-600 hover:underline">7. API & Remote Functions</a></li>
+      <li><a href="#offline" class="text-blue-600 hover:underline">8. Offline/PWA Mode</a></li>
+      <li><a href="#attendance" class="text-blue-600 hover:underline">9. Attendance System + SMS</a></li>
+    </ol>
+  </nav>
 
-    <section id="stack">
-        <h2>1. The Technology Stack</h2>
-        <p class="subtext">We run on the Edge for speed and low latency in Philippines/SE Asia.</p>
-        
-        <div class="grid-3">
-            <div class="tech-card">
-                <h3>Frontend</h3>
-                <div class="highlight">Svelte 5 + Tailwind</div>
-                <p><strong>Why:</strong> We need fine-grained reactivity for the ID Card Canvas editor. React is too heavy.</p>
-            </div>
-            <div class="tech-card">
-                <h3>Backend / API</h3>
-                <div class="highlight">Cloudflare Workers</div>
-                <p><strong>Why:</strong> Zero cold-start. Essential for "Scan & Verify" speed at school gates.</p>
-            </div>
-            <div class="tech-card">
-                <h3>Database</h3>
-                <div class="highlight">PostgreSQL (Supabase/Neon)</div>
-                <p><strong>Why:</strong> Relational data. We need strict foreign keys between Students and Logs.</p>
-            </div>
-        </div>
-    </section>
+  <!-- 1. TECHNOLOGY STACK -->
+  <section id="stack" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">1. Technology Stack</h2>
+    <p class="text-muted-foreground mb-6">Edge-first architecture for low latency in Philippines/SE Asia.</p>
+    
+    <div class="grid md:grid-cols-3 gap-4 mb-6">
+      <Card class="border-l-4 border-l-orange-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg">🎨 Frontend</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <p class="font-bold text-orange-600 mb-2">SvelteKit 2.x + Tailwind 4.x</p>
+          <ul class="space-y-1 text-muted-foreground">
+            <li>• Svelte 5 runes for reactivity</li>
+            <li>• shadcn-svelte + bits-ui components</li>
+            <li>• Threlte (Three.js) for 3D previews</li>
+            <li>• sveltekit-superforms + Zod</li>
+          </ul>
+        </CardContent>
+      </Card>
 
-    <section id="security">
-        <h2>2. NFC Security Architecture</h2>
-        <div class="alert-box critical">
-            <strong>TOP SECRET:</strong> Do not commit actual keys to GitHub. Use ENV variables.
-        </div>
+      <Card class="border-l-4 border-l-blue-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg">⚡ Backend</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <p class="font-bold text-blue-600 mb-2">Cloudflare Pages + Workers</p>
+          <ul class="space-y-1 text-muted-foreground">
+            <li>• Zero cold-start for scan verification</li>
+            <li>• Edge deployment (global)</li>
+            <li>• Node.js 20.x runtime</li>
+            <li>• Vercel alternative deployment</li>
+          </ul>
+        </CardContent>
+      </Card>
 
-        <h3>Card Data Structure (Mifare 1K)</h3>
-        <p>We do not store the student name on the card (GDPR/Privacy). We store a <strong>Signed Token</strong>.</p>
-        
-        <table class="code-table">
+      <Card class="border-l-4 border-l-green-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg">🗄️ Database</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <p class="font-bold text-green-600 mb-2">Neon PostgreSQL + Drizzle ORM</p>
+          <ul class="space-y-1 text-muted-foreground">
+            <li>• Serverless Postgres (auto-scaling)</li>
+            <li>• Drizzle for type-safe queries</li>
+            <li>• Strict foreign key relationships</li>
+            <li>• JSONB for flexible data</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg">🔐 Authentication</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <p class="font-bold text-purple-600 mb-2">Better Auth</p>
+          <ul class="space-y-1 text-muted-foreground">
+            <li>• Email/password + OAuth providers</li>
+            <li>• Lazy initialization for Workers</li>
+            <li>• Session-based auth</li>
+            <li>• Located: <code class="text-xs bg-muted px-1 rounded">src/lib/server/auth.ts</code></li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg">☁️ Storage</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <p class="font-bold text-amber-600 mb-2">Cloudflare R2 (S3-compatible)</p>
+          <ul class="space-y-1 text-muted-foreground">
+            <li>• Template images & assets</li>
+            <li>• Profile photos (per org)</li>
+            <li>• AI decomposition outputs</li>
+            <li>• Image proxy for CORS handling</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+  </section>
+
+  <!-- 2. AUTHENTICATION & RBAC -->
+  <section id="auth" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">2. Authentication & RBAC</h2>
+    
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>🔑 Auth Flow</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <ol class="list-decimal pl-4 space-y-2">
+            <li>Request hits <code class="text-xs bg-muted px-1 rounded">src/hooks.server.ts</code></li>
+            <li>Better Auth validates session cookie</li>
+            <li>User + org data attached to <code class="text-xs bg-muted px-1 rounded">event.locals</code></li>
+            <li>Page/form actions check permissions</li>
+            <li>All data scoped by <code class="text-xs bg-muted px-1 rounded">org_id</code></li>
+          </ol>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>👥 Role-Based Access Control</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <table class="w-full">
             <thead>
-                <tr>
-                    <th>Sector</th>
-                    <th>Data Content</th>
-                    <th>Access Key</th>
-                    <th>Notes</th>
-                </tr>
+              <tr class="border-b">
+                <th class="text-left py-2">Role</th>
+                <th class="text-left py-2">Permissions</th>
+              </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td><strong>Sector 0</strong></td>
-                    <td>Manufacturer UID</td>
-                    <td>Read-Only</td>
-                    <td>Unique hardware ID. Cannot be changed.</td>
-                </tr>
-                <tr>
-                    <td><strong>Sector 1</strong></td>
-                    <td><code>kanaya_uuid</code></td>
-                    <td>Key A (Public)</td>
-                    <td>Points to DB record.</td>
-                </tr>
-                <tr>
-                    <td><strong>Sector 2</strong></td>
-                    <td><code>HMAC_Signature</code></td>
-                    <td>Key B (Private)</td>
-                    <td>Cryptographic proof that WE wrote the card.</td>
-                </tr>
+              <tr class="border-b">
+                <td class="py-2 font-bold">super_admin</td>
+                <td class="py-2 text-muted-foreground">All orgs, system settings</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2 font-bold">org_admin</td>
+                <td class="py-2 text-muted-foreground">Manage org users, billing</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2 font-bold">id_gen_admin</td>
+                <td class="py-2 text-muted-foreground">Templates, encoding, members</td>
+              </tr>
+              <tr>
+                <td class="py-2 font-bold">id_gen_user</td>
+                <td class="py-2 text-muted-foreground">View, scan, basic encoding</td>
+              </tr>
             </tbody>
-        </table>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
 
-        <div class="code-block">
-            <h4>Validation Logic (Pseudocode)</h4>
-            <pre>
-if (VerifyHMAC(card.uuid, card.signature, SECRET_KEY)) &#123;
-    return "Valid Card";
-&#125; else &#123;
-    return "CLONE DETECTED - ALERT ADMIN";
-&#125;</pre>
-        </div>
-    </section>
+    <div class="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm">
+      <strong>⚠️ Important:</strong> All database queries MUST filter by <code class="bg-muted px-1 rounded">org_id</code> to prevent cross-tenant data access.
+    </div>
+  </section>
 
-    <section id="database">
-        <h2>3. Database Schema (Core Tables)</h2>
-        
-        <div class="schema-box">
-            <h3>Table: <code>profiles</code></h3>
-            <ul>
-                <li><code>id</code> (uuid, pk)</li>
-                <li><code>school_id</code> (fk -&gt; organizations)</li>
-                <li><code>role</code> (enum: 'student', 'staff', 'admin')</li>
-                <li><code>nfc_uid</code> (text, unique, nullable) - <em>The Hardware ID</em></li>
-                <li><code>is_active</code> (bool) - <em>Killswitch for lost cards</em></li>
-                <li><code>emergency_contact</code> (jsonb)</li>
-            </ul>
-
-            <h3>Table: <code>access_logs</code></h3>
-            <ul>
-                <li><code>id</code> (bigint, pk)</li>
-                <li><code>profile_id</code> (fk)</li>
-                <li><code>scanner_id</code> (fk)</li>
-                <li><code>timestamp</code> (timestamptz)</li>
-                <li><code>direction</code> (enum: 'in', 'out')</li>
-            </ul>
-        </div>
-    </section>
-
-    <section id="canvas">
-        <h2>4. The "Kanaya Studio" Engine</h2>
-        <p>This is the core of our SaaS offering. It runs 100% Client-Side (Browser).</p>
-
-        <div class="process-flow">
-            <div class="step">
-                <h4>1. Template Load</h4>
-                <p>Loads <code>base_image</code> (PNG) and <code>layout_config</code> (JSON) from R2 Storage.</p>
-            </div>
-            <div class="step">
-                <h4>2. Data Merge</h4>
-                <p>Iterates through CSV rows. Injects Text and Profile Photo (Base64).</p>
-            </div>
-            <div class="step">
-                <h4>3. Render &amp; Mirror</h4>
-                <p>Draws to HTML5 Canvas. Applies <code>scale(-1, 1)</code> for Mirror Printing.</p>
-            </div>
-            <div class="step">
-                <h4>4. PDF Generation</h4>
-                <p>Compiles 10 Canvas elements into a single A4 PDF using <code>jspdf</code>.</p>
-            </div>
-        </div>
-    </section>
-
-    <section id="offline">
-        <h2>5. Offline &amp; Disaster Recovery</h2>
-        
-        <div class="scenario-card">
-            <h3>Scenario: No Internet at School Gate</h3>
-            <p><strong>Solution: Local First Sync (PWA)</strong></p>
-            <ol>
-                <li><strong>Morning Sync:</strong> The Scanner Tablet downloads the <code>whitelist.json</code> (Text only: UID + Name + Status). Photos are not preloaded—fetch on demand or show a placeholder if offline.</li>
-                <li><strong>Offline Scan:</strong> Tablet checks scanned UID against local Storage. Logs are saved locally.</li>
-                <li><strong>Re-Sync:</strong> Logs are pushed to Cloudflare DB once internet is restored.</li>
-            </ol>
-        </div>
-    </section>
-
-    <footer class="docs-footer">
-        <p>Kanaya Engineering • Authorized Developers Only</p>
-    </footer>
-</div>
-
-<style>
-    .docs-container { max-width: 950px; margin: 0 auto; padding: 2rem; font-family: 'Fira Code', 'Segoe UI', monospace; color: #c9d1d9; background: #0d1117; }
+  <!-- 3. DATABASE SCHEMA -->
+  <section id="database" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">3. Database Schema (Core Tables)</h2>
+    <p class="text-muted-foreground mb-4">Schema source: <code class="text-xs bg-muted px-1 rounded">src/lib/server/schema.ts</code></p>
     
-    .docs-header { border-bottom: 2px solid #30363d; margin-bottom: 2rem; padding-bottom: 1rem; }
-    .header-top { display: flex; justify-content: space-between; align-items: center; }
-    .docs-header h1 { color: #58a6ff; margin: 0; font-size: 1.8rem; font-family: 'Segoe UI', sans-serif; font-weight: 700; }
-    .badge { background: #1f6feb; color: white; padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.8rem; }
-    .meta { color: #8b949e; margin-top: 0.5rem; }
+    <div class="grid md:grid-cols-2 gap-4 mb-6">
+      <Card class="border-l-4 border-l-purple-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">organizations</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-purple-600">id</span> (uuid, pk)</li>
+            <li><span class="text-muted-foreground">name</span> (text)</li>
+            <li><span class="text-muted-foreground">slug</span> (text, unique)</li>
+            <li><span class="text-muted-foreground">settings</span> (jsonb)</li>
+            <li><span class="text-muted-foreground">created_at</span> (timestamptz)</li>
+          </ul>
+        </CardContent>
+      </Card>
 
-    .toc { background: #161b22; border: 1px solid #30363d; padding: 1.5rem; border-radius: 6px; margin-bottom: 2rem; }
-    .toc h2 { margin: 0 0 1rem; color: #c9d1d9; }
-    .toc ol { margin: 0; padding-left: 1.5rem; color: #8b949e; }
-    .toc a { color: #58a6ff; text-decoration: none; }
+      <Card class="border-l-4 border-l-blue-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">members</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-blue-600">id</span> (uuid, pk)</li>
+            <li><span class="text-amber-600">org_id</span> (fk → organizations)</li>
+            <li><span class="text-muted-foreground">full_name</span> (text)</li>
+            <li><span class="text-muted-foreground">photo_url</span> (text, nullable)</li>
+            <li><span class="text-muted-foreground">qr_code</span> (text, unique)</li>
+            <li><span class="text-muted-foreground">nfc_uid</span> (text, unique, nullable)</li>
+            <li><span class="text-muted-foreground">is_active</span> (bool)</li>
+            <li><span class="text-muted-foreground">custom_fields</span> (jsonb)</li>
+          </ul>
+        </CardContent>
+      </Card>
 
-    section { margin-bottom: 3rem; }
-    h2 { color: #c9d1d9; border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; margin-bottom: 1.5rem; }
-    .subtext { color: #8b949e; font-style: italic; margin-bottom: 1.5rem; }
+      <Card class="border-l-4 border-l-green-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">templates</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-green-600">id</span> (uuid, pk)</li>
+            <li><span class="text-amber-600">org_id</span> (fk → organizations)</li>
+            <li><span class="text-muted-foreground">name</span> (text)</li>
+            <li><span class="text-muted-foreground">width_px, height_px, dpi</span> (int)</li>
+            <li><span class="text-muted-foreground">background_url</span> (text)</li>
+            <li><span class="text-red-600">template_elements</span> (jsonb) ← The Canvas Config</li>
+          </ul>
+        </CardContent>
+      </Card>
 
-    /* Tech Stack Grid */
-    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-    .tech-card { background: #161b22; border: 1px solid #30363d; padding: 1.5rem; border-radius: 6px; }
-    .tech-card h3 { color: #fff; margin-top: 0; font-size: 1rem; }
-    .highlight { color: #7ee787; font-weight: bold; margin: 0.5rem 0; font-size: 1.1rem; }
-    .tech-card p { color: #8b949e; font-size: 0.9rem; }
+      <Card class="border-l-4 border-l-amber-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">access_logs</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-amber-600">id</span> (bigint, pk)</li>
+            <li><span class="text-muted-foreground">member_id</span> (fk → members)</li>
+            <li><span class="text-muted-foreground">scanner_id</span> (text)</li>
+            <li><span class="text-muted-foreground">timestamp</span> (timestamptz)</li>
+            <li><span class="text-muted-foreground">direction</span> (enum: 'in'|'out')</li>
+            <li><span class="text-muted-foreground">verification_method</span> (enum: 'qr'|'nfc'|'rfid')</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
 
-    /* Tables */
-    .code-table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.9rem; }
-    .code-table th { text-align: left; border-bottom: 1px solid #30363d; padding: 10px; color: #8b949e; }
-    .code-table td { border-bottom: 1px solid #21262d; padding: 10px; color: #c9d1d9; }
-    .code-table code { background: rgba(110,118,129,0.4); padding: 2px 4px; border-radius: 3px; }
+    <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
+      <strong>💡 Template Elements:</strong> The <code class="bg-muted px-1 rounded">template_elements</code> JSONB column stores an array of element definitions 
+      (text, image, qr, barcode, shape) with position, size, styling, and data binding info.
+    </div>
+  </section>
 
-    /* Code Blocks */
-    .code-block { background: #161b22; padding: 1rem; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 2rem; }
-    .code-block pre { margin: 0; color: #a5d6ff; overflow-x: auto; }
+  <!-- 4. ASSET STORAGE -->
+  <section id="storage" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">4. Asset Storage (Cloudflare R2)</h2>
+    
+    <div class="overflow-x-auto mb-6">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-muted/50">
+            <th class="text-left py-3 px-4">Path Pattern</th>
+            <th class="text-left py-3 px-4">Content</th>
+            <th class="text-left py-3 px-4">Access</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-sm">/orgs/{'{org_id}'}/templates/{'{id}'}/</td>
+            <td class="py-3 px-4">Template backgrounds, layers</td>
+            <td class="py-3 px-4">Org-scoped</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-sm">/orgs/{'{org_id}'}/members/{'{id}'}/</td>
+            <td class="py-3 px-4">Profile photos</td>
+            <td class="py-3 px-4">Org-scoped</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-sm">/orgs/{'{org_id}'}/decomposed/</td>
+            <td class="py-3 px-4">AI layer outputs</td>
+            <td class="py-3 px-4">Org-scoped</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-sm">/public/</td>
+            <td class="py-3 px-4">Marketing assets</td>
+            <td class="py-3 px-4">Public</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    /* Schema */
-    .schema-box { background: #161b22; padding: 1.5rem; border-left: 4px solid #d2a8ff; margin-bottom: 2rem; }
-    .schema-box h3 { color: #d2a8ff; margin-top: 0; }
-    .schema-box ul { color: #8b949e; }
-    .schema-box code { color: #ff7b72; }
+    <div class="grid md:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg">Image Access Patterns</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <ul class="space-y-2">
+            <li><strong>Direct R2:</strong> Use <code class="text-xs bg-muted px-1 rounded">getStorageUrl()</code> for &lt;img&gt; tags</li>
+            <li><strong>Canvas/3D:</strong> Use <code class="text-xs bg-muted px-1 rounded">getProxiedUrl()</code> via <code class="text-xs bg-muted px-1 rounded">/api/image-proxy</code></li>
+          </ul>
+          <p class="mt-3 text-muted-foreground text-xs">Path utils: <code class="bg-muted px-1 rounded">src/lib/utils/storagePath.ts</code></p>
+        </CardContent>
+      </Card>
 
-    /* Process Flow */
-    .process-flow { display: grid; gap: 1rem; margin-bottom: 2rem; }
-    .step { background: #21262d; padding: 1rem; border-radius: 6px; border-left: 3px solid #58a6ff; }
-    .step h4 { margin: 0; color: #58a6ff; }
-    .step p { margin: 0.5rem 0 0; color: #c9d1d9; font-size: 0.9rem; }
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg">CORS Handling</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <p class="text-muted-foreground mb-2">Canvas/Three.js requires same-origin images. We proxy through:</p>
+          <code class="text-xs bg-muted px-2 py-1 rounded block">/api/image-proxy?url={'{encoded_r2_url}'}</code>
+          <p class="mt-2 text-muted-foreground text-xs">This adds proper CORS headers for canvas drawing.</p>
+        </CardContent>
+      </Card>
+    </div>
+  </section>
 
-    .alert-box { background: #3e1f1f; border: 1px solid #ff7b72; color: #ff7b72; padding: 1rem; margin-bottom: 1.5rem; border-radius: 6px; }
+  <!-- 5. CANVAS ENGINE -->
+  <section id="canvas" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">5. ID Card Canvas Engine ("Kanaya Studio")</h2>
+    <p class="text-muted-foreground mb-6">100% client-side rendering for privacy and speed.</p>
+    
+    <div class="grid md:grid-cols-4 gap-4 mb-6">
+      <Card class="text-center">
+        <CardContent class="pt-4">
+          <p class="text-2xl mb-2">1️⃣</p>
+          <p class="font-bold">Template Load</p>
+          <p class="text-xs text-muted-foreground">Fetch background (PNG) + elements config (JSON) from R2</p>
+        </CardContent>
+      </Card>
+      <Card class="text-center">
+        <CardContent class="pt-4">
+          <p class="text-2xl mb-2">2️⃣</p>
+          <p class="font-bold">Data Merge</p>
+          <p class="text-xs text-muted-foreground">Inject member data: name, photo, QR code, custom fields</p>
+        </CardContent>
+      </Card>
+      <Card class="text-center">
+        <CardContent class="pt-4">
+          <p class="text-2xl mb-2">3️⃣</p>
+          <p class="font-bold">Canvas Render</p>
+          <p class="text-xs text-muted-foreground">HTML5 Canvas with scale(-1,1) for mirror printing</p>
+        </CardContent>
+      </Card>
+      <Card class="text-center">
+        <CardContent class="pt-4">
+          <p class="text-2xl mb-2">4️⃣</p>
+          <p class="font-bold">Export</p>
+          <p class="text-xs text-muted-foreground">PDF (jspdf) or PNG batch export</p>
+        </CardContent>
+      </Card>
+    </div>
 
-    .scenario-card { background: #161b22; border: 1px dashed #8b949e; padding: 1.5rem; border-radius: 6px; }
-    .scenario-card h3 { margin-top: 0; color: #f2cc60; }
+    <Card>
+      <CardHeader>
+        <CardTitle>🎨 AI Decomposition (fal.ai)</CardTitle>
+      </CardHeader>
+      <CardContent class="text-sm">
+        <p class="mb-3">Uses <strong>Qwen-Image-Layered</strong> to decompose uploaded images into separate layers:</p>
+        <ul class="space-y-1 text-muted-foreground">
+          <li>• Background layer (school logo, design)</li>
+          <li>• Text regions (for variable data placement)</li>
+          <li>• Photo placeholders (auto-detected)</li>
+        </ul>
+        <p class="mt-3 text-xs">Code: <code class="bg-muted px-1 rounded">src/lib/server/fal-layers.ts</code>, <code class="bg-muted px-1 rounded">src/lib/remote/decompose.remote.ts</code></p>
+      </CardContent>
+    </Card>
+  </section>
 
-    .docs-footer { margin-top: 4rem; text-align: center; color: #484f58; border-top: 1px solid #21262d; padding-top: 2rem; font-size: 0.8rem; }
-</style>
+  <!-- 6. NFC/QR SECURITY -->
+  <section id="security" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">6. NFC/QR Security Architecture</h2>
+    
+    <div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg mb-6 text-sm">
+      <strong>🔒 TOP SECRET:</strong> Never commit actual keys to GitHub. Use environment variables only.
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>📱 QR Code Verification</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <ol class="list-decimal pl-4 space-y-2">
+            <li>QR contains <code class="text-xs bg-muted px-1 rounded">member_uuid</code> + <code class="text-xs bg-muted px-1 rounded">HMAC signature</code></li>
+            <li>Scanner app sends to <code class="text-xs bg-muted px-1 rounded">/api/verify</code></li>
+            <li>Server validates HMAC with secret key</li>
+            <li>Returns member status (ACTIVE/EXPIRED/BLOCKED)</li>
+            <li>Logs access to <code class="text-xs bg-muted px-1 rounded">access_logs</code> table</li>
+          </ol>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>💳 NFC Card Structure (Mifare 1K)</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b">
+                <th class="text-left py-2">Sector</th>
+                <th class="text-left py-2">Data</th>
+                <th class="text-left py-2">Access</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b">
+                <td class="py-2">0</td>
+                <td class="py-2">Manufacturer UID</td>
+                <td class="py-2 text-muted-foreground">Read-only (hardware)</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2">1</td>
+                <td class="py-2 font-mono">kanaya_uuid</td>
+                <td class="py-2 text-muted-foreground">Key A (public)</td>
+              </tr>
+              <tr>
+                <td class="py-2">2</td>
+                <td class="py-2 font-mono">HMAC_Signature</td>
+                <td class="py-2 text-muted-foreground">Key B (private)</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="mt-3 text-xs text-muted-foreground">No PII stored on card. Only UUID + crypto proof we wrote it.</p>
+        </CardContent>
+      </Card>
+    </div>
+
+    <Card class="bg-muted/30">
+      <CardHeader class="pb-2">
+        <CardTitle class="text-lg font-mono">Validation Pseudocode</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <pre class="text-sm overflow-x-auto"><code>if (VerifyHMAC(card.uuid, card.signature, SECRET_KEY)) {'{'} 
+  member = db.query("SELECT * FROM members WHERE id = ?", card.uuid);
+  if (member.is_active) return "✅ Valid - Access Granted";
+  else return "⚠️ Card Deactivated";
+{'}'} else {'{'}
+  alertAdmin("🚨 CLONE DETECTED", card);
+  return "❌ Invalid Card";
+{'}'}</code></pre>
+      </CardContent>
+    </Card>
+  </section>
+
+  <!-- 7. API & REMOTE FUNCTIONS -->
+  <section id="api" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">7. API & Remote Functions</h2>
+    
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-muted/50">
+            <th class="text-left py-3 px-4">Endpoint</th>
+            <th class="text-left py-3 px-4">Method</th>
+            <th class="text-left py-3 px-4">Purpose</th>
+            <th class="text-left py-3 px-4">Auth</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-xs">/api/verify</td>
+            <td class="py-3 px-4">POST</td>
+            <td class="py-3 px-4">QR/NFC verification (scanner app)</td>
+            <td class="py-3 px-4">API Key</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-xs">/api/image-proxy</td>
+            <td class="py-3 px-4">GET</td>
+            <td class="py-3 px-4">CORS proxy for canvas images</td>
+            <td class="py-3 px-4">Public</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-xs">/api/decompose</td>
+            <td class="py-3 px-4">POST</td>
+            <td class="py-3 px-4">AI layer decomposition (fal.ai)</td>
+            <td class="py-3 px-4">Session</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-mono text-xs">/llms.txt</td>
+            <td class="py-3 px-4">GET</td>
+            <td class="py-3 px-4">LLM context bundle (docs)</td>
+            <td class="py-3 px-4">Public</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
+      <strong>💡 Remote Functions:</strong> Heavy operations use Remote Functions pattern for progressive loading. 
+      See <code class="bg-muted px-1 rounded">src/lib/remote/*.remote.ts</code>
+    </div>
+  </section>
+
+  <!-- 8. OFFLINE/PWA -->
+  <section id="offline" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">8. Offline Mode & Disaster Recovery</h2>
+    
+    <Card class="border-l-4 border-l-amber-500">
+      <CardHeader>
+        <CardTitle>📴 Scenario: No Internet at School Gate</CardTitle>
+      </CardHeader>
+      <CardContent class="text-sm">
+        <h4 class="font-bold mb-2">Solution: Local-First Sync (PWA)</h4>
+        <ol class="list-decimal pl-4 space-y-2">
+          <li>
+            <strong>Morning Sync:</strong> Scanner tablet downloads <code class="text-xs bg-muted px-1 rounded">whitelist.json</code> 
+            (UID + Name + Status only—no photos to save bandwidth)
+          </li>
+          <li>
+            <strong>Offline Scan:</strong> Tablet validates scanned UID against local IndexedDB. 
+            Logs saved locally with timestamp.
+          </li>
+          <li>
+            <strong>Re-Sync:</strong> When internet restored, local logs pushed to server with 
+            conflict resolution (server wins for member status, merge for logs).
+          </li>
+        </ol>
+        <div class="mt-4 p-3 bg-amber-100 dark:bg-amber-900/30 rounded text-xs">
+          <strong>⚠️ Limitation:</strong> New members added during offline period won't be recognized until sync.
+        </div>
+      </CardContent>
+    </Card>
+  </section>
+
+  <!-- 9. ATTENDANCE SYSTEM ARCHITECTURE -->
+  <section id="attendance" class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">9. Attendance System + SMS Architecture</h2>
+    <p class="text-muted-foreground mb-6">Multi-variant attendance with optional SMS notifications to parents/guardians.</p>
+    
+    <!-- Scanner Types -->
+    <h3 class="font-bold text-lg mb-3">Reader Support Matrix</h3>
+    <div class="overflow-x-auto mb-6">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-muted/50">
+            <th class="text-left py-2 px-4">Reader</th>
+            <th class="text-left py-2 px-4">Hardware</th>
+            <th class="text-right py-2 px-4">Cost</th>
+            <th class="text-left py-2 px-4">Use Case</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b">
+            <td class="py-2 px-4 font-bold">QR</td>
+            <td class="py-2 px-4">Phone camera / USB scanner</td>
+            <td class="py-2 px-4 text-right">₱0-2,000</td>
+            <td class="py-2 px-4">Budget, any org</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4 font-bold">RFID</td>
+            <td class="py-2 px-4">125kHz/13.56MHz reader</td>
+            <td class="py-2 px-4 text-right">₱2,000-5,000</td>
+            <td class="py-2 px-4">High volume, gates</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4 font-bold">NFC</td>
+            <td class="py-2 px-4">Phone NFC / ACR122U</td>
+            <td class="py-2 px-4 text-right">₱0-3,000</td>
+            <td class="py-2 px-4">Premium, access control</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4 font-bold">Biometric</td>
+            <td class="py-2 px-4">USB fingerprint scanner</td>
+            <td class="py-2 px-4 text-right">₱5,000-15,000</td>
+            <td class="py-2 px-4">High security</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Additional Tables -->
+    <h3 class="font-bold text-lg mb-3">Additional Database Tables</h3>
+    <div class="grid md:grid-cols-2 gap-4 mb-6">
+      <Card class="border-l-4 border-l-green-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">scanners</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-green-600">id</span> (uuid, pk)</li>
+            <li><span class="text-amber-600">org_id</span> (fk → organizations)</li>
+            <li><span class="text-muted-foreground">name</span> (text) — "Main Gate"</li>
+            <li><span class="text-muted-foreground">device_type</span> (text)</li>
+            <li><span class="text-muted-foreground">reader_types</span> (jsonb) — ['qr','rfid']</li>
+            <li><span class="text-muted-foreground">is_active</span> (bool)</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card class="border-l-4 border-l-amber-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">sms_subscriptions</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-amber-600">id</span> (uuid, pk)</li>
+            <li><span class="text-muted-foreground">member_id</span> (fk → members)</li>
+            <li><span class="text-muted-foreground">phone_number</span> (text)</li>
+            <li><span class="text-muted-foreground">credits_remaining</span> (int)</li>
+            <li><span class="text-muted-foreground">is_active</span> (bool)</li>
+            <li><span class="text-muted-foreground">expires_at</span> (timestamptz)</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card class="border-l-4 border-l-blue-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">sms_logs</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-blue-600">id</span> (bigserial, pk)</li>
+            <li><span class="text-muted-foreground">subscription_id</span> (fk)</li>
+            <li><span class="text-muted-foreground">access_log_id</span> (fk)</li>
+            <li><span class="text-muted-foreground">message_content</span> (text)</li>
+            <li><span class="text-muted-foreground">status</span> (enum: pending|sent|delivered|failed)</li>
+            <li><span class="text-muted-foreground">cost</span> (decimal)</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card class="border-l-4 border-l-purple-500">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-lg font-mono">sms_packages</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm font-mono">
+          <ul class="space-y-1">
+            <li><span class="text-purple-600">id</span> (uuid, pk)</li>
+            <li><span class="text-muted-foreground">name</span> (text) — "Starter 50"</li>
+            <li><span class="text-muted-foreground">sms_count</span> (int)</li>
+            <li><span class="text-muted-foreground">price</span> (decimal)</li>
+            <li><span class="text-muted-foreground">is_active</span> (bool)</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- SMS Flow -->
+    <h3 class="font-bold text-lg mb-3">SMS Notification Flow</h3>
+    <div class="grid md:grid-cols-5 gap-2 mb-6 text-center text-sm">
+      <Card class="p-3">
+        <p class="text-xl mb-1">📱</p>
+        <p class="font-bold">Scanner</p>
+        <p class="text-xs text-muted-foreground">Tablet/Terminal</p>
+      </Card>
+      <div class="flex items-center justify-center">→</div>
+      <Card class="p-3">
+        <p class="text-xl mb-1">⚡</p>
+        <p class="font-bold">/api/scan</p>
+        <p class="text-xs text-muted-foreground">Log + Queue SMS</p>
+      </Card>
+      <div class="flex items-center justify-center">→</div>
+      <Card class="p-3">
+        <p class="text-xl mb-1">📨</p>
+        <p class="font-bold">Semaphore</p>
+        <p class="text-xs text-muted-foreground">SMS Gateway</p>
+      </Card>
+    </div>
+
+    <!-- SMS Cost -->
+    <div class="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm">
+      <strong>💰 SMS Economics:</strong> Cost ₱0.50-0.60/SMS, sell at ₱1.00 = 40-50% margin. 
+      <strong>⚠️ Never offer unlimited SMS</strong> — it destroys margins. Use prepaid credit packages.
+    </div>
+  </section>
+
+  <!-- KEY FILES REFERENCE -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">📁 Key File Locations</h2>
+    
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-muted/50">
+            <th class="text-left py-2 px-4">Purpose</th>
+            <th class="text-left py-2 px-4">Path</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b">
+            <td class="py-2 px-4">Database Schema</td>
+            <td class="py-2 px-4 font-mono text-xs">src/lib/server/schema.ts</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4">Auth Configuration</td>
+            <td class="py-2 px-4 font-mono text-xs">src/lib/server/auth.ts</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4">DB Connection</td>
+            <td class="py-2 px-4 font-mono text-xs">src/lib/server/db.ts</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4">Zod Schemas</td>
+            <td class="py-2 px-4 font-mono text-xs">src/lib/schemas/*.ts</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4">Storage Utils</td>
+            <td class="py-2 px-4 font-mono text-xs">src/lib/utils/storagePath.ts</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4">Request Hooks</td>
+            <td class="py-2 px-4 font-mono text-xs">src/hooks.server.ts</td>
+          </tr>
+          <tr>
+            <td class="py-2 px-4">AI Decomposition</td>
+            <td class="py-2 px-4 font-mono text-xs">src/lib/server/fal-layers.ts</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="mt-12 pt-6 border-t text-center text-sm text-muted-foreground">
+    <p>Kanaya Engineering • Developer Documentation</p>
+    <p class="mt-2"><a href="/admin/docs" class="underline">← Back to Docs Hub</a></p>
+  </footer>
+</div>

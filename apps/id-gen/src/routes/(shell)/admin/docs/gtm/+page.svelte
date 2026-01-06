@@ -1,381 +1,676 @@
 <script lang="ts">
-  import type { PageData } from './$types';
-  let { data }: { data: PageData } = $props();
+  import { Card, CardContent, CardHeader, CardTitle } from "$lib/components/ui/card";
 </script>
 
 <svelte:head>
-  <title>Master GTM Launch Roadmap | Admin Docs</title>
+  <title>Go-to-Market Plan | Kanaya Admin</title>
 </svelte:head>
 
-<div class="gtm-roadmap">
+<div class="container mx-auto py-8 max-w-6xl">
   <header class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Master GTM Launch Roadmap</h1>
-    <p class="text-gray-600 dark:text-gray-300">Comprehensive go-to-market strategy and execution plan</p>
+    <h1 class="text-4xl font-bold mb-2">GO-TO-MARKET PLAN</h1>
+    <p class="text-muted-foreground">90-Day Launch Roadmap | Zero Capital to Recurring Revenue</p>
+    <div class="inline-block mt-3 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-semibold">
+      Execution Plan | January 2026
+    </div>
   </header>
 
-  <div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-4 mb-8 rounded-r">
-    <div class="flex">
-      <div class="flex-shrink-0">
-        <svg class="h-5 w-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h2a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-        </svg>
-      </div>
-      <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">Strategic Overview</h3>
-        <div class="mt-2 text-sm text-blue-700 dark:text-blue-300">
-          <p>This document outlines our phased approach to launching our product, from initial market validation to full-scale growth. Each phase has specific objectives, KPIs, and resource allocations.</p>
+  <!-- EXECUTIVE SUMMARY -->
+  <section class="mb-10">
+    <div class="p-6 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 rounded-lg">
+      <h2 class="text-xl font-bold mb-4">📊 Revenue Targets Summary</h2>
+      <div class="grid md:grid-cols-4 gap-4">
+        <div class="text-center">
+          <p class="text-3xl font-bold text-blue-600">₱100k+</p>
+          <p class="text-sm text-muted-foreground">90-Day Revenue Target</p>
+        </div>
+        <div class="text-center">
+          <p class="text-3xl font-bold text-green-600">5</p>
+          <p class="text-sm text-muted-foreground">Pilot Clients</p>
+        </div>
+        <div class="text-center">
+          <p class="text-3xl font-bold text-purple-600">3</p>
+          <p class="text-sm text-muted-foreground">Full Contracts</p>
+        </div>
+        <div class="text-center">
+          <p class="text-3xl font-bold text-amber-600">₱60k+</p>
+          <p class="text-sm text-muted-foreground">Annual Recurring (ARR)</p>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="mb-12">
-    <h2 class="text-2xl font-semibold text-gray-800 dark:text-white mb-6">Phase 1: Foundation (Weeks 1-4)</h2>
+  <!-- TARGET MARKET SEGMENTS -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">1. Target Market Segments</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-muted/50">
+            <th class="text-left py-3 px-4">Segment</th>
+            <th class="text-left py-3 px-4">Primary Product</th>
+            <th class="text-right py-3 px-4">Avg. Deal Size</th>
+            <th class="text-right py-3 px-4">SaaS/User/Yr</th>
+            <th class="text-left py-3 px-4">Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b bg-amber-50 dark:bg-amber-900/10">
+            <td class="py-3 px-4 font-bold">🎓 Schools</td>
+            <td class="py-3 px-4">Student IDs + Attendance</td>
+            <td class="py-3 px-4 text-right">₱50,000-150,000</td>
+            <td class="py-3 px-4 text-right">₱10-20</td>
+            <td class="py-3 px-4"><span class="px-2 py-1 bg-amber-200 dark:bg-amber-800 rounded text-xs font-bold">HIGH</span></td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">🏢 HR / Offices</td>
+            <td class="py-3 px-4">Employee IDs + Time Tracking</td>
+            <td class="py-3 px-4 text-right">₱25,000-80,000</td>
+            <td class="py-3 px-4 text-right">₱25-50</td>
+            <td class="py-3 px-4"><span class="px-2 py-1 bg-amber-200 dark:bg-amber-800 rounded text-xs font-bold">HIGH</span></td>
+          </tr>
+          <tr class="border-b bg-green-50 dark:bg-green-900/10">
+            <td class="py-3 px-4 font-bold">💪 Gyms</td>
+            <td class="py-3 px-4">Membership Cards + Check-in</td>
+            <td class="py-3 px-4 text-right">₱20,000-40,000</td>
+            <td class="py-3 px-4 text-right">₱15-30</td>
+            <td class="py-3 px-4"><span class="px-2 py-1 bg-green-200 dark:bg-green-800 rounded text-xs font-bold">MEDIUM</span></td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">🏭 Construction</td>
+            <td class="py-3 px-4">Worker IDs + Gate Access</td>
+            <td class="py-3 px-4 text-right">₱30,000-100,000</td>
+            <td class="py-3 px-4 text-right">₱18-35</td>
+            <td class="py-3 px-4"><span class="px-2 py-1 bg-green-200 dark:bg-green-800 rounded text-xs font-bold">MEDIUM</span></td>
+          </tr>
+          <tr class="border-b bg-purple-50 dark:bg-purple-900/10">
+            <td class="py-3 px-4 font-bold">🏛️ LGU / Gov</td>
+            <td class="py-3 px-4">PWD/Senior/Barangay IDs</td>
+            <td class="py-3 px-4 text-right">₱50,000-500,000</td>
+            <td class="py-3 px-4 text-right">₱5-30</td>
+            <td class="py-3 px-4"><span class="px-2 py-1 bg-blue-200 dark:bg-blue-800 rounded text-xs font-bold">LONG-TERM</span></td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">🎪 Events</td>
+            <td class="py-3 px-4">Event Passes + Visitor Management</td>
+            <td class="py-3 px-4 text-right">₱5,000-20,000</td>
+            <td class="py-3 px-4 text-right">₱2-5/event</td>
+            <td class="py-3 px-4"><span class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-bold">OPPORTUNISTIC</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PHASE 1: FOUNDATION -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">2. Phase 1: Foundation (Days 1-30)</h2>
+    <p class="text-muted-foreground mb-6">Goal: Build pipeline, secure first paying client, acquire production capability</p>
     
-    <div class="grid md:grid-cols-3 gap-6 mb-8">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Market Research</h3>
-        <ul class="space-y-2">
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Complete competitive analysis</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Finalize customer personas</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Define value proposition</span>
-          </li>
-        </ul>
-      </div>
+    <div class="grid md:grid-cols-3 gap-6 mb-6">
+      <Card>
+        <CardHeader class="bg-blue-50 dark:bg-blue-900/20">
+          <CardTitle class="text-lg">🔍 Market Research</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-2">
+            <li class="flex items-center gap-2">
+              <span class="text-green-500">✓</span> Identify 20 target clients within 50km
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-green-500">✓</span> Research OSCA/PDAO contacts per LGU
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-green-500">✓</span> Map competitor pricing in area
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-amber-500">○</span> Build prospect list by segment
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
 
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Brand Development</h3>
-        <ul class="space-y-2">
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Finalize brand guidelines</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Design key marketing assets</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Develop brand voice guide</span>
-          </li>
-        </ul>
-      </div>
+      <Card>
+        <CardHeader class="bg-green-50 dark:bg-green-900/20">
+          <CardTitle class="text-lg">📞 Outreach</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-2">
+            <li class="flex items-center gap-2">
+              <span class="text-amber-500">○</span> Cold call 20 prospects
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-amber-500">○</span> Schedule 10 discovery meetings
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-amber-500">○</span> Conduct 5 demos with sample cards
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-red-500">○</span> Close 1 paying client (300+ IDs)
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
 
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Infrastructure</h3>
-        <ul class="space-y-2">
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Set up analytics</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Implement CRM</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            <span>Marketing automation setup</span>
-          </li>
-        </ul>
-      </div>
+      <Card>
+        <CardHeader class="bg-purple-50 dark:bg-purple-900/20">
+          <CardTitle class="text-lg">🛠️ Infrastructure</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-2">
+            <li class="flex items-center gap-2">
+              <span class="text-green-500">✓</span> Kanaya app production-ready
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-amber-500">○</span> Prepare 100 sample cards
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-amber-500">○</span> Execute "The Flip" to get printer
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-amber-500">○</span> Set up outsourcing partner backup
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
 
-    <div class="mb-8">
-      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-3">Success Metrics</h3>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-800">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">KPI</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Target</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Current</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            <tr>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">Market Research Completion</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">100%</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">85%</td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">In Progress</span>
-              </td>
-            </tr>
-            <tr>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">Brand Assets Ready</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">100%</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">60%</td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">In Progress</span>
-              </td>
-            </tr>
-            <tr>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">Tech Stack Implementation</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">100%</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">40%</td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">Delayed</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <div class="mb-12">
-    <h2 class="text-2xl font-semibold text-gray-800 dark:text-white mb-6">Phase 2: Soft Launch (Weeks 5-8)</h2>
-    
-    <div class="grid md:grid-cols-2 gap-6 mb-8">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Pilot Program</h3>
-        <ul class="space-y-2">
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-gray-300 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Recruit beta testers</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-gray-300 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Gather feedback</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-gray-300 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Iterate on product</span>
-          </li>
-        </ul>
-      </div>
-
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Initial Marketing</h3>
-        <ul class="space-y-2">
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-gray-300 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Launch landing page</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-gray-300 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Start content marketing</span>
-          </li>
-          <li class="flex items-start">
-            <svg class="h-5 w-5 text-gray-300 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>Begin paid acquisition</span>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg mb-8">
-      <h3 class="text-lg font-medium text-blue-800 dark:text-blue-200 mb-3">Key Dependencies</h3>
-      <ul class="list-disc pl-5 space-y-1 text-blue-700 dark:text-blue-300">
-        <li>Completion of Phase 1 infrastructure setup</li>
-        <li>Core product features fully functional</li>
-        <li>Analytics and tracking in place</li>
-        <li>Support systems ready</li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="mb-12">
-    <h2 class="text-2xl font-semibold text-gray-800 dark:text-white mb-6">Phase 3: Scale (Weeks 9-16)</h2>
-    
-    <div class="grid md:grid-cols-3 gap-6 mb-8">
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Marketing Expansion</h3>
-        <ul class="space-y-2">
-          <li>Scale paid campaigns</li>
-          <li>Partnership development</li>
-          <li>Referral program launch</li>
-        </ul>
-      </div>
-
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Product Growth</h3>
-        <ul class="space-y-2">
-          <li>Feature prioritization</li>
-          <li>User feedback implementation</li>
-          <li>Performance optimization</li>
-        </ul>
-      </div>
-
-      <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h3 class="font-medium text-lg text-gray-900 dark:text-white mb-3">Team Scaling</h3>
-        <ul class="space-y-2">
-          <li>Hire additional staff</li>
-          <li>Process documentation</li>
-          <li>Team training</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 mb-8 rounded-r">
-      <div class="flex">
-        <div class="flex-shrink-0">
-          <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-          </svg>
-        </div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Scaling Considerations</h3>
-          <div class="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-            <p>Monitor infrastructure closely during scaling phase. Be prepared to adjust resources based on user growth and feedback.</p>
+    <!-- The Flip Strategy Box -->
+    <Card class="border-2 border-green-300 dark:border-green-700 mb-6">
+      <CardHeader class="bg-green-50 dark:bg-green-900/20">
+        <CardTitle>💰 "The Flip" Strategy - Zero Capital Printer Acquisition</CardTitle>
+      </CardHeader>
+      <CardContent class="pt-4">
+        <div class="grid md:grid-cols-5 gap-4 text-center text-sm">
+          <div class="p-3 bg-muted rounded-lg">
+            <p class="font-bold text-lg">1</p>
+            <p>Close deal: 300 IDs @ ₱120</p>
+            <p class="text-muted-foreground">(Total: ₱36,000)</p>
+          </div>
+          <div class="p-3 bg-muted rounded-lg">
+            <p class="font-bold text-lg">2</p>
+            <p>Collect 50% downpayment</p>
+            <p class="text-green-600 font-bold">₱18,000 cash</p>
+          </div>
+          <div class="p-3 bg-muted rounded-lg">
+            <p class="font-bold text-lg">3</p>
+            <p>Outsource first 100 cards</p>
+            <p class="text-muted-foreground">(Bridge while waiting)</p>
+          </div>
+          <div class="p-3 bg-muted rounded-lg">
+            <p class="font-bold text-lg">4</p>
+            <p>Buy printer + supplies</p>
+            <p class="text-muted-foreground">₱16k + ₱2k = ₱18k</p>
+          </div>
+          <div class="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+            <p class="font-bold text-lg">5</p>
+            <p>Remaining ₱18k payment</p>
+            <p class="text-green-600 font-bold">= Pure Profit</p>
           </div>
         </div>
+      </CardContent>
+    </Card>
+
+    <!-- KPIs -->
+    <h3 class="font-bold text-lg mb-3">Phase 1 Success Metrics</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-muted/50">
+            <th class="text-left py-2 px-4">KPI</th>
+            <th class="text-right py-2 px-4">Target</th>
+            <th class="text-right py-2 px-4">Current</th>
+            <th class="text-left py-2 px-4">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b">
+            <td class="py-2 px-4">Prospects Contacted</td>
+            <td class="py-2 px-4 text-right">20</td>
+            <td class="py-2 px-4 text-right">0</td>
+            <td class="py-2 px-4"><span class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Not Started</span></td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4">Discovery Meetings</td>
+            <td class="py-2 px-4 text-right">10</td>
+            <td class="py-2 px-4 text-right">0</td>
+            <td class="py-2 px-4"><span class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Not Started</span></td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-2 px-4">Demos Conducted</td>
+            <td class="py-2 px-4 text-right">5</td>
+            <td class="py-2 px-4 text-right">0</td>
+            <td class="py-2 px-4"><span class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Not Started</span></td>
+          </tr>
+          <tr class="border-b bg-green-50 dark:bg-green-900/10">
+            <td class="py-2 px-4 font-bold">Paying Clients</td>
+            <td class="py-2 px-4 text-right font-bold">1</td>
+            <td class="py-2 px-4 text-right">0</td>
+            <td class="py-2 px-4"><span class="px-2 py-1 bg-red-200 dark:bg-red-800 rounded text-xs">Critical</span></td>
+          </tr>
+          <tr class="border-b bg-green-50 dark:bg-green-900/10">
+            <td class="py-2 px-4 font-bold">Revenue (Cash)</td>
+            <td class="py-2 px-4 text-right font-bold">₱36,000</td>
+            <td class="py-2 px-4 text-right">₱0</td>
+            <td class="py-2 px-4"><span class="px-2 py-1 bg-red-200 dark:bg-red-800 rounded text-xs">Critical</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PHASE 2: PILOT -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">3. Phase 2: Pilot & Validate (Days 31-60)</h2>
+    <p class="text-muted-foreground mb-6">Goal: Convert 3 pilots, validate SaaS model, build case studies</p>
+    
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+      <Card>
+        <CardHeader class="bg-blue-50 dark:bg-blue-900/20">
+          <CardTitle class="text-lg">🎯 Pilot Program Execution</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-3">
+            <li><strong>Offer:</strong> 50 free cards + 3-month SaaS trial</li>
+            <li><strong>Condition:</strong> Exclusive contract if pilot succeeds</li>
+            <li><strong>Support:</strong> On-site encoding for first batch</li>
+            <li><strong>Goal:</strong> 3 pilots running by Day 45</li>
+          </ul>
+          <div class="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded text-xs">
+            <strong>⚠️ Cost Control:</strong> Free cards = ~₱1,500 per pilot. Budget ₱4,500 total.
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="bg-green-50 dark:bg-green-900/20">
+          <CardTitle class="text-lg">📸 Case Study Collection</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-3">
+            <li>✓ Photo documentation of installations</li>
+            <li>✓ Video testimonials from decision makers</li>
+            <li>✓ Before/after comparison (old ID vs Kanaya)</li>
+            <li>✓ Usage statistics from attendance system</li>
+          </ul>
+          <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+            <strong>💡 Use For:</strong> Social proof in next sales pitches
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Pilot Targets by Segment -->
+    <h3 class="font-bold text-lg mb-3">Pilot Targets by Segment</h3>
+    <div class="grid md:grid-cols-3 gap-4">
+      <Card class="border-l-4 border-l-blue-500">
+        <CardContent class="pt-4">
+          <p class="font-bold">🎓 1 Private School</p>
+          <p class="text-sm text-muted-foreground">100-300 students</p>
+          <p class="text-sm">Target: DML Montessori or VDT ALC</p>
+        </CardContent>
+      </Card>
+      <Card class="border-l-4 border-l-green-500">
+        <CardContent class="pt-4">
+          <p class="font-bold">🏢 1 SME Office</p>
+          <p class="text-sm text-muted-foreground">20-50 employees</p>
+          <p class="text-sm">Target: Any local BPO or retail</p>
+        </CardContent>
+      </Card>
+      <Card class="border-l-4 border-l-purple-500">
+        <CardContent class="pt-4">
+          <p class="font-bold">💪 1 Gym/Fitness</p>
+          <p class="text-sm text-muted-foreground">50-200 members</p>
+          <p class="text-sm">Target: Local gym or martial arts studio</p>
+        </CardContent>
+      </Card>
+    </div>
+  </section>
+
+  <!-- PHASE 3: SCALE -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">4. Phase 3: Scale (Days 61-90)</h2>
+    <p class="text-muted-foreground mb-6">Goal: Convert pilots to contracts, begin LGU outreach, establish recurring revenue</p>
+    
+    <div class="grid md:grid-cols-3 gap-6 mb-6">
+      <Card>
+        <CardHeader class="bg-green-50 dark:bg-green-900/20">
+          <CardTitle class="text-lg">💰 Contract Conversion</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-2">
+            <li>• Convert 3 pilots to full contracts</li>
+            <li>• Upsell hardware bundles (₱16k-40k)</li>
+            <li>• Lock in annual SaaS subscriptions</li>
+            <li>• Collect testimonials and referrals</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="bg-purple-50 dark:bg-purple-900/20">
+          <CardTitle class="text-lg">🏛️ LGU Expansion</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-2">
+            <li>• Start OSCA/PDAO outreach</li>
+            <li>• Prepare demo kits for LGU pitches</li>
+            <li>• Offer pilot programs to 2 LGUs</li>
+            <li>• Begin PhilGEPS accreditation if needed</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="bg-blue-50 dark:bg-blue-900/20">
+          <CardTitle class="text-lg">📈 Process & Systems</CardTitle>
+        </CardHeader>
+        <CardContent class="pt-4 text-sm">
+          <ul class="space-y-2">
+            <li>• Document successful sales process</li>
+            <li>• Create repeatable demo script</li>
+            <li>• Build proposal templates per segment</li>
+            <li>• Establish production workflow</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Revenue Projections -->
+    <Card class="border-2 border-blue-300 dark:border-blue-700">
+      <CardHeader class="bg-blue-50 dark:bg-blue-900/20">
+        <CardTitle>💵 90-Day Revenue Projection</CardTitle>
+      </CardHeader>
+      <CardContent class="pt-4">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b bg-muted/50">
+                <th class="text-left py-2 px-4">Revenue Stream</th>
+                <th class="text-right py-2 px-4">Conservative</th>
+                <th class="text-right py-2 px-4">Target</th>
+                <th class="text-right py-2 px-4">Stretch</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b">
+                <td class="py-2 px-4">ID Card Sales (one-time)</td>
+                <td class="py-2 px-4 text-right">₱50,000</td>
+                <td class="py-2 px-4 text-right">₱80,000</td>
+                <td class="py-2 px-4 text-right">₱120,000</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2 px-4">Hardware Bundles (one-time)</td>
+                <td class="py-2 px-4 text-right">₱16,500</td>
+                <td class="py-2 px-4 text-right">₱35,000</td>
+                <td class="py-2 px-4 text-right">₱60,000</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2 px-4">SaaS Subscriptions (annual)</td>
+                <td class="py-2 px-4 text-right">₱8,000</td>
+                <td class="py-2 px-4 text-right">₱15,000</td>
+                <td class="py-2 px-4 text-right">₱25,000</td>
+              </tr>
+              <tr class="border-b bg-green-50 dark:bg-green-900/10">
+                <td class="py-2 px-4 font-bold">90-Day Total Revenue</td>
+                <td class="py-2 px-4 text-right font-bold text-green-600">₱74,500</td>
+                <td class="py-2 px-4 text-right font-bold text-green-600">₱130,000</td>
+                <td class="py-2 px-4 text-right font-bold text-green-600">₱205,000</td>
+              </tr>
+              <tr class="border-b bg-blue-50 dark:bg-blue-900/10">
+                <td class="py-2 px-4 font-bold">Projected ARR (Annual Recurring)</td>
+                <td class="py-2 px-4 text-right font-bold text-blue-600">₱40,000</td>
+                <td class="py-2 px-4 text-right font-bold text-blue-600">₱75,000</td>
+                <td class="py-2 px-4 text-right font-bold text-blue-600">₱150,000</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-4 text-xs text-muted-foreground">* ARR includes SaaS subscriptions + estimated SMS revenue from parent-paid model</p>
+      </CardContent>
+    </Card>
+  </section>
+
+  <!-- SALES PIPELINE -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">5. Sales Pipeline & Conversion Targets</h2>
+    
+    <div class="grid md:grid-cols-5 gap-2 mb-6 text-center">
+      <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <p class="text-2xl font-bold">20</p>
+        <p class="text-sm">Prospects</p>
+        <p class="text-xs text-muted-foreground">Cold contacts</p>
+      </div>
+      <div class="flex items-center justify-center">→</div>
+      <div class="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+        <p class="text-2xl font-bold">10</p>
+        <p class="text-sm">Meetings</p>
+        <p class="text-xs text-muted-foreground">50% response</p>
+      </div>
+      <div class="flex items-center justify-center">→</div>
+      <div class="p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
+        <p class="text-2xl font-bold">5</p>
+        <p class="text-sm">Demos</p>
+        <p class="text-xs text-muted-foreground">50% interest</p>
       </div>
     </div>
-  </div>
-
-  <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg mb-8">
-    <div class="px-4 py-5 sm:px-6">
-      <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">GTM Timeline Overview</h3>
-      <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Key milestones and deliverables by phase</p>
+    <div class="grid md:grid-cols-5 gap-2 text-center">
+      <div></div>
+      <div></div>
+      <div class="flex items-center justify-center">↓</div>
+      <div></div>
+      <div></div>
     </div>
-    <div class="border-t border-gray-200 dark:border-gray-700">
-      <dl>
-        <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-          <dt class="text-sm font-medium text-gray-500 dark:text-gray-300">Phase 1: Foundation</dt>
-          <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-            <p>Weeks 1-4: Market research, brand development, and infrastructure setup</p>
-          </dd>
-        </div>
-        <div class="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-          <dt class="text-sm font-medium text-gray-500 dark:text-gray-300">Phase 2: Soft Launch</dt>
-          <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-            <p>Weeks 5-8: Beta testing, initial marketing, and feedback collection</p>
-          </dd>
-        </div>
-        <div class="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-          <dt class="text-sm font-medium text-gray-500 dark:text-gray-300">Phase 3: Scale</dt>
-          <dd class="mt-1 text-sm text-gray-900 dark:text-white sm:mt-0 sm:col-span-2">
-            <p>Weeks 9-16: Marketing expansion, product growth, and team scaling</p>
-          </dd>
-        </div>
-      </dl>
-    </div>
-  </div>
-
-  <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
-    <div class="px-4 py-5 sm:px-6">
-      <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Risk Assessment</h3>
-      <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Potential challenges and mitigation strategies</p>
-    </div>
-    <div class="border-t border-gray-200 dark:border-gray-700">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Risk</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Impact</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Likelihood</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mitigation</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            <tr>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Market Saturation</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">High</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Medium</td>
-              <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-200">Differentiate through unique value proposition and targeted messaging</td>
-            </tr>
-            <tr>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Technical Issues</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">High</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Low</td>
-              <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-200">Comprehensive testing and monitoring systems</td>
-            </tr>
-            <tr>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Budget Overruns</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Medium</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">Medium</td>
-              <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-200">Regular budget reviews and contingency planning</td>
-            </tr>
-          </tbody>
-        </table>
+    <div class="grid md:grid-cols-5 gap-2 mt-2 text-center">
+      <div class="p-4 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+        <p class="text-2xl font-bold">3</p>
+        <p class="text-sm">Pilots</p>
+        <p class="text-xs text-muted-foreground">60% trial</p>
+      </div>
+      <div class="flex items-center justify-center">→</div>
+      <div class="p-4 bg-green-200 dark:bg-green-800 rounded-lg">
+        <p class="text-2xl font-bold text-green-700 dark:text-green-300">3</p>
+        <p class="text-sm font-bold">Contracts</p>
+        <p class="text-xs text-muted-foreground">100% convert</p>
+      </div>
+      <div class="flex items-center justify-center">→</div>
+      <div class="p-4 bg-purple-200 dark:bg-purple-800 rounded-lg">
+        <p class="text-2xl font-bold text-purple-700 dark:text-purple-300">₱130k+</p>
+        <p class="text-sm font-bold">Revenue</p>
+        <p class="text-xs text-muted-foreground">Target</p>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- COLD CALL SCRIPTS -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">6. Cold Call Scripts by Segment</h2>
+    
+    <div class="grid gap-4">
+      <Card class="border-l-4 border-l-blue-500">
+        <CardHeader>
+          <CardTitle class="text-lg">🎓 Schools & PTA</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm italic">
+          "Good morning po, I'm [Name] from Kanaya Identity Solutions. We specialize in durable student IDs with 
+          <strong>parent SMS notifications</strong> when their child enters or leaves school. May I ask who handles 
+          your ID program? We'd love to offer a <strong>free 50-card pilot</strong> to show you how it works."
+        </CardContent>
+      </Card>
+
+      <Card class="border-l-4 border-l-green-500">
+        <CardHeader>
+          <CardTitle class="text-lg">🏢 HR Managers</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm italic">
+          "Hi, I'm reaching out to HR managers about <strong>employee attendance tracking</strong>. We offer ID cards 
+          that automatically log time-in/out—no more buddy-punching or manual logbooks. For just ₱25 per employee per year, 
+          you get full attendance reports. Can I send you a quick demo video?"
+        </CardContent>
+      </Card>
+
+      <Card class="border-l-4 border-l-purple-500">
+        <CardHeader>
+          <CardTitle class="text-lg">💪 Gym Owners</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm italic">
+          "Hey, I noticed [Gym Name] and wanted to ask—do you currently have a membership card system? 
+          We offer <strong>QR or RFID cards</strong> that automatically track member check-ins and 
+          <strong>block expired memberships</strong>. Terminal bundle is ₱16,500. Can I show you a quick demo?"
+        </CardContent>
+      </Card>
+
+      <Card class="border-l-4 border-l-red-500">
+        <CardHeader>
+          <CardTitle class="text-lg">🏛️ LGU / Government</CardTitle>
+        </CardHeader>
+        <CardContent class="text-sm italic">
+          "Good morning po, I'm [Name] from Kanaya. We provide <strong>counterfeit-proof IDs</strong> for PWD and 
+          Senior Citizens—with QR verification that any establishment can scan. May I speak with your OSCA or PDAO head? 
+          We're offering <strong>free pilot programs</strong> to municipalities."
+        </CardContent>
+      </Card>
+    </div>
+  </section>
+
+  <!-- PRICING QUICK REFERENCE -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">7. Pricing Quick Reference</h2>
+    
+    <div class="grid md:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>💳 ID Cards (per card)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table class="w-full text-sm">
+            <tbody>
+              <tr class="border-b">
+                <td class="py-2">Basic (Laminated + QR)</td>
+                <td class="py-2 text-right font-bold">₱80-100</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2">Standard (Thermal + QR)</td>
+                <td class="py-2 text-right font-bold">₱120-150</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2">Premium (Thermal + NFC)</td>
+                <td class="py-2 text-right font-bold">₱180-220</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2">Enterprise (UV + NFC + Hologram)</td>
+                <td class="py-2 text-right font-bold">₱300-400</td>
+              </tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>📱 Hardware Bundles</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table class="w-full text-sm">
+            <tbody>
+              <tr class="border-b">
+                <td class="py-2">Lite (Tablet only)</td>
+                <td class="py-2 text-right font-bold">₱12,000</td>
+              </tr>
+              <tr class="border-b bg-green-50 dark:bg-green-900/10">
+                <td class="py-2">QR Standard ⭐</td>
+                <td class="py-2 text-right font-bold">₱16,500</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2">RFID Bundle</td>
+                <td class="py-2 text-right font-bold">₱19,000</td>
+              </tr>
+              <tr class="border-b">
+                <td class="py-2">Biometric (Fingerprint)</td>
+                <td class="py-2 text-right font-bold">₱30,000</td>
+              </tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+
+    <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+      <h3 class="font-bold mb-2">📊 SaaS Subscription Pricing</h3>
+      <div class="grid md:grid-cols-4 gap-4 text-center text-sm">
+        <div>
+          <p class="font-bold">Schools</p>
+          <p>₱10-20/student/yr</p>
+        </div>
+        <div>
+          <p class="font-bold">Offices</p>
+          <p>₱25-50/staff/yr</p>
+        </div>
+        <div>
+          <p class="font-bold">Factories</p>
+          <p>₱18-35/worker/yr</p>
+        </div>
+        <div>
+          <p class="font-bold">LGU</p>
+          <p>₱5-30/user/yr</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-muted-foreground">⚠️ SMS is ALWAYS a separate add-on at ₱1.00/SMS. Never include in base SaaS.</p>
+    </div>
+  </section>
+
+  <!-- RISK ASSESSMENT -->
+  <section class="mb-10">
+    <h2 class="text-2xl font-bold mb-4 border-b pb-2">8. Risk Assessment & Mitigation</h2>
+    
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b bg-muted/50">
+            <th class="text-left py-3 px-4">Risk</th>
+            <th class="text-center py-3 px-4">Impact</th>
+            <th class="text-center py-3 px-4">Likelihood</th>
+            <th class="text-left py-3 px-4">Mitigation Strategy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">No paying client in Day 30</td>
+            <td class="py-3 px-4 text-center"><span class="text-red-600">High</span></td>
+            <td class="py-3 px-4 text-center"><span class="text-amber-600">Medium</span></td>
+            <td class="py-3 px-4">Increase cold call volume to 30+; offer steeper pilot incentives</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">Check clearance delays</td>
+            <td class="py-3 px-4 text-center"><span class="text-amber-600">Medium</span></td>
+            <td class="py-3 px-4 text-center"><span class="text-amber-600">Medium</span></td>
+            <td class="py-3 px-4">Bridge Protocol: Outsource first 100 cards immediately</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">Price objections</td>
+            <td class="py-3 px-4 text-center"><span class="text-amber-600">Medium</span></td>
+            <td class="py-3 px-4 text-center"><span class="text-green-600">High</span></td>
+            <td class="py-3 px-4">Use TCO argument (5-year durability vs 6-month replacements)</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">LGU procurement delays</td>
+            <td class="py-3 px-4 text-center"><span class="text-amber-600">Medium</span></td>
+            <td class="py-3 px-4 text-center"><span class="text-red-600">High</span></td>
+            <td class="py-3 px-4">Focus on private sector first; LGU is Phase 3+ priority</td>
+          </tr>
+          <tr class="border-b">
+            <td class="py-3 px-4 font-bold">SMS cost overruns</td>
+            <td class="py-3 px-4 text-center"><span class="text-red-600">High</span></td>
+            <td class="py-3 px-4 text-center"><span class="text-green-600">Low</span></td>
+            <td class="py-3 px-4">NEVER include unlimited SMS; always parent-paid or separate add-on</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="mt-12 pt-6 border-t text-center text-sm text-muted-foreground">
+    <p>Kanaya GTM Execution Plan • Confidential</p>
+    <p class="mt-2"><a href="/admin/docs" class="underline">← Back to Docs Hub</a></p>
+  </footer>
 </div>
-
-<style>
-  .gtm-roadmap {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem 1rem;
-  }
-  
-  @media (min-width: 768px) {
-    .gtm-roadmap {
-      padding: 3rem 2rem;
-    }
-  }
-  
-  .gtm-roadmap h2 {
-    border-bottom: 1px solid #e5e7eb;
-    padding-bottom: 0.5rem;
-  }
-  
-  .gtm-roadmap h3 {
-    margin-top: 1.5rem;
-  }
-  
-  .gtm-roadmap ul {
-    margin-top: 0.5rem;
-    padding-left: 1.5rem;
-  }
-  
-  .gtm-roadmap li {
-    margin-bottom: 0.5rem;
-  }
-  
-  /* Dark mode overrides */
-  .dark .gtm-roadmap h2 {
-    border-color: #374151;
-  }
-  
-  .dark .gtm-roadmap {
-    color: #e5e7eb;
-  }
-  
-  .dark .gtm-roadmap h1,
-  .dark .gtm-roadmap h2,
-  .dark .gtm-roadmap h3 {
-    color: #f9fafb;
-  }
-</style>

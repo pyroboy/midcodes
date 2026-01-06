@@ -31,7 +31,7 @@
 			</div>
 			<div class="success-box">
 				<h3>Our Weapon:</h3>
-				<p>Software-driven encoding compression that turns 8 hours of manual work into 8 minutes of automated accuracy—allowing us to accept rush orders without staff and guarantee zero errors.</p>
+				<p>Software-driven batch encoding that compresses 3-5 hours of manual data entry into 15-30 minutes—allowing us to handle rush orders efficiently and dramatically reduce human errors.</p>
 			</div>
 		</div>
 	</section>
@@ -263,6 +263,108 @@
 		<h2>12. THE BOTTOM LINE</h2>
 		<p>Kanaya is a school identity survival company that uses a mobile app to guarantee zero encoding errors and realistic 3-5 day lead times.</p>
 		<p><strong>Our goal in 2026:</strong> 3 schools, 1,500 students, ₱225k card revenue. 1 SaaS paying client. 0 government contracts, 0 corporate dashboards.</p>
+	</section>
+
+	<section>
+		<h2>13. APP FEATURES FOR THE BUSINESS ECOSYSTEM</h2>
+		<p>The Kanaya application is not just an ID generator—it is a <em>platform</em> with six core capabilities that can be leveraged across our entire business ecosystem:</p>
+
+		<div class="table-wrapper">
+			<table>
+				<thead>
+					<tr>
+						<th>App Feature</th>
+						<th>Capability</th>
+						<th>Business Ecosystem Application</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>Template Management</strong></td>
+						<td>Drag-and-drop element positioning, preset sizes, multi-element support (text, image, QR, photo, signature)</td>
+						<td>
+							<ul>
+								<li>White-label reseller templates (Phase 2)</li>
+								<li>School-specific branding without design labor</li>
+								<li>Event badge templates (reusable across conferences)</li>
+								<li>Digital business card layouts</li>
+							</ul>
+						</td>
+					</tr>
+					<tr>
+						<td><strong>AI Decomposition</strong></td>
+						<td>fal.ai Qwen-Image-Layered model separates images into RGBA layers for element extraction</td>
+						<td>
+							<ul>
+								<li>Auto-convert client-provided ID mockups into editable templates (8 minutes vs. 8 hours)</li>
+								<li>Extract logos and photo zones from legacy designs</li>
+								<li>Upsell: "We'll digitize your existing template for free if you order 500+ cards"</li>
+							</ul>
+						</td>
+					</tr>
+					<tr>
+						<td><strong>3D Preview</strong></td>
+						<td>Real-time card previews using Threlte (Three.js) with flip animations</td>
+						<td>
+							<ul>
+								<li>Client approval workflow before printing (reduce reprints)</li>
+								<li>Marketing hero section on homepage (wow factor)</li>
+								<li>Sales demo tool: show prospects their ID in 3D before they commit</li>
+							</ul>
+						</td>
+					</tr>
+					<tr>
+						<td><strong>Fast Encoding</strong></td>
+						<td>Batch encoding via Excel upload, 500 cards in 8 minutes, zero typos</td>
+						<td>
+							<ul>
+								<li>Core moat for schools and B2B (see Section 2)</li>
+								<li>Rush order capability: encode same-day without staff</li>
+								<li>Reseller backend: they upload, we encode → print queue</li>
+							</ul>
+						</td>
+					</tr>
+					<tr>
+						<td><strong>Multi-Tenant Architecture</strong></td>
+						<td>Organization-scoped data, RBAC (super_admin → org_admin → id_gen_admin → id_gen_user)</td>
+						<td>
+							<ul>
+								<li>Reseller isolation: each partner sees only their clients</li>
+								<li>School admin portal: registrar uploads, we print</li>
+								<li>Future franchise model: regional partners with full dashboard</li>
+							</ul>
+						</td>
+					</tr>
+					<tr>
+						<td><strong>Payment System</strong></td>
+						<td>Credits-based billing, invoice generation, PayMongo integration</td>
+						<td>
+							<ul>
+								<li>Prepaid credit packs for schools (₱10k = 70 cards)</li>
+								<li>Automated invoicing for B2B clients</li>
+								<li>Insurance billing (₱5/head/year auto-renewed)</li>
+								<li>Future SaaS subscription billing (attendance + analytics)</li>
+							</ul>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="pillar mt-4">
+			<h3>Ecosystem Synergy Map</h3>
+			<p>Each feature feeds the next in a closed loop:</p>
+			<ol>
+				<li><strong>Template Management</strong> → Schools upload once, reuse every year</li>
+				<li><strong>AI Decomposition</strong> → Legacy templates become digital assets overnight</li>
+				<li><strong>3D Preview</strong> → Clients approve visually, zero back-and-forth</li>
+				<li><strong>Fast Encoding</strong> → 8 minutes to production-ready print files</li>
+				<li><strong>Multi-Tenant</strong> → Resellers and schools coexist without data leaks</li>
+				<li><strong>Payment System</strong> → Cash flow secured before printing starts</li>
+			</ol>
+		</div>
+
+		<p class="ground-truth"><strong>Ground Truth:</strong> The app is the moat. Competitors print; we <em>encode, preview, and bill</em> before we print. Every feature above reduces labor, errors, and payment friction—giving us 81% margin while competitors struggle at 40%.</p>
 	</section>
 
 	<footer class="docs-footer">
