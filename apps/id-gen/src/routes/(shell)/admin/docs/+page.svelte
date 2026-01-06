@@ -37,6 +37,7 @@
 			<ul class="clean-links">
 				<li><a href="/admin/docs/ceo-message"><span class="icon">✉️</span> CEO Ground Truth</a></li>
 				<li><a href="/admin/docs/brand"><span class="icon">ᜃ</span> Brand & Heritage</a></li>
+				<li><a href="/admin/docs/master_data"><span class="icon">🔑</span> Master Data Constants</a></li>
 				<li><a href="/admin/docs/strategy"><span class="icon">♟️</span> Growth Strategy</a></li>
 				<li><a href="/admin/docs/gtm"><span class="icon">🚀</span> Go-to-Market Plan</a></li>
 				<li><a href="/admin/docs/architecture"><span class="icon">🏗️</span> System Architecture</a></li>
@@ -60,12 +61,12 @@
 			<ul class="clean-links">
 				<li><a href="/admin/docs/product"><span class="icon">🚀</span> Product & Tech Overview</a></li>
 				<li><a href="/admin/docs/operations"><span class="icon">⚙️</span> Operations Manual</a></li>
+				<li><a href="/admin/docs/inventory_master"><span class="icon">📊</span> Master Inventory</a></li>
 				<li><a href="/admin/docs/processes"><span class="icon">🔄</span> PRODUCTION SYSTEM</a></li>
 				<li><a href="/admin/docs/hardware"><span class="icon">📱</span> Hardware & Terminals</a></li>
-				<li><a href="/admin/docs/low-end-card"><span class="icon">📊</span> LOW END CARD</a></li>
+				<li><a href="/admin/docs/low-end-card"><span class="icon">💳</span> LOW END CARD</a></li>
 				<li><a href="/admin/docs/high-end-card"><span class="icon">🔬</span> HIGH END CARD</a></li>
 				<li><a href="/admin/docs/lanyard-production"><span class="icon">🎗️</span> Lanyard Production</a></li>
-				<li><a href="/admin/docs/inventory"><span class="icon">📦</span> Inventory & Logistics</a></li>
 				<li><a href="/admin/docs/procurement"><span class="icon">🛍️</span> Purchasing & Sourcing</a></li>
 				<li><a href="/admin/docs/legal"><span class="icon">⚖️</span> Legal & Contracts</a></li>
 			</ul>
@@ -75,10 +76,7 @@
 			<h3>Marketing & Media</h3>
 			<ul class="clean-links">
 				<li><a href="/admin/docs/pricing-how-it-works"><span class="icon">📈</span> Pricing & How It Works</a></li>
-				<li><a href="/admin/docs/marketing_collateral"><span class="icon">🎨</span> Marketing Assets</a></li>
-				<li><a href="/admin/docs/ads"><span class="icon">📢</span> Ads & Campaigns</a></li>
-				<li><a href="/admin/docs/social"><span class="icon">📱</span> Social Media Strategy</a></li>
-				<li><a href="/admin/docs/youtube"><span class="icon">📹</span> YouTube Content</a></li>
+				<li><a href="/admin/docs/marketing_playbook"><span class="icon">📚</span> Growth & Media Playbook</a></li>
 			</ul>
 		</section>
 

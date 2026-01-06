@@ -22,8 +22,8 @@
 		<h2>EXECUTIVE SUMMARY</h2>
 		<div class="pitch-card">
 			<p>
-				Kanaya is a two-in-one identity platform: we manufacture physical ID cards (₱5.80 basic, ₱62.32 premium) 
-				AND provide tablet-based attendance terminals (₱16,405 each) with QR/RFID/fingerprint scanning. 
+				Kanaya is a two-in-one identity platform: we manufacture physical ID cards (₱5.80 basic, ₱19.80 with RFID) 
+				AND provide tablet-based attendance terminals (₱16,500 each) with QR/RFID/fingerprint scanning. 
 				The real profit is our <strong>Attendance System Subscription</strong> (₱10/student/year) + 
 				<strong>SMS notifications</strong> (₱0.60 per message, passed through to client).
 			</p>
@@ -46,7 +46,7 @@
 				<li><strong>Equipment:</strong> Epson L8050, PVC Sheets (5k cards), Ink Set, Laminator, Die Cutter.</li>
 				<li><strong>Capacity:</strong> 250 cards/day, 5,000/month.</li>
 				<li><strong>COGS:</strong> ₱5.80/card (₱19.80 with RFID chip).</li>
-				<li><strong>Pricing:</strong> ₱12-60/card.</li>
+				<li><strong>Pricing:</strong> ₱150/card standard.</li>
 				<li><strong>Year 1 Profit:</strong> ₱49,600 (Payback: 6 months).</li>
 			</ul>
 		</div>
@@ -104,11 +104,11 @@
 		<h2>3. HARDWARE SPECIFICATIONS</h2>
 		<div class="grid">
 			<div class="spec-box">
-				<h3>Core Setup (₱16,405)</h3>
+				<h3>Core Setup (₱16,500)</h3>
 				<ul>
 					<li>Samsung Galaxy Tab A9+</li>
 					<li>NETUM Wireless QR Scanner</li>
-					<li>USB-C OTG Hub + Mount</li>
+					<li>Mount + Accessories</li>
 				</ul>
 			</div>
 			<div class="spec-box">
