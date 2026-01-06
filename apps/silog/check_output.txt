@@ -1,0 +1,84 @@
+
+> silog@0.0.1 check /Users/arjomagno/Documents/GitHub/midcodes/apps/silog
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/silog
+Getting Svelte diagnostics...
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/+layout.svelte:8:61
+Error: Type 'true' is not assignable to type '"" | "anonymous" | "use-credentials" | null | undefined'. (js)
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Fonts: 'Oswald' for BIG headers, 'Inter' for body -->
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/+page.svelte:73:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="input-group">
+						<label>Selling Price</label>
+						<div class="input-wrapper">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/+page.svelte:82:29
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                        <div class="input-group">
+                            <label>Base Cost</label>
+                            <input type="number" bind:value={baseCost} />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/+page.svelte:86:29
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+                        <div class="input-group">
+                            <label>Viand Cost</label>
+                            <input type="number" bind:value={viandCost} />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/docs/business-plan/03-market-analysis/+page.svelte:70:5
+Warn: Unused CSS selector ".placeholder"
+https://svelte.dev/e/css_unused_selector (svelte)
+    h2 { margin-top: 2rem; color: #1e293b; font-size: 1.25rem; }
+    .placeholder { color: #94a3b8; font-style: italic; background: #f1f5f9; padding: 1rem; border-radius: 8px; border: 1px dashed #cbd5e0; }
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/docs/business-plan/06-operations/+page.svelte:189:5
+Warn: Unused CSS selector ".equipment-list"
+https://svelte.dev/e/css_unused_selector (svelte)
+    
+    .equipment-list { list-style-type: disc; padding-left: 1.5rem; margin-top: 1rem; }
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/docs/business-plan/06-operations/+page.svelte:191:5
+Warn: Unused CSS selector ".sop-section"
+https://svelte.dev/e/css_unused_selector (svelte)
+    
+    .sop-section { background: #fff; border-left: 4px solid #3b82f6; padding-left: 1.5rem; margin-bottom: 2rem; }
+    .sop-section ol { counter-reset: sop-counter; list-style: none; padding: 0; }
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/docs/business-plan/06-operations/+page.svelte:192:5
+Warn: Unused CSS selector ".sop-section ol"
+https://svelte.dev/e/css_unused_selector (svelte)
+    .sop-section { background: #fff; border-left: 4px solid #3b82f6; padding-left: 1.5rem; margin-bottom: 2rem; }
+    .sop-section ol { counter-reset: sop-counter; list-style: none; padding: 0; }
+    .sop-section li { position: relative; padding-left: 2rem; margin-bottom: 1rem; }
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/docs/business-plan/06-operations/+page.svelte:193:5
+Warn: Unused CSS selector ".sop-section li"
+https://svelte.dev/e/css_unused_selector (svelte)
+    .sop-section ol { counter-reset: sop-counter; list-style: none; padding: 0; }
+    .sop-section li { position: relative; padding-left: 2rem; margin-bottom: 1rem; }
+    .sop-section li::before {
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/docs/business-plan/06-operations/+page.svelte:194:5
+Warn: Unused CSS selector ".sop-section li::before"
+https://svelte.dev/e/css_unused_selector (svelte)
+    .sop-section li { position: relative; padding-left: 2rem; margin-bottom: 1rem; }
+    .sop-section li::before { 
+        counter-increment: sop-counter;
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/silog/src/routes/docs/business-plan/06-operations/+page.svelte:211:5
+Warn: Unused CSS selector ".table-container"
+https://svelte.dev/e/css_unused_selector (svelte)
+
+    .table-container { overflow-x: auto; margin-top: 1rem; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
+
+====================================
+svelte-check found 1 error and 10 warnings in 4 files
+ ELIFECYCLE  Command failed with exit code 1.

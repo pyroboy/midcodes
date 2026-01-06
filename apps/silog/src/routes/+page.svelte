@@ -1,6 +1,5 @@
 <script lang="ts">
-	// Simple Profit Calculator Logic for Dashboard Widget
-	let sellingPrice = $state(85); // Default to Longsilog price
+	let sellingPrice = $state(85);
 	let baseCost = $state(21);
 	let viandCost = $state(16);
 	
@@ -10,384 +9,304 @@
 </script>
 
 <svelte:head>
-	<title>Silog Business | Operations Hub</title>
+	<title>SILOG ADMIN</title>
 </svelte:head>
 
-<div class="dashboard-container">
-	<header class="main-header">
-		<div class="brand">
-			<h1>
-				Silog<span class="highlight">Admin</span>
-			</h1>
-			<p>Strategic Financial Planning & Operations Hub</p>
-		</div>
-		<div class="status-badge">
-			<span class="dot"></span> Planning Phase
-		</div>
+<div class="dashboard-wrapper">
+	<header class="hero-header">
+		<div class="brand-badge">BETA</div>
+		<h1>Silog<span class="dot">.</span><span class="text-orange">Hub</span></h1>
+		<p class="tagline">Strategic Operations & Financial Control</p>
 	</header>
 
-	<div class="docs-sections">
-		<section class="link-group">
-			<h3>Strategy & Vision</h3>
-			<ul class="clean-links">
-				<li><a href="/docs/strategy"><span class="icon">♟️</span> Executive Summary & Targets</a></li>
-				<li><a href="/docs/targets"><span class="icon">🎯</span> Financial Targets & Break-Even</a></li>
-			</ul>
-		</section>
-
-		<section class="link-group">
-			<h3>Financials & Operations</h3>
-			<ul class="clean-links">
-				<li><a href="/docs/capex"><span class="icon">💰</span> CAPEX (Startup Capital)</a></li>
-				<li><a href="/docs/opex"><span class="icon">📉</span> OPEX (Monthly Expenses)</a></li>
-				<li><a href="/docs/menu"><span class="icon">🍱</span> Menu Engineering (Profitability)</a></li>
-			</ul>
-		</section>
-
-		<section class="link-group llm-special">
-			<h3>AI Context</h3>
-			<ul class="clean-links">
-				<li><a href="/llms.txt" target="_blank"><span class="icon">🤖</span> Live LLM Context</a></li>
-				<li><a href="/llms.txt?format=pdf" target="_blank"><span class="icon">📄</span> Download PDF Bundle</a></li>
-			</ul>
-		</section>
-	</div>
-
-	<div class="split-section">
-		<section class="widget calculator">
-			<h3>⚡ Quick Profit Simulator</h3>
-			<p class="subtitle">Estimate margins for new menu items.</p>
+	<main class="grid-container">
+		
+		<!-- LEFT COLUMN: NAVIGATION -->
+		<div class="nav-column">
 			
-			<div class="calc-inputs">
-				<label>
-					Selling Price (₱)
-					<input type="number" bind:value={sellingPrice} min="0" />
-				</label>
-				<label>
-					Base Cost (₱)
-					<input type="number" bind:value={baseCost} min="0" />
-				</label>
-				<label>
-					Viand Cost (₱)
-					<input type="number" bind:value={viandCost} min="0" />
-				</label>
-			</div>
-			
-			<div class="calc-results">
-				<div class="res-row">
-					<span>Total COGS</span>
-					<strong>₱{totalCost}</strong>
+            <section class="nav-group business-plan">
+				<div class="group-header">
+					<h2>Legacy<br>Plan</h2>
+                    <span class="icon-big">📂</span>
 				</div>
-				<div class="res-row">
-					<span>Net Profit</span>
-					<strong class="profit">₱{profit}</strong>
-				</div>
-				<div class="res-row margin">
-					<span>Margin</span>
-					<span class="margin-value" class:high={Number(margin) >= 50} class:mid={Number(margin) >= 40 && Number(margin) < 50} class:low={Number(margin) < 40}>{margin}%</span>
-				</div>
-			</div>
-		</section>
+				<ul class="link-list">
+					<li><a href="/docs/business-plan/01-executive-summary">01 // Executive Summary</a></li>
+					<li><a href="/docs/business-plan/02-company-overview">02 // Company Overview</a></li>
+					<li><a href="/docs/business-plan/03-market-analysis">03 // Market Analysis</a></li>
+					<li><a href="/docs/business-plan/04-products">04 // Products & Menu</a></li>
+					<li><a href="/docs/business-plan/05-marketing">05 // Marketing</a></li>
+                    <li><a href="/docs/business-plan/06-operations">06 // Operations</a></li>
+                    <li><a href="/docs/business-plan/07-organization">07 // Organization</a></li>
+                    <li><a href="/docs/business-plan/08-financial-plan">08 // Financials</a></li>
+					<li><a href="/docs/business-plan/09-risk-management">09 // Risk Management</a></li>
+					<li><a href="/docs/business-plan/10-appendices">10 // Appendices</a></li>
+					<li><a href="/docs/business-plan/11-initial-totex">11 // Initial TOTEX Breakdown</a></li>
+					<li><a href="/docs/business-plan/12-inventory-supply">12 // Inventory Supply</a></li>
+				</ul>
+			</section>
 
-		<section class="widget summary">
-			<h3>🚀 Launch Status</h3>
-			<ul class="checklist">
-				<li class="done">Financial Plan Approved</li>
-				<li class="done">Capital Allocation (₱23,800)</li>
-				<li class="pending">Menu Finalization</li>
-				<li class="pending">Marketing Materials</li>
-			</ul>
-		</section>
-	</div>
+			<section class="nav-group ops">
+				<h3>Operations</h3>
+				<ul class="link-list">
+					<li><a href="/docs/capex">Startup Capital (CAPEX)</a></li>
+					<li><a href="/docs/opex">Monthly Burn (OPEX)</a></li>
+					<li><a href="/docs/menu">Menu Profitability</a></li>
+                    <li><a href="/docs/strategy">Strategy Overview</a></li>
+				</ul>
+			</section>
 
-	<footer class="main-footer">
-		<p>© 2026 Silog Business • Confidential & Proprietary</p>
-	</footer>
+            <section class="nav-group ai">
+				<h3>AI Context</h3>
+				<ul class="link-list">
+					<li><a href="/llms.txt" target="_blank">View llms.txt</a></li>
+				</ul>
+			</section>
+		</div>
+
+		<!-- RIGHT COLUMN: WIDGETS -->
+		<div class="widget-column">
+			<article class="widget calculator">
+				<header class="widget-header">
+					<h3>Profit Simulator</h3>
+				</header>
+				
+				<div class="calc-body">
+					<div class="input-group">
+						<label>Selling Price</label>
+						<div class="input-wrapper">
+							<span>₱</span>
+							<input type="number" bind:value={sellingPrice} />
+						</div>
+					</div>
+                    
+                    <div class="row-inputs">
+                        <div class="input-group">
+                            <label>Base Cost</label>
+                            <input type="number" bind:value={baseCost} />
+                        </div>
+                        <div class="input-group">
+                            <label>Viand Cost</label>
+                            <input type="number" bind:value={viandCost} />
+                        </div>
+                    </div>
+
+					<div class="results-display">
+						<div class="result-item">
+							<span class="label">Net Profit</span>
+							<span class="value profit">₱{profit}</span>
+						</div>
+						<div class="result-item">
+							<span class="label">Margin</span>
+							<span class="value margin" 
+                                  class:high={Number(margin) >= 50} 
+                                  class:low={Number(margin) < 40}
+                            >{margin}%</span>
+						</div>
+					</div>
+				</div>
+			</article>
+
+            <article class="widget status-card">
+                <h3>Launch Status</h3>
+                <div class="status-list">
+                    <div class="status-item done">
+                        <span class="check">✓</span> Financial Plan
+                    </div>
+                     <div class="status-item done">
+                        <span class="check">✓</span> Menu Pricing
+                    </div>
+                    <div class="status-item active">
+                        <span class="spinner">↻</span> Store Setup (Maria Clara)
+                    </div>
+                </div>
+            </article>
+		</div>
+
+	</main>
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background-color: #f8fafc; /* Slate-50 */
-		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-		color: #1e293b; /* Slate-800 */
-	}
-
-	.dashboard-container {
-		max-width: 1000px;
+	.dashboard-wrapper {
+		max-width: 1200px;
 		margin: 0 auto;
-		padding: 3rem 2rem;
+		padding: 4rem 2rem;
 	}
 
-	/* Header */
-	.main-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 4rem;
+	/* HERO HEADER */
+	.hero-header {
+		margin-bottom: 5rem;
+		position: relative;
+        border-bottom: 4px solid var(--color-black);
+        padding-bottom: 2rem;
 	}
-	.main-header h1 {
-		margin: 0;
-		color: #0f172a; /* Slate-900 */
-		font-size: 2.25rem;
-		font-weight: 800;
-		letter-spacing: -0.05em;
-	}
-	.main-header .highlight {
-		color: #f59e0b; /* Amber-500 for that 'Yolk' feel */
-	}
-	.main-header p {
-		margin: 0.5rem 0 0;
-		color: #64748b; /* Slate-500 */
-		font-size: 1rem;
-	}
-
-	.status-badge {
-		background: #fffbeb; /* Amber-50 */
-		color: #b45309; /* Amber-700 */
-		padding: 0.5rem 1rem;
-		border-radius: 9999px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		display: flex;
-		align-items: center;
-		border: 1px solid #fcd34d; /* Amber-300 */
-	}
-	.dot {
-		width: 8px;
-		height: 8px;
-		background: #d97706; /* Amber-600 */
-		border-radius: 50%;
-		margin-right: 8px;
-		display: inline-block;
-		animation: pulse 2s infinite;
-	}
-
-	/* Docs Sections */
-	.docs-sections {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 2rem;
-		margin-bottom: 3rem;
-	}
-
-	.link-group {
-		background: white;
-		padding: 2rem;
-		border-radius: 16px;
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-		border: 1px solid #e2e8f0; /* Slate-200 */
-		transition: transform 0.2s, box-shadow 0.2s;
-	}
-	.link-group:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
-	}
-
-	.link-group h3 {
-		margin: 0 0 1.5rem;
-		font-size: 0.85rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: #94a3b8; /* Slate-400 */
+	.brand-badge {
+		position: absolute;
+		top: -1.5rem;
+		background: var(--color-orange);
+		color: white;
+		padding: 4px 8px;
 		font-weight: 700;
+        font-family: var(--font-header);
+		font-size: 0.8rem;
+		text-transform: uppercase;
+        letter-spacing: 1px;
 	}
-
-	.clean-links {
-		list-style: none;
-		padding: 0;
-		margin: 0;
+	h1 {
+		font-size: 6rem; /* BIG HEADER */
+		line-height: 0.9;
+        letter-spacing: -2px;
 	}
-
-	.clean-links li {
-		margin-bottom: 1rem;
-	}
-	.clean-links li:last-child {
-		margin-bottom: 0;
-	}
-
-	.clean-links a {
-		text-decoration: none;
-		color: #334155; /* Slate-700 */
-		font-size: 1.1rem;
+    .dot { color: var(--color-orange); }
+	.text-orange { color: var(--color-orange); }
+	.tagline {
+		font-size: 1.25rem;
+		color: var(--color-dark);
+		margin-top: 1rem;
 		font-weight: 500;
-		display: flex;
-		align-items: center;
-		transition: color 0.2s;
+        font-family: var(--font-body);
+        letter-spacing: -0.5px;
+        opacity: 0.7;
 	}
 
-	.clean-links a:hover {
-		color: #f59e0b; /* Amber-500 */
-	}
-
-	.clean-links .icon {
-		margin-right: 16px;
-		font-size: 1.4rem;
-		width: 32px;
-		text-align: center;
-		background: #f1f5f9;
-		padding: 4px;
-		border-radius: 8px;
-	}
-
-	/* LLM Special Section styling */
-	.llm-special {
-		background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-		border-color: #334155;
-	}
-	.llm-special h3 {
-		color: #64748b;
-	}
-	.llm-special a {
-		color: #e2e8f0;
-	}
-	.llm-special a:hover {
-		color: #38bdf8; /* Sky-400 */
-	}
-	.llm-special .icon {
-		background: rgba(255,255,255,0.1);
-	}
-
-	/* Widgets */
-	.split-section {
+	/* GRID */
+	.grid-container {
 		display: grid;
 		grid-template-columns: 2fr 1fr;
-		gap: 2rem;
+		gap: 4rem;
 	}
-	@media (max-width: 768px) {
-		.split-section {
-			grid-template-columns: 1fr;
-		}
-	}
+    @media(max-width: 768px) {
+        h1 { font-size: 4rem; }
+        .grid-container { grid-template-columns: 1fr; }
+    }
 
-	.widget {
-		background: white;
-		padding: 2rem;
-		border-radius: 16px;
-		border: 1px solid #e2e8f0;
-	}
-	
-	.widget h3 {
-		margin: 0;
-		color: #1e293b;
-		font-size: 1.25rem;
-	}
-	.subtitle {
-		margin: 0.25rem 0 1.5rem;
-		color: #64748b;
-		font-size: 0.9rem;
-	}
+	/* NAV GROUPS */
+	.nav-group { margin-bottom: 3rem; }
+    
+    .nav-group h3 {
+        font-size: 1.5rem;
+        border-left: 5px solid var(--color-orange);
+        padding-left: 1rem;
+        margin-bottom: 1.5rem;
+    }
 
-	.calc-inputs {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 1.5rem;
-		margin-bottom: 2rem;
-	}
-	.calc-inputs label {
-		font-size: 0.85rem;
-		color: #64748b;
-		display: flex;
-		flex-direction: column;
-		font-weight: 500;
-	}
-	.calc-inputs input {
-		margin-top: 8px;
-		padding: 10px;
-		border: 1px solid #cbd5e0;
-		border-radius: 8px;
-		font-family: inherit;
-		font-weight: 600;
-		font-size: 1rem;
-		color: #1e293b;
-		transition: border-color 0.2s;
-	}
-	.calc-inputs input:focus {
-		outline: none;
-		border-color: #f59e0b;
-	}
+    .business-plan .group-header {
+        background: var(--color-black);
+        padding: 2rem;
+        color: white;
+        margin-bottom: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .business-plan .group-header h2 {
+        color: white;
+        font-size: 2.5rem;
+        line-height: 1;
+    }
+    .icon-big { font-size: 2.5rem; }
 
-	.calc-results {
-		background: #f8fafc;
-		padding: 1.5rem;
-		border-radius: 12px;
-		border: 1px solid #e2e8f0;
-	}
-	.res-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.75rem;
-		font-size: 1rem;
-		color: #475569;
-	}
-	.res-row strong {
-		color: #1e293b;
-		font-weight: 600;
-	}
-	.res-row.margin {
-		margin-top: 1rem;
-		padding-top: 1rem;
-		border-top: 1px dashed #cbd5e0;
-		margin-bottom: 0;
-	}
-	.res-row .profit {
-		color: #16a34a; /* Green-600 */
-		font-size: 1.2rem;
-	}
-	
-	.margin-value {
-		font-weight: 700;
-		font-size: 1.2rem;
-	}
-	.margin-value.high { color: #16a34a; } /* >50% */
-	.margin-value.mid { color: #ca8a04; } /* 40-50% */
-	.margin-value.low { color: #dc2626; } /* <40% */
-
-	/* Summary Checklist */
-	.checklist {
+    .business-plan .link-list {
+        background: white;
+        border: 2px solid var(--color-black);
+        border-top: none;
+        padding: 1.5rem;
+    }
+    
+	.link-list {
 		list-style: none;
 		padding: 0;
 		margin: 0;
 	}
-	.checklist li {
-		margin-bottom: 1rem;
-		padding-left: 1.75rem;
-		position: relative;
-		font-weight: 500;
+    .link-list li { margin-bottom: 0.75rem; }
+	.link-list a {
+		font-size: 1.1rem;
+		font-weight: 600;
+		display: block;
+		padding: 0.5rem;
+		transition: all 0.2s;
+        border-bottom: 1px solid transparent;
 	}
-	.checklist li.done::before {
-		content: '✓';
-		position: absolute;
-		left: 0;
-		color: #16a34a;
-		font-weight: bold;
-	}
-	.checklist li.done {
-		color: #94a3b8;
-		text-decoration: line-through;
-	}
-	.checklist li.pending::before {
-		content: '○';
-		position: absolute;
-		left: 0;
-		color: #f59e0b;
-		font-weight: bold;
-	}
-	.checklist li.pending {
-		color: #1e293b;
+	.link-list a:hover {
+		color: var(--color-orange);
+		padding-left: 1rem;
+        border-bottom: 1px solid var(--color-orange);
 	}
 
-	.main-footer {
-		text-align: center;
-		margin-top: 4rem;
-		color: #94a3b8;
-		font-size: 0.875rem;
-	}
+    /* WIDGETS */
+    .widget {
+        background: white;
+        border: 2px solid var(--color-black);
+        margin-bottom: 2rem;
+        box-shadow: 8px 8px 0px var(--color-black); /* Retro brutalist shadow */
+    }
+    .widget-header {
+        background: var(--color-black);
+        color: white;
+        padding: 1rem 1.5rem;
+    }
+    .widget-header h3 { color: white; font-size: 1.25rem; }
 
-	@keyframes pulse {
-		0% { transform: scale(0.95); opacity: 0.7; }
-		50% { transform: scale(1); opacity: 1; }
-		100% { transform: scale(0.95); opacity: 0.7; }
-	}
+    .calc-body { padding: 1.5rem; }
+
+    .input-group label {
+        display: block;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: #71717a;
+    }
+    .input-wrapper {
+        display: flex;
+        align-items: center;
+        border-bottom: 2px solid var(--color-black);
+    }
+    .input-wrapper span { font-size: 1.5rem; font-weight: 700; color: var(--color-black); }
+    input {
+        width: 100%;
+        border: none;
+        font-family: var(--font-header);
+        font-size: 1.5rem;
+        padding: 0.5rem;
+        background: transparent;
+    }
+    input:focus { outline: none; }
+    
+    .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
+    .row-inputs input { font-size: 1.25rem; border-bottom: 2px solid #e4e4e7; }
+
+    .results-display {
+        margin-top: 2rem;
+        background: var(--color-black);
+        color: white;
+        padding: 1.5rem;
+    }
+    .result-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        border-bottom: 1px dashed #333;
+        padding-bottom: 0.5rem;
+    }
+    .result-item:last-child { border: none; margin: 0; padding: 0; padding-top: 0.5rem;}
+    .label { font-size: 0.9rem; text-transform: uppercase; opacity: 0.7; }
+    .value { font-family: var(--font-header); font-size: 1.5rem; font-weight: 700; }
+    .value.profit { color: #4ade80; }
+    .value.margin.high { color: var(--color-orange); }
+    .value.margin.low { color: #f87171; }
+
+    /* STATUS */
+    .status-list { padding: 1.5rem; }
+    .status-item {
+        margin-bottom: 1rem;
+        font-family: var(--font-header);
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+    }
+    .status-item.done { text-decoration: line-through; color: #a1a1aa; }
+    .status-item.active { color: var(--color-orange); }
+    .check { color: #4ade80; margin-right: 0.5rem; font-weight: 900; }
+    .spinner { margin-right: 0.5rem; font-weight: 900; }
 </style>
