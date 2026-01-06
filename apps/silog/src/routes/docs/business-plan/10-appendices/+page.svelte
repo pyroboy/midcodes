@@ -53,7 +53,7 @@
             <div class="permit-card">
                 <span class="status-badge">REQUIRED</span>
                 <h4>DTI Registration</h4>
-                <p>Trade name protection for "Silog Hub" (National Scope).</p>
+                <p>Trade name protection for "Kuya's Silog & Lugaw" (National Scope).</p>
             </div>
         </div>
 	</article>

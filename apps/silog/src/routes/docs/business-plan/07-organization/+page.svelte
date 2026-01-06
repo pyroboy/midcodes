@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Organization & HR | SILOG HUB</title>
+	<title>Organization & HR | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">

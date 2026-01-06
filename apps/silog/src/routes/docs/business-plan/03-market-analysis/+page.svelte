@@ -77,7 +77,7 @@
                     <h4>Strengths</h4>
                     <ul>
                         <li><strong>Family-Run Model:</strong> Low labor costs.</li>
-                        <li><strong>High Margins:</strong> >50% on Longsilog/Squidsilog.</li>
+                        <li><strong>High Margins:</strong> >50% on Longsilog/Shanghai Rice.</li>
                         <li><strong>Prime Location:</strong> High foot traffic.</li>
                     </ul>
                 </div>

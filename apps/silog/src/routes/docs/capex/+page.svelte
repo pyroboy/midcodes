@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Silog Business | CAPEX</title>
+	<title>Kuya's Silog & Lugaw | CAPEX</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -129,7 +129,7 @@
 					</tr>
 					<tr>
 						<td>"Winners" Stock</td>
-						<td>Longga, Squid, Spam, Ckn Tapa</td>
+						<td>Longga, Shanghai, Spam, Ckn Tapa</td>
 						<td class="cost">₱4,500.00</td>
 					</tr>
 					<tr>

@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Inventory Supply | SILOG HUB</title>
+	<title>Inventory Supply | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -359,6 +359,20 @@
                         <td class="right">₱60.00</td>
                         <td>Public Market</td>
                     </tr>
+                    <tr class="highlight-row">
+                        <td><strong>Kasubha (Dried Safflower)</strong></td>
+                        <td>Arroz Caldo Color</td>
+                        <td>Pack (50g)</td>
+                        <td class="right">₱30.00</td>
+                        <td>Public Market / Spice Vendor</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Mushroom (Button/Oyster)</strong></td>
+                        <td>Chicken Mushroom</td>
+                        <td>Pack (200g)</td>
+                        <td class="right">₱45.00</td>
+                        <td>Grocery / Market</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -403,6 +417,20 @@
                         <td>Pack (1kg)</td>
                         <td class="right">₱180.00</td>
                         <td>Supplier</td>
+                    </tr>
+                    <tr class="highlight-row">
+                        <td><strong>Breadcrumbs / Breading Mix</strong></td>
+                        <td>Pork Chop, Chicsilog</td>
+                        <td>Pack (500g)</td>
+                        <td class="right">₱65.00</td>
+                        <td>Grocery / Baking Supply</td>
+                    </tr>
+                    <tr class="highlight-row">
+                        <td><strong>Evaporated Milk</strong></td>
+                        <td>Chicken Mushroom Sauce</td>
+                        <td>Can (370ml)</td>
+                        <td class="right">₱45.00</td>
+                        <td>Grocery</td>
                     </tr>
                      <tr>
                         <td><strong>Sugar (White/Brown)</strong></td>
@@ -489,6 +517,56 @@
                         <td class="right">₱200.00</td>
                         <td>Homemade / Grocery</td>
                     </tr>
+                    <!-- Cooking Aids -->
+                    <tr>
+                        <td><strong>Cornstarch</strong></td>
+                        <td>Crispy Fry / Gravy Thickener</td>
+                        <td>Pack (250g)</td>
+                        <td class="right">₱40.00</td>
+                        <td>Grocery</td>
+                    </tr>
+                    <tr>
+                        <td><strong>All-Purpose Flour</strong></td>
+                        <td>Breading for Pork/Chicken</td>
+                        <td>Kg</td>
+                        <td class="right">₱50.00</td>
+                        <td>Grocery</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Mayonnaise</strong></td>
+                        <td>Sisig / Burger Dressing</td>
+                        <td>Pouch (220ml)</td>
+                        <td class="right">₱80.00</td>
+                        <td>Wholesale Grocery</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bagoong Alamang</strong></td>
+                        <td>Bagnet Sawsawan</td>
+                        <td>Bottle</td>
+                        <td class="right">₱80.00</td>
+                        <td>Public Market</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Knorr Gravy Mix</strong></td>
+                        <td>Instant Gravy (Just add water)</td>
+                        <td>Pack</td>
+                        <td class="right">₱45.00</td>
+                        <td>Grocery</td>
+                    </tr>
+                    <tr>
+                        <td><strong>All-Purpose Cream</strong></td>
+                        <td>Chicken Mushroom Sauce</td>
+                        <td>Pack (250ml)</td>
+                        <td class="right">₱65.00</td>
+                        <td>Grocery</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Laurel Leaves</strong></td>
+                        <td>Adobo / Tapa Marinade Aroma</td>
+                        <td>Pack</td>
+                        <td class="right">₱20.00</td>
+                        <td>Public Market</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -542,6 +620,28 @@
                         <td>Tank Refill</td>
                         <td class="right">₱1,100.00</td>
                         <td>Authorized Dealer</td>
+                    </tr>
+                    <!-- Cleaning Supplies -->
+                    <tr class="highlight-row">
+                        <td><strong>Dishwashing Liquid</strong></td>
+                        <td>Joy/Generic (Lemon)</td>
+                        <td>Gallon</td>
+                        <td class="right">₱250.00</td>
+                        <td>Chemicals Supplier</td>
+                    </tr>
+                    <tr class="highlight-row">
+                        <td><strong>Trash Bags (XXL)</strong></td>
+                        <td>Daily Waste</td>
+                        <td>Roll</td>
+                        <td class="right">₱90.00</td>
+                        <td>Plasticware Store</td>
+                    </tr>
+                    <tr class="highlight-row">
+                        <td><strong>Sponges/Scrubbers</strong></td>
+                        <td>Dishwashing</td>
+                        <td>Pack</td>
+                        <td class="right">₱50.00</td>
+                        <td>Grocery</td>
                     </tr>
                 </tbody>
             </table>

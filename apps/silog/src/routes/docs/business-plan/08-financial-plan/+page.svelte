@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Financial Plan | SILOG HUB</title>
+	<title>Financial Plan | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">

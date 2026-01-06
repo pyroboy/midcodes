@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Products & Menu | SILOG HUB</title>
+	<title>Products & Menu | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -234,14 +234,7 @@
                         <td class="right">₱85.00</td>
                         <td class="right profit">46%</td>
                     </tr>
-                    <tr>
-                        <td><strong>SIL-002</strong></td>
-                        <td><span class="status-badge winner">Winner</span></td>
-                        <td><strong>Squidsilog</strong></td>
-                        <td class="right">₱61.00</td>
-                        <td class="right">₱100.00</td>
-                        <td class="right profit">39%</td>
-                    </tr>
+
                     <tr>
                         <td><strong>SIL-003</strong></td>
                         <td><span class="status-badge winner">Winner</span></td>

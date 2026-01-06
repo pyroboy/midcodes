@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Marketing Plan | SILOG HUB</title>
+	<title>Marketing Plan | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -17,7 +17,7 @@
         <div class="stat-box">
             <div class="stat">
                  <span class="label">Entry Point</span>
-                 <span class="value">₱75</span>
+                 <span class="value">₱45</span>
             </div>
             <div class="stat orange">
                  <span class="label">Target AVG Ticket</span>
@@ -74,7 +74,7 @@
         <div class="highlight-box">
              <h3>Phase 3: Scale (Month 3)</h3>
              <ul>
-                 <li><strong>The "Silog Squad" Loyalty:</strong> 10 Stamps = 1 Free Meal card to drive retention.</li>
+                 <li><strong>"Suki Card" Loyalty:</strong> 10 Stamps = 1 Free Meal card to drive retention.</li>
                  <li><strong>Bulk Catering:</strong> Target school events and faculty meetings for bulk "Bilao" orders.</li>
                  <li><strong>Goal:</strong> 20% Net Profit Margin.</li>
              </ul>

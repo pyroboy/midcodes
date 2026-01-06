@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>COMPANY OVERVIEW | SILOG HUB</title>
+	<title>COMPANY OVERVIEW | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -54,7 +54,7 @@
             <div class="goal-item">
                 <span class="icon">🚀</span>
                 <div class="text">
-                    <strong>Thriving Ecosystem</strong>
+                    <strong>Sustainable Family Business</strong>
                     <p>To establish a sustainable, self-sufficient business model that supports the family and employees.</p>
                 </div>
             </div>

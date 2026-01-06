@@ -9,13 +9,13 @@
 </script>
 
 <svelte:head>
-	<title>SILOG ADMIN</title>
+	<title>KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <div class="dashboard-wrapper">
 	<header class="hero-header">
 		<div class="brand-badge">BETA</div>
-		<h1>Silog<span class="dot">.</span><span class="text-orange">Hub</span></h1>
+		<h1>Kuya's<br><span class="text-orange">Silog & Lugaw</span></h1>
 		<p class="tagline">Strategic Operations & Financial Control</p>
 	</header>
 
@@ -42,7 +42,13 @@
 					<li><a href="/docs/business-plan/10-appendices">10 // Appendices</a></li>
 					<li><a href="/docs/business-plan/11-initial-totex">11 // Initial TOTEX Breakdown</a></li>
 					<li><a href="/docs/business-plan/12-inventory-supply">12 // Inventory Supply</a></li>
+					<li><a href="/docs/business-plan/13-printable-logs">13 // Ops Logs</a></li>
+					<li><a href="/docs/business-plan/14-sku-portioning">14 // SKU Portioning Guide</a></li>
+					<li><a href="/docs/business-plan/15-daily-checklists">15 // Daily Checklists</a></li>
+					<li><a href="/docs/business-plan/16-contingency">16 // Contingency Plan</a></li>
+					<li><a href="/docs/business-plan/17-complaint-handling">17 // Complaint Handling</a></li>
 				</ul>
+				<a href="/docs/business-plan/print-all" class="print-all-btn">🖨️ Print All Chapters</a>
 			</section>
 
 			<section class="nav-group ops">
@@ -232,6 +238,24 @@
         border-bottom: 1px solid var(--color-orange);
 	}
 
+    /* Print All Button */
+    .print-all-btn {
+        display: block;
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        background: var(--color-orange);
+        color: white;
+        text-align: center;
+        font-weight: 700;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all 0.2s;
+        border: 2px solid var(--color-black);
+    }
+    .print-all-btn:hover {
+        background: var(--color-black);
+        color: var(--color-orange);
+    }
     /* WIDGETS */
     .widget {
         background: white;

@@ -1,5 +1,5 @@
 <svelte:head>
-    <title>Printable Logs | SILOG HUB</title>
+    <title>Printable Logs | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">

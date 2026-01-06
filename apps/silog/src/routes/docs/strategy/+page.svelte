@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Silog Business | Strategy</title>
+	<title>Kuya's Silog & Lugaw | Strategy</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -35,7 +35,7 @@
 			<div class="card winner">
 				<h4>🏆 The "Winners" (>50% Margin)</h4>
 				<p>High margin items that must NEVER run out of stock. These fund the business profitability.</p>
-				<small>Examples: Longsilog, Squidsilog, Shanghai</small>
+				<small>Examples: Longsilog, Chicken Tapa, Shanghai</small>
 			</div>
 			<div class="card volume">
 				<h4>📊 Volume Drivers (40-49% Margin)</h4>

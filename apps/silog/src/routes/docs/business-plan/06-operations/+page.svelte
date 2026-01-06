@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Operations Blueprint | SILOG HUB</title>
+	<title>Operations Blueprint | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -303,6 +303,33 @@
                         </ul>
                     </li>
                 </ol>
+                
+                <div class="freezer-map">
+                    <h4>❄️ The 4-Zone Freezer Rule</h4>
+                    <p class="warning-text">CRITICAL: Do not just throw bags in the freezer. Use 4 plastic baskets/dividers:</p>
+                    <div class="zone-grid">
+                        <div class="freezer-zone zone-1">
+                            <span class="zone-label">ZONE 1</span>
+                            <strong>Top / Easy Access</strong>
+                            <p>The "Winners" — Longga, Shanghai, Tapa. <em>These move fast.</em></p>
+                        </div>
+                        <div class="freezer-zone zone-2">
+                            <span class="zone-label">ZONE 2</span>
+                            <strong>Middle</strong>
+                            <p>Volume Drivers — Hotdogs, Burgers, Tocino.</p>
+                        </div>
+                        <div class="freezer-zone zone-3">
+                            <span class="zone-label">ZONE 3</span>
+                            <strong>Bottom</strong>
+                            <p>Raw Meat — Chicken/Pork cuts for Lugaw/Adobo.</p>
+                        </div>
+                        <div class="freezer-zone zone-4">
+                            <span class="zone-label">ZONE 4</span>
+                            <strong>Side / Separate</strong>
+                            <p>Seafood — Bangus. <em class="warning-text">MUST be separated to prevent fishy smell.</em></p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- SOP 2 -->
@@ -369,6 +396,173 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- SOP 5 -->
+            <div class="sop-card detailed critical">
+                <h3>📦 SOP 5: Freezer Repacking (The "Grab-and-Go" System)</h3>
+                <p><strong>Objective:</strong> Zero weighing during service. Inventory = "counting bags" not "weighing kilos."</p>
+                <p class="warning-text">⚡ This is the SINGLE MOST EFFECTIVE operational change. In a 3x3m kitchen, you cannot afford to use a weighing scale during service hours.</p>
+                
+                <h4>1. The "Delivery Day" Rule</h4>
+                <p>Raw meat deliveries (Tapa, Tocino, Chicken) must be processed <strong>IMMEDIATELY</strong> upon arrival. Never put a bulk 1kg bag straight into the freezer.</p>
+                
+                <h4>2. Portioning Protocol (The "Ice Candy" Method)</h4>
+                <p>Use cheap, small plastic bags (ice candy size or sandwich size) to create single-serving portions.</p>
+                
+                <div class="portion-grid">
+                    <div class="portion-card">
+                        <h5>🥩 Loose Meats</h5>
+                        <p class="portion-label">Tapa, Tocino, Bagnet, Chicken Cuts</p>
+                        <ol>
+                            <li><strong>Weigh</strong> exact serving size (e.g., 100g for Tapa)</li>
+                            <li><strong>Bag</strong> in small plastic. Flat pack (press air out)</li>
+                            <li><strong>Tie</strong> or fold shut</li>
+                        </ol>
+                        <p class="result"><strong>Result:</strong> 1 Bag = 1 Order. Cook grabs ONE bag.</p>
+                    </div>
+                    <div class="portion-card">
+                        <h5>🌭 Sticky Items</h5>
+                        <p class="portion-label">Longganisa, Shanghai</p>
+                        <ul>
+                            <li>Do NOT freeze in a clump</li>
+                            <li>Lay flat on tray with wax paper between layers</li>
+                            <li>Freeze THEN bag</li>
+                            <li><em>Prevents fusing into a rock-hard ball</em></li>
+                        </ul>
+                    </div>
+                    <div class="portion-card">
+                        <h5>🍔 Counting Items</h5>
+                        <p class="portion-label">Hotdogs, Burger Patties</p>
+                        <ul>
+                            <li>Repack into sets of <strong>5 or 10</strong></li>
+                            <li>Do NOT leave original packaging open (causes freezer burn)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h4>3. The "Slacking" Procedure (Thawing for Speed)</h4>
+                <p>Cooking rock-hard frozen Tapa = <strong>8 minutes</strong>. Semi-thawed = <strong>3 minutes</strong>.</p>
+                <div class="info-callout">
+                    <strong>⏰ The 24-Hour Rule:</strong> Before closing, check par level for tomorrow. Move required portion bags from <strong>Freezer → Chiller/Ref</strong>.
+                    <br><em>Example: Expect 20 Tapsilogs tomorrow? Move 20 portion bags to chiller tonight. Ready to fry instantly in the morning.</em>
+                </div>
+            </div>
+
+            <!-- SOP 6 -->
+            <div class="sop-card detailed">
+                <h3>🧽 SOP 6: Dish & Sanitation (The "Anti-Sebo" Protocol)</h3>
+                <p><strong>Objective:</strong> Silog plates are extremely oily (<em>sebo</em>). If not washed correctly, they feel greasy even when dry. This SOP protects your plumbing and ensures customer satisfaction.</p>
+                
+                <h4>1. The "Grease Separation" Rule (CRITICAL)</h4>
+                <p class="warning-text">⚠️ NEVER rinse a plate directly into the sink.</p>
+                <ol>
+                    <li><strong>SCRAPE:</strong> Use rubber spatula to scrape ALL leftovers (rice, bones) and ALL visible oil/sauce into Trash Bin.</li>
+                    <li><strong>WIPE:</strong> If very oily (Sisig, Tapa), wipe with used paper towel BEFORE touching water.</li>
+                </ol>
+                <p><em>Why? Prevents grease trap filling in 2 days and pipe clogs.</em></p>
+
+                <h4>2. The 3-Basin Method (Modified for Small Space)</h4>
+                <p>If you only have one sink, use two plastic basins (<em>palanggana</em>) to simulate a 3-step process.</p>
+                
+                <div class="basin-flow">
+                    <div class="basin-step">
+                        <span class="basin-num">1</span>
+                        <strong>Basin 1: SOAK (Degreasing)</strong>
+                        <p>Water + Dishwashing Liquid + <strong>Degreaser</strong> (or Calamansi/Vinegar). Soak 2+ minutes.</p>
+                    </div>
+                    <div class="basin-step">
+                        <span class="basin-num">2</span>
+                        <strong>THE SCRUB</strong>
+                        <p><strong>Sponge Coding:</strong><br>
+                        🟨 YELLOW sponge = Oily plates/bowls<br>
+                        🟦 BLUE sponge = Glasses/cups ONLY<br>
+                        <em>Never mix or water tastes like pork fat!</em></p>
+                    </div>
+                    <div class="basin-step">
+                        <span class="basin-num">3</span>
+                        <strong>Basin 2 / Sink: RINSE</strong>
+                        <p>Running water rinse. <strong>"Squeak Test"</strong>: If thumb slides = still oily. If squeaks = clean.</p>
+                    </div>
+                    <div class="basin-step">
+                        <span class="basin-num">4</span>
+                        <strong>AIR DRY</strong>
+                        <p>Rack dry only. Do NOT towel dry (towels spread bacteria).</p>
+                    </div>
+                </div>
+
+                <h4>3. The "Glass First" Rule</h4>
+                <p>Always wash in this order (cleanest to oiliest):</p>
+                <ol class="wash-order">
+                    <li>Glasses/Cups</li>
+                    <li>Spoons/Forks</li>
+                    <li>Lugaw Bowls</li>
+                    <li>Silog Plates (Most oily)</li>
+                    <li>Cookware (Pans/Pots)</li>
+                </ol>
+
+                <h4>4. Closing Shift: The Grease Trap</h4>
+                <p><strong>You own the building = plumbing repairs are YOUR expense.</strong></p>
+                <ul>
+                    <li><strong>Every Night:</strong> Open grease trap. Scoop top layer of solid oil ("sludge") into double-bagged trash.</li>
+                    <li class="warning-text"><strong>NEVER</strong> flush sludge down drain or toilet.</li>
+                </ul>
+            </div>
+
+            <!-- SOP 7 -->
+            <div class="sop-card detailed">
+                <h3>🚶 SOP 7: UB Foot Patrol (Walking Delivery)</h3>
+                <p><strong>Objective:</strong> Zero-cost logistical advantage. Beat FoodPanda with <strong>Zero Delivery Fee</strong> and <strong>Zero Gas Cost</strong> by maximizing proximity to University of Bohol (UB).</p>
+
+                <h4>1. The Strategy: "Drop Points" (Not Room Service)</h4>
+                <p>Schools don't allow outsiders to wander hallways. Establish 3 specific "Meet-Up Spots":</p>
+                <ul class="equipment-list">
+                    <li><strong>Drop Point A:</strong> Main Gate (Guardhouse)</li>
+                    <li><strong>Drop Point B:</strong> Back Gate / Side Gate</li>
+                    <li><strong>Drop Point C:</strong> Faculty Lounge/Admin Lobby (if allowed)</li>
+                </ul>
+
+                <h4>2. Operational Rules (Protect The Store)</h4>
+                <div class="grid-2col">
+                    <div class="info-box">
+                        <strong>Rule #1: Buddy System</strong>
+                        <p><strong>Min. 2 Orders</strong> to walk. Walking for one ₱45 Silog isn't worth the server leaving the store. Batching orders makes the trip profitable.</p>
+                    </div>
+                    <div class="info-box">
+                        <strong>Rule #2: The 11:30 Run</strong>
+                        <p>Depart strictly at <strong>11:30 AM</strong> and <strong>12:15 PM</strong>. Encourages students to <em>pre-order</em> by 11:00 AM.</p>
+                    </div>
+                </div>
+                <p class="warning-text">⚠️ <strong>Payment First:</strong> GCash preferred. If COD, require "Exact Change Only" to avoid coin purse hassle at the gate.</p>
+
+                <h4>3. Packaging: The "Anti-Tapon Seal"</h4>
+                <p>Walking is bouncy. Protect the product.</p>
+                <div class="portion-grid">
+                    <div class="portion-card">
+                        <h5>🍱 Silog</h5>
+                        <p class="portion-label">Standard Box</p>
+                        <p>Stack carefully in plastic bag. Stable.</p>
+                    </div>
+                    <div class="portion-card critical">
+                        <h5>🥣 Lugaw (RISK)</h5>
+                        <p class="portion-label">Double Knot</p>
+                        <p>If not separating broth: Put bowl inside clear 8x11 bag. <strong>Tie tight</strong> before putting in carrier bag.</p>
+                    </div>
+                </div>
+
+                <h4>4. Marketing & Contingency</h4>
+                <p><strong>Who watches the store?</strong></p>
+                <ul>
+                    <li><strong>Scenario A:</strong> Cook watches counter (Slows kitchen).</li>
+                    <li><strong>Scenario B:</strong> Owner covers the shift.</li>
+                    <li><strong>Scenario C (Best):</strong> <strong>Student Runner.</strong> Give a trusted student a FREE MEAL to pickup & distribute 5+ orders.</li>
+                </ul>
+
+                <div class="highlight-box" style="margin-top: 1.5rem; padding: 1.5rem;">
+                    <strong>📢 MARKETING PITCH:</strong><br>
+                    "Nasa UB ka ba? Stuck in class? <strong>WE WALK TO YOU.</strong><br>
+                    ✅ No Delivery Fee. ✅ No Min Amount (just 2 orders). ✅ Faster than Motor."
+                </div>
             </div>
         </div>
 </section>
@@ -458,4 +652,48 @@
     
     .highlight-box { border: 2px solid #0f172a; padding: 2rem; background: white; box-shadow: 6px 6px 0px #f97316; margin: 2rem 0; }
     .divider { height: 2px; background: #e4e4e7; margin: 3rem 0; }
+
+    /* Freezer Zone Map */
+    .freezer-map { margin-top: 1.5rem; padding: 1rem; background: #f0f9ff; border-radius: 8px; border: 2px dashed #0284c7; }
+    .freezer-map h4 { margin: 0 0 0.5rem 0; color: #0369a1; }
+    .zone-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
+    @media (max-width: 500px) { .zone-grid { grid-template-columns: 1fr; } }
+    .freezer-zone { padding: 0.75rem; border-radius: 6px; border: 1px solid; }
+    .freezer-zone strong { display: block; margin-bottom: 0.25rem; font-size: 0.9rem; }
+    .freezer-zone p { margin: 0; font-size: 0.85rem; }
+    .zone-label { font-size: 0.65rem; font-weight: 800; padding: 2px 5px; border-radius: 3px; display: inline-block; margin-bottom: 0.5rem; color: white; }
+    .zone-1 { background: #dcfce7; border-color: #22c55e; }
+    .zone-1 .zone-label { background: #22c55e; }
+    .zone-2 { background: #dbeafe; border-color: #3b82f6; }
+    .zone-2 .zone-label { background: #3b82f6; }
+    .zone-3 { background: #fef3c7; border-color: #f59e0b; }
+    .zone-3 .zone-label { background: #f59e0b; }
+    .zone-4 { background: #fee2e2; border-color: #ef4444; }
+    .zone-4 .zone-label { background: #ef4444; }
+    .warning-text { color: #dc2626; font-weight: 600; }
+
+    /* SOP 5 & 6 Styles */
+    .sop-card.critical { border: 2px solid #f59e0b; box-shadow: 4px 4px 0 #fcd34d; background: #fffbeb; }
+    .sop-card.critical h3 { color: #b45309; }
+    
+    .portion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .portion-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; }
+    .portion-card h5 { margin: 0 0 0.5rem 0; font-size: 1rem; color: #1e293b; }
+    .portion-label { font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem; font-style: italic; }
+    .portion-card ol, .portion-card ul { margin: 0; padding-left: 1.25rem; font-size: 0.9rem; }
+    .portion-card li { margin-bottom: 0.35rem; }
+    .portion-card .result { margin-top: 0.75rem; padding: 0.5rem; background: #dcfce7; border-radius: 4px; font-size: 0.85rem; color: #166534; }
+    
+    .info-callout { background: #dbeafe; border-left: 4px solid #3b82f6; padding: 1rem; margin: 1rem 0; border-radius: 0 8px 8px 0; font-size: 0.9rem; }
+    .info-callout strong { color: #1e40af; }
+    
+    .basin-flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .basin-step { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; position: relative; }
+    .basin-num { position: absolute; top: -0.5rem; left: -0.5rem; background: #0f172a; color: white; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
+    .basin-step strong { display: block; margin-bottom: 0.5rem; color: #1e293b; font-size: 0.9rem; }
+    .basin-step p { margin: 0; font-size: 0.85rem; color: #475569; }
+    
+    .wash-order { background: #f1f5f9; padding: 1rem 1rem 1rem 2.5rem; border-radius: 8px; margin: 0.5rem 0; }
+    .wash-order li { margin-bottom: 0.35rem; font-size: 0.9rem; }
+    .wash-order li:last-child { font-weight: 700; color: #dc2626; }
 </style>

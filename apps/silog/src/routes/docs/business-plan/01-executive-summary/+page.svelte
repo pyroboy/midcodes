@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>EXEC SUMMARY | SILOG HUB</title>
+	<title>EXEC SUMMARY | KUYA'S SILOG & LUGAW</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -16,7 +16,7 @@
 			Designed to serve as a daily staple for the neighborhood, the store bridges the gap between a student canteen and a late-night comfort food hub.
 		</p>
 		<p>
-			<strong>Mission:</strong> To provide "Everyday Comfort" through affordable, filling meals. Whether it's a student's lunch or a worker's midnight meal, we ensure quality food is always within reach—physically and financially.
+			<strong>Mission:</strong> To provide "Everyday Comfort" through affordable, filling meals. Whether it's a student's lunch or a worker's midnight meal—quality food that's within reach. Duol na, abot-kaya pa.
 		</p>
         <div class="divider"></div>
 

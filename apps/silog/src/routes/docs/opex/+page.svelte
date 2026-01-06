@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Silog Business | OPEX</title>
+	<title>Kuya's Silog & Lugaw | OPEX</title>
 </svelte:head>
 
 <section class="doc-page">

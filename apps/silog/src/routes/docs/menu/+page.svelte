@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Silog Business | Menu Engineering</title>
+	<title>Kuya's Silog & Lugaw | Menu Engineering</title>
 </svelte:head>
 
 <section class="doc-page">
@@ -44,14 +44,7 @@
 					<td class="profit">₱48</td>
 					<td class="high-margin">56.5%</td>
 				</tr>
-				<tr>
-					<td>Squidsilog</td>
-					<td>₱100</td>
-					<td>₱24</td>
-					<td>₱45</td>
-					<td class="profit">₱55</td>
-					<td class="high-margin">55.0%</td>
-				</tr>
+
 				<tr>
 					<td>Shanghai Rice</td>
 					<td>₱85</td>
@@ -143,19 +136,27 @@
 				</tr>
 				<tr>
 					<td>Chicksilog</td>
-					<td>₱110</td>
+					<td>₱140</td>
 					<td>₱48</td>
 					<td>₱69</td>
-					<td class="profit">₱41</td>
-					<td class="low-margin">37.3%</td>
+					<td class="profit">₱71</td>
+					<td class="mid-margin">50.7%</td>
 				</tr>
                 <tr>
 					<td>Tapsilog (Beef)</td>
-					<td>₱140</td>
-					<td>₱93</td>
-					<td>₱114</td>
-					<td class="profit">₱26</td>
-					<td class="low-margin">18.6%</td>
+					<td>₱150</td>
+					<td>₱58</td>
+					<td>₱79</td>
+					<td class="profit">₱71</td>
+					<td class="mid-margin">47.3%</td>
+				</tr>
+				<tr>
+					<td>Bagnetsilog</td>
+					<td>₱155</td>
+					<td>₱63</td>
+					<td>₱84</td>
+					<td class="profit">₱71</td>
+					<td class="mid-margin">45.8%</td>
 				</tr>
 			</tbody>
 		</table>
