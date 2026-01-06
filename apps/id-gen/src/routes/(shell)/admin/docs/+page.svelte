@@ -31,120 +31,63 @@
 		</div>
 	</header>
 
-	<div class="nav-grid">
-		<a href="/admin/docs/sales" class="card sales">
-			<div class="icon">💰</div>
-			<h2>Sales &amp; Marketing</h2>
-			<p>Pricing matrices, portfolio scripts, and client rules.</p>
-		</a>
+	<div class="docs-sections">
+		<section class="link-group">
+			<h3>Strategy & Brand</h3>
+			<ul class="clean-links">
+				<li><a href="/admin/docs/ceo-message"><span class="icon">✉️</span> CEO Ground Truth</a></li>
+				<li><a href="/admin/docs/brand"><span class="icon">ᜃ</span> Brand & Heritage</a></li>
+				<li><a href="/admin/docs/strategy"><span class="icon">♟️</span> Growth Strategy</a></li>
+				<li><a href="/admin/docs/gtm"><span class="icon">🚀</span> Go-to-Market Plan</a></li>
+				<li><a href="/admin/docs/architecture"><span class="icon">🏗️</span> System Architecture</a></li>
+			</ul>
+		</section>
 
-		<a href="/admin/docs/operations" class="card ops">
-			<div class="icon">⚙️</div>
-			<h2>Operations Manual</h2>
-			<p>Printer settings, laminator temps, and RFID encoding.</p>
-		</a>
+		<section class="link-group">
+			<h3>Sales & Revenue</h3>
+			<ul class="clean-links">
+				<li><a href="/admin/docs/sales"><span class="icon">💰</span> Sales Guide</a></li>
+				<li><a href="/admin/docs/revenue"><span class="icon">💹</span> Revenue Projections</a></li>
+				<li><a href="/admin/docs/sms-pricing"><span class="icon">💬</span> SMS Pricing & Setup</a></li>
+				<li><a href="/admin/docs/proposal"><span class="icon">📄</span> Client Proposals</a></li>
+				<li><a href="/admin/docs/promos"><span class="icon">🏷️</span> Active Promotions</a></li>
+				<li><a href="/admin/docs/partners"><span class="icon">🤝</span> Partnership Program</a></li>
+			</ul>
+		</section>
 
-		<a href="/admin/docs/inventory" class="card inventory">
-			<div class="icon">📦</div>
-			<h2>Inventory &amp; Logistics</h2>
-			<p>Stock levels, supplier directory, and reorder points.</p>
-		</a>
+		<section class="link-group">
+			<h3>Operations & Documentation</h3>
+			<ul class="clean-links">
+				<li><a href="/admin/docs/product"><span class="icon">🚀</span> Product & Tech Overview</a></li>
+				<li><a href="/admin/docs/operations"><span class="icon">⚙️</span> Operations Manual</a></li>
+				<li><a href="/admin/docs/processes"><span class="icon">🔄</span> PRODUCTION SYSTEM</a></li>
+				<li><a href="/admin/docs/hardware"><span class="icon">📱</span> Hardware & Terminals</a></li>
+				<li><a href="/admin/docs/low-end-card"><span class="icon">📊</span> LOW END CARD</a></li>
+				<li><a href="/admin/docs/high-end-card"><span class="icon">🔬</span> HIGH END CARD</a></li>
+				<li><a href="/admin/docs/lanyard-production"><span class="icon">🎗️</span> Lanyard Production</a></li>
+				<li><a href="/admin/docs/inventory"><span class="icon">📦</span> Inventory & Logistics</a></li>
+				<li><a href="/admin/docs/procurement"><span class="icon">🛍️</span> Purchasing & Sourcing</a></li>
+				<li><a href="/admin/docs/legal"><span class="icon">⚖️</span> Legal & Contracts</a></li>
+			</ul>
+		</section>
 
-		<a href="/admin/docs/legal" class="card legal">
-			<div class="icon">⚖️</div>
-			<h2>Legal &amp; Contracts</h2>
-			<p>TOS, anti-fraud waivers, and data privacy forms.</p>
-		</a>
+		<section class="link-group">
+			<h3>Marketing & Media</h3>
+			<ul class="clean-links">
+				<li><a href="/admin/docs/marketing_collateral"><span class="icon">🎨</span> Marketing Assets</a></li>
+				<li><a href="/admin/docs/ads"><span class="icon">📢</span> Ads & Campaigns</a></li>
+				<li><a href="/admin/docs/social"><span class="icon">📱</span> Social Media Strategy</a></li>
+				<li><a href="/admin/docs/youtube"><span class="icon">📹</span> YouTube Content</a></li>
+			</ul>
+		</section>
 
-		<a href="/admin/docs/ads" class="card ads">
-			<div class="icon">📢</div>
-			<h2>Ads &amp; Campaigns</h2>
-			<p>Ad creatives, targeting specs, and performance reports.</p>
-		</a>
-
-		<a href="/admin/docs/architecture" class="card architecture">
-			<div class="icon">🏗️</div>
-			<h2>Architecture</h2>
-			<p>System diagrams, stack details, and infrastructure.</p>
-		</a>
-
-		<a href="/admin/docs/assets" class="card assets">
-			<div class="icon">🎨</div>
-			<h2>Brand Assets</h2>
-			<p>Logos, typography, and official media kits.</p>
-		</a>
-
-		<a href="/admin/docs/gtm" class="card gtm">
-			<div class="icon">🚀</div>
-			<h2>Go-to-Market</h2>
-			<p>Launch strategies, rollout plans, and positioning.</p>
-		</a>
-
-		<a href="/admin/docs/partners" class="card partners">
-			<div class="icon">🤝</div>
-			<h2>Partnerships</h2>
-			<p>Partner programs, affiliate details, and integrations.</p>
-		</a>
-
-		<a href="/admin/docs/procurement" class="card procurement">
-			<div class="icon">🛍️</div>
-			<h2>Procurement</h2>
-			<p>Vendor lists, purchasing guidelines, and sourcing.</p>
-		</a>
-
-		<a href="/admin/docs/promos" class="card promos">
-			<div class="icon">🏷️</div>
-			<h2>Promotions</h2>
-			<p>Current offers, discount codes, and seasonal events.</p>
-		</a>
-
-		<a href="/admin/docs/proposal" class="card proposal">
-			<div class="icon">📄</div>
-			<h2>Proposals</h2>
-			<p>Client proposal templates and pitch decks.</p>
-		</a>
-
-		<a href="/admin/docs/revenue" class="card revenue">
-			<div class="icon">💹</div>
-			<h2>Revenue</h2>
-			<p>Financial reports, projections, and pricing models.</p>
-		</a>
-
-		<a href="/admin/docs/social" class="card social">
-			<div class="icon">📱</div>
-			<h2>Social Media</h2>
-			<p>Content calendar, post guidelines, and engagement.</p>
-		</a>
-
-		<a href="/admin/docs/strategy" class="card strategy">
-			<div class="icon">♟️</div>
-			<h2>Strategy</h2>
-			<p>Long-term goals, roadmaps, and business objectives.</p>
-		</a>
-
-		<a href="/admin/docs/youtube" class="card youtube">
-			<div class="icon">📹</div>
-			<h2>YouTube</h2>
-			<p>Video content, scripts, and channel analytics.</p>
-		</a>
-
-		<a href="/llms.txt" target="_blank" class="card llm">
-			<div class="icon">🤖</div>
-			<h2>LLM Context</h2>
-			<p>Consolidated documentation for AI context.</p>
-			<div class="status-indicator">
-				<span class="dot"></span> Live Generated
-			</div>
-		</a>
-
-		<a href="/llms.txt?format=pdf" target="_blank" class="card pdf">
-			<div class="icon">📄</div>
-			<h2>Download PDF Bundle</h2>
-			<p>All docs exported with styling for offline review.</p>
-			<div class="status-indicator">
-				<span class="dot"></span> Auto-generated
-			</div>
-		</a>
+		<section class="link-group llm-special">
+			<h3>Developer Resources</h3>
+			<ul class="clean-links">
+				<li><a href="/llms.txt" target="_blank"><span class="icon">🤖</span> LLM Context (Live)</a></li>
+				<li><a href="/llms.txt?format=pdf" target="_blank"><span class="icon">📄</span> Download PDF Bundle</a></li>
+			</ul>
+		</section>
 	</div>
 
 	<div class="split-section">
@@ -279,109 +222,84 @@
 		margin-bottom: 2.5rem;
 	}
 
-	.card {
+	/* Docs Sections */
+	.docs-sections {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		gap: 2rem;
+		margin-bottom: 3rem;
+	}
+
+	.link-group {
 		background: white;
-		padding: 2rem;
+		padding: 1.5rem;
 		border-radius: 12px;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+		border: 1px solid #e2e8f0;
+	}
+
+	.link-group h3 {
+		margin: 0 0 1rem;
+		font-size: 1rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #718096;
+		border-bottom: 1px solid #edf2f7;
+		padding-bottom: 0.5rem;
+	}
+
+	.clean-links {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	.clean-links li {
+		margin-bottom: 0.75rem;
+	}
+
+	.clean-links li:last-child {
+		margin-bottom: 0;
+	}
+
+	.clean-links a {
 		text-decoration: none;
 		color: #2d3748;
-		transition: transform 0.2s, box-shadow 0.2s;
-		border: 1px solid #e2e8f0;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-	}
-
-	.card:hover {
-		transform: translateY(-5px);
-		box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
-		border-color: #bee3f8;
-	}
-
-	.icon {
-		font-size: 2.5rem;
-		margin-bottom: 1rem;
-	}
-	.card h2 {
-		margin: 0 0 0.5rem;
-		font-size: 1.25rem;
-		color: #2b6cb0;
-	}
-	.card p {
-		margin: 0;
-		color: #718096;
-		font-size: 0.9rem;
-		line-height: 1.5;
-	}
-
-	/* Specific Card Accents */
-	.card.sales {
-		border-top: 4px solid #48bb78;
-	}
-	.card.ops {
-		border-top: 4px solid #ed8936;
-	}
-	.card.inventory {
-		border-top: 4px solid #4299e1;
-	}
-	.card.legal {
-		border-top: 4px solid #e53e3e;
-	}
-	.card.ads {
-		border-top: 4px solid #805ad5;
-	}
-	.card.architecture {
-		border-top: 4px solid #718096;
-	}
-	.card.assets {
-		border-top: 4px solid #d53f8c;
-	}
-	.card.gtm {
-		border-top: 4px solid #f56565;
-	}
-	.card.partners {
-		border-top: 4px solid #38b2ac;
-	}
-	.card.procurement {
-		border-top: 4px solid #975a16;
-	}
-	.card.promos {
-		border-top: 4px solid #d69e2e;
-	}
-	.card.proposal {
-		border-top: 4px solid #667eea;
-	}
-	.card.revenue {
-		border-top: 4px solid #48bb78;
-	}
-	.card.social {
-		border-top: 4px solid #4299e1;
-	}
-	.card.strategy {
-		border-top: 4px solid #2c5282;
-	}
-	.card.youtube {
-		border-top: 4px solid #f00;
-	}
-	.card.llm {
-		border-top: 4px solid #2d3748;
-		position: relative;
-	}
-	.status-indicator {
+		font-size: 1.05rem;
 		display: flex;
 		align-items: center;
-		font-size: 0.75rem;
-		color: #48bb78;
-		font-weight: bold;
-		margin-top: 0.5rem;
-		background: #f0fff4;
-		padding: 2px 8px;
-		border-radius: 12px;
-		width: fit-content;
+		transition: color 0.2s, transform 0.2s;
 	}
-	.status-indicator .dot {
-		background: #48bb78;
-		margin-right: 6px;
+
+	.clean-links a:hover {
+		color: #3182ce;
+		transform: translateX(5px);
+	}
+
+	.clean-links .icon {
+		margin-right: 12px;
+		font-size: 1.25rem;
+		width: 24px;
+		text-align: center;
+		display: inline-block;
+	}
+
+	.llm-special {
+		background: #2d3748;
+		border-color: #1a202c;
+	}
+
+	.llm-special h3 {
+		color: #a0aec0;
+		border-color: #4a5568;
+	}
+
+	.llm-special a {
+		color: #edf2f7;
+	}
+
+	.llm-special a:hover {
+		color: #63b3ed;
 	}
 
 	/* Widgets Section */
