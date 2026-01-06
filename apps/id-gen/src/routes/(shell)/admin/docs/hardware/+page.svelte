@@ -10,9 +10,9 @@
 
 <div class="docs-container">
 	<header class="docs-header">
-		<h1>Hardware Architecture & Terminals</h1>
-		<p class="meta">Terminal Deployment • Biometrics • Scanning Infrastructure</p>
-		<div class="status-chip highlight">Deployment Blueprint</div>
+		<h1>Hybrid Attendance Terminal Research</h1>
+		<p class="meta">QR + RFID + Fingerprint Systems • Philippine Market Analysis</p>
+		<div class="status-chip highlight">Exchange Rate: ₱58.80 (Jan 2026)</div>
 	</header>
 
 	<section class="blueprint">
@@ -48,7 +48,8 @@
 				<thead>
 					<tr>
 						<th>Device</th>
-						<th>Processor</th>
+						<th>OS</th>
+						<th>RAM</th>
 						<th>Battery</th>
 						<th>Price (PHP)</th>
 						<th>Notes</th>
@@ -57,55 +58,92 @@
 				<tbody>
 					<tr>
 						<td><strong>Samsung Active4 Pro</strong></td>
-						<td>Octa-core</td>
+						<td>Android 12</td>
+						<td>4GB</td>
 						<td>7,600mAh</td>
 						<td>₱38,163</td>
-						<td>Rugged, IP68, S Pen, Knox</td>
+						<td>Rugged, IP68, S Pen, Knox security</td>
 					</tr>
 					<tr>
 						<td><strong>Samsung Galaxy Tab A9+</strong></td>
-						<td>Octa-core</td>
+						<td>Android 13</td>
+						<td>4GB</td>
 						<td>7,040mAh</td>
 						<td>₱12,877</td>
 						<td>Good middle-ground</td>
 					</tr>
 					<tr>
 						<td><strong>Lenovo Tab M9</strong></td>
-						<td>Octa-core</td>
+						<td>Android 12</td>
+						<td>4-8GB</td>
 						<td>5,100mAh</td>
 						<td>₱10,525</td>
-						<td>Budget enterprise</td>
+						<td>Budget enterprise option</td>
 					</tr>
 				</tbody>
 			</table>
 		</div>
 
-		<h3>B. USB QR Readers & Biometrics</h3>
+		<h3>B. USB QR Code Readers (CAPEX)</h3>
 		<div class="table-wrapper">
 			<table>
 				<thead>
 					<tr>
-						<th>Category</th>
 						<th>Model</th>
-						<th>Feature</th>
+						<th>Connection</th>
+						<th>Scan Speed</th>
 						<th>Price (PHP)</th>
 					</tr>
 				</thead>
 				<tbody>
 					<tr>
-						<td><strong>QR Scanner</strong></td>
-						<td>NETUM 2D Wired</td>
+						<td><strong>NETUM 2D Wired</strong></td>
+						<td>USB-C</td>
 						<td>300 scans/sec</td>
 						<td>₱2,058</td>
 					</tr>
 					<tr>
-						<td><strong>Fingerprint (P2)</strong></td>
+						<td><strong>Tera 2D Wireless</strong></td>
+						<td>Bluetooth/USB</td>
+						<td>200 scans/sec</td>
+						<td>₱2,470</td>
+					</tr>
+					<tr>
+						<td><strong>Manhattan CCD</strong></td>
+						<td>USB-A/C</td>
+						<td>Standard</td>
+						<td>₱2,646</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+
+		<h3>C. Fingerprint Scanners (Optional)</h3>
+		<div class="table-wrapper">
+			<table>
+				<thead>
+					<tr>
+						<th>Tier</th>
+						<th>Model</th>
+						<th>Certification</th>
+						<th>Price (PHP)</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>Basic</strong></td>
+						<td>U.are.U 4500</td>
+						<td>PoC Only</td>
+						<td>₱1,176</td>
+					</tr>
+					<tr>
+						<td><strong>Professional</strong></td>
 						<td>SecuGen Hamster Plus</td>
 						<td>FBI-Certified</td>
 						<td>₱4,410</td>
 					</tr>
 					<tr>
-						<td><strong>Fingerprint (P3)</strong></td>
+						<td><strong>High-Security</strong></td>
 						<td>Futronic FS64</td>
 						<td>4-Finger Slap</td>
 						<td>₱44,100</td>
@@ -121,18 +159,20 @@
 			<div class="analysis-card">
 				<h3>One-Time CAPEX (Per Terminal)</h3>
 				<ul class="cost-list">
-					<li><strong>Budget:</strong> ₱16,405</li>
-					<li><strong>Professional:</strong> ₱23,873</li>
-					<li><strong>Premium:</strong> ₱53,451</li>
+					<li><strong>Budget Option:</strong> ₱16,405</li>
+					<li><strong>Professional Option:</strong> ₱23,873</li>
+					<li><strong>Premium Option:</strong> ₱53,451</li>
 				</ul>
+				<p class="small">* Includes hub, mounting, and enclosure</p>
 			</div>
 			<div class="analysis-card">
-				<h3>Monthly OPEX</h3>
+				<h3>Monthly OPEX (Per Terminal)</h3>
 				<ul class="cost-list">
-					<li><strong>Connectivity:</strong> ₱118</li>
-					<li><strong>Management:</strong> ₱176 - ₱294</li>
+					<li><strong>Connectivity/Power:</strong> ₱118</li>
+					<li><strong>Device Management:</strong> ₱176 - ₱294</li>
 					<li><strong>Total/Month:</strong> ₱294 - ₱412</li>
 				</ul>
+				<p class="small">* Excluding cloud storage and card costs</p>
 			</div>
 		</div>
 	</section>
@@ -141,43 +181,67 @@
 		<h2>4. Implementation Roadmap</h2>
 		<div class="timeline">
 			<div class="timeline-item">
-				<span class="phase">Phase 1: MVP (2-3 wks)</span>
-				<p>Order Samsung A9+ kit; develop basic tablet app for QR scanning.</p>
+				<span class="phase">Phase 1: MVP (2-3 Weeks)</span>
+				<p>Order 1x Samsung Tab A9+ & NETUM scanner. Develop basic tablet app for QR scanning and sync testing.</p>
 			</div>
 			<div class="timeline-item">
-				<span class="phase">Phase 2: Pilot (3-4 wks)</span>
-				<p>Order SecuGen biometrics; integrate SDK; dual-mode QR/Fingerprint testing.</p>
+				<span class="phase">Phase 2: Biometric Pilot (3-4 Weeks)</span>
+				<p>Order SecuGen Hamster Plus. Integrate fingerprint SDK. Test dual-mode: QR primary, fingerprint secondary.</p>
 			</div>
 			<div class="timeline-item">
-				<span class="phase">Phase 3: Scale (4-6 wks)</span>
-				<p>Bulk acquisition; configure Hexnode MDM; train client IT staff.</p>
+				<span class="phase">Phase 3: Scale Deployment (4-6 Weeks)</span>
+				<p>Order bulk units. Configure device management (Hexnode/VMware). Train client IT staff on site setup.</p>
+			</div>
+			<div class="timeline-item">
+				<span class="phase">Phase 4: Optimization (Ongoing)</span>
+				<p>Monitor sync reliability. Optimize for offline scenarios. Add photo capture and geofencing features.</p>
 			</div>
 		</div>
 	</section>
 
-	<section class="model">
-		<h2>5. Financial Projections (B2B SaaS Model)</h2>
-		<div class="rec-box highlight-box">
-			<h3>Client Subscription Tiers</h3>
+	<section class="sourcing">
+		<h2>5. Local Sourcing Options (Philippines)</h2>
+		<div class="rec-box">
 			<ul>
-				<li><strong>Basic (QR + NFC):</strong> ₱1,470 / month</li>
-				<li><strong>Premium (Biometric):</strong> ₱2,058 / month</li>
+				<li><strong>Tablets:</strong> Samsung/Lenovo authorized resellers (SM Megamall, Lazada/Shopee Mall).</li>
+				<li><strong>QR Scanners:</strong> Available on Lazada/Shopee for ₱1,500-3,000 with local warranty.</li>
+				<li><strong>Fingerprint Readers:</strong> SecuGen available through local biometrics distributors (~₱5,000-7,000).</li>
+				<li><strong>Mounts:</strong> Local fabrication shops can create custom VESA mounts for ₱1,000-2,500.</li>
 			</ul>
-			<p><strong>Payback Period:</strong> ~20 months per terminal @ 75% gross margin.</p>
+		</div>
+	</section>
+
+	<section class="model highlight-box">
+		<h2>6. B2B Financial Projections</h2>
+		<div class="projections-grid">
+			<div class="proj-card">
+				<h3>Client Pricing</h3>
+				<ul>
+					<li><strong>Basic (QR+NFC):</strong> ₱1,470/mo</li>
+					<li><strong>Premium (+Biometrics):</strong> ₱2,058/mo</li>
+				</ul>
+			</div>
+			<div class="proj-card">
+				<h3>Margins & Payback</h3>
+				<ul>
+					<li><strong>Gross Margin:</strong> ~75%</li>
+					<li><strong>Payback Period:</strong> ~20 months</li>
+				</ul>
+			</div>
 		</div>
 	</section>
 
 	<section class="recommendations">
-		<h2>6. Final Recommendations</h2>
+		<h2>7. Final Recommendations</h2>
 		<ul class="rec-list">
-			<li><strong>Start with QR + NFC tablets</strong> to leverage existing ID infrastructure.</li>
-			<li><strong>Target Schools/Enterprises</strong> already using Kanaya ID cards.</li>
-			<li><strong>Pilot with 2-3 clients</strong> at no extra hardware cost to test sync reliability.</li>
+			<li><strong>Start with QR + NFC</strong> to leverage existing card infrastructure.</li>
+			<li><strong>Target Schools & Enterprises</strong> already purchasing Kanaya ID cards.</li>
+			<li><strong>Competitive Edge:</strong> Real-time sync + offline capability separates us from legacy hardware.</li>
 		</ul>
 	</section>
 
 	<footer class="docs-footer">
-		<p>© 2026 Kanaya Identity Solutions • Authorized Engineering Documentation</p>
+		<p>© 2026 Kanaya Identity Solutions • Hardware Engineering Team</p>
 		<p><a href="/admin/docs">← Back to Index</a></p>
 	</footer>
 </div>

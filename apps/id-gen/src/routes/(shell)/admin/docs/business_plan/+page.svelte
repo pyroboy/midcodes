@@ -5,382 +5,226 @@
 </script>
 
 <svelte:head>
-	<title>Kanaya Business Plan | Admin Docs</title>
+	<title>Master Business Plan 2026 | Kanaya Identity Solutions</title>
 </svelte:head>
 
 <div class="docs-container">
 	<header class="docs-header">
 		<div class="header-top">
-			<h1>Kanaya Business Plan & Investment Proposal</h1>
-			<span class="badge">Status: Draft for Investors</span>
+			<h1>KANAYA IDENTITY SOLUTIONS</h1>
+			<span class="badge">Version 6.0 - Attendance System Subscription Edition</span>
 		</div>
-		<p class="meta">Location: Tagbilaran City, Bohol • Date: January 2026</p>
-		<p class="subject">Master plan for securing ₱25k - ₱30k in seed capital for the Epson L8050 printer.</p>
+		<p class="meta">Master Business Plan 2026: The Hybrid Identity & Attendance Platform</p>
+		<p class="subject">"Physical IDs meet Smart Terminals. One platform, two revenue streams."</p>
 	</header>
 
 	<section class="summary">
-		<h2>Executive Pitch</h2>
+		<h2>EXECUTIVE SUMMARY</h2>
 		<div class="pitch-card">
 			<p>
-				Kanaya Identity Solutions is a Campus Security Platform disguised as an ID provider. While local
-				competitors fight a price war selling fading laminated cards, Kanaya offers Smart IDs that verify
-				fetchers, track attendance, and prevent fraud via our proprietary cloud platform.
+				Kanaya is a two-in-one identity platform: we manufacture physical ID cards (₱5.80 basic, ₱62.32 premium) 
+				AND provide tablet-based attendance terminals (₱16,405 each) with QR/RFID/fingerprint scanning. 
+				The real profit is our <strong>Attendance System Subscription</strong> (₱10/student/year) + 
+				<strong>SMS notifications</strong> (₱0.60 per message, passed through to client).
 			</p>
-			<p>
-				We are seeking ₱25,000 in seed capital to purchase our core production machinery (Epson L8050)
-				and starter inventory. With this investment we project a 45-day break-even (~200 IDs sold).
-			</p>
+			<p><strong>The Combo:</strong> Every school gets cards PLUS a terminal. We own the entire attendance workflow.</p>
+			<ul class="stats-grid">
+				<li><strong>Investment Ask:</strong> ₱165,000 seed capital</li>
+				<li><strong>Break-even:</strong> 50 days (sell 2 school bundles)</li>
+				<li><strong>Year 1 Target:</strong> ₱945,000 revenue</li>
+			</ul>
 		</div>
 	</section>
 
-	<nav class="toc">
-		<h3>Table of Contents</h3>
-		<ol>
-			<li><a href="#executive">Executive Summary</a></li>
-			<li><a href="#problem">The Problem & Solution</a></li>
-			<li><a href="#swot">Market Analysis (SWOT)</a></li>
-			<li><a href="#financials">Financial Highlights</a></li>
-			<li><a href="#ask">The "Ask" (Capital Requirement)</a></li>
-		</ol>
-	</nav>
+	<section>
+		<h2>1. INVESTMENT TIERS (CHOOSE YOUR STARTING POINT)</h2>
+		
+		<div class="tier-card">
+			<h3>TIER 1: "CARDS ONLY" (₱25,000)</h3>
+			<p><strong>Goal:</strong> Build card production first, prove model before adding terminals.</p>
+			<ul>
+				<li><strong>Equipment:</strong> Epson L8050, PVC Sheets (5k cards), Ink Set, Laminator, Die Cutter.</li>
+				<li><strong>Capacity:</strong> 250 cards/day, 5,000/month.</li>
+				<li><strong>COGS:</strong> ₱5.80/card (₱19.80 with RFID chip).</li>
+				<li><strong>Pricing:</strong> ₱12-60/card.</li>
+				<li><strong>Year 1 Profit:</strong> ₱49,600 (Payback: 6 months).</li>
+			</ul>
+		</div>
 
-	<section id="executive">
-		<h2>1. Executive Summary</h2>
-		<p>
-			Kanaya Identity Solutions is not a traditional print shop. We deliver a Tech-Enabled Smart ID System
-			that secures campuses. Our IDs verify fetchers, log attendance, and integrate with our cloud
-			platform to shut down fraud instantly.
-		</p>
-		<p>
-			Seed capital of ₱25,000 unlocks the Epson L8050 printer and inventory needed to produce
-			professional-grade RFID IDs in-house, allowing us to hit profitability within 45 days.
-		</p>
+		<div class="tier-card highlight">
+			<h3>TIER 2: "CARDS + TERMINALS" (₱165,000)</h3>
+			<p><strong>Goal:</strong> Sell complete solution - cards + attendance terminals. Higher ticket, faster payback.</p>
+			<div class="split">
+				<div>
+					<strong>Cards Equipment (₱75,000):</strong>
+					<ul>
+						<li>Epson L8050 + IDP Smart-51S (financed)</li>
+						<li>Lanyard press + Inventory</li>
+					</ul>
+				</div>
+				<div>
+					<strong>Terminal Equipment (₱65,000):</strong>
+					<ul>
+						<li>4× Samsung Galaxy Tab A9+</li>
+						<li>4× NETUM Wireless QR Scanners</li>
+					</ul>
+				</div>
+			</div>
+			<p><strong>ROI:</strong> 84% in Year 1. Payback in 7.2 months.</p>
+		</div>
+
+		<div class="tier-card">
+			<h3>TIER 3: "FULL PLATFORM" (₱265,000)</h3>
+			<p><strong>Goal:</strong> Export-ready, UV security, 10 terminals for multi-site deployments.</p>
+			<ul>
+				<li><strong>Added:</strong> 6× Prof. Terminals, 6× Fingerprint Readers (Hamster Plus).</li>
+				<li><strong>Hardware:</strong> UV Flatbed Printer (Used), Automated Cutter.</li>
+				<li><strong>Year 1 Profit:</strong> ₱450,000 (65% margin). Payback in 7 months.</li>
+			</ul>
+		</div>
 	</section>
 
-	<section id="problem">
-		<h2>2. The Problem & Solution</h2>
+	<section>
+		<h2>2. ATTENDANCE SYSTEM SUBSCRIPTION (THE REAL MONEY)</h2>
+		<p>Student taps card → Server logs attendance → Optional SMS to parent.</p>
+		
+		<div class="pillar">
+			<h3>Pass-Through SMS Pricing (OneWaySMS.ph)</h3>
+			<ul>
+				<li><strong>Cost to us:</strong> ₱0.50 - ₱0.60 per SMS.</li>
+				<li><strong>Student Package:</strong> ₱5/student/year for SMS (10 SMS/mo avg).</li>
+				<li><strong>System Subscription:</strong> ₱10/student/year (Software access).</li>
+				<li><strong>Total:</strong> ₱15/student/year.</li>
+			</ul>
+			<p><strong>Example (500 students):</strong> ₱5,000/year profit per school (67% margin).</p>
+		</div>
+	</section>
+
+	<section>
+		<h2>3. HARDWARE SPECIFICATIONS</h2>
 		<div class="grid">
-			<div>
-				<h3>The Problem: "Dumb Plastic"</h3>
+			<div class="spec-box">
+				<h3>Core Setup (₱16,405)</h3>
 				<ul>
-					<li>Outdated lamination tech creates low-quality IDs.</li>
-					<li>Security risks: fake IDs are easy to manufacture.</li>
-					<li>Lost cards take 1–2 weeks to replace.</li>
-					<li>Thermal prints fade in 3–6 months.</li>
+					<li>Samsung Galaxy Tab A9+</li>
+					<li>NETUM Wireless QR Scanner</li>
+					<li>USB-C OTG Hub + Mount</li>
 				</ul>
 			</div>
-			<div>
-				<h3>The Kanaya Solution: "Smart Security"</h3>
+			<div class="spec-box">
+				<h3>Rugged Upgrade (₱53,451)</h3>
 				<ul>
-					<li>Hardware: fused "Sandwich" PVC cards, waterproof and non-fading.</li>
-					<li>Software: cloud database + QR/NFC scanning for instant verification.</li>
-					<li>Speed: "Lost Card" replacements in under 2 hours.</li>
-					<li>Offering an ecosystem (hardware + SaaS) competitors cannot copy.</li>
-				</ul>
-			</div>
-		</div>
-	</section>
-
-	<section id="swot">
-		<h2>3. Market Analysis (SWOT)</h2>
-		<div class="swot">
-			<div>
-				<h3>Strengths</h3>
-				<ul>
-					<li>Proprietary "Kanaya Studio" software.</li>
-					<li>Low overhead (home base in Tagbilaran, zero rent).</li>
-					<li>Agile production via in-house direct-to-tray RFID printing.</li>
-				</ul>
-			</div>
-			<div>
-				<h3>Weaknesses</h3>
-				<ul>
-					<li>Need capital for Epson L8050 printer.</li>
-					<li>Single-founder operation limits throughput.</li>
-				</ul>
-			</div>
-			<div>
-				<h3>Opportunities</h3>
-				<ul>
-					<li>"Smart City" push—schools want high-tech ID security.</li>
-					<li>SaaS licensing to shops outside Visayas.</li>
-				</ul>
-			</div>
-			<div>
-				<h3>Threats</h3>
-				<ul>
-					<li>"Piso Print" shops competing on low price.</li>
-					<li>Mitigation: emphasize the security platform they cannot replicate.</li>
+					<li>Samsung Tab Active4 Pro (IP68)</li>
+					<li>NETUM + Charging Cradle</li>
+					<li>Commercial Kiosk Mount</li>
 				</ul>
 			</div>
 		</div>
 	</section>
 
-	<section id="financials">
-		<h2>4. Financial Highlights</h2>
-		<h3>Unit Economics (Per ID Card)</h3>
-		<table>
-			<thead>
-				<tr>
-					<th>Item</th>
-					<th>Cost (PHP)</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr>
-					<td>Selling Price (SRP)</td>
-					<td>₱150.00</td>
-				</tr>
-				<tr>
-					<td>Inkjet PVC Sheet / RFID Card</td>
-					<td>₱20.00</td>
-				</tr>
-				<tr>
-					<td>Epson Ink (6-Color Mix)</td>
-					<td>₱1.50</td>
-				</tr>
-				<tr>
-					<td>Laminating Film</td>
-					<td>₱2.00</td>
-				</tr>
-				<tr>
-					<td>Labor (Encoding/Cutting)</td>
-					<td>₱5.00</td>
-				</tr>
-				<tr>
-					<td><strong>Total Cost</strong></td>
-					<td><strong>₱28.50</strong></td>
-				</tr>
-				<tr>
-					<td><strong>Gross Profit</strong></td>
-					<td><strong>₱121.50</strong></td>
-				</tr>
-				<tr>
-					<td><strong>Margin</strong></td>
-					<td><strong>81%</strong></td>
-				</tr>
-			</tbody>
-		</table>
-		<p class="note">Note: Lanyards sold separately (Cost ₱45, Sell ₱75) to protect margins.</p>
-
-		<div class="projection">
-			<h3>Projected Revenue (Year 1)</h3>
-			<ul>
-				<li>Target: 3 small schools + 1 SME client.</li>
-				<li>Volume: ~1,500 IDs.</li>
-				<li>Gross Revenue: ₱225,000.</li>
-				<li>Net Profit (Est): ₱180,000.</li>
-			</ul>
+	<section>
+		<h2>4. THE BUNDLE STRATEGY</h2>
+		<div class="table-wrapper">
+			<table>
+				<thead>
+					<tr>
+						<th>Package</th>
+						<th>Setup Fee (One-Time)</th>
+						<th>Annual Subscription</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>"Smart Campus" (500 students)</strong></td>
+						<td>₱107,810 (IDs + Lanyards + 2 Terminals)</td>
+						<td>₱42,780/year (SaaS + SMS + Lease)</td>
+					</tr>
+					<tr>
+						<td><strong>"Corporate Access" (100 staff)</strong></td>
+						<td>₱44,315 (Premium IDs + 1 Terminal)</td>
+						<td>₱19,640/year (SaaS + Lease)</td>
+					</tr>
+				</tbody>
+			</table>
 		</div>
 	</section>
 
-	<section id="ask">
-		<h2>5. The "Ask" (Investment Requirement)</h2>
-		<p>
-			We are raising ₱25,000 to launch operations immediately and cover CapEx, inventory, and launch
-			costs. Funds will be used as outlined below:
-		</p>
-		<table>
-			<thead>
-				<tr>
-					<th>Item</th>
-					<th>Description</th>
-					<th>Cost (PHP)</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr>
-					<td>Production Hardware</td>
-					<td>Epson L8050 (6-Color WiFi)</td>
-					<td>₱16,500</td>
-				</tr>
-				<tr>
-					<td>Inventory Starter</td>
-					<td>5 boxes PVC, 1 ink set, 50 RFID cards</td>
-					<td>₱5,500</td>
-				</tr>
-				<tr>
-					<td>Marketing / Samples</td>
-					<td>Sample production for demos</td>
-					<td>₱1,000</td>
-				</tr>
-				<tr>
-					<td>Cash Buffer</td>
-					<td>Emergency / Transport</td>
-					<td>₱2,000</td>
-				</tr>
-				<tr class="total">
-					<td colspan="2"><strong>Total Requirement</strong></td>
-					<td><strong>₱25,000</strong></td>
-				</tr>
-			</tbody>
-		</table>
+	<section>
+		<h2>5. GO-TO-MARKET (90-DAY SPRINT)</h2>
+		<ul class="timeline">
+			<li><strong>Days 1-30:</strong> Build demo kit, close School #1 (50% downpayment).</li>
+			<li><strong>Days 31-60:</strong> Deploy 500 cards, close School #2. Own all equipment debt-free.</li>
+			<li><strong>Days 61-90:</strong> Launch BPO package, scale recurring revenue.</li>
+		</ul>
+	</section>
 
-		<div class="repayment">
-			<h3>Repayment Strategy</h3>
-			<ul>
-				<li>Source: First two school contracts (target launch: May/June enrollment season).</li>
-				<li>Timeline: Principal + interest (if applicable) repaid within 3 months.</li>
-				<li>Collateral: Epson L8050 printer retains ~80% resale value.</li>
-			</ul>
+	<section>
+		<h2>6. CEO MANDATE: THE "DO NOT" LIST</h2>
+		<ul class="danger-list">
+			<li>❌ DO NOT chase DepEd RFPs (bureaucracy kills cash flow)</li>
+			<li>❌ DO NOT offer free SMS (always pass through + 20% markup)</li>
+			<li>❌ DO NOT price Attendance System below ₱10/student/year</li>
+			<li>❌ DO NOT store raw biometric data (only immutable hashes)</li>
+		</ul>
+	</section>
+
+	<section>
+		<h2>7. FINANCIAL PROJECTIONS (TIER 2)</h2>
+		<div class="roi-stats">
+			<div class="stat"><span>Year 1 Total Revenue</span> <strong>₱916,210</strong></div>
+			<div class="stat"><span>Net Profit</span> <strong>₱304,270</strong></div>
+			<div class="stat"><span>ROI</span> <strong>184%</strong></div>
 		</div>
 	</section>
 
 	<footer class="docs-footer">
-		<p>Kanaya Identity Solutions — Securing the Campus, One ID at a Time.</p>
+		<p>Document Status: FINAL • Updated: Jan 06, 2026</p>
+		<p><a href="/admin/docs">← Back to Index</a></p>
 	</footer>
 </div>
 
 <style>
-	.docs-container {
-		max-width: 900px;
-		margin: 0 auto;
-		padding: 2rem;
-		font-family: 'Segoe UI', system-ui, sans-serif;
-		color: #1f2933;
-	}
+	:global(body) { background: #f1f5f9; }
+	.docs-container { max-width: 1000px; margin: 3rem auto; padding: 4rem; background: #fff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); font-family: 'Inter', system-ui, sans-serif; color: #334155; }
+	.docs-header { border-bottom: 3px solid #0f172a; padding-bottom: 2rem; margin-bottom: 3rem; }
+	.header-top { display: flex; justify-content: space-between; align-items: center; }
+	h1 { font-size: 2.2rem; font-weight: 900; color: #0f172a; letter-spacing: -0.03em; }
+	.badge { background: #0f172a; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+	.meta { font-size: 1.1rem; font-weight: 600; color: #475569; margin-top: 0.75rem; }
+	.subject { color: #64748b; font-style: italic; margin-top: 0.5rem; }
 
-	.docs-header {
-		border-bottom: 4px solid #111827;
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-	}
+	h2 { font-size: 1.4rem; font-weight: 800; color: #1e293b; border-left: 5px solid #3b82f6; padding-left: 1.2rem; margin: 4rem 0 2rem; text-transform: uppercase; }
+	
+	.pitch-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 2rem; border-radius: 12px; }
+	.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; list-style: none; padding: 0; margin-top: 2rem; border-top: 1px solid #e2e8f0; pt: 1.5rem; }
+	.stats-grid li { font-weight: 700; color: #0369a1; }
 
-	.header-top {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1rem;
-	}
+	.tier-card { padding: 2rem; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 1.5rem; }
+	.tier-card.highlight { border: 2px solid #3b82f6; background: #f0f7ff; }
+	.tier-card h3 { margin-top: 0; color: #0f172a; }
+	.split { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem; }
 
-	.docs-header h1 {
-		margin: 0;
-		font-size: 2rem;
-		color: #111827;
-	}
+	.pillar { background: #fafafa; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0; }
+	.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+	.spec-box { border: 1px solid #e2e8f0; padding: 1.5rem; border-radius: 8px; }
 
-	.badge {
-		background: #fbbf24;
-		color: #111827;
-		padding: 0.3rem 0.8rem;
-		border-radius: 999px;
-		font-weight: 600;
-		font-size: 0.85rem;
-	}
+	.table-wrapper { margin: 2rem 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+	table { width: 100%; border-collapse: collapse; text-align: left; }
+	th { background: #f8fafc; padding: 1.2rem; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
+	td { padding: 1.2rem; border-bottom: 1px solid #f1f5f9; }
 
-	.meta {
-		color: #4b5563;
-		margin: 0.25rem 0;
-	}
+	.timeline { list-style: none; padding: 0; }
+	.timeline li { margin-bottom: 1.5rem; padding-left: 2rem; position: relative; }
+	.timeline li::before { content: '→'; position: absolute; left: 0; color: #3b82f6; font-weight: 900; }
 
-	.subject {
-		color: #1f2933;
-		font-size: 1rem;
-	}
+	.danger-list { list-style: none; padding: 0; }
+	.danger-list li { margin-bottom: 0.75rem; font-weight: 600; color: #991b1b; }
 
-	.summary {
-		margin-bottom: 2rem;
-	}
+	.roi-stats { display: flex; gap: 2rem; margin: 2rem 0; }
+	.stat { flex: 1; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 2rem; border-radius: 12px; text-align: center; }
+	.stat span { display: block; font-size: 0.85rem; color: #166534; margin-bottom: 0.5rem; }
+	.stat strong { font-size: 2rem; color: #15803d; letter-spacing: -0.02em; }
 
-	.pitch-card {
-		background: #fef3c7;
-		border: 1px solid #fcd34d;
-		padding: 1.5rem;
-		border-radius: 12px;
-		color: #92400e;
-		line-height: 1.6;
-	}
-
-	.toc {
-		background: #f8fafc;
-		border: 1px solid #e2e8f0;
-		padding: 1.5rem;
-		border-radius: 10px;
-		margin-bottom: 2rem;
-	}
-
-	.toc h3 {
-		margin-top: 0;
-		color: #0f172a;
-	}
-
-	.toc ol {
-		margin: 0;
-		padding-left: 1.5rem;
-	}
-
-	.toc a {
-		text-decoration: none;
-		color: #1d4ed8;
-		font-weight: 500;
-	}
-
-	h2 {
-		border-left: 6px solid #111827;
-		padding-left: 1rem;
-		color: #111827;
-		margin-top: 3rem;
-	}
-
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-		gap: 1.5rem;
-	}
-
-	.swot {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1rem;
-	}
-
-	.swot div {
-		background: #f9fafb;
-		border: 1px solid #e5e7eb;
-		padding: 1rem;
-		border-radius: 8px;
-	}
-
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		margin: 1.5rem 0;
-	}
-
-	th,
-	td {
-		border: 1px solid #e5e7eb;
-		padding: 0.75rem;
-		text-align: left;
-	}
-
-	th {
-		background: #111827;
-		color: white;
-	}
-
-	.total td {
-		background: #f3f4f6;
-		font-weight: 700;
-	}
-
-	.note {
-		color: #b45309;
-		font-style: italic;
-	}
-
-	.docs-footer {
-		margin-top: 3rem;
-		text-align: center;
-		color: #6b7280;
-		border-top: 1px solid #e5e7eb;
-		padding-top: 1.5rem;
-		font-weight: 600;
-	}
-
-	@media (max-width: 640px) {
-		.header-top {
-			flex-direction: column;
-		}
-	}
+	.docs-footer { margin-top: 6rem; text-align: center; font-size: 0.85rem; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 3rem; }
+	.docs-footer a { color: #64748b; text-decoration: none; font-weight: 700; }
 </style>

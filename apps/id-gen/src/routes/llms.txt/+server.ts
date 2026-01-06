@@ -16,11 +16,6 @@ export const GET: RequestHandler = async ({ url }) => {
 			import: 'default',
 			eager: true
 		}),
-		...import.meta.glob(['../+page.svelte', '../pricing/+page.svelte'], {
-			query: '?raw',
-			import: 'default',
-			eager: true
-		})
 	};
 
 	let content = '# Kanaya Admin Documentation\n\n';
@@ -30,8 +25,13 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	for (const path of sortedPaths) {
 		const rawSvelte = modules[path] as string;
-		const fileName = path.split('/').slice(-2, -1)[0];
-		let title = fileName === 'docs' ? 'Overview' : fileName.toUpperCase();
+		const pathParts = path.split('/');
+		const fileName = pathParts[pathParts.length - 2];
+		
+		let title = fileName;
+		if (fileName === 'docs' || !fileName || fileName === '..') title = 'Home';
+		else if (fileName === '(shell)') title = 'Home'; // Fallback for shell structure
+		else title = fileName.replace(/-/g, ' ').toUpperCase();
 
 		const sectionMd = `\n\n# SECTION: ${title}\nSource: ${path}\n\n`;
 		moduleContents.push({
@@ -42,7 +42,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	if (url.searchParams.get('format') === 'pdf') {
 		const pdfBytes = await generatePdf(moduleContents);
-		return new Response(pdfBytes, {
+		return new Response(pdfBytes as any, {
 			headers: {
 				'content-type': 'application/pdf',
 				'content-disposition': 'attachment; filename="kanaya-admin-docs.pdf"'

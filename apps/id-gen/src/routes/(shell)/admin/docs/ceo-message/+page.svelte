@@ -206,7 +206,61 @@
 	</section>
 
 	<section>
-		<h2>10. THE BOTTOM LINE</h2>
+		<h2>11. MARKET TARGETS & INFRASTRUCTURE REQUIREMENTS</h2>
+		<p>To dominate the identity space, we must understand the specific hardware and software plumbing required for each vertical. We do not build everything; we provide the <em>Identity Layer</em> that makes these systems work.</p>
+
+		<div class="table-wrapper">
+			<table>
+				<thead>
+					<tr>
+						<th>Target Vertical</th>
+						<th>Required Infrastructure</th>
+						<th>Kanaya's Role (The Moat)</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><strong>Attendance Systems</strong></td>
+						<td>Tablet Terminals, QR Scanners, SMS Gateway, Real-time Sync Backend</td>
+						<td>Instant sync from scan to parent notification; offline-first local cache.</td>
+					</tr>
+					<tr>
+						<td><strong>Student IDs</strong></td>
+						<td>High-volume PVC Printers, Batch Encoding App, Photo Enhancement AI</td>
+						<td>8-minute encoding for 500 students; zero-typo guarantee.</td>
+					</tr>
+					<tr>
+						<td><strong>Business Cards</strong></td>
+						<td>NFC Card Stock, VCard Generation UI, Profile Management Dashboard</td>
+						<td>Dynamic QR/NFC links that can be updated after the card is printed.</td>
+					</tr>
+					<tr>
+						<td><strong>Event Badges</strong></td>
+						<td>On-site Thermal Printers, Lanyard Production, Check-in Scanning App</td>
+						<td>Zero-latency check-in for thousands of guests; on-the-spot badge generation.</td>
+					</tr>
+					<tr>
+						<td><strong>Employee Access</strong></td>
+						<td>Mifare/High-Sec NFC Cards, Door Lock Integration (SDK), Audit Log Database</td>
+						<td>Immutable logs of who entered where; centralized credential revocation.</td>
+					</tr>
+					<tr>
+						<td><strong>Gym Memberships</strong></td>
+						<td>Member Portal, Subscription Billing (Stripe/Maya), Check-in UI</td>
+						<td>Photo verification on tap to prevent "card sharing" fraud.</td>
+					</tr>
+					<tr>
+						<td><strong>Verification (LGU/Gov)</strong></td>
+						<td>UV/Hologram Lamination, Secure PII Database, Govt API Integration</td>
+						<td>Anti-counterfeit physical layer + secure, encrypted digital verification.</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</section>
+
+	<section>
+		<h2>12. THE BOTTOM LINE</h2>
 		<p>Kanaya is a school identity survival company that uses a mobile app to guarantee zero encoding errors and realistic 3-5 day lead times.</p>
 		<p><strong>Our goal in 2026:</strong> 3 schools, 1,500 students, ₱225k card revenue. 1 SaaS paying client. 0 government contracts, 0 corporate dashboards.</p>
 	</section>

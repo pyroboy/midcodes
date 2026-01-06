@@ -74,6 +74,7 @@
 		<section class="link-group">
 			<h3>Marketing & Media</h3>
 			<ul class="clean-links">
+				<li><a href="/admin/docs/pricing-how-it-works"><span class="icon">📈</span> Pricing & How It Works</a></li>
 				<li><a href="/admin/docs/marketing_collateral"><span class="icon">🎨</span> Marketing Assets</a></li>
 				<li><a href="/admin/docs/ads"><span class="icon">📢</span> Ads & Campaigns</a></li>
 				<li><a href="/admin/docs/social"><span class="icon">📱</span> Social Media Strategy</a></li>

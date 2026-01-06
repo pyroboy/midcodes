@@ -237,21 +237,21 @@
 				<tbody>
 					<tr>
 						<td>100 pcs</td>
-						<td>₱24.07</td>
-						<td>₱35.00 - ₱40.00</td>
+						<td>₱40.00 (Outsourced)</td>
+						<td>₱60.00 - ₱75.00</td>
 						<td>~35%</td>
 					</tr>
 					<tr>
 						<td>500 pcs</td>
-						<td>₱22.53</td>
-						<td>₱30.00 - ₱35.00</td>
-						<td>~30%</td>
+						<td>₱40.00 (Buying Price)</td>
+						<td>₱60.00 - ₱75.00</td>
+						<td>~33%</td>
 					</tr>
 					<tr>
 						<td>5,000 pcs</td>
-						<td>₱20.30</td>
-						<td>₱25.00 - ₱28.00</td>
-						<td>~20%</td>
+						<td>₱35.00 (Bulk Negotiated)</td>
+						<td>₱55.00 - ₱65.00</td>
+						<td>~36%</td>
 					</tr>
 				</tbody>
 			</table>

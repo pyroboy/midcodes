@@ -131,8 +131,8 @@
 			<div class="addon-category">
 				<h3>Lanyard Upgrades</h3>
 				<ul>
-					<li><strong>¾ Inch:</strong> ₱60.00 each</li>
-					<li><strong>1 Inch:</strong> ₱70.00 each</li>
+					<li><strong>Standard ¾ Inch:</strong> ₱60.00 each</li>
+					<li><strong>Premium 1 Inch:</strong> ₱75.00 each</li>
 					<li><strong>Custom Design Fee:</strong> ₱350.00 (Waived for bulk)</li>
 				</ul>
 			</div>
@@ -168,13 +168,13 @@
 				<tr>
 					<td><strong>Supplier 1</strong></td>
 					<td>Rush / Small Orders</td>
-					<td>High (₱62 @ 50pcs)</td>
+					<td>High (₱55 @ 50pcs)</td>
 					<td>Use only for rush jobs &lt; 50 pcs.</td>
 				</tr>
 				<tr>
 					<td><strong>Supplier 2</strong></td>
 					<td><strong>Standard / Preferred</strong></td>
-					<td><strong>Mid (₱55 @ 50pcs / ₱31 @ 1k)</strong></td>
+					<td><strong>Standard (₱40 @ 100pcs)</strong></td>
 					<td><strong>Primary choice for 90% of orders.</strong></td>
 				</tr>
 				<tr>

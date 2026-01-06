@@ -71,7 +71,7 @@
 					<td><strong>Lanyards (Cebu Source)</strong></td>
 					<td>1-inch Sublimation</td>
 					<td>Order per Project</td>
-					<td>₱45/pc</td>
+					<td>₱40/pc (Standard Outsourced)</td>
 					<td><span class="status neutral">7-Day Lead Time</span></td>
 				</tr>
 			</tbody>
@@ -95,7 +95,7 @@
 			<h3>Supplier 2: The "Volume" Source (Cebu/Tagbilaran)</h3>
 			<p><strong>Use Case:</strong> Main Lanyard Supplier.</p>
 			<ul>
-				<li><strong>Price:</strong> Mid-Range (₱36 - ₱43).</li>
+				<li><strong>Price:</strong> Mid-Range (₱35 - ₱40 Bulk).</li>
 				<li><strong>Strategy:</strong> Order 1 week in advance. Consistent quality.</li>
 				<li><strong>Contact:</strong> [Insert Local Contact Number]</li>
 			</ul>

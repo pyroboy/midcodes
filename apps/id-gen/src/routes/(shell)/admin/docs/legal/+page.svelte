@@ -96,7 +96,18 @@
 				<li><strong>Physical Waste:</strong> Any misprinted cards (rejects) are shredded physically before disposal to prevent identity theft.</li>
 			</ul>
 
-			<p><strong>4. Child Data Protection (RA 10173):</strong> In compliance with the Data Privacy Act of 2012, all student data (minors) is automatically purged and permanently deleted from Kanaya servers <strong>30 days after the school year ends</strong>, unless a contract renewal is executed prior to the deletion date.</p>
+			<p><strong>4. Data Retention & Archiving Policy (RA 10173 Compliance):</strong></p>
+			<ul>
+				<li><strong>a. Active Retention:</strong> Student data remains active and accessible in the Kanaya System for the duration of the Service Agreement with the Client (School) to facilitate annual renewals, attendance tracking, and lost card replacements.</li>
+				<li><strong>b. Archival State:</strong> Upon the end of a school year, student data is not deleted but moved to a "Frozen/Archived" state. This allows for immediate reactivation upon enrollment in the subsequent school year (Renewal).</li>
+				<li><strong>c. Permanent Deletion:</strong> Data is permanently purged from Kanaya servers only upon:
+					<ul>
+						<li>Termination: Formal termination of the contract between Kanaya and the School.</li>
+						<li>Request: Explicit written instruction from the Data Subject (Parent) or the Data Controller (School).</li>
+						<li>Dormancy: A period of two (2) years of inactivity where no renewal or interaction has occurred.</li>
+					</ul>
+				</li>
+			</ul>
 		</div>
 	</section>
 
