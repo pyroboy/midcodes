@@ -1,0 +1,35 @@
+{
+	"report_period": "January 2026",
+	"generated_at": "2026-01-07T00:00:00Z",
+	"meters": [
+		{
+			"id": 1,
+			"name": "Main Water Meter",
+			"location_type": "PROPERTY",
+			"property_id": 1,
+			"floor_id": null,
+			"rental_unit_id": null,
+			"initial_reading": 0,
+			"status": "ACTIVE"
+		}
+	],
+	"readings": [
+		{
+			"id": 1,
+			"meter_id": 1,
+			"meter_name": "Main Water Meter",
+			"reading": 2850,
+			"previous_reading": 2720,
+			"reading_date": "2026-01-01",
+			"consumption": 130,
+			"rate_at_reading": 35.00,
+			"cost": 4550.00
+		}
+	],
+	"summary": {
+		"total_consumption_cubic_meters": 130,
+		"total_cost": 4550.00,
+		"average_rate": 35.00,
+		"meters_active": 1
+	}
+}

@@ -1,0 +1,59 @@
+{
+	"report_date": "2026-01-07",
+	"generated_at": "2026-01-07T00:00:00Z",
+	"tenants": [
+		{
+			"id": 1,
+			"name": "Juan Dela Cruz",
+			"contact_number": "09171234567",
+			"email": "juan@email.com",
+			"status": "ACTIVE",
+			"rental_unit_name": "Room 101",
+			"floor_number": 1,
+			"move_in_date": "2025-06-15"
+		},
+		{
+			"id": 2,
+			"name": "Maria Santos",
+			"contact_number": "09181234567",
+			"email": "maria@email.com",
+			"status": "ACTIVE",
+			"rental_unit_name": "Room 102",
+			"floor_number": 1,
+			"move_in_date": "2025-08-01"
+		},
+		{
+			"id": 3,
+			"name": "Pedro Reyes",
+			"contact_number": "09191234567",
+			"email": "pedro@email.com",
+			"status": "PENDING",
+			"rental_unit_name": null,
+			"floor_number": null,
+			"move_in_date": null
+		}
+	],
+	"population_by_status": [
+		{ "status": "ACTIVE", "count": 24, "percentage": 80.0 },
+		{ "status": "PENDING", "count": 3, "percentage": 10.0 },
+		{ "status": "INACTIVE", "count": 2, "percentage": 6.67 },
+		{ "status": "BLACKLISTED", "count": 1, "percentage": 3.33 }
+	],
+	"occupancy_by_floor": [
+		{ "floor_id": 1, "floor_number": 1, "total_capacity": 12, "occupied": 10, "occupancy_rate": 83.33 },
+		{ "floor_id": 2, "floor_number": 2, "total_capacity": 12, "occupied": 11, "occupancy_rate": 91.67 },
+		{ "floor_id": 3, "floor_number": 3, "total_capacity": 10, "occupied": 8, "occupancy_rate": 80.00 }
+	],
+	"summary": {
+		"total_tenants": 30,
+		"active_tenants": 24,
+		"pending_tenants": 3,
+		"total_capacity": 34,
+		"overall_occupancy_rate": 85.29
+	},
+	"trends": {
+		"move_ins_this_month": 2,
+		"move_outs_this_month": 1,
+		"net_change": 1
+	}
+}

@@ -1,0 +1,74 @@
+{
+	"report_date": "2026-01-07",
+	"generated_at": "2026-01-07T00:00:00Z",
+	"contracts": [
+		{
+			"lease_id": 1,
+			"lease_name": "Dela Cruz Lease",
+			"rental_unit_name": "Room 101",
+			"tenant_names": ["Juan Dela Cruz"],
+			"start_date": "2025-06-15",
+			"end_date": "2026-06-14",
+			"rent_amount": 3500.00,
+			"security_deposit": 7000.00,
+			"status": "ACTIVE",
+			"terms_month": 12,
+			"days_until_expiry": 158
+		},
+		{
+			"lease_id": 2,
+			"lease_name": "Santos Lease",
+			"rental_unit_name": "Room 102",
+			"tenant_names": ["Maria Santos"],
+			"start_date": "2025-08-01",
+			"end_date": "2026-02-01",
+			"rent_amount": 3500.00,
+			"security_deposit": 7000.00,
+			"status": "ACTIVE",
+			"terms_month": 6,
+			"days_until_expiry": 25
+		},
+		{
+			"lease_id": 3,
+			"lease_name": "Garcia Lease",
+			"rental_unit_name": "Room 201",
+			"tenant_names": ["Ana Garcia", "Jose Garcia"],
+			"start_date": "2025-01-01",
+			"end_date": "2025-12-31",
+			"rent_amount": 5000.00,
+			"security_deposit": 10000.00,
+			"status": "EXPIRED",
+			"terms_month": 12,
+			"days_until_expiry": null
+		}
+	],
+	"contracts_by_status": [
+		{ "status": "ACTIVE", "count": 24, "total_rent_value": 86000.00 },
+		{ "status": "EXPIRED", "count": 3, "total_rent_value": 0 },
+		{ "status": "PENDING", "count": 2, "total_rent_value": 7000.00 },
+		{ "status": "TERMINATED", "count": 1, "total_rent_value": 0 }
+	],
+	"summary": {
+		"total_contracts": 30,
+		"active_contracts": 24,
+		"expiring_within_30_days": 3,
+		"expiring_within_60_days": 5,
+		"total_monthly_rent": 86000.00,
+		"total_security_deposits": 172000.00
+	},
+	"renewals_due": [
+		{
+			"lease_id": 2,
+			"lease_name": "Santos Lease",
+			"rental_unit_name": "Room 102",
+			"tenant_names": ["Maria Santos"],
+			"start_date": "2025-08-01",
+			"end_date": "2026-02-01",
+			"rent_amount": 3500.00,
+			"security_deposit": 7000.00,
+			"status": "ACTIVE",
+			"terms_month": 6,
+			"days_until_expiry": 25
+		}
+	]
+}

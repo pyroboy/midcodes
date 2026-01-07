@@ -318,6 +318,30 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
+  apps/dorm-docs:
+    devDependencies:
+      '@sveltejs/adapter-auto':
+        specifier: ^4.0.0
+        version: 4.0.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))
+      '@sveltejs/kit':
+        specifier: ^2.16.0
+        version: 2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5.0.0
+        version: 5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      svelte:
+        specifier: ^5.0.0
+        version: 5.45.9
+      svelte-check:
+        specifier: ^4.0.0
+        version: 4.3.4(picomatch@4.0.3)(svelte@5.45.9)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)
+
   apps/events:
     dependencies:
       '@faker-js/faker':
@@ -483,6 +507,30 @@ importers:
       zod:
         specifier: ^3.23.8
         version: 3.25.76
+
+  apps/foodhub:
+    devDependencies:
+      '@sveltejs/adapter-auto':
+        specifier: ^4.0.0
+        version: 4.0.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))
+      '@sveltejs/kit':
+        specifier: ^2.16.0
+        version: 2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5.0.0
+        version: 5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      svelte:
+        specifier: ^5.0.0
+        version: 5.45.9
+      svelte-check:
+        specifier: ^4.0.0
+        version: 4.3.4(picomatch@4.0.3)(svelte@5.45.9)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)
 
   apps/id-gen:
     dependencies:
@@ -1206,6 +1254,54 @@ importers:
       unist-util-visit:
         specifier: ^5.0.0
         version: 5.0.0
+    devDependencies:
+      '@sveltejs/adapter-auto':
+        specifier: ^4.0.0
+        version: 4.0.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))
+      '@sveltejs/kit':
+        specifier: ^2.16.0
+        version: 2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5.0.0
+        version: 5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      svelte:
+        specifier: ^5.0.0
+        version: 5.45.9
+      svelte-check:
+        specifier: ^4.0.0
+        version: 4.3.4(picomatch@4.0.3)(svelte@5.45.9)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)
+
+  apps/sweetytreats:
+    devDependencies:
+      '@sveltejs/adapter-auto':
+        specifier: ^4.0.0
+        version: 4.0.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))
+      '@sveltejs/kit':
+        specifier: ^2.16.0
+        version: 2.49.2(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^5.0.0
+        version: 5.1.1(svelte@5.45.9)(vite@6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+      svelte:
+        specifier: ^5.0.0
+        version: 5.45.9
+      svelte-check:
+        specifier: ^4.0.0
+        version: 4.3.4(picomatch@4.0.3)(svelte@5.45.9)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)
+
+  apps/tattoo-docs:
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^4.0.0

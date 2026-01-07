@@ -1,0 +1,46 @@
+{
+	"report_month": "January 2026",
+	"generated_at": "2026-01-07T00:00:00Z",
+	"revenue": {
+		"month": "January 2026",
+		"rent_collected": 78500.00,
+		"utility_collected": 9850.00,
+		"penalties_collected": 300.00,
+		"other_collected": 1200.00,
+		"total_collected": 89850.00
+	},
+	"expenses": {
+		"month": "January 2026",
+		"utilities": 11675.00,
+		"maintenance": 5200.00,
+		"supplies": 1800.00,
+		"other": 2500.00,
+		"total_expenses": 21175.00
+	},
+	"occupancy": {
+		"month": "January 2026",
+		"total_units": 34,
+		"occupied_units": 29,
+		"occupancy_rate": 85.29,
+		"move_ins": 2,
+		"move_outs": 1
+	},
+	"summary": {
+		"gross_revenue": 89850.00,
+		"total_expenses": 21175.00,
+		"net_income": 68675.00,
+		"profit_margin": 76.43,
+		"occupancy_rate": 85.29
+	},
+	"year_to_date": {
+		"total_revenue": 89850.00,
+		"total_expenses": 21175.00,
+		"net_income": 68675.00
+	},
+	"trend_data": [
+		{ "month": "October 2025", "rent_collected": 75000.00, "utility_collected": 8500.00, "penalties_collected": 200.00, "other_collected": 800.00, "total_collected": 84500.00 },
+		{ "month": "November 2025", "rent_collected": 76500.00, "utility_collected": 9200.00, "penalties_collected": 150.00, "other_collected": 1000.00, "total_collected": 86850.00 },
+		{ "month": "December 2025", "rent_collected": 77200.00, "utility_collected": 10500.00, "penalties_collected": 250.00, "other_collected": 900.00, "total_collected": 88850.00 },
+		{ "month": "January 2026", "rent_collected": 78500.00, "utility_collected": 9850.00, "penalties_collected": 300.00, "other_collected": 1200.00, "total_collected": 89850.00 }
+	]
+}

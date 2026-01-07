@@ -82,6 +82,27 @@
 			</ul>
 		</section>
 
+		<section class="link-group business-plan">
+			<h3>📋 Business Plan</h3>
+			<ul class="clean-links">
+				<li><a href="/admin/docs/business-plan/01-executive-summary"><span class="icon">01</span> Executive Summary</a></li>
+				<li><a href="/admin/docs/business-plan/02-company-overview"><span class="icon">02</span> Company Overview</a></li>
+				<li><a href="/admin/docs/business-plan/03-market-analysis"><span class="icon">03</span> Market Analysis</a></li>
+				<li><a href="/admin/docs/business-plan/04-products"><span class="icon">04</span> Products & Services</a></li>
+				<li><a href="/admin/docs/business-plan/05-marketing"><span class="icon">05</span> Marketing Strategy</a></li>
+				<li><a href="/admin/docs/business-plan/06-operations"><span class="icon">06</span> Operational Plan</a></li>
+				<li><a href="/admin/docs/business-plan/07-organization"><span class="icon">07</span> Organization</a></li>
+				<li><a href="/admin/docs/business-plan/08-financial-plan"><span class="icon">08</span> Financial Plan</a></li>
+				<li><a href="/admin/docs/business-plan/09-risk-management"><span class="icon">09</span> Risk Management</a></li>
+				<li><a href="/admin/docs/business-plan/10-investment"><span class="icon">10</span> Investment Tiers</a></li>
+				<li><a href="/admin/docs/business-plan/11-initial-totex"><span class="icon">11</span> Initial TOTEX</a></li>
+				<li><a href="/admin/docs/business-plan/12-pricing"><span class="icon">12</span> Pricing Strategy</a></li>
+				<li><a href="/admin/docs/business-plan/13-gtm"><span class="icon">13</span> Go-To-Market</a></li>
+				<li><a href="/admin/docs/business-plan/14-inventory-supply"><span class="icon">14</span> Inventory Supply</a></li>
+				<li><a href="/admin/docs/business-plan/15-appendices"><span class="icon">15</span> Appendices</a></li>
+			</ul>
+		</section>
+
 		<section class="link-group llm-special">
 			<h3>Developer Resources</h3>
 			<ul class="clean-links">
@@ -301,6 +322,22 @@
 
 	.llm-special a:hover {
 		color: #63b3ed;
+	}
+
+	.business-plan {
+		background: linear-gradient(135deg, #f0f7ff, #e0f2fe);
+		border: 2px solid #3b82f6;
+	}
+
+	.business-plan h3 {
+		color: #1e40af;
+		border-color: #93c5fd;
+	}
+
+	.business-plan .icon {
+		font-size: 0.85rem;
+		font-weight: 700;
+		color: #3b82f6;
 	}
 
 	/* Widgets Section */

@@ -1,0 +1,139 @@
+{
+	"report_date": "2026-01-07",
+	"generated_at": "2026-01-07T00:00:00Z",
+	"projects": [
+		{
+			"id": 1,
+			"project_name": "Roof Repair & Replacement",
+			"project_description": "Fix leaking sections and replace old roofing on Floor 3",
+			"project_category": "MAINTENANCE",
+			"planned_amount": 25000.00,
+			"pending_amount": 0,
+			"actual_amount": 25000.00,
+			"budget_items": [
+				{ "name": "Roofing Sheets", "category": "MATERIALS", "planned_amount": 15000.00, "actual_amount": 16000.00, "variance": -1000.00 },
+				{ "name": "Labor", "category": "SERVICE", "planned_amount": 10000.00, "actual_amount": 9000.00, "variance": 1000.00 }
+			],
+			"status": "COMPLETED",
+			"start_date": "2025-11-01",
+			"end_date": "2025-12-15",
+			"property_id": 1,
+			"property_name": "Main Dormitory",
+			"progress_percentage": 100
+		},
+		{
+			"id": 2,
+			"project_name": "Kitchen Renovation",
+			"project_description": "Renovate 2nd Floor Kitchen, Cabinets and Gate Upgrade",
+			"project_category": "CAPITAL",
+			"planned_amount": 150000.00,
+			"pending_amount": 105000.00,
+			"actual_amount": 45000.00,
+			"budget_items": [
+				{ "name": "Cabinets (Materials)", "category": "MATERIALS", "planned_amount": 45000.00, "actual_amount": 45000.00, "variance": 0.00 }
+			],
+			"status": "IN_PROGRESS",
+			"start_date": "2026-01-10",
+			"end_date": "2026-02-28",
+			"property_id": 1,
+			"property_name": "Main Dormitory",
+			"progress_percentage": 30
+		},
+		{
+			"id": 3,
+			"project_name": "CCTV Installation",
+			"project_description": "Anti-theft security cameras for water/cistern area and common halls",
+			"project_category": "CAPITAL",
+			"planned_amount": 45000.00,
+			"pending_amount": 0,
+			"actual_amount": 42000.00,
+			"budget_items": [
+				{ "name": "Cameras & DVR", "category": "EQUIPMENT", "planned_amount": 35000.00, "actual_amount": 34000.00, "variance": 1000.00 },
+				{ "name": "Installation Service", "category": "SERVICE", "planned_amount": 10000.00, "actual_amount": 8000.00, "variance": 2000.00 }
+			],
+			"status": "COMPLETED",
+			"start_date": "2025-12-01",
+			"end_date": "2025-12-30",
+			"property_id": 1,
+			"property_name": "Main Dormitory",
+			"progress_percentage": 100
+		},
+		{
+			"id": 4,
+			"project_name": "Meters Installation",
+			"project_description": "Submetering for 13 Rooms (Electric)",
+			"project_category": "CAPITAL",
+			"planned_amount": 20000.00,
+			"pending_amount": 0,
+			"actual_amount": 18500.00,
+			"budget_items": [],
+			"status": "COMPLETED",
+			"start_date": "2025-10-15",
+			"end_date": "2025-10-31",
+			"property_id": 1,
+			"property_name": "Main Dormitory",
+			"progress_percentage": 100
+		},
+		{
+			"id": 5,
+			"project_name": "Cistern Rehabilitation",
+			"project_description": "Water tank and sump repairs/improvements",
+			"project_category": "MAINTENANCE",
+			"planned_amount": 30000.00,
+			"pending_amount": 30000.00,
+			"actual_amount": 0.00,
+			"budget_items": [],
+			"status": "PLANNED",
+			"start_date": "2026-03-01",
+			"end_date": "2026-03-31",
+			"property_id": 1,
+			"property_name": "Main Dormitory",
+			"progress_percentage": 0
+		},
+        {
+			"id": 6,
+			"project_name": "Aircon Installation",
+			"project_description": "Install new AC units for Room 1 & 2",
+			"project_category": "CAPITAL",
+			"planned_amount": 50000.00,
+			"pending_amount": 50000.00,
+			"actual_amount": 0.00,
+			"budget_items": [],
+			"status": "PLANNED",
+			"start_date": "2026-02-15",
+			"end_date": "2026-02-28",
+			"property_id": 1,
+			"property_name": "Main Dormitory",
+			"progress_percentage": 0
+		}
+	],
+	"projects_by_status": [
+		{ "status": "COMPLETED", "count": 3, "total_budget": 90000.00, "total_spent": 85500.00 },
+		{ "status": "IN_PROGRESS", "count": 1, "total_budget": 150000.00, "total_spent": 45000.00 },
+		{ "status": "PLANNED", "count": 2, "total_budget": 80000.00, "total_spent": 0.00 }
+	],
+	"summary": {
+		"total_projects": 6,
+		"active_projects": 1,
+		"completed_projects": 3,
+		"total_planned_budget": 320000.00,
+		"total_actual_spent": 130500.00,
+		"budget_variance": 139500.00
+	},
+	"upcoming_projects": [
+		{
+			"id": 5,
+			"project_name": "Cistern Rehabilitation",
+			"project_category": "MAINTENANCE",
+			"planned_amount": 30000.00,
+			"start_date": "2026-03-01"
+		},
+         {
+			"id": 6,
+			"project_name": "Aircon Installation",
+			"project_category": "CAPITAL",
+			"planned_amount": 50000.00,
+			"start_date": "2026-02-15"
+		}
+	]
+}

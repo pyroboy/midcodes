@@ -1,0 +1,78 @@
+{
+	"report_period": "January 2026",
+	"generated_at": "2026-01-07T00:00:00Z",
+	"meters": [
+		{
+			"id": 1,
+			"name": "Main Building Meter",
+			"location_type": "PROPERTY",
+			"property_id": 1,
+			"floor_id": null,
+			"rental_unit_id": null,
+			"initial_reading": 0,
+			"status": "ACTIVE"
+		},
+		{
+			"id": 2,
+			"name": "Floor 1 Sub-Meter",
+			"location_type": "FLOOR",
+			"property_id": 1,
+			"floor_id": 1,
+			"rental_unit_id": null,
+			"initial_reading": 0,
+			"status": "ACTIVE"
+		},
+		{
+			"id": 3,
+			"name": "Floor 2 Sub-Meter",
+			"location_type": "FLOOR",
+			"property_id": 1,
+			"floor_id": 2,
+			"rental_unit_id": null,
+			"initial_reading": 0,
+			"status": "ACTIVE"
+		}
+	],
+	"readings": [
+		{
+			"id": 1,
+			"meter_id": 1,
+			"meter_name": "Main Building Meter",
+			"reading": 15420,
+			"previous_reading": 14850,
+			"reading_date": "2026-01-01",
+			"consumption": 570,
+			"rate_at_reading": 12.50,
+			"cost": 7125.00
+		},
+		{
+			"id": 2,
+			"meter_id": 2,
+			"meter_name": "Floor 1 Sub-Meter",
+			"reading": 4280,
+			"previous_reading": 4050,
+			"reading_date": "2026-01-01",
+			"consumption": 230,
+			"rate_at_reading": 12.50,
+			"cost": 2875.00
+		},
+		{
+			"id": 3,
+			"meter_id": 3,
+			"meter_name": "Floor 2 Sub-Meter",
+			"reading": 3890,
+			"previous_reading": 3680,
+			"reading_date": "2026-01-01",
+			"consumption": 210,
+			"rate_at_reading": 12.50,
+			"cost": 2625.00
+		}
+	],
+	"summary": {
+		"total_consumption_kwh": 570,
+		"total_cost": 7125.00,
+		"average_rate": 12.50,
+		"meters_active": 3,
+		"meters_inactive": 0
+	}
+}

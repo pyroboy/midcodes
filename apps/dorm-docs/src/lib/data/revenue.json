@@ -1,0 +1,58 @@
+{
+	"report_period": "January 2026",
+	"generated_at": "2026-01-07T00:00:00Z",
+	"payments": [
+		{
+			"id": 1,
+			"amount": 3500.00,
+			"method": "GCASH",
+			"reference_number": "GC2026010712345",
+			"paid_by": "Juan Dela Cruz",
+			"paid_at": "2026-01-05T10:30:00Z",
+			"notes": "January rent",
+			"billing_type": "RENT"
+		},
+		{
+			"id": 2,
+			"amount": 850.00,
+			"method": "CASH",
+			"reference_number": null,
+			"paid_by": "Maria Santos",
+			"paid_at": "2026-01-03T14:00:00Z",
+			"notes": "Electric bill",
+			"billing_type": "UTILITY"
+		},
+		{
+			"id": 3,
+			"amount": 3500.00,
+			"method": "BANK",
+			"reference_number": "BDO2026010154321",
+			"paid_by": "Pedro Reyes",
+			"paid_at": "2026-01-06T09:15:00Z",
+			"notes": "January rent payment",
+			"billing_type": "RENT"
+		}
+	],
+	"revenue_by_type": [
+		{ "type": "RENT", "total_billed": 86000.00, "total_collected": 78500.00, "outstanding": 7500.00, "collection_rate": 91.28 },
+		{ "type": "UTILITY", "total_billed": 11675.00, "total_collected": 9850.00, "outstanding": 1825.00, "collection_rate": 84.37 },
+		{ "type": "PENALTY", "total_billed": 500.00, "total_collected": 300.00, "outstanding": 200.00, "collection_rate": 60.00 },
+		{ "type": "SERVICE", "total_billed": 1200.00, "total_collected": 1200.00, "outstanding": 0, "collection_rate": 100.00 }
+	],
+	"revenue_by_method": [
+		{ "method": "GCASH", "total_amount": 45200.00, "transaction_count": 18, "percentage": 50.33 },
+		{ "method": "CASH", "total_amount": 28500.00, "transaction_count": 22, "percentage": 31.74 },
+		{ "method": "BANK", "total_amount": 16100.00, "transaction_count": 8, "percentage": 17.93 }
+	],
+	"summary": {
+		"total_billed": 99375.00,
+		"total_collected": 89850.00,
+		"total_outstanding": 9525.00,
+		"collection_rate": 90.42,
+		"transaction_count": 48
+	},
+	"comparison": {
+		"previous_period_collected": 85200.00,
+		"change_percentage": 5.46
+	}
+}
