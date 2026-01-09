@@ -1,0 +1,102 @@
+{
+  "electricity": {
+    "rate": {
+      "perKwh": 12,
+      "currency": "PHP",
+      "provider": "Local Electric Cooperative",
+      "notes": "Standard commercial rate"
+    },
+    "appliances": [
+      { "id": "UT-EL-001", "name": "Refrigerator (2-Door)", "watts": 150, "hoursPerDay": 24, "kwhPerDay": 3.6, "dailyCost": 43.20, "monthlyCost": 1296 },
+      { "id": "UT-EL-002", "name": "Chest Freezer (Large)", "watts": 200, "hoursPerDay": 24, "kwhPerDay": 4.8, "dailyCost": 57.60, "monthlyCost": 1728 },
+      { "id": "UT-EL-003", "name": "Rice Cooker (10-cup) x2", "watts": 700, "hoursPerDay": 6, "kwhPerDay": 4.2, "dailyCost": 50.40, "monthlyCost": 1512 },
+      { "id": "UT-EL-004", "name": "Electric Fan", "watts": 75, "hoursPerDay": 12, "kwhPerDay": 0.9, "dailyCost": 10.80, "monthlyCost": 324 },
+      { "id": "UT-EL-005", "name": "LED Lighting (Store)", "watts": 100, "hoursPerDay": 14, "kwhPerDay": 1.4, "dailyCost": 16.80, "monthlyCost": 504 },
+      { "id": "UT-EL-006", "name": "POS System / Computer", "watts": 150, "hoursPerDay": 12, "kwhPerDay": 1.8, "dailyCost": 21.60, "monthlyCost": 648 },
+      { "id": "UT-EL-007", "name": "Electric Kettle", "watts": 1500, "hoursPerDay": 0.5, "kwhPerDay": 0.75, "dailyCost": 9.00, "monthlyCost": 270 },
+      { "id": "UT-EL-008", "name": "Phone Chargers / Misc", "watts": 50, "hoursPerDay": 8, "kwhPerDay": 0.4, "dailyCost": 4.80, "monthlyCost": 144 }
+    ],
+    "summary": {
+      "totalDailyKwh": 17.85,
+      "totalDailyCost": 214.20,
+      "totalMonthlyCost": 6426,
+      "notes": "Estimated based on typical usage patterns for a silog stall"
+    }
+  },
+  "lpg": {
+    "tank": {
+      "id": "UT-LPG-001",
+      "name": "LPG Tank (11kg)",
+      "price": 952.50,
+      "priceRange": { "floor": 803.04, "ceiling": 1102.00 },
+      "capacity": 11,
+      "capacityUnit": "kg",
+      "pricePerKg": 86.59,
+      "supplier": "Authorized Dealer",
+      "frequency": "weekly",
+      "notes": "January 2026 average price. Bohol premium: ₱1,050-1,150"
+    },
+    "energyContent": {
+      "mjPerKg": 49,
+      "kwhPerKg": 13.61,
+      "totalTankEnergy": 149.71,
+      "costPerKwh": 6.36,
+      "notes": "LPG contains ~49 MJ/kg = 13.61 kWh/kg"
+    },
+    "consumptionRates": {
+      "formula": "0.073 kg per kW per hour",
+      "burners": [
+        { "type": "Small Burner (Low/Simmer)", "kw": 0.3, "gramsPerHour": 22, "costPerHour": 1.90, "tankLifeHours": 500 },
+        { "type": "Small Burner (High)", "kw": 1.0, "gramsPerHour": 73, "costPerHour": 6.32, "tankLifeHours": 150 },
+        { "type": "Medium Burner (High)", "kw": 1.75, "gramsPerHour": 128, "costPerHour": 11.08, "tankLifeHours": 86 },
+        { "type": "Large Burner (High)", "kw": 2.5, "gramsPerHour": 183, "costPerHour": 15.85, "tankLifeHours": 60 },
+        { "type": "Wok Burner (Max)", "kw": 3.5, "gramsPerHour": 256, "costPerHour": 22.17, "tankLifeHours": 43 },
+        { "type": "Gas Oven (350°F avg)", "kw": 2.5, "gramsPerHour": 183, "costPerHour": 15.85, "tankLifeHours": 60 },
+        { "type": "Infrared Burner (High)", "kw": 1.8, "gramsPerHour": 131, "costPerHour": 11.34, "tankLifeHours": 84 }
+      ],
+      "notes": "Based on January 2026 DOE data and thermodynamic calculations"
+    },
+    "typicalSilogOperation": {
+      "description": "Mixed usage: sinangag frying (medium-high) + egg frying + protein cooking",
+      "estimatedAvgKw": 2.0,
+      "avgCostPerHour": 14.19,
+      "estimatedHoursPerDay": 6,
+      "dailyCost": 85.14,
+      "weeklyCost": 595.98,
+      "monthlyCost": 2554.20,
+      "tanksPerMonth": 2.68,
+      "notes": "Realistic silog stall usage - not constant max output"
+    }
+  },
+  "water": {
+    "rate": {
+      "perCubicMeter": 35,
+      "currency": "PHP",
+      "provider": "Local Water District",
+      "notes": "Commercial rate"
+    },
+    "estimatedUsage": {
+      "dailyCubicMeters": 0.5,
+      "dailyCost": 17.50,
+      "monthlyCubicMeters": 15,
+      "monthlyCost": 525,
+      "notes": "Includes dishwashing, cooking, cleaning"
+    }
+  },
+  "summary": {
+    "monthlyUtilityCosts": {
+      "electricity": 6426,
+      "lpg": 2554,
+      "water": 525,
+      "total": 9505,
+      "notes": "Based on realistic silog stall operation, not max intensity"
+    },
+    "dailyUtilityCosts": {
+      "electricity": 214.20,
+      "lpg": 85.14,
+      "water": 17.50,
+      "total": 316.84,
+      "notes": "Realistic daily operating costs"
+    }
+  }
+}

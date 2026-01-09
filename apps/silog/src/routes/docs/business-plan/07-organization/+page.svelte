@@ -140,7 +140,7 @@
     .org-card.dark p { color: #cbd5e1; }
     .org-card p { font-size: 0.95rem; margin: 0; }
 
-    ul, ol { margin-bottom: 1.5rem; list-style-position: inside; }
+    ul { margin-bottom: 1.5rem; list-style-position: inside; }
     li { margin-bottom: 0.5rem; font-size: 1.05rem; color: #334155; }
     .simple-list li { list-style: none; padding-left: 0; margin-bottom: 1rem; }
     .simple-list li strong { display: block; margin-bottom: 0.25rem; color: #0f172a; }

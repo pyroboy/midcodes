@@ -1,0 +1,71 @@
+{
+  "cooking": [
+    { "name": "Gas Stove (2-Burner)", "qty": 2, "unitPrice": 3500, "notes": "Heavy duty, commercial grade" },
+    { "name": "LPG Regulator", "qty": 2, "unitPrice": 500, "notes": "With hose" },
+    { "name": "Wok (Large)", "qty": 2, "unitPrice": 800, "notes": "14-inch, carbon steel" },
+    { "name": "Frying Pan (Non-stick)", "qty": 3, "unitPrice": 500, "notes": "Various sizes" },
+    { "name": "Sauce Pan (Medium)", "qty": 2, "unitPrice": 400, "notes": "For gravies and sauces" },
+    { "name": "Stock Pot (Large)", "qty": 1, "unitPrice": 1500, "notes": "For lugaw batch cooking" },
+    { "name": "Rice Cooker (10-cup)", "qty": 2, "unitPrice": 2500, "notes": "Commercial grade" },
+    { "name": "Deep Fryer Basket", "qty": 2, "unitPrice": 300, "notes": "For shanghai, pork chop" },
+    { "name": "Grill Pan / Griddle", "qty": 1, "unitPrice": 1200, "notes": "For BBQ, hotdog" },
+    { "name": "Sizzling Plate (Oval)", "qty": 6, "unitPrice": 250, "notes": "For sisig serving" },
+    { "name": "Sizzling Plate Holder", "qty": 6, "unitPrice": 150, "notes": "Wooden base" }
+  ],
+  "coldStorage": [
+    { "name": "Refrigerator (2-Door)", "qty": 1, "unitPrice": 25000, "notes": "For daily proteins, vegetables" },
+    { "name": "Chest Freezer (Large)", "qty": 1, "unitPrice": 18000, "notes": "For frozen goods, processed meats" },
+    { "name": "Ice Bin / Cooler", "qty": 1, "unitPrice": 2500, "notes": "For drinks service" },
+    { "name": "Food Storage Containers", "qty": 20, "unitPrice": 150, "notes": "Various sizes, airtight" }
+  ],
+  "prepTools": [
+    { "name": "Digital Kitchen Scale", "qty": 2, "unitPrice": 500, "notes": "5kg capacity, 1g precision" },
+    { "name": "Chopping Board (White)", "qty": 2, "unitPrice": 300, "notes": "For cooked food" },
+    { "name": "Chopping Board (Red)", "qty": 1, "unitPrice": 300, "notes": "For raw meat" },
+    { "name": "Chopping Board (Green)", "qty": 1, "unitPrice": 300, "notes": "For vegetables" },
+    { "name": "Chopping Board (Yellow)", "qty": 1, "unitPrice": 300, "notes": "For poultry" },
+    { "name": "Chef's Knife (8-inch)", "qty": 2, "unitPrice": 800, "notes": "Stainless steel" },
+    { "name": "Paring Knife", "qty": 2, "unitPrice": 200, "notes": "For detailed cutting" },
+    { "name": "Meat Cleaver", "qty": 1, "unitPrice": 600, "notes": "For bones" },
+    { "name": "Kitchen Shears", "qty": 2, "unitPrice": 150, "notes": "Multi-purpose" },
+    { "name": "Garlic Press", "qty": 2, "unitPrice": 150, "notes": "For efficient garlic prep" },
+    { "name": "Grater (Box Type)", "qty": 1, "unitPrice": 200, "notes": "For ginger, vegetables" },
+    { "name": "Mortar & Pestle", "qty": 1, "unitPrice": 250, "notes": "For grinding" },
+    { "name": "Mixing Bowls (Stainless)", "qty": 6, "unitPrice": 200, "notes": "Various sizes" },
+    { "name": "Colander / Strainer", "qty": 2, "unitPrice": 250, "notes": "Large size" },
+    { "name": "Measuring Cups Set", "qty": 2, "unitPrice": 150, "notes": "Plastic or stainless" },
+    { "name": "Measuring Spoons Set", "qty": 2, "unitPrice": 100, "notes": "For precise seasoning" }
+  ],
+  "servingTools": [
+    { "name": "Rice Scoop (200g Mark)", "qty": 3, "unitPrice": 100, "notes": "For consistent rice portions" },
+    { "name": "Porridge Ladle (300ml)", "qty": 2, "unitPrice": 150, "notes": "For lugaw" },
+    { "name": "Sauce Spoons (15ml)", "qty": 4, "unitPrice": 50, "notes": "For condiments" },
+    { "name": "Sauce Spoons (30ml)", "qty": 4, "unitPrice": 50, "notes": "For dips" },
+    { "name": "Ice Scoop (100g)", "qty": 2, "unitPrice": 80, "notes": "For drinks" },
+    { "name": "Portion Cups (1oz)", "qty": 100, "unitPrice": 1, "notes": "For sauces, available in consumables" },
+    { "name": "Portion Cups (2oz)", "qty": 100, "unitPrice": 1.5, "notes": "For dips" },
+    { "name": "Portion Cups (4oz)", "qty": 50, "unitPrice": 2, "notes": "For sides" },
+    { "name": "Tongs (Kitchen)", "qty": 4, "unitPrice": 150, "notes": "For meat handling" },
+    { "name": "Spatula (Large)", "qty": 3, "unitPrice": 100, "notes": "For sinangag, frying" },
+    { "name": "Slotted Spoon", "qty": 2, "unitPrice": 100, "notes": "For draining" }
+  ],
+  "dineIn": [
+    { "name": "Dining Table (4-seater)", "qty": 4, "unitPrice": 3000, "notes": "Plastic or stainless" },
+    { "name": "Monoblock Chairs", "qty": 16, "unitPrice": 350, "notes": "With armrest" },
+    { "name": "Plate (Melamine, 10-inch)", "qty": 24, "unitPrice": 80, "notes": "Durable, stackable" },
+    { "name": "Bowl (Melamine, Lugaw)", "qty": 12, "unitPrice": 60, "notes": "For lugaw dine-in" },
+    { "name": "Spoon & Fork (Stainless)", "qty": 24, "unitPrice": 30, "notes": "Per pair" },
+    { "name": "Drinking Glasses", "qty": 24, "unitPrice": 25, "notes": "For water service" },
+    { "name": "Condiment Holder", "qty": 4, "unitPrice": 150, "notes": "For soy sauce, vinegar, etc." },
+    { "name": "Tissue Dispenser", "qty": 4, "unitPrice": 100, "notes": "Table-top" },
+    { "name": "Menu Stand / Holder", "qty": 4, "unitPrice": 80, "notes": "Acrylic" }
+  ],
+  "cleaning": [
+    { "name": "3-Compartment Sink", "qty": 1, "unitPrice": 8000, "notes": "Stainless steel, for wash-rinse-sanitize" },
+    { "name": "Dish Rack (Large)", "qty": 2, "unitPrice": 500, "notes": "Stainless steel" },
+    { "name": "Mop & Bucket Set", "qty": 2, "unitPrice": 400, "notes": "With wringer" },
+    { "name": "Broom & Dustpan", "qty": 2, "unitPrice": 150, "notes": "Soft and stiff bristle" },
+    { "name": "Trash Bin (Covered)", "qty": 3, "unitPrice": 500, "notes": "Kitchen, dine-in, exterior" },
+    { "name": "Hand Wash Station", "qty": 1, "unitPrice": 2000, "notes": "With soap dispenser" }
+  ]
+}

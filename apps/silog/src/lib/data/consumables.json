@@ -1,0 +1,284 @@
+{
+  "packaging": {
+    "containers": [
+      {
+        "id": "PKG-001",
+        "name": "390cc Paper Bowl (Laminated)",
+        "spec": "Laminated, No-Microwave",
+        "useCase": "Lugaw / Soup Takeout",
+        "unit": "Pack (50s)",
+        "unitQty": 50,
+        "pricePerPc": 4.00,
+        "packPrice": 200,
+        "manilaBase": 1.80,
+        "landedCost": 9.80,
+        "boholLocal": 4.00,
+        "bestStrategy": "LOCAL (Alturas/Dao)",
+        "supplier": "Alturas Mall / Dao Market",
+        "reorderPoint": 100,
+        "notes": "Air freight makes online uneconomical - buy local"
+      },
+      {
+        "id": "PKG-002",
+        "name": "Paper Bowl Lid (390cc)",
+        "spec": "Clear Plastic Lid",
+        "useCase": "Lugaw Bowl Cover",
+        "unit": "Pack (50s)",
+        "unitQty": 50,
+        "pricePerPc": 0.60,
+        "packPrice": 30,
+        "boholLocal": 0.60,
+        "bestStrategy": "LOCAL (Alturas/Dao)",
+        "supplier": "Alturas Mall / Dao Market",
+        "reorderPoint": 100
+      },
+      {
+        "id": "PKG-003",
+        "name": "LB1 Meal Box (White Laminated)",
+        "spec": "White Laminated, Flat Style",
+        "useCase": "Silog Takeout (Standard)",
+        "unit": "Pack (50s)",
+        "unitQty": 50,
+        "pricePerPc": 5.00,
+        "packPrice": 250,
+        "manilaBase": 2.80,
+        "landedCost": 7.10,
+        "boholLocal": 5.00,
+        "bestStrategy": "LOCAL (Unitop/ICM)",
+        "supplier": "Unitop / ICM / Alturas",
+        "reorderPoint": 100,
+        "notes": "Shopee landed cost higher than local retail"
+      },
+      {
+        "id": "PKG-003B",
+        "name": "LB1 Meal Box (Trigem Bulk)",
+        "spec": "Trigem Brand, Sea Freight Bulk",
+        "useCase": "Silog Takeout (Volume)",
+        "unit": "Pack (50s)",
+        "unitQty": 50,
+        "pricePerPc": 3.62,
+        "packPrice": 181,
+        "manilaBase": 3.04,
+        "landedCost": 3.62,
+        "boholLocal": 5.00,
+        "bestStrategy": "BULK SEA FREIGHT (Capex)",
+        "supplier": "Manila Wholesaler via Capex",
+        "reorderPoint": 500,
+        "notes": "Best for >5,000 units/month - requires CapEx sea freight"
+      },
+      {
+        "id": "PKG-004",
+        "name": "Plastic Cup (16oz)",
+        "spec": "Clear PP Plastic",
+        "useCase": "Cold Drinks",
+        "unit": "Pack (50s)",
+        "unitQty": 50,
+        "pricePerPc": 2.00,
+        "packPrice": 100,
+        "boholLocal": 2.00,
+        "bestStrategy": "LOCAL",
+        "supplier": "Alturas / Grocery",
+        "reorderPoint": 100
+      },
+      {
+        "id": "PKG-005",
+        "name": "Cup Lid (16oz)",
+        "spec": "Dome Lid with Hole",
+        "useCase": "Cold Drinks",
+        "unit": "Pack (50s)",
+        "unitQty": 50,
+        "pricePerPc": 0.50,
+        "packPrice": 25,
+        "boholLocal": 0.50,
+        "bestStrategy": "LOCAL",
+        "supplier": "Alturas / Grocery",
+        "reorderPoint": 100
+      }
+    ],
+    "utensils": [
+      {
+        "id": "PKG-U01",
+        "name": "Bamboo Chopsticks",
+        "spec": "Bamboo, High Density",
+        "useCase": "Budget Silog Cutlery",
+        "unit": "Pack (100 pairs)",
+        "unitQty": 100,
+        "pricePerPc": 0.45,
+        "packPrice": 45,
+        "manilaBase": 0.45,
+        "landedCost": 0.55,
+        "boholLocal": 0.90,
+        "bestStrategy": "ONLINE (Shopee)",
+        "supplier": "Shopee / J&T",
+        "reorderPoint": 200,
+        "notes": "High density item - online is 40% cheaper"
+      },
+      {
+        "id": "PKG-U02",
+        "name": "Plastic Spoon (Reinforced White)",
+        "spec": "Reinforced White Plastic",
+        "useCase": "Lugaw / Soup",
+        "unit": "Pack (100s)",
+        "unitQty": 100,
+        "pricePerPc": 0.60,
+        "packPrice": 60,
+        "manilaBase": 0.50,
+        "landedCost": 0.70,
+        "boholLocal": 0.60,
+        "bestStrategy": "LOCAL (Wholesale)",
+        "supplier": "Dao Market / Wholesale",
+        "reorderPoint": 200
+      },
+      {
+        "id": "PKG-U03",
+        "name": "Spoon & Fork Set (Plastic)",
+        "spec": "Wrapped S/F Set",
+        "useCase": "Silog Standard Cutlery",
+        "unit": "Pack (50 sets)",
+        "unitQty": 50,
+        "pricePerPc": 0.90,
+        "packPrice": 45,
+        "boholLocal": 0.90,
+        "bestStrategy": "LOCAL",
+        "supplier": "Unitop / ICM",
+        "reorderPoint": 100
+      },
+      {
+        "id": "PKG-U04",
+        "name": "Straws",
+        "spec": "Plastic Bendable",
+        "useCase": "Cold Drinks",
+        "unit": "Pack (100s)",
+        "unitQty": 100,
+        "pricePerPc": 0.50,
+        "packPrice": 50,
+        "boholLocal": 0.50,
+        "bestStrategy": "LOCAL",
+        "supplier": "Grocery / Market",
+        "reorderPoint": 200
+      }
+    ],
+    "carriers": [
+      {
+        "id": "PKG-C01",
+        "name": "Sando Bag (Small)",
+        "spec": "Small/Tiny Plastic",
+        "useCase": "Takeout Carrier",
+        "unit": "Pack (100s)",
+        "unitQty": 100,
+        "pricePerPc": 0.25,
+        "packPrice": 25,
+        "manilaBase": 0.20,
+        "landedCost": 0.45,
+        "boholLocal": 0.25,
+        "bestStrategy": "LOCAL (Public Market)",
+        "supplier": "Dao Market / Public Market",
+        "reorderPoint": 200
+      },
+      {
+        "id": "PKG-C02",
+        "name": "Tissue (Table/Takeout)",
+        "spec": "Interfolded Tissue",
+        "useCase": "Service / Takeout",
+        "unit": "Pack (1000s)",
+        "unitQty": 1000,
+        "pricePerPc": 0.10,
+        "packPrice": 100,
+        "boholLocal": 0.10,
+        "bestStrategy": "LOCAL",
+        "supplier": "Grocery",
+        "reorderPoint": 500
+      },
+      {
+        "id": "PKG-C03",
+        "name": "Paper Bags (Brown)",
+        "spec": "Small Kraft Paper",
+        "useCase": "Takeout Bundle",
+        "unit": "Pack (50s)",
+        "unitQty": 50,
+        "pricePerPc": 2.40,
+        "packPrice": 120,
+        "boholLocal": 2.40,
+        "bestStrategy": "LOCAL",
+        "supplier": "Packaging Supplier",
+        "reorderPoint": 50
+      },
+      {
+        "id": "PKG-C04",
+        "name": "Sauce Cups (1oz)",
+        "spec": "PP Sauce Container",
+        "useCase": "Condiments/Sauces",
+        "unit": "Pack (100s)",
+        "unitQty": 100,
+        "pricePerPc": 0.80,
+        "packPrice": 80,
+        "boholLocal": 0.80,
+        "bestStrategy": "LOCAL",
+        "supplier": "Packaging Supplier",
+        "reorderPoint": 200
+      }
+    ],
+    "totalPackagingCosts": {
+      "lugaw": {
+        "container": 4.60,
+        "utensil": 0.60,
+        "carrier": 0.35,
+        "total": 5.55,
+        "breakdown": "390cc Bowl+Lid (₱4.60) + Spoon (₱0.60) + Sando+Tissue (₱0.35)",
+        "targetSRP": "₱35-₱50",
+        "pkgPercent": "11%-16%"
+      },
+      "silogStandard": {
+        "container": 5.00,
+        "utensil": 0.90,
+        "carrier": 0.35,
+        "total": 6.25,
+        "breakdown": "White Box (₱5.00) + S/F Set (₱0.90) + Sando+Tissue (₱0.35)",
+        "targetSRP": "₱50-₱80",
+        "pkgPercent": "8%-12%"
+      },
+      "silogBudget": {
+        "container": 5.00,
+        "utensil": 0.45,
+        "carrier": 0.35,
+        "total": 5.80,
+        "breakdown": "White Box (₱5.00) + Chopstick (₱0.45) + Sando+Tissue (₱0.35)",
+        "targetSRP": "₱45-₱60",
+        "pkgPercent": "9%-13%"
+      },
+      "drinks": {
+        "container": 2.50,
+        "utensil": 0.50,
+        "carrier": 0.00,
+        "total": 3.00,
+        "breakdown": "Cup+Lid (₱2.50) + Straw (₱0.50)",
+        "targetSRP": "₱20-₱35",
+        "pkgPercent": "9%-15%"
+      }
+    },
+    "procurementStrategy": [
+      { "stage": "Startup / Micro", "volume": "< 1,000 units/mo", "channel": "Local Retail (Alturas)", "logistics": "Self-Pickup", "expectedCost": "₱6-₱8/pc" },
+      { "stage": "Small Kiosk", "volume": "1,000 - 3,000/mo", "channel": "Shopee (High-Density)", "logistics": "J&T / SPX", "expectedCost": "₱5-₱6/pc" },
+      { "stage": "Institutional", "volume": "> 5,000 units/mo", "channel": "Direct Manila Wholesaler", "logistics": "Sea Freight (Capex)", "expectedCost": "₱3.60/pc" }
+    ]
+  },
+  "hygiene": [
+    { "name": "Nitrile Gloves", "useCase": "Food Handling", "unit": "Box (100s)", "price": 100, "reorderPoint": 50, "supplier": "Medical Supplier / Lazada" },
+    { "name": "Hairnets / Head Caps", "useCase": "Kitchen Staff", "unit": "Pack (100s)", "price": 150, "reorderPoint": 50, "supplier": "Medical Supplier" },
+    { "name": "Aprons (Waterproof)", "useCase": "Kitchen Staff", "unit": "Piece", "price": 150, "reorderPoint": 3, "supplier": "Grocery / Shopee" },
+    { "name": "Face Masks (Surgical)", "useCase": "Kitchen Staff", "unit": "Box (50s)", "price": 150, "reorderPoint": 50, "supplier": "Medical Supplier" },
+    { "name": "Hand Sanitizer", "useCase": "Hygiene Station", "unit": "Gallon", "price": 250, "reorderPoint": 1, "supplier": "Chemicals Supplier" }
+  ],
+  "cleaning": [
+    { "name": "Dishwashing Liquid", "useCase": "Joy/Generic (Lemon)", "unit": "Gallon", "price": 95, "reorderPoint": 1, "supplier": "Chemicals Supplier" },
+    { "name": "Trash Bags (XXL)", "useCase": "Daily Waste", "unit": "Roll", "price": 90, "reorderPoint": 2, "supplier": "Plasticware Store" },
+    { "name": "Sponges/Scrubbers", "useCase": "Dishwashing", "unit": "Pack (5s)", "price": 50, "reorderPoint": 5, "supplier": "Grocery" },
+    { "name": "Floor Cleaner", "useCase": "Daily Cleaning", "unit": "Gallon", "price": 180, "reorderPoint": 1, "supplier": "Chemicals Supplier" },
+    { "name": "Multi-purpose Cleaner", "useCase": "Surface Cleaning", "unit": "Bottle (1L)", "price": 120, "reorderPoint": 2, "supplier": "Grocery" },
+    { "name": "Chlorine Bleach", "useCase": "Sanitizing", "unit": "Gallon", "price": 147, "reorderPoint": 1, "supplier": "Chemicals Supplier" },
+    { "name": "Rags / Wiping Cloth", "useCase": "General Cleaning", "unit": "Pack (10s)", "price": 80, "reorderPoint": 10, "supplier": "Grocery" }
+  ],
+  "fuel": [
+    { "name": "LPG Tank (11kg)", "useCase": "Cooking Fuel", "unit": "Tank Refill", "price": 952.50, "reorderPoint": 1, "supplier": "Authorized Dealer", "notes": "January 2026 DOE average" }
+  ]
+}

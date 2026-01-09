@@ -1,0 +1,12 @@
+[
+  { "name": "Soy Sauce", "portion": "10ml", "container": "Sauce cup", "refillPolicy": "1 free refill" },
+  { "name": "Vinegar (Sukang Iloko)", "portion": "10ml", "container": "Sauce cup", "refillPolicy": "1 free refill" },
+  { "name": "Banana Ketchup", "portion": "15ml", "container": "Squeeze packet or cup", "refillPolicy": "+₱5 for extra" },
+  { "name": "Chili Flakes", "portion": "3g", "container": "Small packet", "refillPolicy": "Free on request" },
+  { "name": "Fish Sauce (Patis)", "portion": "5ml", "container": "Dropper bottle on table", "refillPolicy": "Self-serve" },
+  { "name": "Calamansi", "portion": "1 pc", "container": "—", "refillPolicy": "+₱2 for extra" },
+  { "name": "Mayonnaise", "portion": "10ml", "container": "Sauce cup", "refillPolicy": "+₱5 for extra" },
+  { "name": "Sweet Chili Sauce", "portion": "15ml", "container": "Sauce cup", "refillPolicy": "+₱5 for extra" },
+  { "name": "Gravy", "portion": "20ml", "container": "Side cup", "refillPolicy": "+₱10 for extra" },
+  { "name": "Atchara", "portion": "15g", "container": "Side cup", "refillPolicy": "+₱10 for extra" }
+]

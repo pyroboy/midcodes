@@ -41,9 +41,7 @@
 					<li><a href="/docs/business-plan/09-risk-management">09 // Risk Management</a></li>
 					<li><a href="/docs/business-plan/10-appendices">10 // Appendices</a></li>
 					<li><a href="/docs/business-plan/11-initial-totex">11 // Initial TOTEX Breakdown</a></li>
-					<li><a href="/docs/business-plan/12-inventory-supply">12 // Inventory Supply</a></li>
 					<li><a href="/docs/business-plan/13-printable-logs">13 // Ops Logs</a></li>
-					<li><a href="/docs/business-plan/14-sku-portioning">14 // SKU Portioning Guide</a></li>
 					<li><a href="/docs/business-plan/15-daily-checklists">15 // Daily Checklists</a></li>
 					<li><a href="/docs/business-plan/16-contingency">16 // Contingency Plan</a></li>
 					<li><a href="/docs/business-plan/17-complaint-handling">17 // Complaint Handling</a></li>
@@ -78,21 +76,21 @@
 				
 				<div class="calc-body">
 					<div class="input-group">
-						<label>Selling Price</label>
+						<label for="selling-price">Selling Price</label>
 						<div class="input-wrapper">
 							<span>₱</span>
-							<input type="number" bind:value={sellingPrice} />
+							<input id="selling-price" type="number" bind:value={sellingPrice} />
 						</div>
 					</div>
                     
                     <div class="row-inputs">
                         <div class="input-group">
-                            <label>Base Cost</label>
-                            <input type="number" bind:value={baseCost} />
+                            <label for="base-cost">Base Cost</label>
+                            <input id="base-cost" type="number" bind:value={baseCost} />
                         </div>
                         <div class="input-group">
-                            <label>Viand Cost</label>
-                            <input type="number" bind:value={viandCost} />
+                            <label for="viand-cost">Viand Cost</label>
+                            <input id="viand-cost" type="number" bind:value={viandCost} />
                         </div>
                     </div>
 
@@ -162,7 +160,6 @@
 		line-height: 0.9;
         letter-spacing: -2px;
 	}
-    .dot { color: var(--color-orange); }
 	.text-orange { color: var(--color-orange); }
 	.tagline {
 		font-size: 1.25rem;

@@ -34,11 +34,27 @@
                     <span class="stat-value">26</span>
                 </div>
             </div>
+
+            <!-- Nearby Schools -->
+            <div class="schools-section">
+                <h3>📚 Nearby Schools & Institutions</h3>
+                <div class="schools-grid">
+                    <div class="school-tag university">UB - University of Bohol</div>
+                    <div class="school-tag university">BISU - Bohol Island State University</div>
+                    <div class="school-tag highschool">Bohol High School</div>
+                    <div class="school-tag highschool">DCPNHS (Senior High)</div>
+                </div>
+                <p class="schools-note">Strategic location surrounded by multiple educational institutions ensures a <strong>consistent flow of student customers</strong> throughout the school year.</p>
+            </div>
             
-            <div class="segments-grid">
+            <div class="segments-grid triple">
+                <div class="segment-card morning">
+                    <h4>🌅 Early Morning</h4>
+                    <p>Joggers and fitness enthusiasts from <strong>Grandstand Stadium</strong> (2 blocks away) seeking quick breakfast after workouts. <em>Emerging market — currently underserved.</em></p>
+                </div>
                 <div class="segment-card day">
                     <h4>🌞 Day Shift</h4>
-                    <p>Students and Faculty looking for heavy, affordable lunches between classes.</p>
+                    <p>Students and Faculty from UB, BISU, Bohol HS, and DCPNHS looking for heavy, affordable lunches between classes.</p>
                 </div>
                 <div class="segment-card night">
                     <h4>🌚 Night Shift</h4>
@@ -52,17 +68,51 @@
             <h2>3.3 Competitor Analysis</h2>
             <div class="competitor-list">
                 <div class="competitor-item">
-                    <div class="comp-header">PAENG'S</div>
+                    <div class="comp-header">UB FOODCOURT</div>
                     <div class="comp-detail">
-                        <span class="status-badge negative">Weak Presence</span>
-                        <p>Not apparent in the immediate UB school area, creating a significant opportunity.</p>
+                        <span class="status-badge positive">Strong Competitor</span>
+                        <p>Located inside the school with varied food options. <strong>Limitation:</strong> Only accessible during school hours, closed on weekends and holidays.</p>
+                        <p class="our-edge">🎯 <strong>Our Edge:</strong> Extended hours, late-night availability, accessible location outside campus.</p>
                     </div>
                 </div>
                 <div class="competitor-item">
-                    <div class="comp-header">OTHER CHICKEN SPOTS</div>
+                    <div class="comp-header">AYO</div>
                     <div class="comp-detail">
                         <span class="status-badge neutral">Established</span>
-                        <p>Established but limited variety. Our edge: <strong>Cheaper options</strong> + <strong>Wider selection</strong>.</p>
+                        <p>Jollibee-style menu offering fried chicken, spaghetti, and burger steak. Appeals to students seeking familiar fast-food taste.</p>
+                        <p class="our-edge">🎯 <strong>Our Edge:</strong> Authentic silog meals at lower prices, more filling rice-based options.</p>
+                    </div>
+                </div>
+                <div class="competitor-item">
+                    <div class="comp-header">HOOCHA</div>
+                    <div class="comp-detail">
+                        <span class="status-badge negative">Low Quality</span>
+                        <p>Sells pancit canton, siomai rice, and egg dishes. <strong>Weakness:</strong> Food quality is noticeably low, affecting customer satisfaction.</p>
+                        <p class="our-edge">🎯 <strong>Our Edge:</strong> Premium quality ingredients, consistent taste, better food hygiene.</p>
+                    </div>
+                </div>
+                <div class="competitor-item">
+                    <div class="comp-header">KARENDERIAS</div>
+                    <div class="comp-detail">
+                        <span class="status-badge negative">Multiple Issues</span>
+                        <p><strong>Weaknesses:</strong> Expensive pricing, small serving sizes, and poor food hygiene standards.</p>
+                        <p class="our-edge">🎯 <strong>Our Edge:</strong> Value for money with generous portions, clean preparation, transparent kitchen.</p>
+                    </div>
+                </div>
+                <div class="competitor-item">
+                    <div class="comp-header">PAENG'S</div>
+                    <div class="comp-detail">
+                        <span class="status-badge neutral">Limited Menu</span>
+                        <p>Established fried chicken seller in the area. <strong>Limitation:</strong> Single product focus on fried chicken only.</p>
+                        <p class="our-edge">🎯 <strong>Our Edge:</strong> Complete silog meals, diverse menu variety, breakfast-to-dinner options.</p>
+                    </div>
+                </div>
+                <div class="competitor-item">
+                    <div class="comp-header">BBQ PITS</div>
+                    <div class="comp-detail">
+                        <span class="status-badge neutral">Price Competitor</span>
+                        <p>Street vendors selling cheap BBQ skewers. Appeals to budget-conscious students.</p>
+                        <p class="our-edge">🎯 <strong>Our Edge:</strong> Complete meals with rice & egg, cleaner preparation, consistent quality.</p>
                     </div>
                 </div>
             </div>
@@ -183,11 +233,52 @@
     }
     .stat-sub { font-size: 0.8rem; opacity: 0.7; margin-top: 0.25rem; }
 
+    /* SCHOOLS SECTION */
+    .schools-section {
+        margin: 2rem 0;
+        padding: 1.5rem;
+        background: white;
+        border: 2px solid var(--color-black);
+        box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
+    }
+    .schools-section h3 {
+        font-size: 1.25rem;
+        margin: 0 0 1rem 0;
+    }
+    .schools-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .school-tag {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border: 2px solid var(--color-black);
+    }
+    .school-tag.university {
+        background: var(--color-black);
+        color: white;
+    }
+    .school-tag.highschool {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .schools-note {
+        font-size: 0.95rem;
+        color: #6b7280;
+        margin: 0;
+    }
+
     /* SEGMENTS */
     .segments-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1.5rem;
+    }
+    .segments-grid.triple {
+        grid-template-columns: repeat(3, 1fr);
     }
     .segment-card {
         background: white;
@@ -195,6 +286,11 @@
         padding: 1.5rem;
         box-shadow: 4px 4px 0px var(--color-black);
     }
+    .segment-card.morning {
+        border-color: #f97316;
+        box-shadow: 4px 4px 0px #f97316;
+    }
+    .segment-card.morning h4 { color: #ea580c; }
     .segment-card h4 { font-size: 1.25rem; margin-bottom: 1rem; border-bottom: 2px solid #e4e4e7; padding-bottom: 0.5rem; }
 
     /* COMPETITORS */
@@ -227,6 +323,15 @@
     }
     .status-badge.negative { background: #fee2e2; color: #991b1b; }
     .status-badge.neutral { background: #f3f4f6; color: #374151; }
+    .status-badge.positive { background: #dcfce7; color: #166534; }
+    
+    .our-edge {
+        background: #fffbeb;
+        border-left: 4px solid var(--color-orange);
+        padding: 0.75rem 1rem;
+        margin-top: 0.75rem;
+        font-size: 0.95rem;
+    }
 
     /* SWOT GRID */
     .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
@@ -271,8 +376,9 @@
 
     @media (max-width: 768px) {
         h1 { font-size: 3rem; }
-        .segments-grid, .swot-grid, .competitor-item, .audience-grid { grid-template-columns: 1fr; }
+        .segments-grid, .segments-grid.triple, .swot-grid, .competitor-item, .audience-grid { grid-template-columns: 1fr; }
         .competitor-item { display: block; }
+        .schools-grid { flex-direction: column; }
         .comp-header { border-right: none; border-bottom: 2px solid var(--color-black); }
     }
 </style>

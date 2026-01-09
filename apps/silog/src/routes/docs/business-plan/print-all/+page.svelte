@@ -11,9 +11,7 @@
     import Chapter09 from '../09-risk-management/+page.svelte';
     import Chapter10 from '../10-appendices/+page.svelte';
     import Chapter11 from '../11-initial-totex/+page.svelte';
-    import Chapter12 from '../12-inventory-supply/+page.svelte';
     import Chapter13 from '../13-printable-logs/+page.svelte';
-    import Chapter14 from '../14-sku-portioning/+page.svelte';
     import Chapter15 from '../15-daily-checklists/+page.svelte';
     import Chapter16 from '../16-contingency/+page.svelte';
     import Chapter17 from '../17-complaint-handling/+page.svelte';
@@ -24,7 +22,7 @@
         window.print();
     }
 
-    // Map chapters to components
+    // Map chapters to components (matches chapters.ts order)
     const chapterComponents = [
         { component: Chapter01, ...chapters[0] },
         { component: Chapter02, ...chapters[1] },
@@ -37,12 +35,10 @@
         { component: Chapter09, ...chapters[8] },
         { component: Chapter10, ...chapters[9] },
         { component: Chapter11, ...chapters[10] },
-        { component: Chapter12, ...chapters[11] },
-        { component: Chapter13, ...chapters[12] },
-        { component: Chapter14, ...chapters[13] },
-        { component: Chapter15, ...chapters[14] },
-        { component: Chapter16, ...chapters[15] },
-        { component: Chapter17, ...chapters[16] },
+        { component: Chapter13, ...chapters[11] },
+        { component: Chapter15, ...chapters[12] },
+        { component: Chapter16, ...chapters[13] },
+        { component: Chapter17, ...chapters[14] },
     ];
 </script>
 
@@ -326,7 +322,6 @@
         margin: 0 0 1rem 0;
         color: #0f172a;
     }
-    .dot { color: #f97316; }
     .orange { color: #f97316; }
     .subtitle {
         font-size: 1.5rem;
@@ -522,7 +517,7 @@
             print-color-adjust: exact !important;
         }
         
-        html, body {
+        :global(html), :global(body) {
             font-size: 10pt !important; /* Slightly smaller to ensure fit */
             line-height: 1.4 !important;
             width: 100% !important;
@@ -599,10 +594,6 @@
         .toc-entry.sub {
             font-size: 0.8rem;
             padding-left: 1.5rem;
-        }
-        .toc-item:hover {
-            background: none;
-            padding-left: 0;
         }
         
         /* === Chapter Styling - HEADERS PRIORITIZED === */
@@ -777,7 +768,7 @@
         }
         
         /* === Avoid awkward breaks === */
-        blockquote, pre, figure, img {
+        :global(blockquote), :global(pre), :global(figure), :global(img) {
             page-break-inside: avoid;
             break-inside: avoid;
         }

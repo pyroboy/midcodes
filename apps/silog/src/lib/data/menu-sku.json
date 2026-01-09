@@ -1,0 +1,2222 @@
+{
+  "_config": {
+    "wastageBuffer": 0.05,
+    "wastageBufferNote": "5% shrinkage/wastage buffer to protect margins",
+    "calculation": "effectiveCost = cost * (1 + wastageBuffer)",
+    "effectiveMargin": "margin = 1 - (effectiveCost / srp)",
+    "takeoutFee": 5,
+    "takeoutFeeNote": "Flat 5 takeout service fee to recover packaging costs"
+  },
+  "lugaw": [
+    {
+      "sku": "LUG-001",
+      "name": "Lugaw Plain",
+      "tier": "volume",
+      "description": "Basic seasoned porridge + garlic + egg (half)",
+      "cost": 19.42,
+      "srp": 45,
+      "margin": 57,
+      "portioning": {
+        "main": "300g porridge",
+        "addons": "1/2 egg, 3g garlic bits",
+        "total": "~330g"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-001",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-009",
+          "qty": "0.5 egg"
+        },
+        {
+          "id": "PP-010",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-012",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "LUG-002",
+      "name": "Lugaw w/ Meat",
+      "tier": "volume",
+      "description": "Lugaw Plain + Chicken/Pork strips",
+      "cost": 25,
+      "srp": 55,
+      "margin": 55,
+      "portioning": {
+        "main": "300g porridge",
+        "addons": "50g chicken/pork strips",
+        "total": "~350g"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-001",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-011",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-010",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-012",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "LUG-004",
+      "name": "Lugaw OVERLOAD",
+      "tier": "premium",
+      "description": "Egg (Whole) + Chicharon + Meat + Tofu",
+      "cost": 62.84,
+      "srp": 115,
+      "margin": 45,
+      "portioning": {
+        "main": "350g porridge",
+        "addons": "1 whole egg, 30g chicharon, 40g meat, 30g tofu",
+        "total": "~450g"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-001",
+          "qty": "1.2 serving"
+        },
+        {
+          "id": "PP-009",
+          "qty": "1 egg"
+        },
+        {
+          "id": "PP-011",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-010",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-012",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PD-015",
+          "qty": "30g"
+        }
+      ]
+    },
+    {
+      "sku": "LUG-005",
+      "name": "Arroz Caldo",
+      "tier": "premium",
+      "description": "Pure chicken broth, larger cuts, kasubha",
+      "cost": 45,
+      "srp": 95,
+      "margin": 53,
+      "portioning": {
+        "main": "350g porridge",
+        "addons": "80g chicken cuts, kasubha",
+        "total": "~430g"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-002",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-001",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-011",
+          "qty": "1.5 serving"
+        },
+        {
+          "id": "PP-010",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-012",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-VG-011",
+          "qty": "1g"
+        }
+      ]
+    }
+  ],
+  "drinks": [
+    {
+      "sku": "DRK-001",
+      "name": "House Blend Iced Tea",
+      "tier": "winner",
+      "description": "Refreshing house blend",
+      "cost": 5,
+      "srp": 20,
+      "margin": 75,
+      "portioning": {
+        "main": "350ml",
+        "addons": "100g ice, 20g powder mix",
+        "total": "350ml"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 4.5,
+      "takeoutPrepMins": 0,
+      "ingredientRefs": [
+        {
+          "id": "PP-D01",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PT-023",
+          "qty": "100g"
+        }
+      ]
+    },
+    {
+      "sku": "DRK-002",
+      "name": "Cucumber Lemonade",
+      "tier": "winner",
+      "description": "Fresh and tangy",
+      "cost": 7,
+      "srp": 25,
+      "margin": 72,
+      "portioning": {
+        "main": "350ml",
+        "addons": "30g cucumber, 25ml lemon juice, 15g syrup",
+        "total": "350ml",
+        "notes": "PROMOTED: 72% margin, push over Unli-Drinks!"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 2
+      },
+      "takeoutCost": 4.5,
+      "takeoutPrepMins": 0,
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-005",
+          "qty": "30g"
+        },
+        {
+          "id": "RM-VG-006",
+          "qty": "25ml juice"
+        },
+        {
+          "id": "RM-PT-008",
+          "qty": "15g"
+        }
+      ]
+    },
+    {
+      "sku": "DRK-003",
+      "name": "Blue Lemonade",
+      "tier": "volume",
+      "description": "Eye-catching blue variant",
+      "cost": 7,
+      "srp": 25,
+      "margin": 72,
+      "portioning": {
+        "main": "350ml",
+        "addons": "25ml lemon juice, 15g blue syrup",
+        "total": "350ml"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 4.5,
+      "takeoutPrepMins": 0,
+      "ingredientRefs": [
+        {
+          "id": "RM-BV-002",
+          "qty": "20g"
+        },
+        {
+          "id": "RM-PT-022",
+          "qty": "15g"
+        }
+      ]
+    },
+    {
+      "sku": "DRK-004",
+      "name": "Unli-Drinks Upgrade",
+      "tier": "volume",
+      "description": "Unlimited iced tea refills (dine-in only, no sharing, same cup)",
+      "cost": 18,
+      "srp": 35,
+      "margin": 49,
+      "portioning": {
+        "main": "Unlimited (avg 3 refills)",
+        "addons": "Ice (~₱2), cup, filtered water",
+        "total": "~60g powder × 3 refills",
+        "notes": "POLICY: No sharing, same cup refill only"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "ingredientRefs": [
+        {
+          "id": "RM-BV-001",
+          "qty": "~60g × 3 refills"
+        },
+        {
+          "id": "RM-PT-023",
+          "qty": "~300g ice"
+        }
+      ]
+    },
+    {
+      "sku": "DRK-005",
+      "name": "Mineral Water",
+      "tier": "volume",
+      "description": "Bottled water",
+      "cost": 8,
+      "srp": 20,
+      "margin": 60,
+      "portioning": {
+        "main": "500ml",
+        "addons": "â€”",
+        "total": "500ml"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 0
+      },
+      "ingredientRefs": [
+        {
+          "id": "RM-BV-004",
+          "qty": "1 bottle"
+        }
+      ]
+    },
+    {
+      "sku": "DRK-006",
+      "name": "Soda (Mismo)",
+      "tier": "volume",
+      "description": "Bottled soda",
+      "cost": 22.5,
+      "srp": 40,
+      "margin": 44,
+      "portioning": {
+        "main": "295ml",
+        "addons": "â€”",
+        "total": "295ml"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 0
+      },
+      "ingredientRefs": [
+        {
+          "id": "RM-BV-005",
+          "qty": "1 bottle"
+        }
+      ]
+    },
+    {
+      "sku": "DRK-007",
+      "name": "3-in-1 Coffee",
+      "tier": "volume",
+      "description": "Hot coffee",
+      "cost": 12,
+      "srp": 25,
+      "margin": 52,
+      "portioning": {
+        "main": "200ml",
+        "addons": "1 sachet (20g), hot water",
+        "total": "200ml"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 1
+      },
+      "takeoutCost": 4.5,
+      "takeoutPrepMins": 0,
+      "ingredientRefs": [
+        {
+          "id": "RM-BV-003",
+          "qty": "1 sachet"
+        }
+      ]
+    }
+  ],
+  "noodles": [
+    {
+      "sku": "NDL-001",
+      "name": "Original",
+      "tier": "volume",
+      "description": "Classic savory flavor",
+      "cost": 26.07,
+      "srp": 48,
+      "margin": 46,
+      "portioning": {
+        "main": "1 pack (60g)",
+        "addons": "5ml special oil, spring onion (3g)",
+        "total": "~65g"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PT-010",
+          "qty": "5ml"
+        },
+        {
+          "id": "PP-012",
+          "qty": "0.6 serving"
+        }
+      ]
+    },
+    {
+      "sku": "NDL-002",
+      "name": "Kalamansi",
+      "tier": "volume",
+      "description": "Tangy and citrusy",
+      "cost": 24.86,
+      "srp": 45,
+      "margin": 45,
+      "portioning": {
+        "main": "1 pack (60g)",
+        "addons": "5ml special oil, calamansi wedge (1 pc)",
+        "total": "~65g"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PT-010",
+          "qty": "5ml"
+        },
+        {
+          "id": "RM-VG-006",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "NDL-003",
+      "name": "Chili-Mansi",
+      "tier": "volume",
+      "description": "Spicy and tangy mix",
+      "cost": 26.06,
+      "srp": 48,
+      "margin": 46,
+      "portioning": {
+        "main": "1 pack (60g)",
+        "addons": "5ml special oil + chili flakes (2g), calamansi",
+        "total": "~65g"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PT-010",
+          "qty": "5ml"
+        },
+        {
+          "id": "RM-PT-011",
+          "qty": "2g"
+        },
+        {
+          "id": "RM-VG-006",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "NDL-004",
+      "name": "Sweet & Spicy",
+      "tier": "volume",
+      "description": "Spicy-sweet combination",
+      "cost": 24.47,
+      "srp": 45,
+      "margin": 46,
+      "portioning": {
+        "main": "1 pack (60g)",
+        "addons": "5ml sweet chili sauce, spring onion (3g)",
+        "total": "~65g"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PT-014",
+          "qty": "5ml"
+        },
+        {
+          "id": "PP-012",
+          "qty": "0.6 serving"
+        }
+      ]
+    },
+    {
+      "sku": "NDL-005",
+      "name": "Hot Chili",
+      "tier": "volume",
+      "description": "Intense heat (Extra Hot)",
+      "cost": 29.07,
+      "srp": 55,
+      "margin": 47,
+      "portioning": {
+        "main": "1 pack (60g)",
+        "addons": "5ml chili oil + extra chili (5g), spring onion (3g)",
+        "total": "~65g"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PT-010",
+          "qty": "5ml"
+        },
+        {
+          "id": "RM-PT-011",
+          "qty": "5g"
+        },
+        {
+          "id": "PP-012",
+          "qty": "0.6 serving"
+        }
+      ]
+    },
+    {
+      "sku": "NDL-006",
+      "name": "Canton OVERLOAD",
+      "tier": "winner",
+      "description": "Loaded noodles: Egg + Cheese + Bacon Bits",
+      "cost": 39,
+      "srp": 95,
+      "margin": 59,
+      "portioning": {
+        "main": "1 pack (60g) noodles",
+        "addons": "1 fried egg, cheese sauce (30ml), bacon bits (25g)",
+        "total": "~180g loaded",
+        "notes": "UPSELL: P46 profit per bowl vs P24 base"
+      },
+      "prepTime": {
+        "cookMins": 7,
+        "prepMins": 2
+      },
+      "takeoutCost": 6.2,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-005",
+          "qty": "30ml"
+        },
+        {
+          "id": "RM-PD-010",
+          "qty": "25g"
+        },
+        {
+          "id": "PP-012",
+          "qty": "0.6 serving"
+        }
+      ]
+    }
+  ],
+  "silog": [
+    {
+      "sku": "SIL-001",
+      "name": "Longsilog",
+      "tier": "winner",
+      "description": "Longganisa + Sinangag + Itlog",
+      "cost": 70.96,
+      "srp": 125,
+      "margin": 43,
+      "portioning": {
+        "main": "100g longganisa (2 pcs)",
+        "addons": "Atchara (15g)",
+        "notes": "Cut diagonally for presentation"
+      },
+      "prepTime": {
+        "cookMins": 5,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-001",
+          "qty": "100g / 2 pcs"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "PP-008",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-003",
+      "name": "Shanghai Rice",
+      "tier": "winner",
+      "description": "Lumpia Shanghai + Sinangag + Itlog",
+      "cost": 56,
+      "srp": 135,
+      "margin": 59,
+      "portioning": {
+        "main": "80g shanghai (4 pcs)",
+        "addons": "Sweet chili dip (15ml)",
+        "notes": "Line up neatly beside rice"
+      },
+      "prepTime": {
+        "cookMins": 6,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-006-P",
+          "qty": "4 pcs"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-004",
+          "qty": "15ml"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-006",
+      "name": "Basic Silog",
+      "tier": "volume",
+      "description": "Rice + Egg only",
+      "cost": 30.89,
+      "srp": 58,
+      "margin": 47,
+      "portioning": {
+        "main": "â€”",
+        "addons": "Extra egg yolk optional (+â‚±5)",
+        "notes": "Entry-level option"
+      },
+      "prepTime": {
+        "cookMins": 2,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-VG-001",
+          "qty": "5g"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "15ml"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-007",
+      "name": "Burgersilog",
+      "tier": "volume",
+      "description": "Burger Patty + Sinangag + Itlog",
+      "cost": 51,
+      "srp": 125,
+      "margin": 59,
+      "portioning": {
+        "main": "100g burger patty (1 pc)",
+        "addons": "Ketchup/mayo (10ml each)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 5,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-005-P",
+          "qty": "1 pc"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-004",
+          "qty": "10ml"
+        },
+        {
+          "id": "RM-PT-017",
+          "qty": "10ml"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-008",
+      "name": "Hotsilog",
+      "tier": "volume",
+      "description": "Hotdog + Sinangag + Itlog",
+      "cost": 43.2,
+      "srp": 80,
+      "margin": 46,
+      "portioning": {
+        "main": "60g hotdog (2 pcs)",
+        "addons": "Ketchup (15ml)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-007",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-004",
+          "qty": "15ml"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-010",
+      "name": "Cornsilog",
+      "tier": "volume",
+      "description": "Corned Beef + Sinangag + Itlog",
+      "cost": 60.94,
+      "srp": 110,
+      "margin": 45,
+      "portioning": {
+        "main": "100g corned beef",
+        "addons": "Onion rings (20g)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 4,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-007",
+          "qty": "100g"
+        },
+        {
+          "id": "RM-VG-002",
+          "qty": "20g"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-011",
+      "name": "Tocilog",
+      "tier": "volume",
+      "description": "Tocino + Sinangag + Itlog",
+      "cost": 75.03,
+      "srp": 138,
+      "margin": 46,
+      "portioning": {
+        "main": "100g tocino slices",
+        "addons": "Atchara (15g)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 5,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-006",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "PP-008",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-012",
+      "name": "Sisigsilog",
+      "tier": "premium",
+      "description": "Sizzling Sisig + Sinangag + Itlog",
+      "cost": 86.14,
+      "srp": 158,
+      "margin": 45,
+      "portioning": {
+        "main": "150g sizzling sisig",
+        "addons": "Mayo drizzle (10ml), chili (5g)",
+        "notes": "Serve on sizzling plate"
+      },
+      "prepTime": {
+        "cookMins": 10,
+        "prepMins": 3
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-008",
+          "qty": "150g"
+        },
+        {
+          "id": "RM-PT-017",
+          "qty": "10ml"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-VG-002",
+          "qty": "20g"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-013",
+      "name": "Tapsilog",
+      "tier": "premium",
+      "description": "The OG Beef Tapa + Sinangag + Itlog",
+      "cost": 92.79,
+      "srp": 170,
+      "margin": 45,
+      "portioning": {
+        "main": "120g beef tapa",
+        "addons": "Vinegar + garlic (15ml)",
+        "notes": "Slice thin against grain"
+      },
+      "prepTime": {
+        "cookMins": 6,
+        "prepMins": 3
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-005",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "15ml"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-014",
+      "name": "Bangsilog",
+      "tier": "premium",
+      "description": "Sarangani Bay Prime Bangus (400-500g) + Fried Talong + 2 Eggs + Sinangag",
+      "cost": 109.7,
+      "srp": 199,
+      "margin": 45,
+      "portioning": {
+        "main": "1 pc frozen bangus belly (400-500g)",
+        "addons": "2 eggs, fried talong (50g)",
+        "notes": "DOWNPLAY: Lowest silog margin, 15min total prep. Prioritize Hungsilog instead."
+      },
+      "prepTime": {
+        "cookMins": 10,
+        "prepMins": 5
+      },
+      "takeoutCost": 6.25,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-007-A",
+          "qty": "1 pc",
+          "note": "Sarangani Bay Prime 400-500g"
+        },
+        {
+          "id": "RM-VG-009",
+          "qty": "50g"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "2 pcs"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-015",
+      "name": "Grandsilog",
+      "tier": "signature",
+      "description": "Tapa + Tocino Overload",
+      "cost": 101,
+      "srp": 199,
+      "margin": 49,
+      "portioning": {
+        "main": "80g tapa + 80g tocino",
+        "addons": "Atchara (20g)",
+        "notes": "Signature combo plate"
+      },
+      "prepTime": {
+        "cookMins": 8,
+        "prepMins": 4
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-005",
+          "qty": "0.67 serving"
+        },
+        {
+          "id": "PP-006",
+          "qty": "0.8 serving"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "PP-008",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-016",
+      "name": "Overload Silog",
+      "tier": "signature",
+      "description": "Tapa + Hungarian Sausage + Cheese",
+      "cost": 121,
+      "srp": 249,
+      "margin": 51,
+      "portioning": {
+        "main": "80g tapa + 60g hungarian",
+        "addons": "Cheese sauce (30ml)",
+        "notes": "Premium presentation"
+      },
+      "prepTime": {
+        "cookMins": 10,
+        "prepMins": 4
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-005",
+          "qty": "0.67 serving"
+        },
+        {
+          "id": "RM-PD-004",
+          "qty": "60g"
+        },
+        {
+          "id": "RM-PT-005",
+          "qty": "30ml"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-017",
+      "name": "Adobosilog",
+      "tier": "volume",
+      "description": "Chicken/Pork Adobo + Sinangag + Itlog",
+      "cost": 64.21,
+      "srp": 140,
+      "margin": 54,
+      "portioning": {
+        "main": "Adobo serving (~₱27.38 from PP-014)",
+        "addons": "Sauce included",
+        "notes": "Reheat portion. Cost: Adobo ₱27.38 + Sinangag ₱13 + Egg ₱9.83 + Overhead ₱14"
+      },
+      "prepTime": {
+        "cookMins": 2,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-014",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-018",
+      "name": "Bacsilog",
+      "tier": "volume",
+      "description": "Bacon + Sinangag + Itlog",
+      "cost": 61,
+      "srp": 120,
+      "margin": 49,
+      "portioning": {
+        "main": "60g bacon (3 strips)",
+        "addons": "Maple drizzle optional",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 4,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-010",
+          "qty": "60g / 3 strips"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-021",
+      "name": "Daing na Galunggong Silog",
+      "tier": "volume",
+      "description": "Dried Galunggong + Sinangag + Itlog",
+      "cost": 66,
+      "srp": 130,
+      "margin": 49,
+      "portioning": {
+        "main": "120g dried fish",
+        "addons": "Vinegar + onion (15ml)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 6,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-008",
+          "qty": "120g"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "15ml"
+        },
+        {
+          "id": "RM-VG-002",
+          "qty": "10g"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-023",
+      "name": "Embusilog",
+      "tier": "volume",
+      "description": "Embutido + Sinangag + Itlog",
+      "cost": 56,
+      "srp": 120,
+      "margin": 53,
+      "portioning": {
+        "main": "100g embutido (2 slices)",
+        "addons": "Banana ketchup (15ml)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 4,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-011",
+          "qty": "100g / 2 slices"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-004",
+          "qty": "15ml"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-024",
+      "name": "Hamsilog",
+      "tier": "volume",
+      "description": "Sweet Ham + Sinangag + Itlog",
+      "cost": 56,
+      "srp": 120,
+      "margin": 53,
+      "portioning": {
+        "main": "80g sweet ham (2 slices)",
+        "addons": "Pineapple ring (1 pc)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-012",
+          "qty": "80g / 2 slices"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-025",
+      "name": "Hungsilog",
+      "tier": "winner",
+      "description": "Hungarian Sausage + Sinangag + Itlog",
+      "cost": 61,
+      "srp": 215,
+      "margin": 72,
+      "portioning": {
+        "main": "100g hungarian sausage (2 pcs)",
+        "addons": "Mustard (10ml)",
+        "notes": "PROMOTED: High margin item!"
+      },
+      "prepTime": {
+        "cookMins": 5,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-004",
+          "qty": "100g / 2 pcs"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-026",
+      "name": "Pork BBQ Silog",
+      "tier": "premium",
+      "description": "Pork BBQ Sticks + Sinangag + Itlog",
+      "cost": 71,
+      "srp": 140,
+      "margin": 49,
+      "portioning": {
+        "main": "100g pork BBQ (2 sticks)",
+        "addons": "Atchara (20g)",
+        "notes": "Charred grill marks visible"
+      },
+      "prepTime": {
+        "cookMins": 8,
+        "prepMins": 3
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-004",
+          "qty": "100g"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-008",
+          "qty": "10g marinade"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "10ml marinade"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-027",
+      "name": "Spamsilog",
+      "tier": "premium",
+      "description": "Spam Luncheon Meat + Sinangag + Itlog",
+      "cost": 76,
+      "srp": 140,
+      "margin": 46,
+      "portioning": {
+        "main": "85g Spam (3 slices)",
+        "addons": "â€”",
+        "notes": "Pan-fried until crispy edges"
+      },
+      "prepTime": {
+        "cookMins": 4,
+        "prepMins": 1
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-013",
+          "qty": "85g / 3 slices"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "SIL-028",
+      "name": "Tinapasilog",
+      "tier": "volume",
+      "description": "Smoked Fish + Sinangag + Itlog",
+      "cost": 130.14,
+      "srp": 238,
+      "margin": 45,
+      "portioning": {
+        "main": "120g smoked fish",
+        "addons": "Tomato slices (30g)",
+        "notes": ""
+      },
+      "prepTime": {
+        "cookMins": 5,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-010",
+          "qty": "120g"
+        },
+        {
+          "id": "RM-VG-010",
+          "qty": "30g"
+        },
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    }
+  ],
+  "addons": [
+    {
+      "sku": "ADD-001",
+      "name": "Extra Egg (Large)",
+      "tier": "volume",
+      "description": "Fried or Boiled",
+      "cost": 12.83,
+      "srp": 25,
+      "margin": 49,
+      "portioning": {
+        "main": "1 large egg",
+        "addons": "â€”",
+        "notes": "Fried or boiled"
+      },
+      "prepTime": {
+        "cookMins": 2,
+        "prepMins": 0
+      },
+      "takeoutCost": 3,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-002",
+      "name": "Extra Sinangag",
+      "tier": "volume",
+      "description": "Garlic Fried Rice",
+      "cost": 18.2,
+      "srp": 40,
+      "margin": 55,
+      "portioning": {
+        "main": "200g garlic rice",
+        "addons": "â€”",
+        "notes": "Separate bowl"
+      },
+      "prepTime": {
+        "cookMins": 2,
+        "prepMins": 1
+      },
+      "takeoutCost": 4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-003",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-003",
+      "name": "Extra Chicharon",
+      "tier": "volume",
+      "description": "Crispy Pork Cracklings",
+      "cost": 26.1,
+      "srp": 55,
+      "margin": 53,
+      "portioning": {
+        "main": "30g chicharon",
+        "addons": "Vinegar dip",
+        "notes": "Side dish"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-015",
+          "qty": "30g"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-004",
+      "name": "Extra Meat (Chicken/Pork)",
+      "tier": "volume",
+      "description": "Adobo or Tapa portion",
+      "cost": 14.88,
+      "srp": 35,
+      "margin": 57,
+      "portioning": {
+        "main": "50g meat serving",
+        "addons": "Sauce included",
+        "notes": "Small side portion"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-002",
+          "qty": "50g"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-005",
+      "name": "Extra Cheese Sauce",
+      "tier": "volume",
+      "description": "EasyBrand Cheese Sauce",
+      "cost": 7.67,
+      "srp": 20,
+      "margin": 62,
+      "portioning": {
+        "main": "30ml sauce cup",
+        "addons": "â€”",
+        "notes": "Dip or topping"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 2,
+      "ingredientRefs": [
+        {
+          "id": "RM-PT-005",
+          "qty": "30ml"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-006",
+      "name": "Extra Tokwa't Baboy (Side)",
+      "tier": "volume",
+      "description": "Tofu & Pork Side",
+      "cost": 27.51,
+      "srp": 60,
+      "margin": 54,
+      "portioning": {
+        "main": "80g tokwa + 30g pork",
+        "addons": "Soy-vinegar sauce",
+        "notes": "Small bowl"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-009",
+          "qty": "80g"
+        },
+        {
+          "id": "RM-PR-004",
+          "qty": "30g"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-007",
+      "name": "Takeout Box",
+      "tier": "volume",
+      "description": "Charge if needed",
+      "cost": 3,
+      "srp": 5,
+      "margin": 40,
+      "portioning": {
+        "main": "1 box",
+        "addons": "â€”",
+        "notes": "Standard meal box"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 0
+      },
+      "takeoutCost": 0,
+      "takeoutPrepMins": 0,
+      "ingredientRefs": [
+        {
+          "id": "RM-CS-001",
+          "qty": "1 pc"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-008",
+      "name": "The \"Super\" Upgrade",
+      "tier": "winner",
+      "description": "Add 2nd Egg + Fried Talong",
+      "cost": 12,
+      "srp": 45,
+      "margin": 73,
+      "portioning": {
+        "main": "1 egg + 50g talong",
+        "addons": "â€”",
+        "notes": "Fried talong slices + extra egg"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-VG-009",
+          "qty": "50g"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "15ml"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-010",
+      "name": "Salted Egg Side",
+      "tier": "volume",
+      "description": "Half w/ Tomato",
+      "cost": 8,
+      "srp": 30,
+      "margin": 73,
+      "portioning": {
+        "main": "1/2 salted egg + 2 tomato slices",
+        "addons": "â€”",
+        "notes": "Small plate"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-011",
+          "qty": "0.5 pc"
+        },
+        {
+          "id": "RM-VG-010",
+          "qty": "20g"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-011",
+      "name": "Fried Tawilis Side",
+      "tier": "volume",
+      "description": "Crispy Side Dish",
+      "cost": 15,
+      "srp": 35,
+      "margin": 57,
+      "portioning": {
+        "main": "60g (5-6 pcs)",
+        "addons": "Vinegar dip",
+        "notes": "Crispy, with vinegar dip"
+      },
+      "prepTime": {
+        "cookMins": 4,
+        "prepMins": 1
+      },
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-012",
+          "qty": "60g"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "10ml"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-012",
+      "name": "Extra Plain Rice",
+      "tier": "volume",
+      "description": "Steamed Jasmine",
+      "cost": 7,
+      "srp": 15,
+      "margin": 53,
+      "portioning": {
+        "main": "180g cooked rice",
+        "addons": "â€”",
+        "notes": "Separate bowl"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-004",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-013",
+      "name": "Unli Rice Promo",
+      "tier": "volume",
+      "description": "Dine-in Only",
+      "cost": 24.65,
+      "srp": 45,
+      "margin": 45,
+      "portioning": {
+        "main": "180g per refill",
+        "addons": "Max 3 refills tracked",
+        "notes": "Dine-in only"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-GR-001",
+          "qty": "540g"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-014",
+      "name": "Extra Atchara",
+      "tier": "volume",
+      "description": "Small side cup",
+      "cost": 3,
+      "srp": 10,
+      "margin": 70,
+      "portioning": {
+        "main": "30g",
+        "addons": "â€”",
+        "notes": "Small sauce cup"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-008",
+          "qty": "1.5 serving"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-015",
+      "name": "Extra Garlic Bits",
+      "tier": "winner",
+      "description": "Fried garlic topping",
+      "cost": 1,
+      "srp": 20,
+      "margin": 95,
+      "portioning": {
+        "main": "10g",
+        "addons": "â€”",
+        "notes": "Sprinkle on top"
+      },
+      "prepTime": {
+        "cookMins": 1,
+        "prepMins": 0
+      },
+      "takeoutCost": 3,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-010",
+          "qty": "2 servings"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-018",
+      "name": "Extra Pancit Canton",
+      "tier": "volume",
+      "description": "Add a pack of canton to any meal",
+      "cost": 13.9,
+      "srp": 30,
+      "margin": 54,
+      "portioning": {
+        "main": "1 pack (60g)",
+        "addons": "-",
+        "notes": "BUILD YOUR OWN CANTON base"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        }
+      ]
+    }
+  ],
+  "bundleAddons": [
+    {
+      "sku": "ADD-016",
+      "name": "Cheesy Overload",
+      "tier": "winner",
+      "description": "Pour cheese sauce over any Silog or Noodles",
+      "cost": 5.67,
+      "srp": 25,
+      "margin": 77,
+      "portioning": {
+        "main": "30ml cheese sauce pour",
+        "addons": "-",
+        "notes": "UPSELL BUNDLE: P19 profit per pour!"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 2,
+      "ingredientRefs": [
+        {
+          "id": "RM-PT-005",
+          "qty": "30ml"
+        }
+      ]
+    },
+    {
+      "sku": "ADD-017",
+      "name": "Spicy Warrior",
+      "tier": "winner",
+      "description": "Chili powder + Chili oil + Fried garlic heat pack",
+      "cost": 3,
+      "srp": 15,
+      "margin": 80,
+      "portioning": {
+        "main": "3g chili powder + 5ml chili oil + 5g fried garlic",
+        "addons": "-",
+        "notes": "UPSELL BUNDLE: Low cost, high excitement!"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 2,
+      "ingredientRefs": [
+        {
+          "id": "RM-PT-011",
+          "qty": "3g"
+        },
+        {
+          "id": "RM-PT-010",
+          "qty": "5ml"
+        },
+        {
+          "id": "PP-010",
+          "qty": "1 serving"
+        }
+      ]
+    }
+  ],
+  "combos": [
+    {
+      "sku": "COMBO-001",
+      "name": "The Student Meal",
+      "tier": "winner",
+      "description": "1 Cup Rice + 1 Pack Canton + 1 Fried Egg + Tipid Ulam (Shanghai 2pcs or Hotdog 1pc)",
+      "cost": 43.42,
+      "srp": 89,
+      "margin": 51,
+      "portioning": {
+        "main": "180g rice + 60g canton + 1 egg",
+        "addons": "Shanghai (2pcs) OR Hotdog (1pc)",
+        "total": "~400g plate",
+        "notes": "BUSOG MEAL: Full carbs + protein under 90!"
+      },
+      "prepTime": {
+        "cookMins": 6,
+        "prepMins": 2
+      },
+      "takeoutCost": 8.4,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "PP-004",
+          "qty": "1 serving"
+        },
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "PP-007",
+          "qty": "0.5 serving",
+          "note": "Hotdog option"
+        }
+      ]
+    },
+    {
+      "sku": "COMBO-002",
+      "name": "Canton Overload Combo",
+      "tier": "winner",
+      "description": "Canton Overload + 1 Cup Rice + Iced Tea",
+      "cost": 52,
+      "srp": 115,
+      "margin": 55,
+      "portioning": {
+        "main": "NDL-006 + 180g rice + 350ml iced tea",
+        "addons": "Complete meal deal",
+        "total": "~550g + drink",
+        "notes": "BUILD YOUR OWN: Add extra toppings!"
+      },
+      "prepTime": {
+        "cookMins": 7,
+        "prepMins": 2
+      },
+      "takeoutCost": 10,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-014",
+          "qty": "1 pack"
+        },
+        {
+          "id": "RM-PR-001",
+          "qty": "1 pc"
+        },
+        {
+          "id": "RM-PT-005",
+          "qty": "30ml"
+        },
+        {
+          "id": "RM-PD-010",
+          "qty": "25g"
+        },
+        {
+          "id": "PP-004",
+          "qty": "1 serving"
+        },
+        {
+          "id": "PP-D01",
+          "qty": "1 serving"
+        }
+      ]
+    }
+  ],
+  "sides": [
+    {
+      "sku": "SIDE-001",
+      "name": "K.S.T. Side (Kamatis, Sibuyas, Toyo)",
+      "tier": "winner",
+      "description": "Fresh tomato, onion slices, soy sauce dip",
+      "cost": 6.5,
+      "srp": 15,
+      "margin": 57,
+      "portioning": {
+        "main": "30g tomato + 20g onion + 10ml soy",
+        "addons": "-",
+        "notes": "PAMPATANGGAL UMAY: Cuts grease!"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 2
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-010",
+          "qty": "30g"
+        },
+        {
+          "id": "RM-VG-002",
+          "qty": "20g"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "10ml"
+        }
+      ]
+    },
+    {
+      "sku": "SIDE-002",
+      "name": "Cucumber Atchara (Pickled)",
+      "tier": "winner",
+      "description": "Quick-pickled cucumber slices",
+      "cost": 4,
+      "srp": 15,
+      "margin": 73,
+      "portioning": {
+        "main": "50g pickled cucumber",
+        "addons": "-",
+        "notes": "Uses DRK-002 cucumber stock - reduces waste!"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-005",
+          "qty": "50g"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "10ml"
+        },
+        {
+          "id": "RM-PT-008",
+          "qty": "5g"
+        }
+      ]
+    },
+    {
+      "sku": "SIDE-003",
+      "name": "Fried Talong (3 slices)",
+      "tier": "volume",
+      "description": "Crispy fried eggplant slices",
+      "cost": 5,
+      "srp": 15,
+      "margin": 66,
+      "portioning": {
+        "main": "3 slices (~50g)",
+        "addons": "-",
+        "notes": "Uses SIL-014 eggplant stock - reduces waste!"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-009",
+          "qty": "50g"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "20ml"
+        }
+      ]
+    }
+  ],
+  "flavorBoosters": [
+    {
+      "sku": "FB-001",
+      "name": "Garlic Mayo Dip",
+      "tier": "volume",
+      "description": "Creamy garlic mayo sauce",
+      "cost": 4.5,
+      "srp": 10,
+      "margin": 55,
+      "portioning": {
+        "main": "20ml mayo + 5g garlic bits",
+        "addons": "-",
+        "notes": "Perfect for dry silog meals"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 2,
+      "ingredientRefs": [
+        {
+          "id": "RM-PT-017",
+          "qty": "20ml"
+        },
+        {
+          "id": "PP-010",
+          "qty": "1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "FB-002",
+      "name": "Adobo Rice Upgrade",
+      "tier": "winner",
+      "description": "Replace plain rice with adobo-flavored sinangag",
+      "cost": 1.5,
+      "srp": 10,
+      "margin": 85,
+      "portioning": {
+        "main": "1 tbsp adobo sauce over rice",
+        "addons": "-",
+        "notes": "Uses PP-014 sauce - almost FREE premium taste!"
+      },
+      "prepTime": {
+        "cookMins": 0,
+        "prepMins": 1
+      },
+      "takeoutCost": 0,
+      "ingredientRefs": [
+        {
+          "id": "PP-014",
+          "qty": "0.1 serving"
+        }
+      ]
+    },
+    {
+      "sku": "FB-003",
+      "name": "Ala King Gravy",
+      "tier": "premium",
+      "description": "Creamy gravy for chicken/pork meals",
+      "cost": 5,
+      "srp": 15,
+      "margin": 66,
+      "portioning": {
+        "main": "30ml cream gravy",
+        "addons": "-",
+        "notes": "Great upsell for Chicsilog"
+      },
+      "prepTime": {
+        "cookMins": 2,
+        "prepMins": 1
+      },
+      "takeoutCost": 2,
+      "ingredientRefs": [
+        {
+          "id": "RM-PT-020",
+          "qty": "25ml"
+        },
+        {
+          "id": "RM-PT-007",
+          "qty": "10ml"
+        }
+      ]
+    }
+  ],
+  "tingal": [
+    {
+      "sku": "TING-001",
+      "name": "Side Shanghai (3 pcs)",
+      "tier": "volume",
+      "description": "Crispy lumpia shanghai bites",
+      "cost": 21,
+      "srp": 35,
+      "margin": 40,
+      "portioning": {
+        "main": "3 pcs lumpia",
+        "addons": "Sweet chili dip",
+        "notes": "TINGAL: Taste of Shanghai without full meal"
+      },
+      "prepTime": {
+        "cookMins": 4,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-006-P",
+          "qty": "3 pcs"
+        },
+        {
+          "id": "RM-PT-004",
+          "qty": "10ml"
+        }
+      ]
+    },
+    {
+      "sku": "TING-002",
+      "name": "Solo Longganisa (1 pc)",
+      "tier": "volume",
+      "description": "Single longganisa piece",
+      "cost": 17.2,
+      "srp": 25,
+      "margin": 31,
+      "portioning": {
+        "main": "1 pc longganisa (~50g)",
+        "addons": "-",
+        "notes": "TINGAL: Add-on protein"
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-001",
+          "qty": "50g"
+        }
+      ]
+    },
+    {
+      "sku": "TING-003",
+      "name": "Solo Hotdog (1 pc)",
+      "tier": "volume",
+      "description": "Single hotdog piece",
+      "cost": 12.13,
+      "srp": 20,
+      "margin": 39,
+      "portioning": {
+        "main": "1 pc hotdog (~30g)",
+        "addons": "-",
+        "notes": "TINGAL: Budget protein add"
+      },
+      "prepTime": {
+        "cookMins": 2,
+        "prepMins": 1
+      },
+      "takeoutCost": 3,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-003",
+          "qty": "30g"
+        }
+      ]
+    }
+  ]
+}
