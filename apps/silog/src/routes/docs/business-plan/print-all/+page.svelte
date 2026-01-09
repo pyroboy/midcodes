@@ -4,17 +4,18 @@
     import Chapter02 from '../02-company-overview/+page.svelte';
     import Chapter03 from '../03-market-analysis/+page.svelte';
     import Chapter04 from '../04-products/+page.svelte';
-    import Chapter05 from '../05-marketing/+page.svelte';
-    import Chapter06 from '../06-operations/+page.svelte';
-    import Chapter07 from '../07-organization/+page.svelte';
-    import Chapter08 from '../08-financial-plan/+page.svelte';
-    import Chapter09 from '../09-risk-management/+page.svelte';
-    import Chapter10 from '../10-appendices/+page.svelte';
-    import Chapter11 from '../11-initial-totex/+page.svelte';
-    import Chapter13 from '../13-printable-logs/+page.svelte';
-    import Chapter15 from '../15-daily-checklists/+page.svelte';
-    import Chapter16 from '../16-contingency/+page.svelte';
-    import Chapter17 from '../17-complaint-handling/+page.svelte';
+    import Chapter05 from '../05-prep-guidelines/+page.svelte';
+    import Chapter06 from '../06-marketing/+page.svelte';
+    import Chapter07 from '../07-operations/+page.svelte';
+    import Chapter08 from '../08-organization/+page.svelte';
+    import Chapter09 from '../09-financial-plan/+page.svelte';
+    import Chapter10 from '../10-risk-management/+page.svelte';
+    import Chapter11 from '../11-appendices/+page.svelte';
+    import Chapter12 from '../12-initial-totex/+page.svelte';
+    import Chapter14 from '../14-printable-logs/+page.svelte';
+    import Chapter16 from '../16-daily-checklists/+page.svelte';
+    import Chapter17 from '../17-contingency/+page.svelte';
+    import Chapter18 from '../18-complaint-handling/+page.svelte';
 
     import { chapters } from '../chapters';
 
@@ -35,10 +36,11 @@
         { component: Chapter09, ...chapters[8] },
         { component: Chapter10, ...chapters[9] },
         { component: Chapter11, ...chapters[10] },
-        { component: Chapter13, ...chapters[11] },
-        { component: Chapter15, ...chapters[12] },
+        { component: Chapter12, ...chapters[11] },
+        { component: Chapter14, ...chapters[12] },
         { component: Chapter16, ...chapters[13] },
         { component: Chapter17, ...chapters[14] },
+        { component: Chapter18, ...chapters[15] },
     ];
 </script>
 

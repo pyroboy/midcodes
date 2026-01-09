@@ -46,7 +46,10 @@
 					<li><a href="/docs/business-plan/16-contingency">16 // Contingency Plan</a></li>
 					<li><a href="/docs/business-plan/17-complaint-handling">17 // Complaint Handling</a></li>
 				</ul>
-				<a href="/docs/business-plan/print-all" class="print-all-btn">🖨️ Print All Chapters</a>
+				<div class="print-links">
+                    <a href="/docs/business-plan/print-all" class="print-btn main">🖨️ Print All Chapters</a>
+                    <a href="/docs/business-plan/print-kitchen" class="print-btn sub">👨‍🍳 Kitchen Manual Only</a>
+                </div>
 			</section>
 
 			<section class="nav-group ops">
@@ -235,22 +238,39 @@
         border-bottom: 1px solid var(--color-orange);
 	}
 
-    /* Print All Button */
-    .print-all-btn {
-        display: block;
+    /* Print Buttons */
+    .print-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
         margin-top: 1rem;
+    }
+    .print-btn {
+        display: block;
         padding: 0.75rem 1rem;
-        background: var(--color-orange);
-        color: white;
         text-align: center;
         font-weight: 700;
-        font-size: 1rem;
+        font-size: 0.95rem;
         text-decoration: none;
         transition: all 0.2s;
         border: 2px solid var(--color-black);
     }
-    .print-all-btn:hover {
+    .print-btn.main {
+        background: var(--color-orange);
+        color: white;
+    }
+    .print-btn.main:hover {
         background: var(--color-black);
+        color: var(--color-orange);
+    }
+    .print-btn.sub {
+        background: white;
+        color: var(--color-black);
+        font-size: 0.9rem;
+    }
+    .print-btn.sub:hover {
+        background: #f4f4f5;
+        border-color: var(--color-orange);
         color: var(--color-orange);
     }
     /* WIDGETS */

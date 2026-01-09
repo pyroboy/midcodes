@@ -37,9 +37,9 @@
 		name: string;
 		tier: string;
 		description: string;
-		cost: number;
+		cost?: number; // Calculated dynamically
 		srp: number;
-		margin: number;
+		margin?: number; // Calculated dynamically
 		portioning: Portioning;
 		prepTime: PrepTime;
 		ingredientRefs: IngredientRef[];
@@ -103,13 +103,26 @@
 		notes: string;
 	}
 
+	interface MenuConfig {
+		wastageBuffer: number;
+		wastageBufferNote: string;
+		calculation: string;
+		effectiveMargin: string;
+		takeoutFee: number;
+		takeoutFeeNote: string;
+	}
+
 	// Type assertions for JSON imports
-	const menuData = menuSku as Record<string, MenuItem[]>;
+	// menuData has both _config and category arrays, so we use Record<string, any>
+	const menuData = menuSku as Record<string, MenuItem[] | MenuConfig>;
 	const rawMaterialsData = rawMaterials as Record<string, RawMaterial[]>;
 	const prepProductsData = preparedProducts as Record<string, PreparedProduct[]>;
-	const consumablesData = consumables as Record<string, Consumable[]>;
+	const consumablesData = consumables as any;
 	const equipmentData = equipment as Record<string, Equipment[]>;
 	const condimentsData = condiments as Condiment[];
+
+	// Helper to get _config safely
+	const menuConfig = menuData._config as MenuConfig | undefined;
 
 	// Create a flat lookup map for all raw materials
 	const rawMaterialsMap = new Map<string, RawMaterial>();
@@ -258,9 +271,12 @@
 		}
 		
 		// Add-ons (minimal)
-		if (category === 'addons') {
-			if (name.includes('egg') || name.includes('rice')) {
+		if (['lugaw_addons', 'silog_addons', 'noodle_addons', 'sides'].includes(category)) {
+			if (name.includes('egg') || name.includes('rice') || name.includes('longganisa') || name.includes('hotdog')) {
 				appliances.push(APPLIANCES.fryingPan);
+			}
+			if (name.includes('shanghai') || name.includes('chicharon') || name.includes('tawilis') || name.includes('tokwa')) {
+				appliances.push(APPLIANCES.deepFryer);
 			}
 		}
 		
@@ -289,7 +305,7 @@
 
 	// Calculate total cost for a menu item (ingredients + overhead)
 	function calculateSkuCost(item: MenuItem): number {
-		const buffer = menuData?._config?.wastageBuffer || 0.05;
+		const buffer = menuConfig?.wastageBuffer || 0.05;
 		const ingredientTotal = calculateIngredientTotal(item);
 		// Apply buffer to ingredient cost
 		const bufferedIngredientCost = ingredientTotal * (1 + buffer);
@@ -357,11 +373,10 @@
 		noodles: 'Noodles Matrix (NDL)',
 		silog: 'Silog Master List (SIL)',
 		combos: '🍱 Busog Meals / Combos (COMBO)',
-		addons: 'Add-ons & Modifiers (ADD)',
-		bundleAddons: '⭐ Premium Add-On Bundles',
-		sides: '🥗 Pampatanggal Umay (Sides)',
-		flavorBoosters: '🌶️ Flavor Boosters',
-		tingal: '🍖 Tingal (Small Protein Bites)'
+		lugaw_addons: '🥚 Lugaw Add-ons',
+		silog_addons: '🍚 Silog Add-ons',
+		noodle_addons: '🍜 Noodle Add-ons',
+		sides: '🍟 Sides & Appetizers'
 	};
 
 	const rawMaterialLabels: Record<string, string> = {
@@ -404,10 +419,11 @@
 		<h2>1. Menu SKU Master</h2>
 		<p class="section-intro">All finished products with pricing, portioning, and ingredient breakdown. Click any row to expand ingredients.</p>
 
-		{#each Object.entries(menuData) as [category, items]}
+		{#each Object.entries(menuData).filter(([key]) => key !== '_config') as [category, items]}
+			{@const menuItems = items as MenuItem[]}
 			<h3>{categoryLabels[category]}</h3>
 			<div class="sku-cards">
-				{#each items as item}
+				{#each menuItems as item}
 					{@const overhead = getOverhead(item)}
 					{@const ingredientCost = calculateIngredientTotal(item)}
 					{@const totalCost = calculateSkuCost(item)}
@@ -419,7 +435,7 @@
 					{@const toLabor = toTime * LABOR_RATE}
 					{@const toPack = item.takeoutCost || 0}
 					{@const toTotal = toLabor + overhead.electricity + overhead.gas + toPack}
-					{@const buffer = menuData?._config?.wastageBuffer || 0.05}
+					{@const buffer = menuConfig?.wastageBuffer || 0.05}
 					{@const bufferedIngredientCost = ingredientCost * (1 + buffer)}
 					{@const appliances = getAppliancesUsed(item, category)}
 
@@ -486,16 +502,16 @@
 										</tr>
 										<tr class="wastage-row">
 											<td colspan="3" class="wastage-label">
-												<span class="muted">Wastage Buffer ({(menuData?._config?.wastageBuffer * 100) || 5}%)</span>
+												<span class="muted">Wastage Buffer ({((menuConfig?.wastageBuffer || 0.05) * 100).toFixed(0)}%)</span>
 											</td>
 											<td class="right muted">
-												₱{(calculateIngredientTotal(item) * (menuData?._config?.wastageBuffer || 0.05)).toFixed(2)}
+												₱{(calculateIngredientTotal(item) * (menuConfig?.wastageBuffer || 0.05)).toFixed(2)}
 											</td>
 										</tr>
 										<tr class="total-ing-row">
 											<td colspan="3"><strong>TOTAL INGREDIENT COST</strong></td>
 											<td class="right strong">
-												₱{(calculateIngredientTotal(item) * (1 + (menuData?._config?.wastageBuffer || 0.05))).toFixed(2)}
+												₱{(calculateIngredientTotal(item) * (1 + (menuConfig?.wastageBuffer || 0.05))).toFixed(2)}
 											</td>
 										</tr>
 									</tfoot>

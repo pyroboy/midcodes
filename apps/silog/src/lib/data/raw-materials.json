@@ -7,7 +7,7 @@
     { "id": "RM-GR-005", "name": "Well Milled Rice", "useCase": "Standard Rice", "unit": "1kg", "unitSize": 1000, "unitType": "g", "price": 43.45, "supplier": "Bigasan", "frequency": "weekly", "critical": false }
   ],
   "proteins": [
-    { "id": "RM-PR-001", "name": "Eggs (Large)", "useCase": "ALL SKUS (Critical)", "unit": "Tray (30s)", "unitSize": 30, "unitType": "pc", "price": 295, "supplier": "Direct Supplier / Market", "frequency": "daily", "critical": true },
+    { "id": "RM-PR-001", "name": "Eggs (Medium)", "useCase": "ALL SKUS (Critical)", "unit": "Tray (30s)", "unitSize": 30, "unitType": "pc", "price": 225, "supplier": "Direct Supplier", "frequency": "daily", "critical": true, "notes": "Medium eggs sourced directly from supplier. Cost: ₱7.50/pc vs ₱9.83/pc for large." },
     { "id": "RM-PR-002", "name": "Chicken (Whole Dressed)", "useCase": "Chicken Tapa, Lugaw, Adobo", "unit": "Kg", "unitSize": 1000, "unitType": "g", "price": 170, "supplier": "Wet Market (Morning)", "frequency": "daily", "critical": false },
     { "id": "RM-PR-003", "name": "Chicken (Leg/Thigh)", "useCase": "Chicsilog, Chicken Mushroom", "unit": "Kg", "unitSize": 1000, "unitType": "g", "price": 180, "supplier": "Wet Market", "frequency": "daily", "critical": false },
     { "id": "RM-PR-004", "name": "Pork Kasim/Shoulder", "useCase": "Pork Chop, Tokwa, Lugaw, BBQ", "unit": "Kg", "unitSize": 1000, "unitType": "g", "price": 330, "supplier": "Wet Market (Morning)", "frequency": "daily", "critical": false },
@@ -20,7 +20,9 @@
     { "id": "RM-PR-010", "name": "Tinapa (Galunggong)", "useCase": "Tinapasilog", "unit": "Pack (250g)", "unitSize": 250, "unitType": "g", "price": 180, "supplier": "Market / Supplier", "frequency": "weekly", "critical": false },
     { "id": "RM-PR-011", "name": "Salted Egg (Itlog na Maalat)", "useCase": "Side / Garnish", "unit": "Piece", "unitSize": 1, "unitType": "pc", "price": 15, "supplier": "Market / Supplier", "frequency": "weekly", "critical": false },
     { "id": "RM-PR-012", "name": "Tawilis (Smoked/Fried)", "useCase": "Side / Garnish", "unit": "Kg", "unitSize": 1000, "unitType": "g", "price": 200, "supplier": "Market (Specialty)", "frequency": "weekly", "critical": false },
-    { "id": "RM-PR-013", "name": "Frozen Imported Liempo", "useCase": "Food Service", "unit": "Kg", "unitSize": 1000, "unitType": "g", "price": 316.67, "supplier": "Frozen Supplier", "frequency": "weekly", "critical": false }
+    { "id": "RM-PR-013", "name": "Frozen Imported Liempo", "useCase": "Food Service", "unit": "Kg", "unitSize": 1000, "unitType": "g", "price": 316.67, "supplier": "Frozen Supplier", "frequency": "weekly", "critical": false },
+    { "id": "RM-PR-014", "name": "Homemade Sweet Tapa (Outsourced)", "useCase": "Cheesy Tapa Silog", "unit": "Pack (500g - 5 servings)", "unitSize": 5, "unitType": "serving", "price": 175, "supplier": "Local Supplier / Home Cook", "frequency": "2x weekly", "critical": false, "notes": "Sweet & soft timpla style, 100g per serving. TO LEARN: Research recipe for in-house prep." },
+    { "id": "RM-PR-015", "name": "Ox Tripe (Tuwalya)", "useCase": "Goto Base", "unit": "Kg", "unitSize": 1000, "unitType": "g", "price": 300, "supplier": "Public Market", "frequency": "weekly", "critical": false, "notes": "Cleaned/Scalded. For PP-019 Goto Base." }
   ],
   "processed": [
     { "id": "RM-PD-001", "name": "Longganisa (CDO Skinless - Negosyo Pack)", "useCase": "Longsilog", "unit": "Pack (250g)", "unitSize": 250, "unitType": "g", "price": 86, "supplier": "Frozen Supplier / CDO", "frequency": "weekly", "critical": false },
@@ -65,7 +67,7 @@
     { "id": "RM-VG-012", "name": "Mushroom (Button/Oyster)", "useCase": "Chicken Mushroom", "unit": "Pack (200g)", "unitSize": 200, "unitType": "g", "price": 45, "supplier": "Grocery / Market", "frequency": "weekly", "critical": false }
   ],
   "pantry": [
-    { "id": "RM-PT-001", "name": "Cooking Oil (Palm - Wholesale)", "useCase": "Frying, Sinangag", "unit": "Gallon (3.8L)", "unitSize": 3800, "unitType": "ml", "price": 500, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": true },
+    { "id": "RM-PT-001", "name": "Cooking Oil (Palm - Wholesale)", "useCase": "Frying, Sinangag", "unit": "Gallon (3.8L)", "unitSize": 3800, "unitType": "ml", "price": 500, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": true, "portionGuide": "10ml per dish (spray/measured usage)", "notes": "Reduced from 15ml to 10ml per dish for cost control." },
     { "id": "RM-PT-002", "name": "Soy Sauce (Silver Swan)", "useCase": "Marinades, Dips", "unit": "Gallon (3.8L)", "unitSize": 3800, "unitType": "ml", "price": 227, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": false },
     { "id": "RM-PT-003", "name": "Vinegar (Datu Puti)", "useCase": "Marinades, Sawsawan", "unit": "Gallon (3.8L)", "unitSize": 3800, "unitType": "ml", "price": 162, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": false },
     { "id": "RM-PT-004", "name": "Banana Ketchup (Papa / Mafran)", "useCase": "Condiment, Dip", "unit": "Gallon (3.8L)", "unitSize": 3800, "unitType": "ml", "price": 235, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": false },
@@ -87,7 +89,9 @@
     { "id": "RM-PT-021", "name": "Laurel Leaves", "useCase": "Adobo, Tapa Marinade", "unit": "Pack (20g)", "unitSize": 20, "unitType": "pc", "price": 20, "supplier": "Public Market", "frequency": "weekly", "critical": false },
     { "id": "RM-PT-022", "name": "Blue Lemonade Syrup (inJoy)", "useCase": "Blue Lemonade", "unit": "Bottle (1L)", "unitSize": 1000, "unitType": "ml", "price": 122, "supplier": "Beverage Supplier", "frequency": "weekly", "critical": false },
     { "id": "RM-PT-023", "name": "Ice", "useCase": "Drinks", "unit": "Bag (3kg)", "unitSize": 3000, "unitType": "g", "price": 20, "supplier": "In-house", "frequency": "daily", "critical": false },
-    { "id": "RM-PT-024", "name": "Magic Sarap", "useCase": "Seasoning", "unit": "Box (12-18s)", "unitSize": 1, "unitType": "box", "price": 92.50, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": false }
+    { "id": "RM-PT-024", "name": "Magic Sarap", "useCase": "Seasoning", "unit": "Box (12-18s)", "unitSize": 1, "unitType": "box", "price": 92.50, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": false },
+    { "id": "RM-PT-026", "name": "Java Rice Seasoning Mix", "useCase": "Java Rice Base", "unit": "Pack (250g)", "unitSize": 250, "unitType": "g", "price": 85, "supplier": "Wholesale Grocery", "frequency": "weekly", "critical": false, "notes": "Contains annatto, onion flakes, garlic granules. Mix 15g per 200g sinangag serving." },
+    { "id": "RM-PT-027", "name": "Fish Sauce (Patis)", "useCase": "Goto Base, Seasoning", "unit": "Bottle (350ml)", "unitSize": 350, "unitType": "ml", "price": 50, "supplier": "Grocery", "frequency": "weekly", "critical": false, "notes": "UFC or Rufina brand. For PP-019 Goto Base seasoning." }
   ],
   "beverages": [
     { "id": "RM-BV-001", "name": "Iced Tea Powder", "useCase": "House Blend", "unit": "Pack (1kg)", "unitSize": 1000, "unitType": "g", "price": 180, "supplier": "Beverage Supplier", "frequency": "weekly", "critical": false },
