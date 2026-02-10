@@ -175,6 +175,56 @@
 		return match ? parseFloat(match[0]) : 1;
 	}
 
+	// Extract serving unit from batchUnit (e.g., "servings (270g each)" → "270g", "servings (2 pcs each)" → "2 pcs")
+	function extractServingUnit(batchUnit: string): { value: string; hasUnit: boolean } {
+		// Match patterns like "(270g each)", "(2 pcs each)", "(50g)", "(350ml each)"
+		const match = batchUnit.match(/\((\d+\s*(?:g|ml|pcs?)?(?:\s*each)?)\)/i);
+		if (match) {
+			// Clean up the match - remove "each" and extra spaces
+			const cleaned = match[1].replace(/\s*each\s*/i, '').trim();
+			return { value: cleaned, hasUnit: true };
+		}
+		// Check if it's just "eggs" or similar simple unit
+		if (batchUnit === 'eggs') {
+			return { value: '1 egg', hasUnit: true };
+		}
+		return { value: 'serving', hasUnit: false };
+	}
+
+	// Get batch yield for prepared product (e.g., "5940g" = batchSize × serving unit)
+	function getBatchYield(prep: PreparedProduct): string {
+		const unit = extractServingUnit(prep.batchUnit);
+		if (!unit.hasUnit || unit.value === '1 egg') return `${prep.batchSize} ${prep.batchUnit.split(' ')[0]}`;
+		// Try to extract numeric value for gram calculations
+		const numMatch = unit.value.match(/^(\d+)/);
+		if (numMatch && unit.value.includes('g')) {
+			const unitValue = parseInt(numMatch[1]);
+			const totalGrams = prep.batchSize * unitValue;
+			return `${totalGrams}g`;
+		}
+		return `${prep.batchSize} ${prep.batchUnit.split(' ')[0]}`;
+	}
+
+	// Get servings count for prepared product (e.g., "22")
+	function getServingsCount(prep: PreparedProduct): string {
+		return `${prep.batchSize}`;
+	}
+
+	// Get display qty for ingredient - shows unit for PP-*, original qty for RM-*
+	function getDisplayQty(ref: IngredientRef): string {
+		if (ref.id.startsWith('PP-')) {
+			const prep = prepProductsMap.get(ref.id);
+			if (!prep) return ref.qty;
+			const qty = parseQty(ref.qty);
+			const unit = extractServingUnit(prep.batchUnit);
+			// If no specific unit found, return original qty string
+			if (!unit.hasUnit) return ref.qty;
+			// Format: "270g" for qty=1, "2× 270g" for qty=2
+			return qty === 1 ? unit.value : `${qty}× ${unit.value}`;
+		}
+		return ref.qty;
+	}
+
 	// Calculate cost for a single ingredient reference (handles RM- and PP- prefixes)
 	function calculateIngredientCost(ref: IngredientRef): number {
 		const id = ref.id;
@@ -476,8 +526,10 @@
 									<thead>
 										<tr>
 											<th>Item</th>
+											<th class="right">Batch Cost</th>
+											<th class="center">Batch Yield</th>
+											<th class="center">Servings</th>
 											<th>Qty</th>
-											<th>Source</th>
 											<th class="right">Cost</th>
 										</tr>
 									</thead>
@@ -485,11 +537,16 @@
 										{#each item.ingredientRefs as ref}
 											{@const ing = resolveIngredient(ref)}
 											{@const ingCost = calculateIngredientCost(ref)}
+											{@const isPrep = ref.id.startsWith('PP-')}
+											{@const prepItem = isPrep ? prepProductsMap.get(ref.id) : null}
+											{@const prepCosts = isPrep && prepItem ? calculatePrepBatchCost(prepItem) : null}
 											{#if ing}
 												<tr>
 													<td>{ing.item}</td>
-													<td>{ing.qty}</td>
-													<td class="source">{ing.supplier}</td>
+													<td class="right batch-cost">{isPrep && prepCosts ? `₱${prepCosts.totalBatchCost.toFixed(2)}` : '—'}</td>
+													<td class="center batch-info">{isPrep && prepItem ? getBatchYield(prepItem) : '—'}</td>
+													<td class="center batch-info">{isPrep && prepItem ? getServingsCount(prepItem) : '—'}</td>
+													<td>{getDisplayQty(ref)}</td>
 													<td class="right cost">₱{ingCost.toFixed(2)}</td>
 												</tr>
 											{/if}
@@ -497,11 +554,11 @@
 									</tbody>
 									<tfoot>
 										<tr class="subtotal-row">
-											<td colspan="3">INGREDIENT SUBTOTAL</td>
+											<td colspan="5">INGREDIENT SUBTOTAL</td>
 											<td class="right">₱{calculateIngredientTotal(item).toFixed(2)}</td>
 										</tr>
 										<tr class="wastage-row">
-											<td colspan="3" class="wastage-label">
+											<td colspan="5" class="wastage-label">
 												<span class="muted">Wastage Buffer ({((menuConfig?.wastageBuffer || 0.05) * 100).toFixed(0)}%)</span>
 											</td>
 											<td class="right muted">
@@ -509,7 +566,7 @@
 											</td>
 										</tr>
 										<tr class="total-ing-row">
-											<td colspan="3"><strong>TOTAL INGREDIENT COST</strong></td>
+											<td colspan="5"><strong>TOTAL INGREDIENT COST</strong></td>
 											<td class="right strong">
 												₱{(calculateIngredientTotal(item) * (1 + (menuConfig?.wastageBuffer || 0.05))).toFixed(2)}
 											</td>
@@ -1408,10 +1465,24 @@
 	}
 
 	/* INGREDIENT TABLE OVERRIDES */
-	.ingredient-table { width: 100%; border-collapse: collapse; }
-	.ingredient-table th { padding: 6px 0; border-bottom: 1px solid #cbd5e1; color: #0f172a; font-weight: 700; }
-	.ingredient-table td { padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 0.85rem; }
+	.ingredient-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+	.ingredient-table th { padding: 6px 4px; border-bottom: 1px solid #cbd5e1; color: #0f172a; font-weight: 700; font-size: 0.7rem; }
+	.ingredient-table td { padding: 6px 4px; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem; }
+	.ingredient-table th:nth-child(1) { width: 24%; } /* Item */
+	.ingredient-table th:nth-child(2) { width: 14%; } /* Batch Cost */
+	.ingredient-table th:nth-child(3) { width: 14%; } /* Batch Yield */
+	.ingredient-table th:nth-child(4) { width: 14%; } /* Servings */
+	.ingredient-table th:nth-child(5) { width: 14%; } /* Qty */
+	.ingredient-table th:nth-child(6) { width: 12%; } /* Cost */
 	.col-ingredients .right { text-align: right; }
+	.col-ingredients .center { text-align: center; }
+	
+	/* Batch info column styling */
+	.batch-cost, .batch-info { 
+		font-size: 0.7rem; 
+		color: #64748b;
+		white-space: nowrap;
+	}
 	
 	.subtotal-row td {
 		border-top: 2px solid #cbd5e1;

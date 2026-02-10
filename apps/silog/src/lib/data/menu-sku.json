@@ -747,8 +747,8 @@
       "name": "Basic Silog",
       "tier": "volume",
       "description": "Rice + Egg only",
-            "srp": 59,
-            "foodpandaSrp": 85,
+            "srp": 49,
+            "foodpandaSrp": 70,
       "portioning": {
         "main": "â€”",
         "addons": "Extra egg yolk optional (+â‚±5)",
@@ -830,8 +830,8 @@
       "name": "Hotsilog",
       "tier": "volume",
       "description": "Hotdog + Sinangag + Itlog",
-            "srp": 85,
-            "foodpandaSrp": 115,
+            "srp": 99,
+            "foodpandaSrp": 130,
       "portioning": {
         "main": "60g hotdog (2 pcs)",
         "addons": "Ketchup (15ml)",
@@ -872,8 +872,8 @@
       "name": "Cornsilog",
       "tier": "volume",
       "description": "Corned Beef + Sinangag + Itlog",
-            "srp": 115,
-            "foodpandaSrp": 155,
+            "srp": 99,
+            "foodpandaSrp": 130,
       "portioning": {
         "main": "100g corned beef",
         "addons": "Onion rings (20g)",
@@ -914,8 +914,8 @@
       "name": "Tocilog",
       "tier": "volume",
       "description": "Tocino + Sinangag + Itlog",
-            "srp": 139,
-            "foodpandaSrp": 185,
+            "srp": 129,
+            "foodpandaSrp": 170,
       "portioning": {
         "main": "100g tocino slices",
         "addons": "Atchara (15g)",
@@ -1012,8 +1012,8 @@
       "name": "Tapsilog",
       "tier": "premium",
       "description": "The OG Beef Tapa + Sinangag + Itlog",
-            "srp": 175,
-            "foodpandaSrp": 230,
+            "srp": 165,
+            "foodpandaSrp": 215,
       "portioning": {
         "main": "120g beef tapa",
         "addons": "Vinegar + garlic (15ml)",
@@ -1059,8 +1059,8 @@
       "name": "Bangsilog",
       "tier": "premium",
       "description": "Sarangani Bay Prime Bangus (400-500g) + Fried Talong + 2 Eggs + Sinangag",
-            "srp": 199,
-            "foodpandaSrp": 255,
+            "srp": 165,
+            "foodpandaSrp": 215,
       "portioning": {
         "main": "1 pc frozen bangus belly (400-500g)",
         "addons": "2 eggs, fried talong (50g)",
@@ -1102,7 +1102,7 @@
       "name": "Grandsilog",
       "tier": "signature",
       "description": "Tapa + Tocino Overload",
-            "srp": 199,
+            "srp": 200,
             "foodpandaSrp": 260,
       "portioning": {
         "main": "80g tapa + 80g tocino",
@@ -1148,8 +1148,8 @@
       "name": "Overload Silog",
       "tier": "signature",
       "description": "Tapa + Hungarian Sausage + Cheese",
-            "srp": 249,
-            "foodpandaSrp": 320,
+            "srp": 200,
+            "foodpandaSrp": 260,
       "portioning": {
         "main": "80g tapa + 60g hungarian",
         "addons": "Cheese sauce (30ml)",
@@ -1232,8 +1232,8 @@
       "name": "Bacsilog",
       "tier": "volume",
       "description": "Bacon + Sinangag + Itlog",
-            "srp": 125,
-            "foodpandaSrp": 165,
+            "srp": 99,
+            "foodpandaSrp": 130,
       "portioning": {
         "main": "60g bacon (3 strips)",
         "addons": "Maple drizzle optional",
@@ -1266,100 +1266,12 @@
       ]
     },
     {
-      "sku": "SIL-021",
-      "name": "Daing na Galunggong Silog",
-      "tier": "volume",
-      "description": "Dried Galunggong + Sinangag + Itlog",
-            "srp": 135,
-            "foodpandaSrp": 180,
-      "portioning": {
-        "main": "120g dried fish",
-        "addons": "Vinegar + onion (15ml)",
-        "notes": ""
-      },
-      "prepTime": {
-        "cookMins": 6,
-        "prepMins": 2
-      },
-      "takeoutCost": 8.4,
-      "takeoutPrepMins": 1,
-      "ingredientRefs": [
-        {
-          "id": "RM-PR-008",
-          "qty": "120g"
-        },
-        {
-          "id": "PP-003",
-          "qty": "1 serving"
-        },
-        {
-          "id": "RM-PR-001",
-          "qty": "1 pc"
-        },
-        {
-          "id": "RM-PT-003",
-          "qty": "15ml"
-        },
-        {
-          "id": "RM-VG-002",
-          "qty": "10g"
-        },
-        {
-          "id": "RM-PT-001",
-          "qty": "10ml",
-          "note": "Frying oil for egg/protein"
-        }
-      ]
-    },
-    {
-      "sku": "SIL-023",
-      "name": "Embusilog",
-      "tier": "volume",
-      "description": "Embutido + Sinangag + Itlog",
-            "srp": 125,
-            "foodpandaSrp": 165,
-      "portioning": {
-        "main": "100g embutido (2 slices)",
-        "addons": "Banana ketchup (15ml)",
-        "notes": ""
-      },
-      "prepTime": {
-        "cookMins": 4,
-        "prepMins": 1
-      },
-      "takeoutCost": 8.4,
-      "takeoutPrepMins": 1,
-      "ingredientRefs": [
-        {
-          "id": "RM-PD-011",
-          "qty": "100g / 2 slices"
-        },
-        {
-          "id": "PP-003",
-          "qty": "1 serving"
-        },
-        {
-          "id": "RM-PR-001",
-          "qty": "1 pc"
-        },
-        {
-          "id": "RM-PT-004",
-          "qty": "15ml"
-        },
-        {
-          "id": "RM-PT-001",
-          "qty": "10ml",
-          "note": "Frying oil for egg/protein"
-        }
-      ]
-    },
-    {
       "sku": "SIL-024",
       "name": "Hamsilog",
       "tier": "volume",
       "description": "Sweet Ham + Sinangag + Itlog",
-            "srp": 125,
-            "foodpandaSrp": 165,
+            "srp": 99,
+            "foodpandaSrp": 130,
       "portioning": {
         "main": "80g sweet ham (2 slices)",
         "addons": "Pineapple ring (1 pc)",
@@ -1396,8 +1308,8 @@
       "name": "Hungsilog",
       "tier": "winner",
       "description": "Hungarian Sausage + Sinangag + Itlog",
-            "srp": 215,
-            "foodpandaSrp": 280,
+            "srp": 165,
+            "foodpandaSrp": 215,
       "portioning": {
         "main": "100g hungarian sausage (2 pcs)",
         "addons": "Mustard (10ml)",
@@ -1432,12 +1344,12 @@
     {
       "sku": "SIL-027",
       "name": "Spamsilog",
-      "tier": "premium",
-      "description": "Spam Luncheon Meat + Sinangag + Itlog",
-            "srp": 139,
-            "foodpandaSrp": 185,
+      "tier": "volume",
+      "description": "Luncheon Meat + Sinangag + Itlog",
+            "srp": 99,
+            "foodpandaSrp": 135,
       "portioning": {
-        "main": "85g Spam (3 slices)",
+        "main": "76g luncheon meat (2 slices)",
         "addons": "â€”",
         "notes": "Pan-fried until crispy edges"
       },
@@ -1450,7 +1362,7 @@
       "ingredientRefs": [
         {
           "id": "RM-PD-013",
-          "qty": "85g / 3 slices"
+          "qty": "76g / 2 slices"
         },
         {
           "id": "PP-003",
@@ -1696,8 +1608,8 @@
       "name": "Extra Egg (Large)",
       "tier": "volume",
       "description": "Fried or Boiled",
-            "srp": 25,
-            "foodpandaSrp": 35,
+            "srp": 20,
+            "foodpandaSrp": 30,
       "portioning": {
         "main": "1 large egg",
         "addons": "â€”",
@@ -1796,8 +1708,8 @@
       "name": "Extra Egg (Large)",
       "tier": "volume",
       "description": "Fried or Boiled",
-            "srp": 25,
-            "foodpandaSrp": 35,
+            "srp": 20,
+            "foodpandaSrp": 30,
       "portioning": {
         "main": "1 large egg",
         "addons": "â€”",
@@ -1819,8 +1731,8 @@
       "name": "Extra Sinangag",
       "tier": "volume",
       "description": "Garlic Fried Rice",
-            "srp": 40,
-            "foodpandaSrp": 55,
+            "srp": 25,
+            "foodpandaSrp": 35,
       "portioning": {
         "main": "160g garlic rice",
         "addons": "â€”",
@@ -1843,8 +1755,8 @@
       "name": "Extra Plain Rice",
       "tier": "volume",
       "description": "Steamed Jasmine",
-            "srp": 15,
-            "foodpandaSrp": 25,
+            "srp": 20,
+            "foodpandaSrp": 30,
       "portioning": {
         "main": "160g cooked rice",
         "addons": "â€”",
@@ -1961,8 +1873,8 @@
       "name": "Extra Egg (Large)",
       "tier": "volume",
       "description": "Fried or Boiled",
-            "srp": 25,
-            "foodpandaSrp": 35,
+            "srp": 20,
+            "foodpandaSrp": 30,
       "portioning": {
         "main": "1 large egg",
         "addons": "â€”",
@@ -2174,60 +2086,6 @@
       ]
     },
     {
-      "sku": "ADD-011",
-      "name": "Fried Tawilis Side",
-      "tier": "volume",
-      "description": "Crispy Side Dish",
-            "srp": 35,
-            "portioning": {
-        "main": "60g (5-6 pcs)",
-        "addons": "Vinegar dip",
-        "notes": "Crispy, with vinegar dip"
-      },
-      "prepTime": {
-        "cookMins": 4,
-        "prepMins": 1
-      },
-      "takeoutCost": 3,
-      "ingredientRefs": [
-        {
-          "id": "RM-PR-012",
-          "qty": "60g"
-        },
-        {
-          "id": "RM-PT-003",
-          "qty": "10ml"
-        }
-      ]
-    },
-    {
-      "sku": "FB-003",
-      "name": "Ala King Gravy",
-      "tier": "premium",
-      "description": "Creamy gravy for chicken/pork meals",
-            "srp": 15,
-            "portioning": {
-        "main": "30ml cream gravy",
-        "addons": "-",
-        "notes": "Great upsell for Chicsilog"
-      },
-      "prepTime": {
-        "cookMins": 2,
-        "prepMins": 1
-      },
-      "takeoutCost": 2,
-      "ingredientRefs": [
-        {
-          "id": "RM-PT-020",
-          "qty": "25ml"
-        },
-        {
-          "id": "RM-PT-007",
-          "qty": "10ml"
-        }
-      ]
-    },
-    {
       "sku": "PROT-001",
       "name": "Side Shanghai (3 pcs)",
       "tier": "volume",
@@ -2297,6 +2155,49 @@
         {
           "id": "RM-PD-003",
           "qty": "30g"
+        }
+      ]
+    },
+    {
+      "sku": "PROT-004",
+      "name": "Spam Musubi",
+      "tier": "winner",
+      "description": "Japanese-style luncheon meat rice ball",
+            "srp": 49,
+            "foodpandaSrp": 65,
+      "portioning": {
+        "main": "1 slice luncheon meat (~38g) + 80g rice",
+        "addons": "Nori wrap (half sheet), teriyaki glaze (5ml)",
+        "notes": "Lotte luncheon meat. Shape rice, top with spam, wrap with nori."
+      },
+      "prepTime": {
+        "cookMins": 3,
+        "prepMins": 2
+      },
+      "takeoutCost": 3,
+      "takeoutPrepMins": 1,
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-013",
+          "qty": "38g / 1 slice"
+        },
+        {
+          "id": "PP-004",
+          "qty": "0.5 serving (80g)"
+        },
+        {
+          "id": "RM-PD-021",
+          "qty": "0.5 sheet"
+        },
+        {
+          "id": "RM-PT-014",
+          "qty": "5ml",
+          "note": "Teriyaki glaze"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "5ml",
+          "note": "Frying oil"
         }
       ]
     },

@@ -566,6 +566,32 @@
         "step4_combining": "Pour sautéed mixture into pot with tripe/broth. Simmer 5-10 mins. Season with black pepper and patis to taste.",
         "step5_storage": "For batch prep: Cool and portion into containers. Freeze until ready. Thaw, boil, and mix with PP-001 Lugaw or add rice directly."
       }
+    },
+    {
+      "id": "PP-020",
+      "name": "Fried Egg",
+      "description": "Sunny-side up or over-easy fried egg for silog/noodle dishes",
+      "batchSize": 10,
+      "batchUnit": "servings (1 egg each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-001",
+          "qty": "10 pcs"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "100ml",
+          "note": "10ml oil per egg for frying"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 5,
+        "cookLaborMins": 10,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Per-order frying. Cost: Egg ₱7.50 + Oil ₱1.32 + Overhead ₱1.50 = ~₱10.32/egg. Use medium heat, 1-2 min per egg."
     }
   ],
   "drinks": [
