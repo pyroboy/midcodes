@@ -236,13 +236,7 @@
 		animation: pulse 2s infinite;
 	}
 
-	/* Grid Navigation */
-	.nav-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 1.5rem;
-		margin-bottom: 2.5rem;
-	}
+
 
 	/* Docs Sections */
 	.docs-sections {

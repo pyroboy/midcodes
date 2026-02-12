@@ -39,7 +39,7 @@
 					<li><strong>Tech:</strong> Encrypted QR Code</li>
 					<li><strong>Security:</strong> Crypto-signed Data</li>
 					<li><strong>Use Case:</strong> School Attendance, Events</li>
-					<li><strong>Speed:</strong> < 200ms Scan Time</li>
+					<li><strong>Speed:</strong> &lt; 200ms Scan Time</li>
 				</ul>
 			</div>
 
