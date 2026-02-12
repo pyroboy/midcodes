@@ -29,6 +29,13 @@
       "when": 1766721510711,
       "tag": "0003_add_template_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770871721723,
+      "tag": "0004_talented_frightful_four",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,28 @@
-CREATE TYPE "public"."app_permission" AS ENUM('payments.read', 'payments.update', 'payments.delete', 'payment_schedules.manage', 'payment_schedules.read', 'penalties.configure', 'meters.create', 'meters.read', 'meters.update', 'meters.delete', 'readings.create', 'readings.read', 'readings.update', 'readings.delete', 'events.create', 'events.read', 'events.update', 'events.delete', 'attendees.create', 'attendees.read', 'attendees.update', 'attendees.delete', 'attendees.check_qr', 'templates.create', 'templates.read', 'templates.update', 'templates.delete', 'idcards.create', 'idcards.read', 'idcards.update', 'idcards.delete', 'organizations.create', 'organizations.read', 'organizations.update', 'organizations.delete', 'profiles.read', 'profiles.update', 'bookings.read', 'bookings.update', 'bookings.delete');--> statement-breakpoint
-CREATE TYPE "public"."app_role" AS ENUM('super_admin', 'org_admin', 'user', 'event_admin', 'event_qr_checker', 'property_admin', 'property_user', 'id_gen_admin', 'id_gen_user');--> statement-breakpoint
-CREATE TYPE "public"."template_orientation" AS ENUM('portrait', 'landscape');--> statement-breakpoint
-CREATE TYPE "public"."template_sample_type" AS ENUM('student', 'employee', 'membership', 'visitor', 'other');--> statement-breakpoint
-CREATE TYPE "public"."user_role" AS ENUM('super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user', 'user');--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."app_permission" AS ENUM('payments.read', 'payments.update', 'payments.delete', 'payment_schedules.manage', 'payment_schedules.read', 'penalties.configure', 'meters.create', 'meters.read', 'meters.update', 'meters.delete', 'readings.create', 'readings.read', 'readings.update', 'readings.delete', 'events.create', 'events.read', 'events.update', 'events.delete', 'attendees.create', 'attendees.read', 'attendees.update', 'attendees.delete', 'attendees.check_qr', 'templates.create', 'templates.read', 'templates.update', 'templates.delete', 'idcards.create', 'idcards.read', 'idcards.update', 'idcards.delete', 'organizations.create', 'organizations.read', 'organizations.update', 'organizations.delete', 'profiles.read', 'profiles.update', 'bookings.read', 'bookings.update', 'bookings.delete');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."app_role" AS ENUM('super_admin', 'org_admin', 'user', 'event_admin', 'event_qr_checker', 'property_admin', 'property_user', 'id_gen_admin', 'id_gen_user');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."template_orientation" AS ENUM('portrait', 'landscape');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."template_sample_type" AS ENUM('student', 'employee', 'membership', 'visitor', 'other');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."user_role" AS ENUM('super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user', 'user');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,

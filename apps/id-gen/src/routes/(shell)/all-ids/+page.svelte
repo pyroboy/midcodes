@@ -132,6 +132,8 @@
 
 	// UI states
 	let searchQuery = $state('');
+	let sortBy = $state<string>('id-number'); // Default sort
+	let sortDirection = $state<'asc' | 'desc'>('asc'); // Default direction
 	let selectedTemplateFilter = $state<string>('all'); // 'all' or template name
 	let selectedColumnFilter = $state<string>('all'); // 'all' or column name
 	let selectedFrontImage: string | null = $state(null);
@@ -235,6 +237,23 @@
 		}
 	}
 
+	// Handle sort change
+	async function handleSort(column: string) {
+		if (sortBy === column) {
+			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+		} else {
+			sortBy = column;
+			sortDirection = 'asc';
+		}
+		
+		// Reset and reload
+		dataRows = []; // Clear current list to avoid mixing sorted data
+		totalCount = 0;
+		hasMore = true;
+		
+		await loadInitialCards({ forceRefresh: true });
+	}
+
 	// Load initial cards
 	async function loadInitialCards(opts: { forceRefresh?: boolean; background?: boolean } = {}) {
 		const forceRefresh = opts.forceRefresh ?? false;
@@ -261,10 +280,9 @@
 		try {
 			console.log(`%c├─ ⏳ Calling remote functions...`, logStyles.info);
 			const [result, count] = await Promise.all([
-				cachedRemoteFunctionCall({
 					scopeKey,
 					keyBase: 'all-ids:getIDCards',
-					args: { offset: 0, limit: INITIAL_LOAD },
+					args: { offset: 0, limit: INITIAL_LOAD, sortBy, sortDirection },
 					forceRefresh,
 					fetcher: (args) => getIDCards(args),
 					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
@@ -339,10 +357,9 @@
 		loadingMore = true;
 		try {
 			console.log(`%c├─ ⏳ Fetching next ${LOAD_MORE_COUNT} cards...`, logStyles.info);
-			const result = await cachedRemoteFunctionCall({
 				scopeKey,
 				keyBase: 'all-ids:getIDCards',
-				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT },
+				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT, sortBy, sortDirection },
 				forceRefresh,
 				fetcher: (args) => getIDCards(args),
 				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
@@ -500,6 +517,8 @@
 				viewMode.set(optimalMode);
 			}
 		}
+
+
 
 		// 0) Check for hard refresh (browser reload)
 		// If detected, we clear the cache to ensure fresh data.
@@ -1484,8 +1503,22 @@
 										<th class="px-4 py-3 font-medium whitespace-nowrap">SecureToken</th>
 										{#if templateFields[templateName]}
 											{#each templateFields[templateName] || [] as field}
-												<th class="px-4 py-3 font-medium whitespace-nowrap">{field.variableName}</th
+												<th 
+													class="px-4 py-3 font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors select-none group/th"
+													onclick={() => handleSort(field.variableName)}
+													title="Sort by {field.variableName}"
 												>
+													<div class="flex items-center gap-1">
+														{field.variableName}
+														{#if sortBy === field.variableName}
+															<span class="text-primary text-[10px]">
+																{#if sortDirection === 'asc'}▲{:else}▼{/if}
+															</span>
+														{:else}
+															<span class="text-muted-foreground opacity-0 group-hover/th:opacity-50 text-[10px]">↕</span>
+														{/if}
+													</div>
+												</th>
 											{/each}
 										{/if}
 										<th class="px-4 py-3 font-medium text-right">Actions</th>
