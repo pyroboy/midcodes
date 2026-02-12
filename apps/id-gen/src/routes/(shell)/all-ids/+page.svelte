@@ -19,6 +19,7 @@
 	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
 	import JSZip from 'jszip';
+	import { toast } from 'svelte-sonner';
 	import { getProxiedUrl, getStorageUrl } from '$lib/utils/storage';
 	import { createCardFromInches } from '$lib/utils/cardGeometry';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
@@ -190,6 +191,9 @@
 
 	// Visible card window for performance
 	let visibleStartIndex = $state(0);
+	
+	// Track last selected card for shift-select range
+	let lastSelectedCardId = $state<string | null>(null);
 
 	// Card zoom control
 	let cardMinWidth = $state(250);
@@ -881,18 +885,52 @@
 
 	const selectionManager = {
 		isSelected: (cardId: string) => selectedCards.has(cardId),
-		toggleSelection: (cardId: string) => {
+		toggleSelection: (cardId: string, event?: MouseEvent | Event) => {
 			if (!cardId) return;
 			const newSelectedCards = new Set(selectedCards);
+			
+			// Handle Shift+Click Range Selection
+			if (event instanceof MouseEvent && event.shiftKey && lastSelectedCardId) {
+				const currentIndex = filteredCards.findIndex(c => getCardId(c) === cardId);
+				const lastIndex = filteredCards.findIndex(c => getCardId(c) === lastSelectedCardId);
+
+				if (currentIndex !== -1 && lastIndex !== -1) {
+					const start = Math.min(currentIndex, lastIndex);
+					const end = Math.max(currentIndex, lastIndex);
+					
+					// Determine target state based on the clicked card's current state
+					// If clicking an unselected card, select the range.
+					// If clicking a selected card, usually we still select range (standard behavior)
+					// But let's stick to additive selection for Shift-Click
+					const rangeCards = filteredCards.slice(start, end + 1);
+					
+					// Add all cards in range to selection
+					rangeCards.forEach(card => {
+						const id = getCardId(card);
+						if (id) newSelectedCards.add(id);
+					});
+					
+					selectedCards = newSelectedCards;
+					// Don't update lastSelectedCardId on range select to allow extending range from original anchor? 
+					// Actually standard behavior often updates anchor. Let's update it.
+					// lastSelectedCardId = cardId; 
+					return;
+				}
+			}
+
+			// Single Toggle Behavior
 			if (newSelectedCards.has(cardId)) {
 				newSelectedCards.delete(cardId);
+				lastSelectedCardId = null; // Clear anchor on deselect
 			} else {
 				newSelectedCards.add(cardId);
+				lastSelectedCardId = cardId; // Set anchor on select
 			}
 			selectedCards = newSelectedCards;
 		},
 		clearSelection: () => {
 			selectedCards = new Set();
+			lastSelectedCardId = null;
 		}
 	};
 
@@ -1099,9 +1137,13 @@
 				// Ensure remote-function pages don't remain stale after mutations
 				clearAllIdsRemoteCache();
 				clearAllIdsCache(scopeKey);
+				toast.success('ID card deleted successfully');
+			} else {
+				toast.error('Failed to delete ID card');
 			}
 		} catch (error) {
 			console.error('Error deleting ID card:', error);
+			toast.error('An error occurred while deleting the ID card');
 		} finally {
 			deletingCards.delete(cardId);
 			deletingCards = deletingCards;
@@ -1142,9 +1184,13 @@
 
 				clearAllIdsRemoteCache();
 				clearAllIdsCache(scopeKey);
+				toast.success(`Successfully deleted ${cardIds.length} ID cards`);
+			} else {
+				toast.error('Failed to delete selected ID cards');
 			}
 		} catch (error) {
 			console.error('Error deleting ID cards:', error);
+			toast.error('An error occurred while deleting the selected ID cards');
 		} finally {
 			deletingCards = new Set();
 		}
@@ -1406,7 +1452,8 @@
 													type="checkbox"
 													class="rounded border-muted-foreground"
 													checked={selectionManager.isSelected(getCardId(card))}
-													onchange={() => selectionManager.toggleSelection(getCardId(card))}
+													onclick={(e) => e.stopPropagation()} 
+													onchange={(e) => selectionManager.toggleSelection(getCardId(card), e)}
 												/>
 											</td>
 											<td class="px-4 py-2" onclick={(e) => openPreview(e, card)}>
@@ -1605,7 +1652,7 @@
 										minWidth={cardMinWidth}
 										onDataLoaded={updateCardData}
 										isSelected={selectionManager.isSelected(getCardId(card))}
-										onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
+										onToggleSelect={(c, e) => selectionManager.toggleSelection(getCardId(card), e)}
 										onDownload={downloadCard}
 										onDelete={handleDelete}
 										onOpenPreview={openPreview}

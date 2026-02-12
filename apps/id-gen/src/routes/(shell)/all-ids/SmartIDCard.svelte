@@ -13,7 +13,7 @@
 	export let id: string;
 	export let initialData: IDCard | null = null;
 	export let isSelected: boolean = false;
-	export let onToggleSelect: (card: any) => void;
+	export let onToggleSelect: (card: any, event?: MouseEvent) => void;
 	export let onDownload: (card: any) => void;
 	export let onDelete: (card: any) => void;
 	export let onOpenPreview: (e: MouseEvent, card: any) => void;

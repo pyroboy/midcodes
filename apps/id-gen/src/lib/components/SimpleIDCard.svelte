@@ -10,7 +10,7 @@
 	interface Props {
 		card: any;
 		isSelected?: boolean;
-		onToggleSelect: (card: any) => void;
+		onToggleSelect: (card: any, event?: MouseEvent) => void;
 		onDownload: (card: any) => void;
 		onDelete: (card: any) => void;
 		onOpenPreview: (e: MouseEvent, card: any) => void;
@@ -95,7 +95,7 @@
 			checked={isSelected}
 			onclick={(e: MouseEvent) => {
 				e.stopPropagation();
-				onToggleSelect(card);
+				onToggleSelect(card, e);
 			}}
 			class="h-5 w-5 rounded border-muted-foreground text-primary focus:ring-primary"
 		/>
