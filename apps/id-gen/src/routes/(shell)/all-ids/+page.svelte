@@ -116,6 +116,7 @@
 	let selectedColumnFilter = $state<string>('all'); // 'all' or column name
 	let selectedFrontImage: string | null = $state(null);
 	let selectedBackImage: string | null = $state(null);
+	let selectedFilenameField = $state<string>('Name'); // Default to 'Name' field for filenames
 	let selectedTemplateDimensions: { width: number; height: number; unit?: string } | null =
 		$state(null);
 	let selectedCardGeometry: any = $state(null);
@@ -915,6 +916,46 @@
 		selectedCardGeometry = null;
 	}
 
+	// Helper to sanitize filenames
+	function sanitizeFilename(name: string): string {
+		return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+	}
+
+	// Helper to get download name based on selected field
+	function getDownloadName(card: IDCard, formatField: string): string {
+		// Priority: Selected Field -> 'Name' -> 'name' -> ID
+		let rawName = '';
+		if (formatField && formatField !== 'Name' && card.fields?.[formatField]?.value) {
+			rawName = card.fields[formatField].value;
+		} else if (card.fields?.['Name']?.value) {
+			rawName = card.fields['Name'].value;
+		} else if (card.fields?.['name']?.value) {
+			rawName = card.fields['name'].value;
+		} else {
+			rawName = `id-${getCardId(card)}`;
+		}
+		return sanitizeFilename(rawName) || `id-${getCardId(card)}`;
+	}
+
+	// Helper to get file extension from URL/path
+	function getFileExtension(path: string): string {
+		if (!path) return 'jpg';
+		// Handle data URLs
+		if (path.startsWith('data:image/')) {
+			const match = path.match(/data:image\/([a-zA-Z]+);base64/);
+			return match ? match[1] : 'jpg';
+		}
+		// Handle normal paths
+		const parts = path.split('.');
+		if (parts.length > 1) {
+			const ext = parts.pop()?.toLowerCase();
+			if (ext && ['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+				return ext;
+			}
+		}
+		return 'jpg'; // Default fallback
+	}
+
 	// Download card
 	async function downloadCard(card: IDCard) {
 		const cardId = getCardId(card);
@@ -923,9 +964,8 @@
 
 		try {
 			const zip = new JSZip();
-			const nameField =
-				card.fields?.['Name']?.value || card.fields?.['name']?.value || `id-${cardId}`;
-			const folder = zip.folder(nameField);
+			const downloadName = getDownloadName(card, selectedFilenameField);
+			const folder = zip.folder(downloadName);
 			if (!folder) throw new Error('Failed to create folder');
 
 			if (card.front_image) {
@@ -934,7 +974,8 @@
 					const frontResponse = await fetch(frontImageUrl);
 					if (frontResponse.ok) {
 						const frontBlob = await frontResponse.blob();
-						folder.file(`${nameField}_front.jpg`, frontBlob);
+						const ext = getFileExtension(card.front_image);
+						folder.file(`${downloadName}_front.${ext}`, frontBlob);
 					}
 				}
 			}
@@ -945,7 +986,8 @@
 					const backResponse = await fetch(backImageUrl);
 					if (backResponse.ok) {
 						const backBlob = await backResponse.blob();
-						folder.file(`${nameField}_back.jpg`, backBlob);
+						const ext = getFileExtension(card.back_image);
+						folder.file(`${downloadName}_back.${ext}`, backBlob);
 					}
 				}
 			}
@@ -954,7 +996,7 @@
 			const url = window.URL.createObjectURL(zipBlob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `${nameField}.zip`;
+			a.download = `${downloadName}.zip`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
@@ -979,9 +1021,8 @@
 			const zip = new JSZip();
 
 			for (const card of selectedRows) {
-				const cardId = getCardId(card);
-				const nameField = card.fields?.['Name']?.value || `id-${cardId}`;
-				const folder = zip.folder(nameField);
+				const downloadName = getDownloadName(card, selectedFilenameField);
+				const folder = zip.folder(downloadName);
 
 				if (folder) {
 					if (card.front_image) {
@@ -990,7 +1031,8 @@
 							const frontResponse = await fetch(frontImageUrl);
 							if (frontResponse.ok) {
 								const frontBlob = await frontResponse.blob();
-								folder.file(`${nameField}_front.jpg`, frontBlob);
+								const ext = getFileExtension(card.front_image);
+								folder.file(`${downloadName}_front.${ext}`, frontBlob);
 							}
 						}
 					}
@@ -1000,7 +1042,8 @@
 							const backResponse = await fetch(backImageUrl);
 							if (backResponse.ok) {
 								const backBlob = await backResponse.blob();
-								folder.file(`${nameField}_back.jpg`, backBlob);
+								const ext = getFileExtension(card.back_image);
+								folder.file(`${downloadName}_back.${ext}`, backBlob);
 							}
 						}
 					}
@@ -1160,6 +1203,21 @@
 						<option value={column}>{column}</option>
 					{/each}
 				</select>
+
+				<!-- Filename Field Dropdown -->
+				<div class="relative group" title="Select field to use for file names">
+					<select
+						bind:value={selectedFilenameField}
+						class="px-3 py-2 bg-background border border-input rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+					>
+						<option value="Name">Filename: Default (Name)</option>
+						{#each availableColumns as column}
+							{#if column !== 'Name'}
+								<option value={column}>Filename: {column}</option>
+							{/if}
+						{/each}
+					</select>
+				</div>
 
 				<!-- Clear Filters Button -->
 				{#if searchQuery || selectedTemplateFilter !== 'all' || selectedColumnFilter !== 'all'}
