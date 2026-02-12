@@ -115,6 +115,7 @@
 						alt="Card preview"
 						class="w-full h-full transition-transform duration-300 group-hover:scale-105"
 						loading="lazy"
+						decoding="async"
 					/>
 				{:else}
 					<div

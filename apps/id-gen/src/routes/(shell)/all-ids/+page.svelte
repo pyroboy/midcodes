@@ -19,7 +19,7 @@
 	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
 	import JSZip from 'jszip';
-	import { getProxiedUrl } from '$lib/utils/storage';
+	import { getProxiedUrl, getStorageUrl } from '$lib/utils/storage';
 	import { createCardFromInches } from '$lib/utils/cardGeometry';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
 	import { viewMode, detectViewportDefault } from '$lib/stores/viewMode';
@@ -53,10 +53,11 @@
 	import type { IDCard } from './data.remote';
 
 	// Constants
-	const INITIAL_LOAD = 20;
-	const LOAD_MORE_COUNT = 15;
-	const VISIBLE_LIMIT = 15; // Max cards to render at once for performance
+	const INITIAL_LOAD = 50;
+	const LOAD_MORE_COUNT = 50;
+	const VISIBLE_LIMIT = 100; // Max cards to render at once for performance
 	const MAX_CACHED_CARDS = 200; // Cap cache to prevent SessionStorage overflow (~5MB limit)
+	const PREFETCH_AHEAD = 100; // How many upcoming card images to prefetch
 
 	// Logging helpers
 	const LOG_PREFIX = '[AllIds]';
@@ -126,7 +127,7 @@
 	let bulkDownloadProgress = $state({ current: 0, total: 0 });
 	let errorMessage = '';
 
-	// IntersectionObserver action for infinite scroll
+	// IntersectionObserver action for infinite scroll — 800px lookahead for early prefetch
 	function intersectionObserver(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			(entries) => {
@@ -136,7 +137,7 @@
 					}
 				});
 			},
-			{ threshold: 0.1, rootMargin: '200px' }
+			{ threshold: 0.1, rootMargin: '800px' }
 		);
 		observer.observe(node);
 		return {
@@ -144,6 +145,46 @@
 				observer.disconnect();
 			}
 		};
+	}
+
+	// Image prefetching — preload upcoming card images before they enter viewport
+	const prefetchedUrls = new Set<string>();
+
+	function prefetchUpcomingImages() {
+		if (!browser) return;
+
+		const visibleCount = filteredCards.length;
+		const endIndex = Math.min(visibleCount + PREFETCH_AHEAD, allFilteredCards.length);
+
+		for (let i = visibleCount; i < endIndex; i++) {
+			const card = allFilteredCards[i];
+			const imagePath = card.front_image_low_res || card.front_image;
+			if (!imagePath || prefetchedUrls.has(imagePath)) continue;
+
+			prefetchedUrls.add(imagePath);
+			const img = new Image();
+			img.src = getStorageUrl(imagePath, 'cards');
+		}
+	}
+
+	// Throttled scroll handler for proactive prefetch
+	let scrollRafId: number | null = null;
+
+	function onScrollPrefetch(el: HTMLElement) {
+		if (scrollRafId !== null) return;
+		scrollRafId = requestAnimationFrame(() => {
+			scrollRafId = null;
+			const { scrollTop: st, scrollHeight, clientHeight } = el;
+			const scrollRemaining = scrollHeight - st - clientHeight;
+			const threshold = clientHeight * 1.5; // 1.5 viewports ahead
+
+			if (scrollRemaining < threshold) {
+				checkAndLoadMore();
+			}
+
+			// Always prefetch images regardless of scroll position
+			prefetchUpcomingImages();
+		});
 	}
 
 	// Visible card window for performance
@@ -574,7 +615,7 @@
 		}
 	});
 
-	// Track scroll position for cache persistence
+	// Track scroll position for cache persistence + proactive prefetch
 	$effect(() => {
 		if (!browser || initialLoading) return;
 
@@ -583,9 +624,14 @@
 
 		const onScroll = () => {
 			scrollTop = el.scrollTop;
+			onScrollPrefetch(el);
 		};
 
 		el.addEventListener('scroll', onScroll, { passive: true });
+
+		// Initial prefetch of upcoming images
+		prefetchUpcomingImages();
+
 		return () => el.removeEventListener('scroll', onScroll);
 	});
 
