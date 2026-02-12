@@ -38,7 +38,38 @@
 	</section>
 
 	<section class="data-section">
-		<h2>Revenue Breakdown</h2>
+		<h2>Revenue by Floor</h2>
+		<div class="table-wrapper">
+			<table>
+				<thead>
+					<tr>
+						<th>Floor</th>
+						<th>Amount</th>
+						<th>% of Total</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.revenue_by_floor as floor}
+					<tr>
+						<td>{floor.floor}</td>
+						<td class="positive">₱{floor.amount.toLocaleString()}</td>
+						<td>{floor.percentage}%</td>
+					</tr>
+					{/each}
+				</tbody>
+				<tfoot>
+					<tr>
+						<td><strong>Total Rent Income</strong></td>
+						<td class="positive"><strong>₱{data.revenue.rent_collected.toLocaleString()}</strong></td>
+						<td><strong>100%</strong></td>
+					</tr>
+				</tfoot>
+			</table>
+		</div>
+	</section>
+
+	<section class="data-section">
+		<h2>Expense Breakdown</h2>
 		<div class="table-wrapper">
 			<table>
 				<thead>
@@ -48,31 +79,38 @@
 					</tr>
 				</thead>
 				<tbody>
+					{#each data.expense_breakdown as expense}
 					<tr>
-						<td>Rent Collected</td>
-						<td class="positive">₱{data.revenue.rent_collected.toLocaleString()}</td>
+						<td>{expense.category}</td>
+						<td class="negative">₱{expense.amount.toLocaleString()}</td>
 					</tr>
-					<tr>
-						<td>Utility Billings</td>
-						<td class="positive">₱{data.revenue.utility_collected.toLocaleString()}</td>
-					</tr>
-					<tr>
-						<td>Penalties</td>
-						<td class="positive">₱{data.revenue.penalties_collected.toLocaleString()}</td>
-					</tr>
-					<tr>
-						<td>Other Income</td>
-						<td class="positive">₱{data.revenue.other_collected.toLocaleString()}</td>
-					</tr>
+					{/each}
 				</tbody>
 				<tfoot>
 					<tr>
-						<td><strong>Total Revenue</strong></td>
-						<td class="positive"><strong>₱{data.revenue.total_collected.toLocaleString()}</strong></td>
+						<td><strong>Total Expenses</strong></td>
+						<td class="negative"><strong>₱{data.expenses.total_expenses.toLocaleString()}</strong></td>
 					</tr>
 				</tfoot>
 			</table>
 		</div>
+	</section>
+
+	<section class="data-section">
+		<h2>Profit Sharing</h2>
+		<div class="sharing-grid">
+			<div class="share-card">
+				<span class="share-percent">{data.profit_sharing.manager_share_percent}%</span>
+				<span class="share-amount">₱{data.profit_sharing.manager_share_amount.toLocaleString()}</span>
+				<span class="share-label">Manager/Operations</span>
+			</div>
+			<div class="share-card owner">
+				<span class="share-percent">{data.profit_sharing.owner_share_percent}%</span>
+				<span class="share-amount">₱{data.profit_sharing.owner_share_amount.toLocaleString()}</span>
+				<span class="share-label">Owner/Capital</span>
+			</div>
+		</div>
+		<p class="sharing-total">Total Profit: <strong>₱{data.profit_sharing.total_profit.toLocaleString()}</strong></p>
 	</section>
 
 	<section class="data-section">
@@ -231,4 +269,14 @@
 	.ytd-card .value { font-family: var(--font-header); font-size: 1.5rem; font-weight: 700; }
 
 	.report-footer { font-size: 0.85rem; color: #71717a; border-top: 1px solid var(--color-gray-200); padding-top: 1rem; }
+
+	/* Profit Sharing */
+	.sharing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+	@media (max-width: 600px) { .sharing-grid { grid-template-columns: 1fr; } }
+	.share-card { background: #e0f2fe; border: 2px solid var(--color-black); padding: 1.5rem; text-align: center; }
+	.share-card.owner { background: #dcfce7; }
+	.share-percent { font-family: var(--font-header); font-size: 2.5rem; font-weight: 700; display: block; }
+	.share-amount { font-family: var(--font-header); font-size: 1.5rem; font-weight: 600; display: block; margin: 0.5rem 0; }
+	.share-label { font-size: 0.9rem; opacity: 0.7; text-transform: uppercase; }
+	.sharing-total { text-align: center; margin-top: 1rem; font-size: 1.1rem; }
 </style>

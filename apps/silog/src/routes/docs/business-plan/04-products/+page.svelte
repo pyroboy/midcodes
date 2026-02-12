@@ -651,19 +651,7 @@
     }
     .highlight-box h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a; }
     
-    .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
-    .market-card { padding: 1.5rem; background: white; border: 1px solid #d4d4d8; }
-    .market-card.dark { background: #0f172a; color: white; }
-    .market-card.dark h4 { color: white; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; margin-bottom: 1rem;}
-    .market-card h4 { font-size: 1.1rem; margin-bottom: 0.5rem; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; margin-bottom: 1rem;}
 
-    .text-sm { font-size: 0.9rem; }
-    .text-xs { font-size: 0.8rem; }
-    .text-red-500 { color: #ef4444; }
-
-    ul.simple-list { list-style: none; padding: 0; margin: 0; }
-    ul.simple-list li { padding: 0.5rem 0; border-bottom: 1px dashed #334155; color: white; }
-    .market-card:not(.dark) ul.simple-list li { border-bottom: 1px dashed #e2e8f0; color: #334155; }
     ul:not(.simple-list) { margin-bottom: 1rem; list-style-position: inside; }
 
     .status-badge {

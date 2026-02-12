@@ -228,7 +228,7 @@
 	.latte-card p { font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem; }
 
 	.script-box { background: #0f172a; border-radius: 6px; padding: 0.75rem; }
-	.script-box .label { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 0.25rem; }
+
 	.script-box .script { font-size: 0.85rem; color: #fbbf24; font-style: italic; }
 
 	/* Scenario Cards */

@@ -12,54 +12,61 @@
 		<h2>Organizational Structure</h2>
 		<div class="org-chart">
 			<div class="role owner">
-				<span class="role-title">Owner/Manager</span>
-				<span class="role-name placeholder">[Name]</span>
+				<span class="role-title">Owner</span>
+				<span class="role-name">Amalia Reyes Tirol ("Mama Maly")</span>
 			</div>
 			<div class="role-group">
 				<div class="role">
-					<span class="role-title">Caretaker</span>
-					<span class="role-name placeholder">[Name]</span>
+					<span class="role-title">Manager</span>
+					<span class="role-name">Arturo Jose & Raclaire Stephan Magno</span>
 				</div>
 				<div class="role">
 					<span class="role-title">Accountant</span>
-					<span class="role-name placeholder">[Name/Outsourced]</span>
+					<span class="role-name">Tirol Corporation (Outsourced)</span>
 				</div>
 			</div>
 		</div>
+		<p class="note">📌 <strong>Note:</strong> The dormitory operates without a dedicated caretaker. Some tasks are delegated to "Working Tenants" in exchange for rent discounts.</p>
 	</section>
 
 	<section class="section">
 		<h2>Roles & Responsibilities</h2>
 		
 		<div class="role-card">
-			<h3>👤 Owner/Manager</h3>
+			<h3>👑 Owner — Amalia Tirol</h3>
 			<ul>
-				<li>Overall business management and decision-making</li>
-				<li>Tenant screening and contract approval</li>
-				<li>Financial oversight and reporting</li>
-				<li>Major maintenance approvals</li>
+				<li>Overall business ownership and strategic decisions</li>
+				<li>Major financial approvals and investments</li>
 				<li>Property improvements planning</li>
 			</ul>
 		</div>
 
 		<div class="role-card">
-			<h3>🏠 Caretaker</h3>
+			<h3>👤 Manager — Arturo Jose & Raclaire Stephan Magno</h3>
 			<ul>
 				<li>Daily property inspection and security</li>
 				<li>Rent collection and remittance</li>
-				<li>Minor maintenance and repairs</li>
+				<li>Minor maintenance and repairs coordination</li>
 				<li>Tenant issue resolution</li>
+				<li>Tenant screening and contract processing</li>
+				<li>Overall operations management</li>
+			</ul>
+		</div>
+
+		<div class="role-card">
+			<h3>🧹 Working Tenants (Delegated Tasks)</h3>
+			<p>Selected tenants who assist with property upkeep in exchange for rent discounts:</p>
+			<ul>
 				<li>Utility meter readings</li>
 				<li>Cleanliness of common areas</li>
 			</ul>
 			<div class="terms">
-				<p><strong>Schedule:</strong> <span class="placeholder">[24/7 on-site / Shift-based]</span></p>
-				<p><strong>Compensation:</strong> <span class="placeholder">₱[X]/month + free accommodation</span></p>
+				<p><strong>Arrangement:</strong> Rent discount in exchange for assigned tasks</p>
 			</div>
 		</div>
 
 		<div class="role-card">
-			<h3>📊 Accountant/Bookkeeper</h3>
+			<h3>📊 Accountant — Tirol Corporation</h3>
 			<ul>
 				<li>Monthly financial statements</li>
 				<li>Tax computation and filing</li>
@@ -67,8 +74,7 @@
 				<li>Expense tracking</li>
 			</ul>
 			<div class="terms">
-				<p><strong>Arrangement:</strong> <span class="placeholder">[In-house / Outsourced / Part-time]</span></p>
-				<p><strong>Fee:</strong> <span class="placeholder">₱[X]/month</span></p>
+				<p><strong>Arrangement:</strong> Outsourced (Family-owned corporation)</p>
 			</div>
 		</div>
 	</section>
@@ -86,21 +92,21 @@
 			</thead>
 			<tbody>
 				<tr>
-					<td>Caretaker</td>
-					<td class="placeholder">1</td>
-					<td class="placeholder">Full-time</td>
-					<td class="placeholder">₱[X]</td>
+					<td>Manager</td>
+					<td>2</td>
+					<td>Family (Unpaid)</td>
+					<td>—</td>
 				</tr>
 				<tr>
-					<td>Cleaner</td>
-					<td class="placeholder">1</td>
-					<td class="placeholder">Part-time</td>
-					<td class="placeholder">₱[X]</td>
+					<td>Working Tenants</td>
+					<td class="placeholder">[X]</td>
+					<td>Rent Discount</td>
+					<td class="placeholder">-₱[X] discount</td>
 				</tr>
 				<tr>
-					<td>Bookkeeper</td>
-					<td class="placeholder">1</td>
-					<td class="placeholder">Outsourced</td>
+					<td>Accountant</td>
+					<td>1</td>
+					<td>Outsourced</td>
 					<td class="placeholder">₱[X]</td>
 				</tr>
 				<tr class="total-row">
@@ -115,10 +121,9 @@
 		<h2>Labor Compliance</h2>
 		<div class="compliance-box">
 			<ul>
-				<li class="placeholder">Salary based on current minimum wage: ₱[X]/day</li>
-				<li>13th month pay provided to all regular employees</li>
-				<li class="placeholder">SSS/PhilHealth/Pag-IBIG contributions [if applicable]</li>
-				<li class="placeholder">BMBE status: [Yes/No] - if yes, exempt from minimum wage</li>
+				<li><strong>No salaried employees:</strong> Family-managed operation with task delegation to tenants</li>
+				<li>Working Tenants receive rent discounts, not wages (no formal employer-employee relationship)</li>
+				<li>Accounting services outsourced to Tirol Corporation</li>
 			</ul>
 		</div>
 	</section>
@@ -136,12 +141,17 @@
 			<tbody>
 				<tr>
 					<td>Owner</td>
-					<td class="placeholder">[Name]</td>
+					<td>Amalia Reyes Tirol</td>
 					<td class="placeholder">[Phone]</td>
 				</tr>
 				<tr>
-					<td>Caretaker</td>
-					<td class="placeholder">[Name]</td>
+					<td>Manager</td>
+					<td>Arturo Jose Magno</td>
+					<td class="placeholder">[Phone]</td>
+				</tr>
+				<tr>
+					<td>Manager</td>
+					<td>Raclaire Stephan Magno</td>
 					<td class="placeholder">[Phone]</td>
 				</tr>
 				<tr>

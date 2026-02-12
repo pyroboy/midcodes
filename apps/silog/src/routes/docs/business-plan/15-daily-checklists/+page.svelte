@@ -251,7 +251,53 @@
 	}
 	.highlight { color: white; background: #0f172a; padding: 0 1rem; }
 	.tagline { font-size: 1.1rem; color: #64748b; margin-bottom: 4rem; }
-	@media(max-width:600px) { .doc-header h1 { font-size: 3rem; }}
+    @media(max-width:600px) { .doc-header h1 { font-size: 3rem; }}
+
+    @media print {
+        :global(body) { background: white; }
+        .doc-page { padding: 0; margin: 0; max-width: none; }
+        .doc-header, .highlight-box, .alert-box { display: none; } /* Hide non-essential header stuff/alerts if not needed, OR compact them */
+        
+        /* Show headers but compact */
+        .doc-header { display: block; margin-bottom: 1rem; }
+        .doc-header h1 { font-size: 2rem; margin-bottom: 0; }
+        .tagline { display: none; }
+        
+        h2 { margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1.2rem; border-left: 4px solid #0f172a; }
+        p, .section-intro { font-size: 0.9rem; margin-bottom: 0.5rem; }
+
+        /* MULTI-COLUMN LAYOUT */
+        .checklist-container {
+            column-count: 2;
+            column-gap: 1rem;
+            display: block; /* Override flex */
+        }
+        
+        .checklist-item {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border: 1px solid #000;
+        }
+        
+        .check-content h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
+        .check-content p { font-size: 0.8rem; margin-bottom: 0.25rem; }
+        
+        /* Inline Bisaya Script */
+        .bisaya-script {
+            padding: 0.25rem;
+            background: none;
+            border-top: 1px dotted #ccc;
+            margin-top: 0.25rem;
+            display: block;
+        }
+        .bisaya-script .label { display: none; } /* Hide label to save space */
+        .bisaya-script .script { font-size: 0.8rem; color: #444; font-style: italic; }
+        
+        .alert-box { display: none; } /* Optional: Hide alerts to save huge space, or make them tiny */
+        .divider { margin: 1rem 0; }
+    }
 
 	h2 {
 		border-left: 6px solid #0f172a;

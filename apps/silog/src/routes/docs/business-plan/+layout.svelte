@@ -2,6 +2,8 @@
 	import { page } from '$app/stores';
 	import { chapters } from './chapters';
 
+    let { children } = $props();
+
 	let currentSlug = $derived($page.url.pathname.split('/').pop());
 	let currentIndex = $derived(chapters.findIndex((c) => c.slug === currentSlug));
 
@@ -36,7 +38,7 @@
 	</nav>
 
 	<div class="page-content">
-		<slot />
+		{@render children()}
 	</div>
     
 </div>

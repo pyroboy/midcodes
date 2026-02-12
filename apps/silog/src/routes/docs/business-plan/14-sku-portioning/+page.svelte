@@ -741,7 +741,6 @@
 	table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 	th { background: #f1f5f9; padding: 12px 16px; text-align: left; font-weight: 700; color: #334155; border-bottom: 2px solid #e2e8f0; }
 	td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; }
-	.right { text-align: right; }
 	.highlight-row { background: #fff7ed; }
 	.winner-row { background: #dcfce7; }
 

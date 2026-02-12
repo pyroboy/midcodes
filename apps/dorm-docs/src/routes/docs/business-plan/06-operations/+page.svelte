@@ -12,24 +12,24 @@
 		<h2>Daily Operations</h2>
 		<div class="schedule">
 			<div class="schedule-item">
-				<span class="time placeholder">6:00 AM</span>
+				<span class="time">6:00 AM</span>
 				<p>Morning inspection and common area check</p>
 			</div>
 			<div class="schedule-item">
-				<span class="time placeholder">8:00 AM</span>
+				<span class="time">8:00 AM</span>
 				<p>Office opens, tenant inquiries</p>
 			</div>
 			<div class="schedule-item">
-				<span class="time placeholder">12:00 PM</span>
+				<span class="time">12:00 PM</span>
 				<p>Midday walkthrough</p>
 			</div>
 			<div class="schedule-item">
-				<span class="time placeholder">6:00 PM</span>
+				<span class="time">6:00 PM</span>
 				<p>Evening security check</p>
 			</div>
 			<div class="schedule-item">
-				<span class="time placeholder">10:00 PM</span>
-				<p>Gate closure and final rounds</p>
+				<span class="time">10:00 PM</span>
+				<p><strong>Gate closure and curfew</strong> (per Contract of Lease)</p>
 			</div>
 		</div>
 	</section>
@@ -40,27 +40,27 @@
 			<div class="step">
 				<span class="step-num">1</span>
 				<h3>Inquiry & Viewing</h3>
-				<p class="placeholder">Schedule property tour, explain rates and inclusions</p>
+				<p>Schedule property tour, explain rates (₱2,000/bedspace) and inclusions</p>
 			</div>
 			<div class="step">
 				<span class="step-num">2</span>
 				<h3>Application</h3>
-				<p class="placeholder">Submit valid ID, complete tenant information form</p>
+				<p>Submit valid ID, complete tenant information form</p>
 			</div>
 			<div class="step">
 				<span class="step-num">3</span>
-				<h3>Payment</h3>
-				<p class="placeholder">Pay security deposit (1 month) + advance rent (1 month)</p>
+				<h3>Initial Payment</h3>
+				<p><strong>1-month security deposit + 1-month advance rent</strong> (non-refundable, consumable)</p>
 			</div>
 			<div class="step">
 				<span class="step-num">4</span>
 				<h3>Contract Signing</h3>
-				<p class="placeholder">Review and sign lease agreement</p>
+				<p>Review and sign Contract of Lease (<strong>minimum 6-month term</strong>)</p>
 			</div>
 			<div class="step">
 				<span class="step-num">5</span>
 				<h3>Move-in</h3>
-				<p class="placeholder">Room assignment, key handover, orientation</p>
+				<p>Room assignment, key handover, orientation on House Rules (Annex A)</p>
 			</div>
 		</div>
 	</section>
@@ -172,6 +172,7 @@
 						<li>Rent Amount & Security Deposit (Auto-filled from Unit base rate).</li>
 					</ul>
 				</li>
+			</ol>
 		</div>
 		<div class="workflow-card">
 			<h3>🔄 Lease Renewal Workflow</h3>
@@ -199,27 +200,27 @@
 			<div class="step">
 				<span class="step-num">1</span>
 				<h3>Notice</h3>
-				<p class="placeholder">Tenant provides [X] days written notice</p>
+				<p>Tenant provides <strong>30 days</strong> written notice (per Contract of Lease)</p>
 			</div>
 			<div class="step">
 				<span class="step-num">2</span>
 				<h3>Inspection</h3>
-				<p>Room inspection for damages</p>
+				<p>Room inspection for damages beyond normal wear and tear</p>
 			</div>
 			<div class="step">
 				<span class="step-num">3</span>
 				<h3>Final Billing</h3>
-				<p>Outstanding utilities and charges calculated</p>
+				<p>Outstanding utilities and charges calculated; cleaning fee up to <strong>₱200</strong> if not left clean</p>
 			</div>
 			<div class="step">
 				<span class="step-num">4</span>
 				<h3>Key Return</h3>
-				<p>All keys returned to admin</p>
+				<p>All keys (Main Gate + Room Key) returned to admin</p>
 			</div>
 			<div class="step">
 				<span class="step-num">5</span>
-				<h3>Deposit Refund</h3>
-				<p class="placeholder">Security deposit refunded within [X] days (less deductions)</p>
+				<h3>Deposit Application</h3>
+				<p>Security deposit is <strong>consumable</strong> — applied to last month's rent (not refundable in cash). Early termination before 6 months forfeits the deposit.</p>
 			</div>
 		</div>
 	</section>

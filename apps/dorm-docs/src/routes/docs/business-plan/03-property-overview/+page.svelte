@@ -1,3 +1,24 @@
+<script lang="ts">
+	import propertyData from '$lib/data/property.json';
+
+	const property = propertyData.property;
+	const floors = propertyData.floors;
+	const summary = propertyData.summary;
+
+	// Get residential floors with rooms
+	const residentialFloors = floors.filter(f => f.type === 'residential');
+
+	// Helper function to get room type label
+	function getRoomTypeLabel(type: string): string {
+		switch(type) {
+			case 'bedspace': return '🛏️ Bedspace';
+			case 'private': return '🚪 Private';
+			case 'working': return '🧹 Working';
+			default: return type;
+		}
+	}
+</script>
+
 <svelte:head>
 	<title>03 Property Overview - DA Tirol Dorm</title>
 </svelte:head>
@@ -13,16 +34,20 @@
 		<table class="info-table">
 			<tbody>
 				<tr>
+					<th>Property Address</th>
+					<td>{property.address}</td>
+				</tr>
+				<tr>
 					<th>Building Type</th>
-					<td>Mixed-Use (Residential Dormitory & Commercial Ground Floor)</td>
+					<td>{property.building_type}</td>
 				</tr>
 				<tr>
 					<th>Number of Floors</th>
-					<td>3 Floors (Rooftop Deck pending)</td>
+					<td>{property.floors} Floors (Rooftop Deck pending)</td>
 				</tr>
 				<tr>
 					<th>Renovation Status</th>
-					<td>Ongoing (Kitchen & Roof upgrades 2024)</td>
+					<td>{property.renovation_status}</td>
 				</tr>
 			</tbody>
 		</table>
@@ -33,21 +58,22 @@
 		<div class="metrics-grid">
 			<div class="metric">
 				<span class="metric-label">Total Rooms</span>
-				<span class="metric-value">8 Rooms</span>
+				<span class="metric-value">{summary.total_rooms}</span>
 			</div>
 			<div class="metric">
 				<span class="metric-label">Bedspace Capacity</span>
-				<span class="metric-value">~24 pax</span>
+				<span class="metric-value">{summary.bedspace_capacity} pax</span>
 			</div>
 			<div class="metric">
 				<span class="metric-label">Private Capacity</span>
-				<span class="metric-value">~6 pax</span>
+				<span class="metric-value">{summary.private_capacity} pax</span>
 			</div>
-			<div class="metric">
+			<div class="metric highlight">
 				<span class="metric-label">Total Capacity</span>
-				<span class="metric-value">30 pax</span>
+				<span class="metric-value">{summary.total_capacity} pax</span>
 			</div>
 		</div>
+		<p class="note">📌 {summary.working_capacity} persons are Working Tenants (free rent in exchange for tasks). Paying capacity: {summary.paying_capacity} pax.</p>
 	</section>
 
 	<section class="section">
@@ -56,61 +82,110 @@
 			<thead>
 				<tr>
 					<th>Unit Type</th>
+					<th>Rooms</th>
 					<th>Capacity</th>
 					<th>Monthly Rate</th>
-					<th>Inclusions</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr>
-					<td><strong>Standard Bedspace</strong></td>
-					<td>4-6 pax</td>
-					<td>₱1,500 - ₱1,700 /head</td>
-					<td>Water/Lights (Basic)</td>
+					<td><strong>Bedspace (Aircon)</strong></td>
+					<td>3</td>
+					<td>22 pax</td>
+					<td>₱2,000/head</td>
+				</tr>
+				<tr>
+					<td><strong>Bedspace (Non-Aircon)</strong></td>
+					<td>3</td>
+					<td>13 pax</td>
+					<td>₱2,000/head</td>
 				</tr>
 				<tr>
 					<td><strong>Private Room (Solo)</strong></td>
-					<td>1 pax</td>
-					<td>₱3,500 /room</td>
-					<td>Sub-metered Utilities</td>
+					<td>2</td>
+					<td>2 pax</td>
+					<td>₱5,000/room</td>
 				</tr>
 				<tr>
 					<td><strong>Private Room (Duo)</strong></td>
+					<td>1</td>
 					<td>2 pax</td>
-					<td>₱4,500 /room</td>
-					<td>Sub-metered Utilities</td>
+					<td>₱5,500/room</td>
+				</tr>
+				<tr class="highlight-row">
+					<td><strong>Working Room</strong></td>
+					<td>1</td>
+					<td>2 pax</td>
+					<td><em>Free (rent discount)</em></td>
 				</tr>
 			</tbody>
 		</table>
 	</section>
 
 	<section class="section">
+		<h2>Room Inventory</h2>
+		
+		{#each residentialFloors as floor}
+		<h3>{floor.name} — {floor.rooms?.length || 0} Rooms, {floor.floor_number === 2 ? summary.second_floor_capacity : summary.third_floor_capacity} pax capacity</h3>
+		<div class="room-grid">
+			{#each floor.rooms || [] as room}
+			<div class="room-card {room.type}">
+				<div class="room-header">
+					<span class="room-name">{room.name}</span>
+					<span class="room-type">{getRoomTypeLabel(room.type)}</span>
+				</div>
+				<div class="room-capacity">{room.capacity} {room.capacity === 1 ? 'person' : 'persons'}</div>
+				<ul class="room-features">
+					{#if room.double_decks > 0}
+					<li>{room.double_decks} double deck{room.double_decks > 1 ? 's' : ''}</li>
+					{/if}
+					{#if room.single_decks > 0}
+					<li>{room.single_decks} single deck</li>
+					{/if}
+					{#if room.cabinets > 0}
+					<li>{room.cabinets} cabinets</li>
+					{/if}
+					{#if room.aircon}
+					<li>❄️ Aircon</li>
+					{/if}
+					<li>{room.cr_type === 'private' ? '🚿 Private CR/Bath' : '🚿 Shared CR'}</li>
+				</ul>
+				{#if room.rate > 0}
+				{#if room.type === 'bedspace'}
+				<div class="room-rate">₱{(room.rate * room.capacity).toLocaleString()}</div>
+				{:else}
+				<div class="room-rate">₱{room.rate.toLocaleString()}</div>
+				{/if}
+				{:else}
+				<div class="room-rate free">Free (Working)</div>
+				{/if}
+			</div>
+			{/each}
+		</div>
+		{/each}
+	</section>
+
+	<section class="section">
 		<h2>Floor Plan Summary</h2>
 		<div class="floor-list">
+			{#each floors as floor}
 			<div class="floor-item">
-				<h3>Ground Floor</h3>
+				<h3>{floor.name}</h3>
+				{#if floor.type === 'commercial'}
 				<ul>
-					<li><strong>Commercial Space:</strong> "The Original Paeng's Fried Chicken" (Rented to Cousin)</li>
-					<li><strong>Office/Reception:</strong> Caretaker's station</li>
-					<li><strong>Utilities:</strong> Water Cistern & Pump room</li>
+					{#each floor.areas || [] as area}
+					<li><strong>{area.name}:</strong> {area.description}</li>
+					{/each}
 				</ul>
-			</div>
-			<div class="floor-item">
-				<h3>2nd Floor (Main Dorm)</h3>
+				{:else}
 				<ul>
-					<li>Aircon Rooms</li>
-					<li>Standard Bedspace Rooms</li>
-					<li>Shared Comfort Rooms (CRs)</li>
+					{#each floor.features || [] as feature}
+					<li>{feature}</li>
+					{/each}
 				</ul>
+				{/if}
 			</div>
-			<div class="floor-item">
-				<h3>3rd Floor (Expansion)</h3>
-				<ul>
-					<li>Private Rooms</li>
-					<li>Communal Kitchen & Dining Area</li>
-					<li>Study Area / Deck</li>
-				</ul>
-			</div>
+			{/each}
 		</div>
 	</section>
 
@@ -126,49 +201,56 @@
 </article>
 
 <style>
-	.chapter { max-width: 800px; }
+	.chapter { max-width: 900px; }
 	.chapter-header { margin-bottom: 3rem; }
-	.chapter-number {
-		font-family: var(--font-header);
-		font-size: 4rem;
-		font-weight: 700;
-		color: var(--color-primary);
-		opacity: 0.3;
-		line-height: 1;
-	}
+	.chapter-number { font-family: var(--font-header); font-size: 4rem; font-weight: 700; color: var(--color-primary); opacity: 0.3; line-height: 1; }
 	.chapter-header h1 { font-size: 3rem; margin-top: 0.5rem; line-height: 1.1; }
+	
 	.section { margin-bottom: 3rem; }
-	.section h2 {
-		font-size: 1.5rem;
-		margin-bottom: 1.5rem;
-		padding-bottom: 0.5rem;
-		border-bottom: 2px solid var(--color-gray-200);
-	}
-	.section h3 { font-size: 1.1rem; margin-bottom: 0.75rem; text-transform: none; }
-	.placeholder { background: #fef3c7; padding: 0.25rem 0.5rem; border-left: 3px solid #f59e0b; }
+	.section h2 { font-size: 1.5rem; margin-bottom: 1.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--color-gray-200); }
+	.section h3 { font-size: 1.1rem; margin: 1.5rem 0 1rem; text-transform: none; }
+	
+	.note { font-size: 0.9rem; color: #71717a; font-style: italic; margin-top: 1rem; }
+
+	/* Tables */
 	.info-table, .pricing-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-	.info-table th, .info-table td, .pricing-table th, .pricing-table td {
-		padding: 1rem;
-		border: 1px solid var(--color-gray-200);
-		text-align: left;
-	}
+	.info-table th, .info-table td, .pricing-table th, .pricing-table td { padding: 0.75rem 1rem; border: 1px solid var(--color-gray-200); text-align: left; }
 	.info-table th { background: var(--color-gray-100); font-weight: 600; width: 35%; }
 	.pricing-table th { background: var(--color-black); color: white; font-weight: 600; }
 	.pricing-table tbody tr:nth-child(even) { background: var(--color-gray-100); }
-	.metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-	@media (max-width: 600px) { .metrics-grid { grid-template-columns: 1fr; } }
-	.metric {
-		background: white;
-		border: 2px solid var(--color-black);
-		padding: 1.5rem;
-		text-align: center;
-	}
-	.metric-label { display: block; font-size: 0.85rem; text-transform: uppercase; font-weight: 600; color: #71717a; margin-bottom: 0.5rem; }
-	.metric-value { font-family: var(--font-header); font-size: 1.75rem; font-weight: 700; }
+	.highlight-row { background: #fef3c7 !important; }
+
+	/* Metrics */
+	.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+	@media (max-width: 700px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+	.metric { background: white; border: 2px solid var(--color-black); padding: 1.25rem; text-align: center; }
+	.metric.highlight { background: var(--color-black); color: white; }
+	.metric-label { display: block; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem; opacity: 0.7; }
+	.metric-value { font-family: var(--font-header); font-size: 1.5rem; font-weight: 700; }
+
+	/* Room Grid */
+	.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+	.room-card { background: white; border: 2px solid var(--color-gray-200); padding: 1rem; }
+	.room-card.bedspace { border-left: 4px solid var(--color-primary); }
+	.room-card.private { border-left: 4px solid #10b981; }
+	.room-card.working { border-left: 4px solid #f59e0b; }
+	.room-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+	.room-name { font-weight: 700; }
+	.room-type { font-size: 0.75rem; opacity: 0.7; }
+	.room-capacity { font-family: var(--font-header); font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+	.room-features { font-size: 0.85rem; margin: 0; padding-left: 1.25rem; color: #71717a; }
+	.room-features li { margin-bottom: 0.25rem; }
+	.room-rate { font-weight: 600; margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--color-gray-200); }
+	.room-rate.free { color: #f59e0b; }
+
+	/* Floor List */
 	.floor-list { display: grid; gap: 1rem; }
 	.floor-item { background: var(--color-gray-100); padding: 1.5rem; border-left: 4px solid var(--color-primary); }
+	.floor-item h3 { margin: 0 0 0.75rem; }
 	.floor-item ul { margin: 0; padding-left: 1.5rem; }
 	.floor-item li { margin-bottom: 0.5rem; }
+
+	/* Feature List */
 	.feature-list { list-style: none; padding: 0; }
 	.feature-list li { position: relative; padding-left: 2rem; margin-bottom: 1rem; font-size: 1.1rem; }
 	.feature-list li::before { content: '✓'; position: absolute; left: 0; font-weight: 700; color: var(--color-accent, #10b981); }

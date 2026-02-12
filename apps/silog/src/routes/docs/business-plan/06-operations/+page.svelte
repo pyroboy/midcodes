@@ -565,6 +565,7 @@
                 </div>
             </div>
         </div>
+    </article>
 </section>
 
 <style>
@@ -615,27 +616,9 @@
     
     .equipment-list { list-style-type: disc; padding-left: 1.5rem; margin-top: 1rem; }
     
-    .sop-section { background: #fff; border-left: 4px solid #3b82f6; padding-left: 1.5rem; margin-bottom: 2rem; }
-    .sop-section ol { counter-reset: sop-counter; list-style: none; padding: 0; }
-    .sop-section li { position: relative; padding-left: 2rem; margin-bottom: 1rem; }
-    .sop-section li::before { 
-        counter-increment: sop-counter; 
-        content: counter(sop-counter); 
-        position: absolute; 
-        left: 0; 
-        top: 0; 
-        width: 1.5rem; 
-        height: 1.5rem; 
-        background: #e0f2fe; 
-        color: #0369a1; 
-        border-radius: 50%; 
-        text-align: center; 
-        line-height: 1.5rem; 
-        font-size: 0.875rem; 
-        font-weight: bold; 
-    }
 
-    .table-container { overflow-x: auto; margin-top: 1rem; }
+
+    .table-wrapper { overflow-x: auto; margin-top: 1rem; }
     table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
     th { background: #f1f5f9; padding: 0.75rem; font-weight: 600; color: #334155; border-bottom: 2px solid #e2e8f0; }
     td { padding: 0.75rem; border-bottom: 1px solid #e2e8f0; color: #475569; }

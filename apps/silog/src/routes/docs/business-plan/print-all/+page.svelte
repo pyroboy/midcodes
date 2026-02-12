@@ -44,6 +44,14 @@
         { component: Chapter16, ...chapters[15] },
         { component: Chapter17, ...chapters[16] },
     ];
+    import { onMount } from 'svelte';
+
+    onMount(() => {
+        // Auto-expand all details for print
+        document.querySelectorAll('details').forEach((el) => {
+            el.open = true;
+        });
+    });
 </script>
 
 
@@ -227,10 +235,7 @@
     </div>
 
     <!-- End of Document -->
-    <section class="doc-footer">
-        <p>— End of Business Plan Document —</p>
-        <p class="small">Generated from Kuya's Silog & Lugaw Documentation System</p>
-    </section>
+
 </div>
 
 <svelte:head>
@@ -326,7 +331,7 @@
         margin: 0 0 1rem 0;
         color: #0f172a;
     }
-    .dot { color: #f97316; }
+
     .orange { color: #f97316; }
     .subtitle {
         font-size: 1.5rem;
@@ -453,29 +458,15 @@
         min-height: auto !important;
     }
 
-    /* Document Footer */
-    .doc-footer {
-        text-align: center;
-        padding: 4rem 2rem;
-        background: #f8fafc;
-        border-top: 4px solid #0f172a;
-    }
-    .doc-footer p {
-        margin: 0.5rem 0;
-        color: #64748b;
-        font-size: 1rem;
-    }
-    .doc-footer .small {
-        font-size: 0.85rem;
-        opacity: 0.7;
-    }
+
 
     /* ===== PRINT STYLES - UNIVERSAL ===== */
     
     /* Let printer driver determine page size to avoid clipping on A4 vs Letter vs Folio */
+    /* Let printer driver determine page size to avoid clipping on A4 vs Letter vs Folio */
     @page {
-        size: auto; 
-        margin: 0.5in;
+        size: 216mm 330mm; /* Folio Size */
+        margin: 15mm;
     }
     
     /* Cover page - full bleed effect */
@@ -522,9 +513,9 @@
             print-color-adjust: exact !important;
         }
         
-        html, body {
-            font-size: 10pt !important; /* Slightly smaller to ensure fit */
-            line-height: 1.4 !important;
+        :global(html), :global(body) {
+            font-size: 9.5pt !important; /* Optimized for Folio density */
+            line-height: 1.25 !important;
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -600,17 +591,15 @@
             font-size: 0.8rem;
             padding-left: 1.5rem;
         }
-        .toc-item:hover {
-            background: none;
-            padding-left: 0;
-        }
+
         
         /* === Chapter Styling - HEADERS PRIORITIZED === */
         .chapter-wrapper {
             page: chapter;
             page-break-before: always;
             break-before: page;
-            page-break-inside: auto;
+            /* Allow breaking inside chapters to fill pages efficiently */
+            page-break-inside: auto; 
             border: none;
         }
         
@@ -637,8 +626,8 @@
         
         /* Chapter content container */
         .chapter-content {
-            orphans: 3;
-            widows: 3;
+            orphans: 2; /* Relaxed from 3 */
+            widows: 2; /* Relaxed from 3 */
         }
         
         /* Override nested doc-page styles for print */
@@ -663,11 +652,11 @@
         
         .chapter-content :global(.doc-header h1) {
             font-size: 1.8rem !important;
-            line-height: 1.2 !important;
-            margin: 0 0 0.5rem 0 !important;
-            padding-top: 0.5rem;
+            line-height: 1.1 !important;
+            margin: 0 0 0.25rem 0 !important;
+            padding-top: 0.25rem;
             border-bottom: 2px solid #0f172a;
-            padding-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
             page-break-after: avoid !important;
             break-after: avoid !important;
         }
@@ -675,8 +664,8 @@
         /* Section headers - keep with content */
         .chapter-content :global(h2) {
             font-size: 1.4rem !important;
-            margin-top: 1.25rem !important;
-            margin-bottom: 0.5rem !important;
+            margin-top: 0.75rem !important;
+            margin-bottom: 0.25rem !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
             page-break-inside: avoid !important;
@@ -685,57 +674,65 @@
         
         .chapter-content :global(h3) {
             font-size: 1.15rem !important;
-            margin-top: 1rem !important;
-            margin-bottom: 0.4rem !important;
+            margin-top: 0.5rem !important;
+            margin-bottom: 0.2rem !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
         }
         
         .chapter-content :global(h4) {
             font-size: 1rem !important;
-            margin-top: 0.75rem !important;
-            margin-bottom: 0.3rem !important;
+            margin-top: 0.4rem !important;
+            margin-bottom: 0.2rem !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
         }
         
         /* === Tables & Cards === */
+        /* Only avoid breaking SMALL tables, allow large ones to flow */
         .chapter-content :global(table) {
-            font-size: 9pt !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            margin: 0.5rem 0 !important;
+            font-size: 8.5pt !important;
+            page-break-inside: auto; /* Changed from avoid to auto for better flow */
+            break-inside: auto;
+            margin: 0.25rem 0 !important;
+            width: 100% !important;
         }
         
+        .chapter-content :global(tr) {
+            page-break-inside: avoid; /* Keep rows intact */
+            break-inside: avoid;
+        }
+
         .chapter-content :global(th),
         .chapter-content :global(td) {
-            padding: 0.35rem 0.5rem !important;
+            padding: 0.2rem 0.3rem !important;
         }
         
+        /* Allow cards to break if they are large containers, but verify contents */
         .chapter-content :global(.card),
         .chapter-content :global(.info-card),
         .chapter-content :global(.grid-card),
         .chapter-content :global(.stat-card) {
-            page-break-inside: avoid;
+            page-break-inside: avoid; /* Keep atomic cards intact */
             break-inside: avoid;
-            margin: 0.5rem 0 !important;
-            padding: 0.75rem !important;
+            margin: 0.2rem 0 !important;
+            padding: 0.4rem !important;
         }
         
         /* === Lists & Paragraphs === */
         .chapter-content :global(p) {
-            margin: 0.4rem 0 !important;
+            margin: 0.2rem 0 !important;
             font-size: 10.5pt !important;
         }
         
         .chapter-content :global(ul),
         .chapter-content :global(ol) {
-            margin: 0.4rem 0 !important;
+            margin: 0.2rem 0 !important;
             padding-left: 1.25rem !important;
         }
         
         .chapter-content :global(li) {
-            margin: 0.2rem 0 !important;
+            margin: 0.1rem 0 !important;
             font-size: 10.5pt !important;
         }
         
@@ -746,6 +743,206 @@
             break-before: avoid;
         }
         
+        /* === GLOBAL COMPONENT COMPRESSION (Smart Sizing) === */
+        
+        /* Headers */
+        .chapter-content :global(.doc-header h1) {
+            font-size: 2.2rem !important; /* Force small header */
+            line-height: 1 !important;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        .chapter-content :global(h2) {
+             margin-top: 1rem !important;
+             margin-bottom: 0.5rem !important;
+        }
+
+        /* Highlight Boxes (Value Props, Break Even, etc) */
+        .chapter-content :global(.highlight-box) {
+            padding: 0.75rem !important;
+            margin: 0.75rem 0 !important;
+            box-shadow: none !important;
+            border-width: 1px !important;
+            background: white !important;
+        }
+        .chapter-content :global(.highlight-box h3) {
+            font-size: 1.1rem !important;
+            margin-bottom: 0.25rem !important;
+        }
+        
+        /* Alert Boxes */
+        .chapter-content :global(.alert-box) {
+            padding: 0.5rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+
+        /* Grids (Team, Market, Goals, Risks, Permits) */
+        .chapter-content :global(.team-grid),
+        .chapter-content :global(.market-grid),
+        .chapter-content :global(.goals-wrapper),
+        .chapter-content :global(.risk-grid),
+        .chapter-content :global(.permit-grid),
+        .chapter-content :global(.grid-2col) {
+            gap: 0.5rem !important;
+            margin-bottom: 1rem !important;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important; /* Force 2-col for grids to save vertical space */
+        }
+        
+        /* Cards inside grids */
+        .chapter-content :global(.team-card),
+        .chapter-content :global(.market-card),
+        .chapter-content :global(.goal-item),
+        .chapter-content :global(.risk-card),
+        .chapter-content :global(.mitigation-card),
+        .chapter-content :global(.permit-card) {
+            padding: 0.5rem !important;
+            border-width: 1px !important;
+            box-shadow: none !important;
+            break-inside: avoid;
+        }
+
+        .chapter-content :global(.risk-card h3),
+        .chapter-content :global(.mitigation-card h3),
+        .chapter-content :global(.permit-card h4) {
+             font-size: 1rem !important;
+             margin-bottom: 0.25rem !important;
+        }
+
+        /* Visual Placeholders (Chap 10) */
+        .chapter-content :global(.visual-placeholder) {
+            min-height: 0 !important;
+            padding: 1rem !important;
+            margin-bottom: 0.5rem !important;
+            border-width: 1px !important;
+        }
+        .chapter-content :global(.visual-placeholder .icon) {
+            font-size: 1.5rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+
+        /* === Footer Removal === */
+        .doc-footer {
+            display: none !important;
+        }
+        .chapter-content :global(.market-card h4), 
+        .chapter-content :global(.team-card h4) {
+            font-size: 1rem !important;
+            margin-bottom: 0.25rem !important;
+        }
+        
+        /* Stat Boxes */
+        .chapter-content :global(.stat-box) {
+            padding: 0.5rem !important;
+            margin-bottom: 1rem !important;
+            gap: 1.5rem !important;
+            border: 1px solid #ccc !important;
+        }
+        .chapter-content :global(.stat .value) {
+            font-size: 1.5rem !important;
+        }
+        
+        /* Quote Box */
+        .chapter-content :global(.quote-box) {
+            padding: 1rem !important;
+            margin-bottom: 1rem !important;
+            font-size: 1.1rem !important;
+            background: none !important;
+            border-left-width: 2px !important;
+        }
+        
+        /* Dividers */
+        .chapter-content :global(.divider) {
+            margin: 1rem 0 !important;
+            height: 1px !important;
+            background: #ccc !important;
+        }
+        
+        /* === GLOBAL COMPONENT COMPRESSION (Smart Sizing) === */
+        
+        /* Headers */
+        .chapter-content :global(.doc-header h1) {
+            font-size: 2.2rem !important; /* Force small header */
+            line-height: 1 !important;
+            margin-bottom: 0.5rem !important;
+        }
+        
+        .chapter-content :global(h2) {
+             margin-top: 1rem !important;
+             margin-bottom: 0.5rem !important;
+        }
+
+        /* Highlight Boxes (Value Props, Break Even, etc) */
+        .chapter-content :global(.highlight-box) {
+            padding: 0.75rem !important;
+            margin: 0.75rem 0 !important;
+            box-shadow: none !important;
+            border-width: 1px !important;
+            background: white !important;
+        }
+        .chapter-content :global(.highlight-box h3) {
+            font-size: 1.1rem !important;
+            margin-bottom: 0.25rem !important;
+        }
+        
+        /* Alert Boxes */
+        .chapter-content :global(.alert-box) {
+            padding: 0.5rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+
+        /* Grids (Team, Market, Goals) */
+        .chapter-content :global(.team-grid),
+        .chapter-content :global(.market-grid),
+        .chapter-content :global(.goals-wrapper) {
+            gap: 0.5rem !important;
+            margin-bottom: 1rem !important;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important; /* Force 2-col for grids to save vertical space */
+        }
+        
+        /* Cards inside grids */
+        .chapter-content :global(.team-card),
+        .chapter-content :global(.market-card),
+        .chapter-content :global(.goal-item) {
+            padding: 0.5rem !important;
+            border-width: 1px !important;
+            box-shadow: none !important;
+            break-inside: avoid;
+        }
+        .chapter-content :global(.market-card h4), 
+        .chapter-content :global(.team-card h4) {
+            font-size: 1rem !important;
+            margin-bottom: 0.25rem !important;
+        }
+        
+        /* Stat Boxes */
+        .chapter-content :global(.stat-box) {
+            padding: 0.5rem !important;
+            margin-bottom: 1rem !important;
+            gap: 1.5rem !important;
+            border: 1px solid #ccc !important;
+        }
+        .chapter-content :global(.stat .value) {
+            font-size: 1.5rem !important;
+        }
+        
+        /* Quote Box */
+        .chapter-content :global(.quote-box) {
+            padding: 1rem !important;
+            margin-bottom: 1rem !important;
+            font-size: 1.1rem !important;
+            background: none !important;
+            border-left-width: 2px !important;
+        }
+        
+        /* Dividers */
+        .chapter-content :global(.divider) {
+            margin: 1rem 0 !important;
+            height: 1px !important;
+            background: #ccc !important;
+        }
+
         /* === Grid Layouts === */
         .chapter-content :global(.grid),
         .chapter-content :global(.two-col),
@@ -777,7 +974,7 @@
         }
         
         /* === Avoid awkward breaks === */
-        blockquote, pre, figure, img {
+        :global(blockquote), :global(pre), :global(figure), :global(img) {
             page-break-inside: avoid;
             break-inside: avoid;
         }

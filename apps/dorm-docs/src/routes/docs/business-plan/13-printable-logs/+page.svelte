@@ -9,6 +9,20 @@
 	</header>
 
 	<section class="section">
+		<h2>Monthly Logs</h2>
+		<div class="link-grid">
+			<a href="/docs/business-plan/13-printable-logs/tenant-payment-log" class="link-card">
+				<div class="card-icon">📊</div>
+				<div class="card-content">
+					<h3>Monthly Tenant Payment Log</h3>
+					<p>Printable checklist for tracking rent and electricity payments for all occupants.</p>
+					<span class="fake-link">Open Log →</span>
+				</div>
+			</a>
+		</div>
+	</section>
+
+	<section class="section">
 		<h2>Daily Visitor Log</h2>
 		<div class="printable-form">
 			<div class="form-header">
@@ -230,4 +244,51 @@
 	.gate-pass { max-width: 500px; margin: 0 auto; border: 2px dashed var(--color-black); }
 	.pass-header { display: flex; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 2px solid var(--color-black); padding-bottom: 0.5rem; }
 	.gate-pass .log-table.small th, .gate-pass .log-table.small td { padding: 0.25rem; font-size: 0.85rem; }
+
+	.link-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+		gap: 1.5rem;
+		margin-bottom: 2rem;
+	}
+
+	.link-card {
+		display: flex;
+		gap: 1rem;
+		padding: 1.5rem;
+		background: white;
+		border: 2px solid var(--color-black);
+		text-decoration: none;
+		color: inherit;
+		transition: all 0.2s;
+	}
+
+	.link-card:hover {
+		transform: translateY(-2px);
+		box-shadow: 4px 4px 0 var(--color-black);
+	}
+
+	.card-icon {
+		font-size: 2rem;
+	}
+
+	.card-content h3 {
+		margin: 0 0 0.5rem 0;
+		font-size: 1.1rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	.card-content p {
+		margin: 0 0 1rem 0;
+		font-size: 0.9rem;
+		color: #555;
+		line-height: 1.4;
+	}
+
+	.fake-link {
+		font-weight: 600;
+		color: var(--color-primary);
+		font-size: 0.9rem;
+	}
 </style>

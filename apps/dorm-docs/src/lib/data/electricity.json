@@ -1,78 +1,113 @@
 {
-	"report_period": "January 2026",
+	"report_period": "August - December 2025",
 	"generated_at": "2026-01-07T00:00:00Z",
-	"meters": [
+	"note": "Billing includes Excess Electricity Charges (Sala, Lights, Electric fans) shared per floor",
+	"monthly_bills": [
 		{
-			"id": 1,
-			"name": "Main Building Meter",
-			"location_type": "PROPERTY",
-			"property_id": 1,
-			"floor_id": null,
-			"rental_unit_id": null,
-			"initial_reading": 0,
-			"status": "ACTIVE"
+			"month": "August 2025",
+			"status": "Paid",
+			"note": "Ignore if already paid previous month",
+			"bills": [
+				{ "room": "2nd Floor - Room 1", "amount": 835 },
+				{ "room": "2nd Floor - Room 2", "amount": 1867 },
+				{ "room": "2nd Floor - Room 3", "amount": 847 },
+				{ "room": "2nd Floor - Room 4", "amount": 1363 },
+				{ "room": "2nd Floor - Room 5", "amount": 2323 },
+				{ "room": "3rd Floor - Room 1", "amount": 392 },
+				{ "room": "3rd Floor - Room 2", "amount": 374 },
+				{ "room": "3rd Floor - Room 3", "amount": 264 },
+				{ "room": "3rd Floor - Room 4", "amount": 257 },
+				{ "room": "3rd Floor - Room 5", "amount": 459 },
+				{ "room": "3rd Floor - Room 6", "amount": 317 },
+				{ "room": "3rd Floor - Room 7", "amount": 374 }
+			],
+			"total": 9672
 		},
 		{
-			"id": 2,
-			"name": "Floor 1 Sub-Meter",
-			"location_type": "FLOOR",
-			"property_id": 1,
-			"floor_id": 1,
-			"rental_unit_id": null,
-			"initial_reading": 0,
-			"status": "ACTIVE"
+			"month": "September 2025",
+			"status": "Unpaid",
+			"note": "",
+			"bills": [
+				{ "room": "2nd Floor - Room 1", "amount": 1308 },
+				{ "room": "2nd Floor - Room 2", "amount": 2808 },
+				{ "room": "2nd Floor - Room 3", "amount": 2868 },
+				{ "room": "2nd Floor - Room 4", "amount": 1282 },
+				{ "room": "2nd Floor - Room 5", "amount": 1896 },
+				{ "room": "3rd Floor - Room 1", "amount": 566 },
+				{ "room": "3rd Floor - Room 2", "amount": 736 },
+				{ "room": "3rd Floor - Room 3", "amount": 511 },
+				{ "room": "3rd Floor - Room 4", "amount": 508 },
+				{ "room": "3rd Floor - Room 5", "amount": 674 },
+				{ "room": "3rd Floor - Room 6", "amount": 577 },
+				{ "room": "3rd Floor - Room 7", "amount": 736 }
+			],
+			"total": 14470
 		},
 		{
-			"id": 3,
-			"name": "Floor 2 Sub-Meter",
-			"location_type": "FLOOR",
-			"property_id": 1,
-			"floor_id": 2,
-			"rental_unit_id": null,
-			"initial_reading": 0,
-			"status": "ACTIVE"
-		}
-	],
-	"readings": [
-		{
-			"id": 1,
-			"meter_id": 1,
-			"meter_name": "Main Building Meter",
-			"reading": 15420,
-			"previous_reading": 14850,
-			"reading_date": "2026-01-01",
-			"consumption": 570,
-			"rate_at_reading": 12.50,
-			"cost": 7125.00
+			"month": "October 2025",
+			"status": "Paid",
+			"note": "",
+			"bills": [
+				{ "room": "2nd Floor - Room 1", "amount": 1134 },
+				{ "room": "2nd Floor - Room 2", "amount": 2790 },
+				{ "room": "2nd Floor - Room 3", "amount": 2310 },
+				{ "room": "2nd Floor - Room 4", "amount": 1967 },
+				{ "room": "2nd Floor - Room 5", "amount": 1890 },
+				{ "room": "3rd Floor - Room 1", "amount": 420 },
+				{ "room": "3rd Floor - Room 2", "amount": 544 },
+				{ "room": "3rd Floor - Room 3", "amount": 317 },
+				{ "room": "3rd Floor - Room 4", "amount": 301 },
+				{ "room": "3rd Floor - Room 5", "amount": 593 },
+				{ "room": "3rd Floor - Room 6", "amount": 600 },
+				{ "room": "3rd Floor - Room 7", "amount": 633 }
+			],
+			"total": 13499
 		},
 		{
-			"id": 2,
-			"meter_id": 2,
-			"meter_name": "Floor 1 Sub-Meter",
-			"reading": 4280,
-			"previous_reading": 4050,
-			"reading_date": "2026-01-01",
-			"consumption": 230,
-			"rate_at_reading": 12.50,
-			"cost": 2875.00
+			"month": "November 2025",
+			"status": "Paid",
+			"note": "",
+			"bills": [
+				{ "room": "2nd Floor - Room 1", "amount": 667 },
+				{ "room": "2nd Floor - Room 2", "amount": 1783 },
+				{ "room": "2nd Floor - Room 3", "amount": 1303 },
+				{ "room": "2nd Floor - Room 4", "amount": 1027 },
+				{ "room": "2nd Floor - Room 5", "amount": 1747 },
+				{ "room": "3rd Floor - Room 1", "amount": 513 },
+				{ "room": "3rd Floor - Room 2", "amount": 506 },
+				{ "room": "3rd Floor - Room 3", "amount": 471 },
+				{ "room": "3rd Floor - Room 4", "amount": 424 },
+				{ "room": "3rd Floor - Room 5", "amount": 571 },
+				{ "room": "3rd Floor - Room 6", "amount": 742 },
+				{ "room": "3rd Floor - Room 7", "amount": 651 }
+			],
+			"total": 10405
 		},
 		{
-			"id": 3,
-			"meter_id": 3,
-			"meter_name": "Floor 2 Sub-Meter",
-			"reading": 3890,
-			"previous_reading": 3680,
-			"reading_date": "2026-01-01",
-			"consumption": 210,
-			"rate_at_reading": 12.50,
-			"cost": 2625.00
+			"month": "December 2025",
+			"status": "Paid",
+			"note": "",
+			"bills": [
+				{ "room": "2nd Floor - Room 1", "amount": 624 },
+				{ "room": "2nd Floor - Room 2", "amount": 1656 },
+				{ "room": "2nd Floor - Room 3", "amount": 1176 },
+				{ "room": "2nd Floor - Room 4", "amount": 948 },
+				{ "room": "2nd Floor - Room 5", "amount": 1416 },
+				{ "room": "3rd Floor - Room 1", "amount": 425 },
+				{ "room": "3rd Floor - Room 2", "amount": 431 },
+				{ "room": "3rd Floor - Room 3", "amount": 333 },
+				{ "room": "3rd Floor - Room 4", "amount": 400 },
+				{ "room": "3rd Floor - Room 5", "amount": 447 },
+				{ "room": "3rd Floor - Room 6", "amount": 591 },
+				{ "room": "3rd Floor - Room 7", "amount": 370 }
+			],
+			"total": 8817
 		}
 	],
 	"summary": {
-		"total_consumption_kwh": 570,
-		"total_cost": 7125.00,
-		"average_rate": 12.50,
-		"meters_active": 3,
-		"meters_inactive": 0
+		"total_billed": 56863,
+		"months_covered": 5,
+		"average_monthly": 11373,
+		"rooms_billed": 12
 	}
 }
