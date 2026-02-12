@@ -85,7 +85,26 @@
 	});
 
 	function clearAllIdsRemoteCache() {
-		clearRemoteFunctionCacheByPrefix(`idgen:rf:v1:${scopeKey}:all-ids:`);
+		const prefix = `idgen:rf:v1:${scopeKey}:all-ids:`;
+		console.log(`%c${LOG_PREFIX} 🧹 Clearing remote cache with prefix: ${prefix}`, logStyles.info);
+		
+		if (browser) {
+			let clearedCount = 0;
+			try {
+				for (let i = window.sessionStorage.length - 1; i >= 0; i--) {
+					const k = window.sessionStorage.key(i);
+					if (k && k.startsWith(prefix)) {
+						console.log(`%c${LOG_PREFIX} 🗑️ Removing key: ${k}`, logStyles.info);
+						clearedCount++;
+					}
+				}
+			} catch (e) {
+				console.warn('Error verifying cache keys:', e);
+			}
+			console.log(`%c${LOG_PREFIX} 🧹 Cleared ${clearedCount} keys from sessionStorage`, logStyles.info);
+		}
+		
+		clearRemoteFunctionCacheByPrefix(prefix);
 	}
 
 	// Loading states
@@ -466,6 +485,7 @@
 		);
 		console.log(`%c├─ [T+0ms] onMount started`, 'color: #64748b');
 		console.log(`%c├─ scopeKey: ${scopeKey}`, logStyles.info);
+		console.log(`%c├─ cache prefix expectation: idgen:rf:v1:${scopeKey}:all-ids:`, logStyles.info);
 
 		// Apply viewport-based view mode AFTER hydration (prevents SSR mismatch)
 		// Only if user hasn't explicitly set a preference in localStorage
