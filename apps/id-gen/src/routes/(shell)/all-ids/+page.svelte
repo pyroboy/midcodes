@@ -891,18 +891,16 @@
 			
 			// Handle Shift+Click Range Selection
 			if (event instanceof MouseEvent && event.shiftKey && lastSelectedCardId) {
-				const currentIndex = filteredCards.findIndex(c => getCardId(c) === cardId);
-				const lastIndex = filteredCards.findIndex(c => getCardId(c) === lastSelectedCardId);
+				// Use allFilteredCards to ensure we can select across the entire filtered dataset, not just the visible slice
+				const currentIndex = allFilteredCards.findIndex(c => getCardId(c) === cardId);
+				const lastIndex = allFilteredCards.findIndex(c => getCardId(c) === lastSelectedCardId);
 
 				if (currentIndex !== -1 && lastIndex !== -1) {
 					const start = Math.min(currentIndex, lastIndex);
 					const end = Math.max(currentIndex, lastIndex);
 					
-					// Determine target state based on the clicked card's current state
-					// If clicking an unselected card, select the range.
-					// If clicking a selected card, usually we still select range (standard behavior)
-					// But let's stick to additive selection for Shift-Click
-					const rangeCards = filteredCards.slice(start, end + 1);
+					// Get all cards in the range from the full filtered dataset
+					const rangeCards = allFilteredCards.slice(start, end + 1);
 					
 					// Add all cards in range to selection
 					rangeCards.forEach(card => {
@@ -911,9 +909,8 @@
 					});
 					
 					selectedCards = newSelectedCards;
-					// Don't update lastSelectedCardId on range select to allow extending range from original anchor? 
-					// Actually standard behavior often updates anchor. Let's update it.
-					// lastSelectedCardId = cardId; 
+					// Update anchor to the current card to allow extending the selection from here
+					lastSelectedCardId = cardId;
 					return;
 				}
 			}
