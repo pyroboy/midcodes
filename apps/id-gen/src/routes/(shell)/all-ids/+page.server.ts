@@ -26,7 +26,9 @@ export const actions: Actions = {
 			const [card] = await db
 				.select({
 					frontImage: idcards.frontImage,
-					backImage: idcards.backImage
+					backImage: idcards.backImage,
+					frontImageLowRes: idcards.frontImageLowRes,
+					backImageLowRes: idcards.backImageLowRes
 				})
 				.from(idcards)
 				.where(eq(idcards.id, cardId))
@@ -40,6 +42,8 @@ export const actions: Actions = {
 			const imagesToDelete: string[] = [];
 			if (card.frontImage) imagesToDelete.push(card.frontImage);
 			if (card.backImage) imagesToDelete.push(card.backImage);
+			if (card.frontImageLowRes) imagesToDelete.push(card.frontImageLowRes);
+			if (card.backImageLowRes) imagesToDelete.push(card.backImageLowRes);
 
 			if (imagesToDelete.length > 0) {
 				try {
@@ -80,7 +84,9 @@ export const actions: Actions = {
 				.select({
 					id: idcards.id,
 					frontImage: idcards.frontImage,
-					backImage: idcards.backImage
+					backImage: idcards.backImage,
+					frontImageLowRes: idcards.frontImageLowRes,
+					backImageLowRes: idcards.backImageLowRes
 				})
 				.from(idcards)
 				.where(inArray(idcards.id, ids));
@@ -90,6 +96,8 @@ export const actions: Actions = {
 			for (const card of cards) {
 				if (card.frontImage) imagesToDelete.push(card.frontImage);
 				if (card.backImage) imagesToDelete.push(card.backImage);
+				if (card.frontImageLowRes) imagesToDelete.push(card.frontImageLowRes);
+				if (card.backImageLowRes) imagesToDelete.push(card.backImageLowRes);
 			}
 
 			// Delete all images from R2 storage

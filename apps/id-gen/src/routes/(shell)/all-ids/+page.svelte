@@ -1446,7 +1446,7 @@
 									{#each cards as card}
 										{@const dims = templateDimensions[card.template_name]}
 										{@const isPortrait = dims ? dims.height > dims.width : false}
-										<tr class="hover:bg-muted/30 transition-colors group">
+										<tr class="hover:bg-muted/30 transition-colors group {selectionManager.isSelected(getCardId(card)) ? 'bg-primary/10' : ''}">
 											<td class="px-4 py-3">
 												<input
 													type="checkbox"

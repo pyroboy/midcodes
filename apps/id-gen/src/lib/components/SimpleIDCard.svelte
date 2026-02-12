@@ -102,7 +102,9 @@
 	</div>
 
 	<Card
-		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50"
+		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50 {isSelected
+			? 'ring-2 ring-primary border-primary'
+			: ''}"
 	>
 		<!-- Image Area - uniform sizing: portrait cards are narrower to match landscape visual footprint -->
 		<div
