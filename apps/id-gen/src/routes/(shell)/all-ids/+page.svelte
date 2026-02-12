@@ -891,13 +891,18 @@
 			
 			// Handle Shift+Click Range Selection
 			if (event instanceof MouseEvent && event.shiftKey && lastSelectedCardId) {
+				console.log('[DEBUG] Shift+Click detected', { cardId, lastSelectedCardId });
 				// Use allFilteredCards to ensure we can select across the entire filtered dataset, not just the visible slice
 				const currentIndex = allFilteredCards.findIndex(c => getCardId(c) === cardId);
 				const lastIndex = allFilteredCards.findIndex(c => getCardId(c) === lastSelectedCardId);
 
+				console.log('[DEBUG] Indices:', { currentIndex, lastIndex });
+
 				if (currentIndex !== -1 && lastIndex !== -1) {
 					const start = Math.min(currentIndex, lastIndex);
 					const end = Math.max(currentIndex, lastIndex);
+					
+					console.log('[DEBUG] Selecting range:', { start, end });
 					
 					// Get all cards in the range from the full filtered dataset
 					const rangeCards = allFilteredCards.slice(start, end + 1);
