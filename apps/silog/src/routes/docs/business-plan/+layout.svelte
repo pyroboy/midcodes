@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { chapters } from './chapters';
+	import type { Snippet } from 'svelte';
+
+	let { children }: { children: Snippet } = $props();
 
     let { children } = $props();
 
@@ -112,11 +115,9 @@
         background: #f1f5f9;
     }
 
-    /* Page Content */
     .page-content {
-        /* No padding here, let pages handle their own padding/centering if needed, but usually layout handles wrapper */
-        /* However, looking at 06-operations, it has .doc-page { max-width: 800px; margin: 0 auto; ... } */
-        /* So we just render slot */
+        /* Wrapper for page content - pages handle their own max-width/padding */
+        display: block;
     }
 
     @media (max-width: 640px) {

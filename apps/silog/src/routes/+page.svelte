@@ -41,14 +41,15 @@
 					<li><a href="/docs/business-plan/09-risk-management">09 // Risk Management</a></li>
 					<li><a href="/docs/business-plan/10-appendices">10 // Appendices</a></li>
 					<li><a href="/docs/business-plan/11-initial-totex">11 // Initial TOTEX Breakdown</a></li>
-					<li><a href="/docs/business-plan/12-inventory-supply">12 // Inventory Supply</a></li>
 					<li><a href="/docs/business-plan/13-printable-logs">13 // Ops Logs</a></li>
-					<li><a href="/docs/business-plan/14-sku-portioning">14 // SKU Portioning Guide</a></li>
 					<li><a href="/docs/business-plan/15-daily-checklists">15 // Daily Checklists</a></li>
 					<li><a href="/docs/business-plan/16-contingency">16 // Contingency Plan</a></li>
 					<li><a href="/docs/business-plan/17-complaint-handling">17 // Complaint Handling</a></li>
 				</ul>
-				<a href="/docs/business-plan/print-all" class="print-all-btn">🖨️ Print All Chapters</a>
+				<div class="print-links">
+                    <a href="/docs/business-plan/print-all" class="print-btn main">🖨️ Print All Chapters</a>
+                    <a href="/docs/business-plan/print-kitchen" class="print-btn sub">👨‍🍳 Kitchen Manual Only</a>
+                </div>
 			</section>
 
 			<section class="nav-group ops">
@@ -78,21 +79,21 @@
 				
 				<div class="calc-body">
 					<div class="input-group">
-						<label>Selling Price</label>
+						<label for="selling-price">Selling Price</label>
 						<div class="input-wrapper">
 							<span>₱</span>
-							<input type="number" bind:value={sellingPrice} />
+							<input id="selling-price" type="number" bind:value={sellingPrice} />
 						</div>
 					</div>
                     
                     <div class="row-inputs">
                         <div class="input-group">
-                            <label>Base Cost</label>
-                            <input type="number" bind:value={baseCost} />
+                            <label for="base-cost">Base Cost</label>
+                            <input id="base-cost" type="number" bind:value={baseCost} />
                         </div>
                         <div class="input-group">
-                            <label>Viand Cost</label>
-                            <input type="number" bind:value={viandCost} />
+                            <label for="viand-cost">Viand Cost</label>
+                            <input id="viand-cost" type="number" bind:value={viandCost} />
                         </div>
                     </div>
 
@@ -162,7 +163,6 @@
 		line-height: 0.9;
         letter-spacing: -2px;
 	}
-    .dot { color: var(--color-orange); }
 	.text-orange { color: var(--color-orange); }
 	.tagline {
 		font-size: 1.25rem;
@@ -238,22 +238,39 @@
         border-bottom: 1px solid var(--color-orange);
 	}
 
-    /* Print All Button */
-    .print-all-btn {
-        display: block;
+    /* Print Buttons */
+    .print-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
         margin-top: 1rem;
+    }
+    .print-btn {
+        display: block;
         padding: 0.75rem 1rem;
-        background: var(--color-orange);
-        color: white;
         text-align: center;
         font-weight: 700;
-        font-size: 1rem;
+        font-size: 0.95rem;
         text-decoration: none;
         transition: all 0.2s;
         border: 2px solid var(--color-black);
     }
-    .print-all-btn:hover {
+    .print-btn.main {
+        background: var(--color-orange);
+        color: white;
+    }
+    .print-btn.main:hover {
         background: var(--color-black);
+        color: var(--color-orange);
+    }
+    .print-btn.sub {
+        background: white;
+        color: var(--color-black);
+        font-size: 0.9rem;
+    }
+    .print-btn.sub:hover {
+        background: #f4f4f5;
+        border-color: var(--color-orange);
         color: var(--color-orange);
     }
     /* WIDGETS */

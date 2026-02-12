@@ -615,10 +615,15 @@
     .simple-table td { border-bottom: 1px solid #e2e8f0; padding: 0.5rem; font-size: 0.95rem; }
     
     .equipment-list { list-style-type: disc; padding-left: 1.5rem; margin-top: 1rem; }
+<<<<<<< HEAD:apps/silog/src/routes/docs/business-plan/06-operations/+page.svelte
     
 
 
     .table-wrapper { overflow-x: auto; margin-top: 1rem; }
+=======
+
+    /* Removed unused .sop-section selectors */
+>>>>>>> 201610ec875ea988babebbea8387487442975b76:apps/silog/src/routes/docs/business-plan/07-operations/+page.svelte
     table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
     th { background: #f1f5f9; padding: 0.75rem; font-weight: 600; color: #334155; border-bottom: 2px solid #e2e8f0; }
     td { padding: 0.75rem; border-bottom: 1px solid #e2e8f0; color: #475569; }

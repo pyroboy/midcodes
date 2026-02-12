@@ -4,19 +4,18 @@
     import Chapter02 from '../02-company-overview/+page.svelte';
     import Chapter03 from '../03-market-analysis/+page.svelte';
     import Chapter04 from '../04-products/+page.svelte';
-    import Chapter05 from '../05-marketing/+page.svelte';
-    import Chapter06 from '../06-operations/+page.svelte';
-    import Chapter07 from '../07-organization/+page.svelte';
-    import Chapter08 from '../08-financial-plan/+page.svelte';
-    import Chapter09 from '../09-risk-management/+page.svelte';
-    import Chapter10 from '../10-appendices/+page.svelte';
-    import Chapter11 from '../11-initial-totex/+page.svelte';
-    import Chapter12 from '../12-inventory-supply/+page.svelte';
-    import Chapter13 from '../13-printable-logs/+page.svelte';
-    import Chapter14 from '../14-sku-portioning/+page.svelte';
-    import Chapter15 from '../15-daily-checklists/+page.svelte';
-    import Chapter16 from '../16-contingency/+page.svelte';
-    import Chapter17 from '../17-complaint-handling/+page.svelte';
+    import Chapter05 from '../05-prep-guidelines/+page.svelte';
+    import Chapter06 from '../06-marketing/+page.svelte';
+    import Chapter07 from '../07-operations/+page.svelte';
+    import Chapter08 from '../08-organization/+page.svelte';
+    import Chapter09 from '../09-financial-plan/+page.svelte';
+    import Chapter10 from '../10-risk-management/+page.svelte';
+    import Chapter11 from '../11-appendices/+page.svelte';
+    import Chapter12 from '../12-initial-totex/+page.svelte';
+    import Chapter14 from '../14-printable-logs/+page.svelte';
+    import Chapter16 from '../16-daily-checklists/+page.svelte';
+    import Chapter17 from '../17-contingency/+page.svelte';
+    import Chapter18 from '../18-complaint-handling/+page.svelte';
 
     import { chapters } from '../chapters';
 
@@ -24,7 +23,7 @@
         window.print();
     }
 
-    // Map chapters to components
+    // Map chapters to components (matches chapters.ts order)
     const chapterComponents = [
         { component: Chapter01, ...chapters[0] },
         { component: Chapter02, ...chapters[1] },
@@ -38,11 +37,10 @@
         { component: Chapter10, ...chapters[9] },
         { component: Chapter11, ...chapters[10] },
         { component: Chapter12, ...chapters[11] },
-        { component: Chapter13, ...chapters[12] },
-        { component: Chapter14, ...chapters[13] },
-        { component: Chapter15, ...chapters[14] },
-        { component: Chapter16, ...chapters[15] },
-        { component: Chapter17, ...chapters[16] },
+        { component: Chapter14, ...chapters[12] },
+        { component: Chapter16, ...chapters[13] },
+        { component: Chapter17, ...chapters[14] },
+        { component: Chapter18, ...chapters[15] },
     ];
     import { onMount } from 'svelte';
 
@@ -331,7 +329,10 @@
         margin: 0 0 1rem 0;
         color: #0f172a;
     }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 201610ec875ea988babebbea8387487442975b76
     .orange { color: #f97316; }
     .subtitle {
         font-size: 1.5rem;
@@ -514,8 +515,13 @@
         }
         
         :global(html), :global(body) {
+<<<<<<< HEAD
             font-size: 9.5pt !important; /* Optimized for Folio density */
             line-height: 1.25 !important;
+=======
+            font-size: 10pt !important; /* Slightly smaller to ensure fit */
+            line-height: 1.4 !important;
+>>>>>>> 201610ec875ea988babebbea8387487442975b76
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -591,7 +597,10 @@
             font-size: 0.8rem;
             padding-left: 1.5rem;
         }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 201610ec875ea988babebbea8387487442975b76
         
         /* === Chapter Styling - HEADERS PRIORITIZED === */
         .chapter-wrapper {

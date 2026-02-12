@@ -1,0 +1,625 @@
+{
+  "batches": [
+    {
+      "id": "PP-001",
+      "name": "Lugaw Batch",
+      "description": "Cooked glutinous rice porridge, kept warm in rice cooker",
+      "batchSize": 22,
+      "batchUnit": "servings (270g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-GR-002",
+          "qty": "1000g dry"
+        },
+        {
+          "id": "RM-VG-003",
+          "qty": "50g"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "30ml"
+        },
+        {
+          "id": "RM-PT-024",
+          "qty": "2 sachets",
+          "note": "Magic Sarap/Chicken Cube for depth"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 15,
+        "cookGas": 0,
+        "cookLaborMins": 30,
+        "warmingPerHour": 2,
+        "avgWarmingHrs": 4
+      },
+      "notes": "Rice cooker runs ~4hrs keeping warm. Portion reduced 10% (300g→270g) for cost control."
+    },
+    {
+      "id": "PP-002",
+      "name": "Arroz Caldo Stock",
+      "description": "Chicken broth base for arroz caldo",
+      "batchSize": 15,
+      "batchUnit": "servings",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-002",
+          "qty": "500g bones"
+        },
+        {
+          "id": "RM-VG-003",
+          "qty": "30g"
+        },
+        {
+          "id": "RM-VG-002",
+          "qty": "50g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 20,
+        "cookLaborMins": 45,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Simmered on gas stove for 1.5hrs"
+    },
+    {
+      "id": "PP-003",
+      "name": "Sinangag Batch",
+      "description": "Garlic fried rice, prepared in batches",
+      "batchSize": 15,
+      "batchUnit": "servings (160g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-GR-001",
+          "qty": "2400g cooked"
+        },
+        {
+          "id": "RM-VG-001",
+          "qty": "100g"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "100ml"
+        },
+        {
+          "id": "RM-PT-024",
+          "qty": "1 sachet",
+          "note": "Magic Sarap for flavor"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 12,
+        "cookLaborMins": 15,
+        "warmingPerHour": 2,
+        "avgWarmingHrs": 3
+      },
+      "notes": "Fried in large wok, kept warm in rice cooker. Portion reduced 20% (200g→160g) for cost control."
+    },
+    {
+      "id": "PP-004",
+      "name": "Steamed Rice Batch",
+      "description": "Plain jasmine rice for silog meals",
+      "batchSize": 20,
+      "batchUnit": "servings (180g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-GR-001",
+          "qty": "2500g dry"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 10,
+        "cookGas": 0,
+        "cookLaborMins": 5,
+        "warmingPerHour": 2,
+        "avgWarmingHrs": 5
+      },
+      "notes": "Rice cooker, kept warm all day"
+    },
+    {
+      "id": "PP-005",
+      "name": "Marinated Tapa",
+      "description": "Beef tapa marinated overnight",
+      "batchSize": 10,
+      "batchUnit": "servings (120g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-006",
+          "qty": "1200g"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "100ml"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "50ml"
+        },
+        {
+          "id": "RM-PT-008",
+          "qty": "50g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 0,
+        "cookLaborMins": 20,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Prep only, frying is per-order"
+    },
+    {
+      "id": "PP-006",
+      "name": "Marinated Tocino",
+      "description": "Pork tocino, ready to fry",
+      "batchSize": 10,
+      "batchUnit": "servings (100g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-002",
+          "qty": "1000g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 0,
+        "cookLaborMins": 5,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Pre-packaged, just needs portioning"
+    },
+    {
+      "id": "PP-007",
+      "name": "Thawed Hotdogs",
+      "description": "Defrosted hotdogs, ready to cook",
+      "batchSize": 15,
+      "batchUnit": "servings (2 pcs each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-003",
+          "qty": "1000g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 2,
+        "cookGas": 0,
+        "cookLaborMins": 2,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Thawed in ref overnight"
+    },
+    {
+      "id": "PP-008",
+      "name": "Atchara Batch",
+      "description": "Pickled papaya for silog sides",
+      "batchSize": 40,
+      "batchUnit": "servings (20g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-007",
+          "qty": "2 pcs (1kg)"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "200ml"
+        },
+        {
+          "id": "RM-PT-008",
+          "qty": "100g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 0,
+        "cookLaborMins": 30,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Prep once, lasts several days"
+    },
+    {
+      "id": "PP-009",
+      "name": "Boiled Eggs Batch",
+      "description": "Hard-boiled eggs for lugaw toppings",
+      "batchSize": 30,
+      "batchUnit": "eggs",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-001",
+          "qty": "30 pcs"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 8,
+        "cookLaborMins": 15,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Boiled in large pot, peeled and halved"
+    },
+    {
+      "id": "PP-010",
+      "name": "Fried Garlic Bits",
+      "description": "Crispy fried garlic topping",
+      "batchSize": 100,
+      "batchUnit": "servings (3g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-001",
+          "qty": "1000g"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "300ml"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 15,
+        "cookLaborMins": 30,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Bulk fried garlic. 1kg raw yields ~400g fried. 3g serving is standard garnish."
+    },
+    {
+      "id": "PP-011",
+      "name": "Chicken/Pork Flakes",
+      "description": "Shredded meat for lugaw with meat",
+      "batchSize": 20,
+      "batchUnit": "servings (50g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-002",
+          "qty": "1200g"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "30ml"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "20ml"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 15,
+        "cookLaborMins": 30,
+        "warmingPerHour": 1,
+        "avgWarmingHrs": 4
+      },
+      "notes": "Boiled, shredded, sautéed with seasoning"
+    },
+    {
+      "id": "PP-012",
+      "name": "Chopped Spring Onions",
+      "description": "Pre-chopped green onions for garnish",
+      "batchSize": 40,
+      "batchUnit": "servings (5g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-004",
+          "qty": "250g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 0,
+        "cookLaborMins": 10,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Washed, chopped, stored in ref"
+    },
+    {
+      "id": "PP-013",
+      "name": "Tokwa't Baboy Prep",
+      "description": "Fried tofu and pork for tokwa't baboy lugaw",
+      "batchSize": 15,
+      "batchUnit": "servings (80g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-009",
+          "qty": "600g"
+        },
+        {
+          "id": "RM-PR-004",
+          "qty": "600g"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "50ml"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "50ml"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 18,
+        "cookLaborMins": 25,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Tofu fried, pork boiled and cubed, mixed with sauce"
+    },
+    {
+      "id": "PP-014",
+      "name": "Adobo Base (Small Batch Prep)",
+      "description": "Small batch adobo prep (10 servings)",
+      "batchSize": 10,
+      "batchUnit": "servings",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-002",
+          "qty": "1250g"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "150ml"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "100ml"
+        },
+        {
+          "id": "RM-VG-001",
+          "qty": "50g"
+        },
+        {
+          "id": "RM-PT-008",
+          "qty": "25g"
+        },
+        {
+          "id": "RM-PT-021",
+          "qty": "5 pcs"
+        },
+        {
+          "id": "RM-PT-025",
+          "qty": "5g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 15,
+        "cookLaborMins": 30,
+        "warmingPerHour": 1,
+        "avgWarmingHrs": 3
+      },
+      "notes": "Cost per serving: ~₱27.38 (ingredients + overhead)"
+    },
+    {
+      "id": "PP-015",
+      "name": "Pre-Cooked Bacon Bits",
+      "description": "Bacon strips pre-cooked and crumbled for quick service",
+      "batchSize": 20,
+      "batchUnit": "servings (25g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PD-010",
+          "qty": "500g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 10,
+        "cookLaborMins": 15,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Pre-cook in morning. Store in container. Saves 3-4 min per order."
+    },
+    {
+      "id": "PP-016",
+      "name": "K.S.T. Garnish (Standard Silog)",
+      "description": "Kamatis + Sibuyas + Toyo - standardized garnish for all silogs",
+      "batchSize": 20,
+      "batchUnit": "servings",
+      "ingredientRefs": [
+        {
+          "id": "RM-VG-010",
+          "qty": "400g"
+        },
+        {
+          "id": "RM-VG-002",
+          "qty": "200g"
+        },
+        {
+          "id": "RM-PT-002",
+          "qty": "100ml"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 0,
+        "cookLaborMins": 15,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "STANDARDIZED: Slice tomato/onion in morning. Lower prep overhead than Atchara."
+    },
+    {
+      "id": "PP-017",
+      "name": "Java Rice Batch",
+      "description": "Sinangag hybrid - Java seasoned garlic rice with annatto color",
+      "batchSize": 15,
+      "batchUnit": "servings (200g each)",
+      "ingredientRefs": [
+        {
+          "id": "PP-003",
+          "qty": "15 servings",
+          "note": "Use sinangag base"
+        },
+        {
+          "id": "RM-PT-026",
+          "qty": "225g (15g × 15)",
+          "note": "Java seasoning mix"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 8,
+        "cookLaborMins": 10,
+        "warmingPerHour": 2,
+        "avgWarmingHrs": 3
+      },
+      "notes": "Quick convert: toss sinangag with Java mix for signature Cheesy line rice. Can also be made fresh per-order (+1 min)."
+    },
+    {
+      "id": "PP-018",
+      "name": "Homemade Sweet Tapa (Outsourced)",
+      "description": "Sweet & soft timpla-style tapa - outsourced until recipe learned",
+      "batchSize": 5,
+      "batchUnit": "servings (100g each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-014",
+          "qty": "1 pack (5 servings)"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 0,
+        "cookLaborMins": 0,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0,
+        "outsourcedCost": 35,
+        "outsourcedNote": "₱35 per serving cost from supplier"
+      },
+      "notes": "OUTSOURCED PREP: Buy ready-marinated from local home cook. TO LEARN: Research sweet tapa recipe (sugar, soy, calamansi base)."
+    },
+    {
+      "id": "PP-019",
+      "name": "Goto Base (Tripe & Broth) - Outsourced",
+      "description": "Tenderized ox tripe in savory kaldo broth, infused with sautéed aromatics. Mix with PP-001 Lugaw Batch for Goto service.",
+      "batchSize": 20,
+      "batchUnit": "servings (when mixed with rice)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-015",
+          "qty": "1000g",
+          "note": "Ox Tripe (Tuwalya) - Cleaned/Scalded"
+        },
+        {
+          "id": "RM-VG-003",
+          "qty": "100g",
+          "note": "Ginger - Split for boiling & sautéing"
+        },
+        {
+          "id": "RM-VG-001",
+          "qty": "50g",
+          "note": "Garlic - Split for boiling & sautéing"
+        },
+        {
+          "id": "RM-VG-002",
+          "qty": "100g",
+          "note": "Onion - Split for boiling & sautéing"
+        },
+        {
+          "id": "RM-PT-021",
+          "qty": "4-5 pcs",
+          "note": "Dried Bay Leaves (Laurel)"
+        },
+        {
+          "id": "RM-PT-003",
+          "qty": "30ml",
+          "note": "White Vinegar - For tenderizing step"
+        },
+        {
+          "id": "RM-PT-027",
+          "qty": "60ml",
+          "note": "Fish Sauce (Patis) - Seasoning base"
+        },
+        {
+          "id": "RM-PT-025",
+          "qty": "5g",
+          "note": "Black Pepper (Cracked/Ground)"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "30ml",
+          "note": "Cooking Oil - For sautéing"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 40,
+        "cookLaborMins": 30,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0,
+        "outsourcedCost": 18.49,
+        "outsourcedNote": "₱18.49 per serving cost from supplier (Total Batch: ₱369.80)"
+      },
+      "notes": "OUTSOURCED PREP: Long boiling time (1.5-2 hrs). Buy ready-prepared from local supplier. Cost per serving ₱18.49 - Add to PP-001 Lugaw cost for total Goto cost. TO LEARN: Research Chef RV's Goto recipe for in-house prep.",
+      "cookingInstructions": {
+        "step1_cleaning": "Triple Wash ox tripe, slice into strips. Prep two sets of aromatics: Set A (Boiling) and Set B (Sautéing) - each with Ginger, Garlic, Onions.",
+        "step2_tenderizing": "In large pot, place tripe with Set A aromatics, bay leaves, vinegar, patis, and water. Simmer 1.5-2 hrs (or 1hr pressure cooker) until tender. Keep broth (kaldo).",
+        "step3_gisa": "In separate pan, sauté Set B (garlic first until browned, then onions, then ginger). Season with salt.",
+        "step4_combining": "Pour sautéed mixture into pot with tripe/broth. Simmer 5-10 mins. Season with black pepper and patis to taste.",
+        "step5_storage": "For batch prep: Cool and portion into containers. Freeze until ready. Thaw, boil, and mix with PP-001 Lugaw or add rice directly."
+      }
+    },
+    {
+      "id": "PP-020",
+      "name": "Fried Egg",
+      "description": "Sunny-side up or over-easy fried egg for silog/noodle dishes",
+      "batchSize": 10,
+      "batchUnit": "servings (1 egg each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-PR-001",
+          "qty": "10 pcs"
+        },
+        {
+          "id": "RM-PT-001",
+          "qty": "100ml",
+          "note": "10ml oil per egg for frying"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 0,
+        "cookGas": 5,
+        "cookLaborMins": 10,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0
+      },
+      "notes": "Per-order frying. Cost: Egg ₱7.50 + Oil ₱1.32 + Overhead ₱1.50 = ~₱10.32/egg. Use medium heat, 1-2 min per egg."
+    }
+  ],
+  "drinks": [
+    {
+      "id": "PP-D01",
+      "name": "Iced Tea Pitcher",
+      "description": "House blend iced tea, kept in ref",
+      "batchSize": 10,
+      "batchUnit": "servings (350ml each)",
+      "ingredientRefs": [
+        {
+          "id": "RM-BV-001",
+          "qty": "200g"
+        },
+        {
+          "id": "RM-PT-008",
+          "qty": "150g"
+        }
+      ],
+      "overhead": {
+        "cookElectricity": 5,
+        "cookGas": 0,
+        "cookLaborMins": 5,
+        "warmingPerHour": 0,
+        "avgWarmingHrs": 0,
+        "refPerServing": 0.5
+      },
+      "notes": "Refrigerator running cost amortized per serving"
+    }
+  ]
+}
