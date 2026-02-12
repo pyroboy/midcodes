@@ -28,7 +28,8 @@ export const actions: Actions = {
 					frontImage: idcards.frontImage,
 					backImage: idcards.backImage,
 					frontImageLowRes: idcards.frontImageLowRes,
-					backImageLowRes: idcards.backImageLowRes
+					backImageLowRes: idcards.backImageLowRes,
+					originalAssets: idcards.originalAssets
 				})
 				.from(idcards)
 				.where(eq(idcards.id, cardId))
@@ -44,6 +45,14 @@ export const actions: Actions = {
 			if (card.backImage) imagesToDelete.push(card.backImage);
 			if (card.frontImageLowRes) imagesToDelete.push(card.frontImageLowRes);
 			if (card.backImageLowRes) imagesToDelete.push(card.backImageLowRes);
+
+			// Add original assets to deletion list
+			if (card.originalAssets && typeof card.originalAssets === 'object') {
+				const assets = card.originalAssets as Record<string, { path: string }>;
+				Object.values(assets).forEach((asset) => {
+					if (asset?.path) imagesToDelete.push(asset.path);
+				});
+			}
 
 			if (imagesToDelete.length > 0) {
 				try {
@@ -86,7 +95,8 @@ export const actions: Actions = {
 					frontImage: idcards.frontImage,
 					backImage: idcards.backImage,
 					frontImageLowRes: idcards.frontImageLowRes,
-					backImageLowRes: idcards.backImageLowRes
+					backImageLowRes: idcards.backImageLowRes,
+					originalAssets: idcards.originalAssets
 				})
 				.from(idcards)
 				.where(inArray(idcards.id, ids));
@@ -98,6 +108,14 @@ export const actions: Actions = {
 				if (card.backImage) imagesToDelete.push(card.backImage);
 				if (card.frontImageLowRes) imagesToDelete.push(card.frontImageLowRes);
 				if (card.backImageLowRes) imagesToDelete.push(card.backImageLowRes);
+
+				// Add original assets to deletion list
+				if (card.originalAssets && typeof card.originalAssets === 'object') {
+					const assets = card.originalAssets as Record<string, { path: string }>;
+					Object.values(assets).forEach((asset) => {
+						if (asset?.path) imagesToDelete.push(asset.path);
+					});
+				}
 			}
 
 			// Delete all images from R2 storage
