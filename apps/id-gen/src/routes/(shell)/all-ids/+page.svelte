@@ -481,6 +481,35 @@
 			}
 		}
 
+		// 0) Check for hard refresh (browser reload)
+		// If detected, we clear the cache to ensure fresh data.
+		try {
+			const navEntries = performance.getEntriesByType('navigation');
+			if (navEntries.length > 0) {
+				const nav = navEntries[0] as PerformanceNavigationTiming;
+				if (nav.type === 'reload') {
+					console.log(
+						`%c${LOG_PREFIX} 🔄 Page reload detected - clearing cache`,
+						'color: #f59e0b; font-weight: bold'
+					);
+					clearAllIdsCache(scopeKey);
+					clearAllIdsRemoteCache();
+				}
+			} else {
+				// Fallback for older browsers (deprecated but sometimes needed)
+				if (performance.navigation.type === 1) { // 1 = TYPE_RELOAD
+					console.log(
+						`%c${LOG_PREFIX} 🔄 Page reload detected (legacy) - clearing cache`,
+						'color: #f59e0b; font-weight: bold'
+					);
+					clearAllIdsCache(scopeKey);
+					clearAllIdsRemoteCache();
+				}
+			}
+		} catch (e) {
+			console.warn('Error checking navigation type:', e);
+		}
+
 		// 1) Check for cached data
 		console.log(
 			`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Reading cache...`,
@@ -890,19 +919,17 @@
 			const newSelectedCards = new Set(selectedCards);
 			
 			// Handle Shift+Click Range Selection
-			if (event instanceof MouseEvent && event.shiftKey && lastSelectedCardId) {
-				console.log('[DEBUG] Shift+Click detected', { cardId, lastSelectedCardId });
+			// Check for shiftKey loosely to handle different event types
+			const isShift = event && (event as MouseEvent).shiftKey;
+			
+			if (isShift && lastSelectedCardId) {
 				// Use allFilteredCards to ensure we can select across the entire filtered dataset, not just the visible slice
 				const currentIndex = allFilteredCards.findIndex(c => getCardId(c) === cardId);
 				const lastIndex = allFilteredCards.findIndex(c => getCardId(c) === lastSelectedCardId);
 
-				console.log('[DEBUG] Indices:', { currentIndex, lastIndex });
-
 				if (currentIndex !== -1 && lastIndex !== -1) {
 					const start = Math.min(currentIndex, lastIndex);
 					const end = Math.max(currentIndex, lastIndex);
-					
-					console.log('[DEBUG] Selecting range:', { start, end });
 					
 					// Get all cards in the range from the full filtered dataset
 					const rangeCards = allFilteredCards.slice(start, end + 1);
@@ -1454,8 +1481,10 @@
 													type="checkbox"
 													class="rounded border-muted-foreground"
 													checked={selectionManager.isSelected(getCardId(card))}
-													onclick={(e) => e.stopPropagation()} 
-													onchange={(e) => selectionManager.toggleSelection(getCardId(card), e)}
+													onclick={(e) => {
+														e.stopPropagation();
+														selectionManager.toggleSelection(getCardId(card), e);
+													}}
 												/>
 											</td>
 											<td class="px-4 py-2" onclick={(e) => openPreview(e, card)}>
