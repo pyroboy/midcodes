@@ -1,3 +1,31 @@
+<script lang="ts">
+	import propertyData from '$lib/data/property.json';
+
+	const floors = propertyData.floors;
+	const summary = propertyData.summary;
+
+	// Get residential floors with rooms
+	const residentialFloors = floors.filter(f => f.type === 'residential');
+
+	// Calculate totals from property data
+	let totalDoubleDeck = 0;
+	let totalSingleDeck = 0;
+	let totalCabinets = 0;
+	let totalAircon = 0;
+	let totalMattresses = 0;
+
+	residentialFloors.forEach(floor => {
+		floor.rooms?.forEach(room => {
+			totalDoubleDeck += room.double_decks || 0;
+			totalSingleDeck += room.single_decks || 0;
+			totalCabinets += room.cabinets || 0;
+			if (room.aircon) totalAircon++;
+			// Each double deck = 2 mattresses, each single = 1
+			totalMattresses += ((room.double_decks || 0) * 2) + (room.single_decks || 0);
+		});
+	});
+</script>
+
 <svelte:head>
 	<title>14 Inventory & Assets - DA Tirol Dorm</title>
 </svelte:head>
@@ -9,94 +37,64 @@
 	</header>
 
 	<section class="section">
-		<h2>Room Furnishings</h2>
-		<p class="section-desc">Standard inventory assigned per room type.</p>
-		
-		<div class="inventory-card">
-			<h3>Standard Bedspace Room</h3>
-			<table class="inventory-table">
-				<thead>
-					<tr>
-						<th>Item</th>
-						<th>Specs/Description</th>
-						<th>Qty per Room</th>
-						<th>Est. Cost</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr>
-						<td>Bunk Bed</td>
-						<td class="placeholder">Steel deck, double decker, 36x75</td>
-						<td class="placeholder">2 (for 4 pax)</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
-					<tr>
-						<td>Mattress</td>
-						<td class="placeholder">Uratex foam, 4 inches thick</td>
-						<td class="placeholder">4</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
-					<tr>
-						<td>Locker Cabinet</td>
-						<td class="placeholder">Metal/Wood locker with hasp</td>
-						<td class="placeholder">4 compartments</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
-					<tr>
-						<td>Ceiling/Wall Fan</td>
-						<td class="placeholder">Orbit fan 16"</td>
-						<td class="placeholder">1</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
-					<tr>
-						<td>Curtains</td>
-						<td class="placeholder">Blocking curtains (set)</td>
-						<td class="placeholder">2 sets</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
-				</tbody>
-			</table>
+		<h2>Building Inventory Summary</h2>
+		<p class="section-desc">Assets across all {summary.total_rooms} rooms based on property data.</p>
+		<div class="metrics-grid">
+			<div class="metric">
+				<span class="metric-label">Double Decks</span>
+				<span class="metric-value">{totalDoubleDeck}</span>
+			</div>
+			<div class="metric">
+				<span class="metric-label">Single Decks</span>
+				<span class="metric-value">{totalSingleDeck}</span>
+			</div>
+			<div class="metric">
+				<span class="metric-label">Mattresses</span>
+				<span class="metric-value">{totalMattresses}</span>
+			</div>
+			<div class="metric">
+				<span class="metric-label">Cabinets</span>
+				<span class="metric-value">{totalCabinets}</span>
+			</div>
+			<div class="metric highlight">
+				<span class="metric-label">Aircon Units</span>
+				<span class="metric-value">{totalAircon}</span>
+			</div>
 		</div>
+	</section>
 
+	<section class="section">
+		<h2>Room-by-Room Inventory</h2>
+		
+		{#each residentialFloors as floor}
 		<div class="inventory-card">
-			<h3>Private Room</h3>
+			<h3>{floor.name}</h3>
 			<table class="inventory-table">
 				<thead>
 					<tr>
-						<th>Item</th>
-						<th>Specs/Description</th>
-						<th>Qty per Room</th>
-						<th>Est. Cost</th>
+						<th>Room</th>
+						<th>Capacity</th>
+						<th>Double Decks</th>
+						<th>Single Decks</th>
+						<th>Cabinets</th>
+						<th>Aircon</th>
 					</tr>
 				</thead>
 				<tbody>
+					{#each floor.rooms || [] as room}
 					<tr>
-						<td>Bed Frame</td>
-						<td class="placeholder">Single/Double frame, wood/metal</td>
-						<td class="placeholder">1</td>
-						<td class="placeholder">₱[X]</td>
+						<td><strong>{room.name}</strong></td>
+						<td>{room.capacity} pax</td>
+						<td>{room.double_decks || 0}</td>
+						<td>{room.single_decks || 0}</td>
+						<td>{room.cabinets || 0}</td>
+						<td>{room.aircon ? '✓' : '—'}</td>
 					</tr>
-					<tr>
-						<td>Study Table & Chair</td>
-						<td class="placeholder">Basic desk set</td>
-						<td class="placeholder">1</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
-					<tr>
-						<td>Aircon Unit</td>
-						<td class="placeholder">Window type, 0.5HP-1HP</td>
-						<td class="placeholder">1</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
-					<tr>
-						<td>Wardrobe</td>
-						<td class="placeholder">Standalone cabinet</td>
-						<td class="placeholder">1</td>
-						<td class="placeholder">₱[X]</td>
-					</tr>
+					{/each}
 				</tbody>
 			</table>
 		</div>
+		{/each}
 	</section>
 
 	<section class="section">
@@ -129,17 +127,17 @@
 					<td>Hammer, screwdrivers, pliers</td>
 					<td class="placeholder">Admin Office</td>
 				</tr>
-				<tr>
+				<tr class="project-row">
 					<td>Repair</td>
-					<td>Ladder</td>
+					<td>Ladder <span class="badge">🚧 Project</span></td>
 					<td>Changing bulbs, high reach</td>
-					<td class="placeholder">Storage Room</td>
+					<td>Storage Room <em>(Planned)</em></td>
 				</tr>
-				<tr>
+				<tr class="project-row">
 					<td>Safety</td>
-					<td>Fire Extinguisher</td>
+					<td>Fire Extinguisher <span class="badge">🚧 Project</span></td>
 					<td>10lbs Dry Chemical</td>
-					<td class="placeholder">Every 15 meters</td>
+					<td>Every 15 meters <em>(Planned)</em></td>
 				</tr>
 				<tr>
 					<td>Safety</td>
@@ -159,10 +157,10 @@
 				<span class="name">Refrigerator</span>
 				<span class="desc placeholder">Inverter, 10 cu.ft, for common use</span>
 			</div>
-			<div class="asset-item">
-				<span class="qty placeholder">1</span>
-				<span class="name">Microwave Oven</span>
-				<span class="desc placeholder">Basic model for reheating</span>
+			<div class="asset-item project">
+				<span class="qty">🚧</span>
+				<span class="name">Microwave Oven <span class="badge">Project</span></span>
+				<span class="desc">Basic model for reheating <em>(Planned)</em></span>
 			</div>
 			<div class="asset-item">
 				<span class="qty placeholder">1</span>
@@ -196,7 +194,7 @@
 </article>
 
 <style>
-	.chapter { max-width: 800px; }
+	.chapter { max-width: 900px; }
 	.chapter-header { margin-bottom: 3rem; }
 	.chapter-number { font-family: var(--font-header); font-size: 4rem; font-weight: 700; color: var(--color-primary); opacity: 0.3; line-height: 1; }
 	.chapter-header h1 { font-size: 3rem; margin-top: 0.5rem; line-height: 1.1; }
@@ -204,20 +202,32 @@
 	.section h2 { font-size: 1.5rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--color-gray-200); }
 	.section-desc { color: #71717a; margin-bottom: 1.5rem; font-style: italic; }
 
+	/* Metrics Grid */
+	.metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
+	@media (max-width: 700px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+	.metric { background: white; border: 2px solid var(--color-black); padding: 1.25rem; text-align: center; }
+	.metric.highlight { background: var(--color-black); color: white; }
+	.metric-label { display: block; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.5rem; opacity: 0.7; }
+	.metric-value { font-family: var(--font-header); font-size: 1.5rem; font-weight: 700; }
+
 	.inventory-card { background: var(--color-gray-100); padding: 1.5rem; margin-bottom: 2rem; border-left: 4px solid var(--color-primary); }
 	.inventory-card h3 { margin-bottom: 1rem; }
 
 	.inventory-table { width: 100%; border-collapse: collapse; background: white; }
 	.inventory-table th, .inventory-table td { padding: 0.75rem; border: 1px solid var(--color-gray-200); text-align: left; font-size: 0.95rem; }
 	.inventory-table th { background: var(--color-black); color: white; font-weight: 600; }
+	.inventory-table tr.project-row { background: #fffbeb; }
 	
 	.placeholder { background: #fef3c7; }
+	.badge { font-size: 0.7rem; background: #f59e0b; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle; }
 
 	.asset-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 	@media (max-width: 600px) { .asset-list { grid-template-columns: 1fr; } }
 	
 	.asset-item { display: flex; align-items: center; gap: 1rem; background: white; border: 2px solid var(--color-black); padding: 1rem; }
+	.asset-item.project { border-color: #f59e0b; background: #fffbeb; }
 	.asset-item .qty { background: var(--color-primary); color: white; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 4px; }
+	.asset-item.project .qty { background: #f59e0b; }
 	.asset-item .name { font-weight: 600; font-family: var(--font-header); font-size: 1.1rem; }
 	.asset-item .desc { font-size: 0.85rem; color: #71717a; margin-left: auto; }
 

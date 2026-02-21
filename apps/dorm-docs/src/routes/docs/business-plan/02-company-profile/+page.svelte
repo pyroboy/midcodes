@@ -14,7 +14,7 @@
 			<tbody>
 				<tr>
 					<th>Business Name</th>
-					<td>DA Tirol Dorm</td>
+					<td>DA Tirol Dorm (Tirol Dormitory)</td>
 				</tr>
 				<tr>
 					<th>Business Type</th>
@@ -23,6 +23,10 @@
 				<tr>
 					<th>Proprietor</th>
 					<td>Mrs. Amalia Reyes Tirol ("Mama Maly")</td>
+				</tr>
+				<tr>
+					<th>Manager</th>
+					<td>Arturo Jose Tirol Magno (with Raclaire Stephan Trigo Magno)</td>
 				</tr>
 				<tr>
 					<th>Classification</th>
@@ -65,9 +69,9 @@
 		<h2>Location</h2>
 		<div class="highlight-box">
 			<p>
-				<strong>Address:</strong> [Specific Street Address], Tagbilaran City<br>
+				<strong>Address:</strong> 0187 Maria Clara Street, Cogon, Tagbilaran City<br>
 				<strong>Province:</strong> Bohol, Philippines 6300<br>
-				<strong>Landmark:</strong> Near University of Bohol (UB) Campus
+				<strong>Landmark:</strong> Directly in front of University of Bohol (UB) Campus
 			</p>
 		</div>
 		<h3>Accessibility</h3>

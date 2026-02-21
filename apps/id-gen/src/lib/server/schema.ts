@@ -370,7 +370,7 @@ export const digitalCards = pgTable('digital_cards', {
 	slug: text('slug').notNull().unique(),
 	ownerId: text('owner_id').references(() => profiles.id),
 	orgId: uuid('org_id').references(() => organizations.id),
-	linkedIdCardId: uuid('linked_id_card_id').references(() => idcards.id),
+	linkedIdCardId: uuid('linked_id_card_id').references(() => idcards.id, { onDelete: 'cascade' }),
 	status: digitalCardStatusEnum('status').default('unclaimed'),
 	claimCodeHash: text('claim_code_hash'),
 	recipientEmail: text('recipient_email'), // Email for magic link claiming

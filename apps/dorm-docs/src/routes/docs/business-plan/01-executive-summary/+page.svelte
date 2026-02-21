@@ -56,7 +56,7 @@
 		<h2>Business Highlights</h2>
 		<ul class="highlight-list">
 			<li><strong>Prime Location:</strong> Walking distance to University of Bohol and accessible to public transport.</li>
-			<li><strong>Affordable Rates:</strong> Competitive bedspace rates starting at ₱1,500/month.</li>
+			<li><strong>Affordable Rates:</strong> Competitive bedspace rates starting at ₱2,000/month.</li>
 			<li><strong>Modern Upgrades:</strong> Newly renovated roof, kitchen, and upcoming CCTV installation.</li>
 			<li><strong>Tech-Integrated:</strong> developing a dedicated Dorm Management App for billing and transparent utility tracking.</li>
 			<li><strong>Family-Oriented:</strong> Managed by the Tirol family ("Mama Maly"), ensuring personalized care and safety.</li>

@@ -144,9 +144,14 @@
         :global(body) { background: white; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         .doc-page { margin: 0; padding: 0; width: 100%; max-width: none; border: none; }
         .no-print { display: none; }
-        .sheet-page { border: 2px solid #000; margin: 0; height: 100vh; page-break-after: always; padding: 1cm; box-sizing: border-box; }
+        .sheet-page { border: 2px solid #000; margin: 0; min-height: 0; height: auto; page-break-after: always; padding: 0.5cm; box-sizing: border-box; }
         .page-break { display: block; page-break-before: always; }
-        /* Reset heights for print */
-        .log-table tbody tr { height: 3rem; }
+        /* Reset heights for print - COMPACT */
+        .log-table tbody tr { height: 1.8rem; }
+        .sheet-header h2 { font-size: 1.2rem; }
+        .meta .line { margin-top: 0.25rem; font-size: 0.9rem; }
+        .sheet-instruction { padding: 0.25rem; margin-bottom: 0.5rem; font-size: 0.8rem; }
+        .log-table th { padding: 0.25rem; font-size: 0.75rem; }
+        .log-table td { padding: 0.25rem; font-size: 0.8rem; }
     }
 </style>

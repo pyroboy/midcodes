@@ -1353,6 +1353,20 @@
 	tr.critical { background: #fef3c7; }
 	.profit { color: #16a34a; font-weight: 600; }
 
+<<<<<<< HEAD
+    /* GRIDS & BOXES */
+    .highlight-box {
+        border: 2px solid #0f172a;
+        padding: 2rem;
+        background: white;
+        box-shadow: 6px 6px 0px #f97316; 
+        margin: 2rem 0;
+    }
+    .highlight-box h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a; }
+    
+
+    ul:not(.simple-list) { margin-bottom: 1rem; list-style-position: inside; }
+=======
 	/* BADGES */
 	.freq-badge, .freq-cell {
 		font-size: 0.75rem;
@@ -1374,6 +1388,7 @@
 		overflow: hidden;
 		border: 1px solid #e2e8f0;
 	}
+>>>>>>> 201610ec875ea988babebbea8387487442975b76
 
 	/* HEADER */
 	.sku-header-new {

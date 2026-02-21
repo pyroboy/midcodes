@@ -19,7 +19,8 @@
 	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
 	import JSZip from 'jszip';
-	import { getProxiedUrl } from '$lib/utils/storage';
+	import { toast } from 'svelte-sonner';
+	import { getProxiedUrl, getStorageUrl } from '$lib/utils/storage';
 	import { createCardFromInches } from '$lib/utils/cardGeometry';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
 	import { viewMode, detectViewportDefault } from '$lib/stores/viewMode';
@@ -53,10 +54,11 @@
 	import type { IDCard } from './data.remote';
 
 	// Constants
-	const INITIAL_LOAD = 20;
-	const LOAD_MORE_COUNT = 15;
-	const VISIBLE_LIMIT = 15; // Max cards to render at once for performance
+	const INITIAL_LOAD = 50;
+	const LOAD_MORE_COUNT = 50;
+	const VISIBLE_LIMIT = 100; // Max cards to render at once for performance
 	const MAX_CACHED_CARDS = 200; // Cap cache to prevent SessionStorage overflow (~5MB limit)
+	const PREFETCH_AHEAD = 100; // How many upcoming card images to prefetch
 
 	// Logging helpers
 	const LOG_PREFIX = '[AllIds]';
@@ -83,7 +85,26 @@
 	});
 
 	function clearAllIdsRemoteCache() {
-		clearRemoteFunctionCacheByPrefix(`idgen:rf:v1:${scopeKey}:all-ids:`);
+		const prefix = `idgen:rf:v1:${scopeKey}:all-ids:`;
+		console.log(`%c${LOG_PREFIX} 🧹 Clearing remote cache with prefix: ${prefix}`, logStyles.info);
+		
+		if (browser) {
+			let clearedCount = 0;
+			try {
+				for (let i = window.sessionStorage.length - 1; i >= 0; i--) {
+					const k = window.sessionStorage.key(i);
+					if (k && k.startsWith(prefix)) {
+						console.log(`%c${LOG_PREFIX} 🗑️ Removing key: ${k}`, logStyles.info);
+						clearedCount++;
+					}
+				}
+			} catch (e) {
+				console.warn('Error verifying cache keys:', e);
+			}
+			console.log(`%c${LOG_PREFIX} 🧹 Cleared ${clearedCount} keys from sessionStorage`, logStyles.info);
+		}
+		
+		clearRemoteFunctionCacheByPrefix(prefix);
 	}
 
 	// Loading states
@@ -111,10 +132,13 @@
 
 	// UI states
 	let searchQuery = $state('');
+	let sortBy = $state<string>('id-number'); // Default sort
+	let sortDirection = $state<'asc' | 'desc'>('asc'); // Default direction
 	let selectedTemplateFilter = $state<string>('all'); // 'all' or template name
 	let selectedColumnFilter = $state<string>('all'); // 'all' or column name
 	let selectedFrontImage: string | null = $state(null);
 	let selectedBackImage: string | null = $state(null);
+	let selectedFilenameField = $state<string>('Name'); // Default to 'Name' field for filenames
 	let selectedTemplateDimensions: { width: number; height: number; unit?: string } | null =
 		$state(null);
 	let selectedCardGeometry: any = $state(null);
@@ -126,7 +150,7 @@
 	let bulkDownloadProgress = $state({ current: 0, total: 0 });
 	let errorMessage = '';
 
-	// IntersectionObserver action for infinite scroll
+	// IntersectionObserver action for infinite scroll — 800px lookahead for early prefetch
 	function intersectionObserver(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			(entries) => {
@@ -136,7 +160,7 @@
 					}
 				});
 			},
-			{ threshold: 0.1, rootMargin: '200px' }
+			{ threshold: 0.1, rootMargin: '800px' }
 		);
 		observer.observe(node);
 		return {
@@ -146,8 +170,51 @@
 		};
 	}
 
+	// Image prefetching — preload upcoming card images before they enter viewport
+	const prefetchedUrls = new Set<string>();
+
+	function prefetchUpcomingImages() {
+		if (!browser) return;
+
+		const visibleCount = filteredCards.length;
+		const endIndex = Math.min(visibleCount + PREFETCH_AHEAD, allFilteredCards.length);
+
+		for (let i = visibleCount; i < endIndex; i++) {
+			const card = allFilteredCards[i];
+			const imagePath = card.front_image_low_res || card.front_image;
+			if (!imagePath || prefetchedUrls.has(imagePath)) continue;
+
+			prefetchedUrls.add(imagePath);
+			const img = new Image();
+			img.src = getStorageUrl(imagePath, 'cards');
+		}
+	}
+
+	// Throttled scroll handler for proactive prefetch
+	let scrollRafId: number | null = null;
+
+	function onScrollPrefetch(el: HTMLElement) {
+		if (scrollRafId !== null) return;
+		scrollRafId = requestAnimationFrame(() => {
+			scrollRafId = null;
+			const { scrollTop: st, scrollHeight, clientHeight } = el;
+			const scrollRemaining = scrollHeight - st - clientHeight;
+			const threshold = clientHeight * 1.5; // 1.5 viewports ahead
+
+			if (scrollRemaining < threshold) {
+				checkAndLoadMore();
+			}
+
+			// Always prefetch images regardless of scroll position
+			prefetchUpcomingImages();
+		});
+	}
+
 	// Visible card window for performance
 	let visibleStartIndex = $state(0);
+	
+	// Track last selected card for shift-select range
+	let lastSelectedCardId = $state<string | null>(null);
 
 	// Card zoom control
 	let cardMinWidth = $state(250);
@@ -168,6 +235,23 @@
 			// Preserve existing properties if any, but overwrite with new data
 			dataRows[index] = { ...dataRows[index], ...card };
 		}
+	}
+
+	// Handle sort change
+	async function handleSort(column: string) {
+		if (sortBy === column) {
+			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+		} else {
+			sortBy = column;
+			sortDirection = 'asc';
+		}
+		
+		// Reset and reload
+		dataRows = []; // Clear current list to avoid mixing sorted data
+		totalCount = 0;
+		hasMore = true;
+		
+		await loadInitialCards({ forceRefresh: true });
 	}
 
 	// Load initial cards
@@ -196,10 +280,9 @@
 		try {
 			console.log(`%c├─ ⏳ Calling remote functions...`, logStyles.info);
 			const [result, count] = await Promise.all([
-				cachedRemoteFunctionCall({
 					scopeKey,
 					keyBase: 'all-ids:getIDCards',
-					args: { offset: 0, limit: INITIAL_LOAD },
+					args: { offset: 0, limit: INITIAL_LOAD, sortBy, sortDirection },
 					forceRefresh,
 					fetcher: (args) => getIDCards(args),
 					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
@@ -274,10 +357,9 @@
 		loadingMore = true;
 		try {
 			console.log(`%c├─ ⏳ Fetching next ${LOAD_MORE_COUNT} cards...`, logStyles.info);
-			const result = await cachedRemoteFunctionCall({
 				scopeKey,
 				keyBase: 'all-ids:getIDCards',
-				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT },
+				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT, sortBy, sortDirection },
 				forceRefresh,
 				fetcher: (args) => getIDCards(args),
 				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
@@ -420,6 +502,7 @@
 		);
 		console.log(`%c├─ [T+0ms] onMount started`, 'color: #64748b');
 		console.log(`%c├─ scopeKey: ${scopeKey}`, logStyles.info);
+		console.log(`%c├─ cache prefix expectation: idgen:rf:v1:${scopeKey}:all-ids:`, logStyles.info);
 
 		// Apply viewport-based view mode AFTER hydration (prevents SSR mismatch)
 		// Only if user hasn't explicitly set a preference in localStorage
@@ -433,6 +516,37 @@
 				);
 				viewMode.set(optimalMode);
 			}
+		}
+
+
+
+		// 0) Check for hard refresh (browser reload)
+		// If detected, we clear the cache to ensure fresh data.
+		try {
+			const navEntries = performance.getEntriesByType('navigation');
+			if (navEntries.length > 0) {
+				const nav = navEntries[0] as PerformanceNavigationTiming;
+				if (nav.type === 'reload') {
+					console.log(
+						`%c${LOG_PREFIX} 🔄 Page reload detected - clearing cache`,
+						'color: #f59e0b; font-weight: bold'
+					);
+					clearAllIdsCache(scopeKey);
+					clearAllIdsRemoteCache();
+				}
+			} else {
+				// Fallback for older browsers (deprecated but sometimes needed)
+				if (performance.navigation.type === 1) { // 1 = TYPE_RELOAD
+					console.log(
+						`%c${LOG_PREFIX} 🔄 Page reload detected (legacy) - clearing cache`,
+						'color: #f59e0b; font-weight: bold'
+					);
+					clearAllIdsCache(scopeKey);
+					clearAllIdsRemoteCache();
+				}
+			}
+		} catch (e) {
+			console.warn('Error checking navigation type:', e);
 		}
 
 		// 1) Check for cached data
@@ -574,7 +688,7 @@
 		}
 	});
 
-	// Track scroll position for cache persistence
+	// Track scroll position for cache persistence + proactive prefetch
 	$effect(() => {
 		if (!browser || initialLoading) return;
 
@@ -583,9 +697,14 @@
 
 		const onScroll = () => {
 			scrollTop = el.scrollTop;
+			onScrollPrefetch(el);
 		};
 
 		el.addEventListener('scroll', onScroll, { passive: true });
+
+		// Initial prefetch of upcoming images
+		prefetchUpcomingImages();
+
 		return () => el.removeEventListener('scroll', onScroll);
 	});
 
@@ -834,18 +953,52 @@
 
 	const selectionManager = {
 		isSelected: (cardId: string) => selectedCards.has(cardId),
-		toggleSelection: (cardId: string) => {
+		toggleSelection: (cardId: string, event?: MouseEvent | Event) => {
 			if (!cardId) return;
 			const newSelectedCards = new Set(selectedCards);
+			
+			// Handle Shift+Click Range Selection
+			// Check for shiftKey loosely to handle different event types
+			const isShift = event && (event as MouseEvent).shiftKey;
+			
+			if (isShift && lastSelectedCardId) {
+				// Use allFilteredCards to ensure we can select across the entire filtered dataset, not just the visible slice
+				const currentIndex = allFilteredCards.findIndex(c => getCardId(c) === cardId);
+				const lastIndex = allFilteredCards.findIndex(c => getCardId(c) === lastSelectedCardId);
+
+				if (currentIndex !== -1 && lastIndex !== -1) {
+					const start = Math.min(currentIndex, lastIndex);
+					const end = Math.max(currentIndex, lastIndex);
+					
+					// Get all cards in the range from the full filtered dataset
+					const rangeCards = allFilteredCards.slice(start, end + 1);
+					
+					// Add all cards in range to selection
+					rangeCards.forEach(card => {
+						const id = getCardId(card);
+						if (id) newSelectedCards.add(id);
+					});
+					
+					selectedCards = newSelectedCards;
+					// Update anchor to the current card to allow extending the selection from here
+					lastSelectedCardId = cardId;
+					return;
+				}
+			}
+
+			// Single Toggle Behavior
 			if (newSelectedCards.has(cardId)) {
 				newSelectedCards.delete(cardId);
+				lastSelectedCardId = null; // Clear anchor on deselect
 			} else {
 				newSelectedCards.add(cardId);
+				lastSelectedCardId = cardId; // Set anchor on select
 			}
 			selectedCards = newSelectedCards;
 		},
 		clearSelection: () => {
 			selectedCards = new Set();
+			lastSelectedCardId = null;
 		}
 	};
 
@@ -869,6 +1022,46 @@
 		selectedCardGeometry = null;
 	}
 
+	// Helper to sanitize filenames
+	function sanitizeFilename(name: string): string {
+		return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+	}
+
+	// Helper to get download name based on selected field
+	function getDownloadName(card: IDCard, formatField: string): string {
+		// Priority: Selected Field -> 'Name' -> 'name' -> ID
+		let rawName = '';
+		if (formatField && formatField !== 'Name' && card.fields?.[formatField]?.value) {
+			rawName = card.fields[formatField].value;
+		} else if (card.fields?.['Name']?.value) {
+			rawName = card.fields['Name'].value;
+		} else if (card.fields?.['name']?.value) {
+			rawName = card.fields['name'].value;
+		} else {
+			rawName = `id-${getCardId(card)}`;
+		}
+		return sanitizeFilename(rawName) || `id-${getCardId(card)}`;
+	}
+
+	// Helper to get file extension from URL/path
+	function getFileExtension(path: string): string {
+		if (!path) return 'jpg';
+		// Handle data URLs
+		if (path.startsWith('data:image/')) {
+			const match = path.match(/data:image\/([a-zA-Z]+);base64/);
+			return match ? match[1] : 'jpg';
+		}
+		// Handle normal paths
+		const parts = path.split('.');
+		if (parts.length > 1) {
+			const ext = parts.pop()?.toLowerCase();
+			if (ext && ['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+				return ext;
+			}
+		}
+		return 'jpg'; // Default fallback
+	}
+
 	// Download card
 	async function downloadCard(card: IDCard) {
 		const cardId = getCardId(card);
@@ -877,9 +1070,8 @@
 
 		try {
 			const zip = new JSZip();
-			const nameField =
-				card.fields?.['Name']?.value || card.fields?.['name']?.value || `id-${cardId}`;
-			const folder = zip.folder(nameField);
+			const downloadName = getDownloadName(card, selectedFilenameField);
+			const folder = zip.folder(downloadName);
 			if (!folder) throw new Error('Failed to create folder');
 
 			if (card.front_image) {
@@ -888,7 +1080,8 @@
 					const frontResponse = await fetch(frontImageUrl);
 					if (frontResponse.ok) {
 						const frontBlob = await frontResponse.blob();
-						folder.file(`${nameField}_front.jpg`, frontBlob);
+						const ext = getFileExtension(card.front_image);
+						folder.file(`${downloadName}_front.${ext}`, frontBlob);
 					}
 				}
 			}
@@ -899,7 +1092,8 @@
 					const backResponse = await fetch(backImageUrl);
 					if (backResponse.ok) {
 						const backBlob = await backResponse.blob();
-						folder.file(`${nameField}_back.jpg`, backBlob);
+						const ext = getFileExtension(card.back_image);
+						folder.file(`${downloadName}_back.${ext}`, backBlob);
 					}
 				}
 			}
@@ -908,7 +1102,7 @@
 			const url = window.URL.createObjectURL(zipBlob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `${nameField}.zip`;
+			a.download = `${downloadName}.zip`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
@@ -933,9 +1127,8 @@
 			const zip = new JSZip();
 
 			for (const card of selectedRows) {
-				const cardId = getCardId(card);
-				const nameField = card.fields?.['Name']?.value || `id-${cardId}`;
-				const folder = zip.folder(nameField);
+				const downloadName = getDownloadName(card, selectedFilenameField);
+				const folder = zip.folder(downloadName);
 
 				if (folder) {
 					if (card.front_image) {
@@ -944,7 +1137,8 @@
 							const frontResponse = await fetch(frontImageUrl);
 							if (frontResponse.ok) {
 								const frontBlob = await frontResponse.blob();
-								folder.file(`${nameField}_front.jpg`, frontBlob);
+								const ext = getFileExtension(card.front_image);
+								folder.file(`${downloadName}_front.${ext}`, frontBlob);
 							}
 						}
 					}
@@ -954,7 +1148,8 @@
 							const backResponse = await fetch(backImageUrl);
 							if (backResponse.ok) {
 								const backBlob = await backResponse.blob();
-								folder.file(`${nameField}_back.jpg`, backBlob);
+								const ext = getFileExtension(card.back_image);
+								folder.file(`${downloadName}_back.${ext}`, backBlob);
 							}
 						}
 					}
@@ -1010,9 +1205,13 @@
 				// Ensure remote-function pages don't remain stale after mutations
 				clearAllIdsRemoteCache();
 				clearAllIdsCache(scopeKey);
+				toast.success('ID card deleted successfully');
+			} else {
+				toast.error('Failed to delete ID card');
 			}
 		} catch (error) {
 			console.error('Error deleting ID card:', error);
+			toast.error('An error occurred while deleting the ID card');
 		} finally {
 			deletingCards.delete(cardId);
 			deletingCards = deletingCards;
@@ -1053,9 +1252,13 @@
 
 				clearAllIdsRemoteCache();
 				clearAllIdsCache(scopeKey);
+				toast.success(`Successfully deleted ${cardIds.length} ID cards`);
+			} else {
+				toast.error('Failed to delete selected ID cards');
 			}
 		} catch (error) {
 			console.error('Error deleting ID cards:', error);
+			toast.error('An error occurred while deleting the selected ID cards');
 		} finally {
 			deletingCards = new Set();
 		}
@@ -1114,6 +1317,21 @@
 						<option value={column}>{column}</option>
 					{/each}
 				</select>
+
+				<!-- Filename Field Dropdown -->
+				<div class="relative group" title="Select field to use for file names">
+					<select
+						bind:value={selectedFilenameField}
+						class="px-3 py-2 bg-background border border-input rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary pr-8"
+					>
+						<option value="Name">Filename: Default (Name)</option>
+						{#each availableColumns as column}
+							{#if column !== 'Name'}
+								<option value={column}>Filename: {column}</option>
+							{/if}
+						{/each}
+					</select>
+				</div>
 
 				<!-- Clear Filters Button -->
 				{#if searchQuery || selectedTemplateFilter !== 'all' || selectedColumnFilter !== 'all'}
@@ -1285,8 +1503,22 @@
 										<th class="px-4 py-3 font-medium whitespace-nowrap">SecureToken</th>
 										{#if templateFields[templateName]}
 											{#each templateFields[templateName] || [] as field}
-												<th class="px-4 py-3 font-medium whitespace-nowrap">{field.variableName}</th
+												<th 
+													class="px-4 py-3 font-medium whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors select-none group/th"
+													onclick={() => handleSort(field.variableName)}
+													title="Sort by {field.variableName}"
 												>
+													<div class="flex items-center gap-1">
+														{field.variableName}
+														{#if sortBy === field.variableName}
+															<span class="text-primary text-[10px]">
+																{#if sortDirection === 'asc'}▲{:else}▼{/if}
+															</span>
+														{:else}
+															<span class="text-muted-foreground opacity-0 group-hover/th:opacity-50 text-[10px]">↕</span>
+														{/if}
+													</div>
+												</th>
 											{/each}
 										{/if}
 										<th class="px-4 py-3 font-medium text-right">Actions</th>
@@ -1296,13 +1528,16 @@
 									{#each cards as card}
 										{@const dims = templateDimensions[card.template_name]}
 										{@const isPortrait = dims ? dims.height > dims.width : false}
-										<tr class="hover:bg-muted/30 transition-colors group">
+										<tr class="hover:bg-muted/30 transition-colors group {selectionManager.isSelected(getCardId(card)) ? 'bg-primary/10' : ''}">
 											<td class="px-4 py-3">
 												<input
 													type="checkbox"
 													class="rounded border-muted-foreground"
 													checked={selectionManager.isSelected(getCardId(card))}
-													onchange={() => selectionManager.toggleSelection(getCardId(card))}
+													onclick={(e) => {
+														e.stopPropagation();
+														selectionManager.toggleSelection(getCardId(card), e);
+													}}
 												/>
 											</td>
 											<td class="px-4 py-2" onclick={(e) => openPreview(e, card)}>
@@ -1501,7 +1736,7 @@
 										minWidth={cardMinWidth}
 										onDataLoaded={updateCardData}
 										isSelected={selectionManager.isSelected(getCardId(card))}
-										onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
+										onToggleSelect={(c, e) => selectionManager.toggleSelection(getCardId(card), e)}
 										onDownload={downloadCard}
 										onDelete={handleDelete}
 										onOpenPreview={openPreview}

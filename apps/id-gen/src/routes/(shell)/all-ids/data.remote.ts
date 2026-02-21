@@ -42,14 +42,16 @@ interface TemplateVariable {
 // Schema for pagination arguments
 const PaginationSchema = z.object({
 	offset: z.number().default(0),
-	limit: z.number().default(10)
+	limit: z.number().default(10),
+	sortBy: z.string().optional(),
+	sortDirection: z.enum(['asc', 'desc']).default('asc')
 });
 
 // Schema for template names
 const TemplateNamesSchema = z.array(z.string());
 
 // Query for paginated ID cards
-export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
+export const getIDCards = query(PaginationSchema, async ({ offset, limit, sortBy = 'createdAt', sortDirection = 'desc' }) => {
 	const { locals } = getRequestEvent();
 	const { org_id } = locals;
 
@@ -60,7 +62,30 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 	// Fetch one extra row so we can accurately determine if there's more.
 	const fetchLimit = Math.max(0, limit) + 1;
 
+	// Determine sort order
+	let orderByClause;
+	const direction = sortDirection === 'asc' ? sql`asc` : sql`desc`;
+
+	if (sortBy === 'template_name') {
+		orderByClause = sql`${templates.name} ${direction}`;
+	} else if (sortBy === 'created_at') {
+		orderByClause = sql`${idcards.createdAt} ${direction}`;
+	} else if (sortBy === 'updated_at') {
+		orderByClause = sql`${idcards.updatedAt} ${direction}`; // Assuming updatedAt exists, or fallback
+	} else {
+		// Default / Dynamic JSONB sorting
+		// If sortBy is provided and not one of the above, assume it's a field in the JSONB 'data' column
+		// We cast to text for safe sorting.
+		// NOTE: 'id-number' will fall through here, which is what we want.
+		if (sortBy) {
+			orderByClause = sql`${idcards.data}->>${sortBy} ${direction}`;
+		} else {
+			orderByClause = desc(idcards.createdAt);
+		}
+	}
+
 	// Fetch cards with template names and digital card info using Drizzle
+	console.log(`[getIDCards] Querying DB (offset=${offset}, limit=${limit}, sort=${sortBy}:${sortDirection})...`);
 	const results = await db
 		.select({
 			id: idcards.id,
@@ -79,9 +104,11 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 		.leftJoin(templates, eq(idcards.templateId, templates.id))
 		.leftJoin(digitalCards, eq(digitalCards.linkedIdCardId, idcards.id))
 		.where(eq(idcards.orgId, org_id))
-		.orderBy(desc(idcards.createdAt))
+		.orderBy(orderByClause)
 		.offset(offset)
 		.limit(fetchLimit);
+
+	console.log(`[getIDCards] Found ${results.length} cards.`);
 
 	const hasMore = results.length > limit;
 	const pageRows = hasMore ? results.slice(0, limit) : results;

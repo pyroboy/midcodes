@@ -2,6 +2,66 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	const slides = [
+		{
+			title: 'Slide 1: The Hook',
+			visual: 'Photo of a faded, peeling school ID from a local school.',
+			script:
+				"Good morning. This ID belongs to a student in Tagbilaran. It’s 4 months old, and you can’t read the name anymore. The parents paid ₱150 for this. It's useless. This is the current standard in Bohol. We can do better."
+		},
+		{
+			title: 'Slide 2: The Problem',
+			visual: "Parent panic / 'Lost ID' Facebook post.",
+			script:
+				"Schools today have two problems. One: 'Dumb' plastic IDs that fade. Two: Safety. When a parent asks, 'Did my child arrive?', the school has no answer because the ID is just a piece of plastic. It has no data."
+		},
+		{
+			title: 'Slide 3: The Solution (Kanaya)',
+			visual: 'Kanaya Smart ID beside the app interface.',
+			script:
+				"Meet Kanaya. We don't just sell plastic. We sell a Safety System. Our IDs are Sandwich Fused—meaning the ink is inside the plastic, not on top. It never fades. But the real magic is the chip. A guard scans this and instantly sees the student's status. It’s a smart card for the price of a dumb card."
+		},
+		{
+			title: 'Slide 4: The Secret Sauce (Why Us?)',
+			visual: 'Screenshot of Kanaya Studio software.',
+			script:
+				"How do we compete on price? Technology. Other shops use Photoshop and type names manually—it takes 15 minutes per card. I wrote my own software. It takes 15 seconds. I can produce 500 IDs in an afternoon while they take a week. My labor cost is near zero."
+		},
+		{
+			title: 'Slide 5: The Money (Unit Economics)',
+			visual: 'Profit chart showing ₱150 sales vs ₱28.50 cost.',
+			script:
+				"Let's talk numbers. I sell each ID for ₱150. My material cost is ₱28.50. Profit per student is ₱121.50. With just one small school of 500 students, we generate ₱60,000 in net profit—enough to cover the investment twice."
+		},
+		{
+			title: 'Slide 6: The Ask',
+			visual: 'Photo of Epson L8050 printer.',
+			script:
+				"I have the software, the skills, and waiting clients. I need one thing: the machine. I'm raising ₱25,000 today to buy the Epson L8050 and initial inventory. I can pay this back within 90 days, with interest."
+		},
+		{
+			title: 'Slide 7: Closing',
+			visual: 'Kanaya Identity Solutions logo or hero graphic.',
+			script:
+				"The school season is approaching. The market is wide open for a high-tech player. Let's build the safest campus in Tagbilaran together. Thank you."
+		}
+	];
+
+	const faqs = [
+		{
+			q: "Why can't the shop in BQ Mall just copy you?",
+			a: "They can buy the same printer, but they can't copy the software. My 'Scan & Verify' system is proprietary code. They sell plastic; I sell a platform."
+		},
+		{
+			q: 'What if the printer breaks?',
+			a: 'The Epson L8050 is a tank. Still, I have a backup agreement with a local partner to outsource printing temporarily while I repair it. Operations continue uninterrupted.'
+		},
+		{
+			q: 'Why Tagbilaran? It’s small.',
+			a: 'Small is an advantage—we dominate quickly. Word of mouth here is powerful. Once we land one flagship school, the rest follow due to FOMO.'
+		}
+	];
 </script>
 
 <svelte:head>
@@ -97,67 +157,7 @@
 	</footer>
 </div>
 
-<script lang="ts">
-	const slides = [
-		{
-			title: 'Slide 1: The Hook',
-			visual: 'Photo of a faded, peeling school ID from a local school.',
-			script:
-				"Good morning. This ID belongs to a student in Tagbilaran. It’s 4 months old, and you can’t read the name anymore. The parents paid ₱150 for this. It's useless. This is the current standard in Bohol. We can do better."
-		},
-		{
-			title: 'Slide 2: The Problem',
-			visual: "Parent panic / 'Lost ID' Facebook post.",
-			script:
-				"Schools today have two problems. One: 'Dumb' plastic IDs that fade. Two: Safety. When a parent asks, 'Did my child arrive?', the school has no answer because the ID is just a piece of plastic. It has no data."
-		},
-		{
-			title: 'Slide 3: The Solution (Kanaya)',
-			visual: 'Kanaya Smart ID beside the app interface.',
-			script:
-				"Meet Kanaya. We don't just sell plastic. We sell a Safety System. Our IDs are Sandwich Fused—meaning the ink is inside the plastic, not on top. It never fades. But the real magic is the chip. A guard scans this and instantly sees the student's status. It’s a smart card for the price of a dumb card."
-		},
-		{
-			title: 'Slide 4: The Secret Sauce (Why Us?)',
-			visual: 'Screenshot of Kanaya Studio software.',
-			script:
-				"How do we compete on price? Technology. Other shops use Photoshop and type names manually—it takes 15 minutes per card. I wrote my own software. It takes 15 seconds. I can produce 500 IDs in an afternoon while they take a week. My labor cost is near zero."
-		},
-		{
-			title: 'Slide 5: The Money (Unit Economics)',
-			visual: 'Profit chart showing ₱150 sales vs ₱28.50 cost.',
-			script:
-				"Let's talk numbers. I sell each ID for ₱150. My material cost is ₱28.50. Profit per student is ₱121.50. With just one small school of 500 students, we generate ₱60,000 in net profit—enough to cover the investment twice."
-		},
-		{
-			title: 'Slide 6: The Ask',
-			visual: 'Photo of Epson L8050 printer.',
-			script:
-				"I have the software, the skills, and waiting clients. I need one thing: the machine. I'm raising ₱25,000 today to buy the Epson L8050 and initial inventory. I can pay this back within 90 days, with interest."
-		},
-		{
-			title: 'Slide 7: Closing',
-			visual: 'Kanaya Identity Solutions logo or hero graphic.',
-			script:
-				"The school season is approaching. The market is wide open for a high-tech player. Let's build the safest campus in Tagbilaran together. Thank you."
-		}
-	];
 
-	const faqs = [
-		{
-			q: "Why can't the shop in BQ Mall just copy you?",
-			a: "They can buy the same printer, but they can't copy the software. My 'Scan & Verify' system is proprietary code. They sell plastic; I sell a platform."
-		},
-		{
-			q: 'What if the printer breaks?',
-			a: 'The Epson L8050 is a tank. Still, I have a backup agreement with a local partner to outsource printing temporarily while I repair it. Operations continue uninterrupted.'
-		},
-		{
-			q: 'Why Tagbilaran? It’s small.',
-			a: 'Small is an advantage—we dominate quickly. Word of mouth here is powerful. Once we land one flagship school, the rest follow due to FOMO.'
-		}
-	];
-</script>
 
 <style>
 	.docs-container {

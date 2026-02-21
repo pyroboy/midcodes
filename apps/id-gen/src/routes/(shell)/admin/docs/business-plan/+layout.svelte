@@ -7,6 +7,8 @@
 
 	let prev = $derived(chapters[currentIndex - 1]);
 	let next = $derived(chapters[currentIndex + 1]);
+
+	let { children } = $props();
 </script>
 
 <div class="bp-layout">
@@ -36,7 +38,7 @@
 	</nav>
 
 	<div class="page-content">
-		<slot />
+		{@render children()}
 	</div>
     
 </div>

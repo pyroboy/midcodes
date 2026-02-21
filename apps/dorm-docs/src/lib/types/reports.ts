@@ -326,6 +326,22 @@ export interface MonthlyReportData {
 		total_expenses: number;
 		net_income: number;
 	};
+	profit_sharing: {
+		total_profit: number;
+		manager_share_percent: number;
+		manager_share_amount: number;
+		owner_share_percent: number;
+		owner_share_amount: number;
+	};
+	revenue_by_floor: {
+		floor: string;
+		amount: number;
+		percentage: number;
+	}[];
+	expense_breakdown: {
+		category: string;
+		amount: number;
+	}[];
 	trend_data: MonthlyRevenue[];
 }
 

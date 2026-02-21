@@ -5,6 +5,8 @@
 
 	let { children }: { children: Snippet } = $props();
 
+    let { children } = $props();
+
 	let currentSlug = $derived($page.url.pathname.split('/').pop());
 	let currentIndex = $derived(chapters.findIndex((c) => c.slug === currentSlug));
 

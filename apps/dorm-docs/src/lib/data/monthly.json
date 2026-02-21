@@ -1,46 +1,63 @@
 {
-	"report_month": "January 2026",
-	"generated_at": "2026-01-07T00:00:00Z",
+	"report_month": "November 2023",
+	"generated_at": "2023-11-30T00:00:00Z",
 	"revenue": {
-		"month": "January 2026",
-		"rent_collected": 78500.00,
-		"utility_collected": 9850.00,
-		"penalties_collected": 300.00,
-		"other_collected": 1200.00,
-		"total_collected": 89850.00
+		"month": "November 2023",
+		"rent_collected": 62700.00,
+		"utility_collected": 0.00,
+		"penalties_collected": 0.00,
+		"other_collected": 0.00,
+		"total_collected": 62700.00
 	},
 	"expenses": {
-		"month": "January 2026",
-		"utilities": 11675.00,
-		"maintenance": 5200.00,
-		"supplies": 1800.00,
-		"other": 2500.00,
-		"total_expenses": 21175.00
+		"month": "November 2023",
+		"utilities": 10270.00,
+		"maintenance": 0.00,
+		"supplies": 3400.00,
+		"other": 0.00,
+		"total_expenses": 13670.00
 	},
 	"occupancy": {
-		"month": "January 2026",
-		"total_units": 34,
-		"occupied_units": 29,
-		"occupancy_rate": 85.29,
-		"move_ins": 2,
-		"move_outs": 1
+		"month": "November 2023",
+		"total_units": 30,
+		"occupied_units": 27,
+		"occupancy_rate": 90.00,
+		"move_ins": 0,
+		"move_outs": 0
 	},
 	"summary": {
-		"gross_revenue": 89850.00,
-		"total_expenses": 21175.00,
-		"net_income": 68675.00,
-		"profit_margin": 76.43,
-		"occupancy_rate": 85.29
+		"gross_revenue": 62700.00,
+		"total_expenses": 13670.00,
+		"net_income": 49030.00,
+		"profit_margin": 78.20,
+		"occupancy_rate": 90.00
 	},
 	"year_to_date": {
-		"total_revenue": 89850.00,
-		"total_expenses": 21175.00,
-		"net_income": 68675.00
+		"total_revenue": 62700.00,
+		"total_expenses": 13670.00,
+		"net_income": 49030.00
 	},
+	"profit_sharing": {
+		"total_profit": 49030.00,
+		"manager_share_percent": 40,
+		"manager_share_amount": 19612.00,
+		"owner_share_percent": 60,
+		"owner_share_amount": 29418.00
+	},
+	"revenue_by_floor": [
+		{ "floor": "2nd Floor", "amount": 35700.00, "percentage": 56.94 },
+		{ "floor": "3rd Floor", "amount": 27000.00, "percentage": 43.06 }
+	],
+	"expense_breakdown": [
+		{ "category": "Dorm Management Electricity", "amount": 4590.00 },
+		{ "category": "Dorm Management & Tenants Water", "amount": 3980.00 },
+		{ "category": "Dorm Internet", "amount": 1700.00 },
+		{ "category": "Dorm Janitorial", "amount": 3400.00 }
+	],
 	"trend_data": [
-		{ "month": "October 2025", "rent_collected": 75000.00, "utility_collected": 8500.00, "penalties_collected": 200.00, "other_collected": 800.00, "total_collected": 84500.00 },
-		{ "month": "November 2025", "rent_collected": 76500.00, "utility_collected": 9200.00, "penalties_collected": 150.00, "other_collected": 1000.00, "total_collected": 86850.00 },
-		{ "month": "December 2025", "rent_collected": 77200.00, "utility_collected": 10500.00, "penalties_collected": 250.00, "other_collected": 900.00, "total_collected": 88850.00 },
-		{ "month": "January 2026", "rent_collected": 78500.00, "utility_collected": 9850.00, "penalties_collected": 300.00, "other_collected": 1200.00, "total_collected": 89850.00 }
+		{ "month": "August 2023", "rent_collected": 58000.00, "utility_collected": 0.00, "penalties_collected": 0.00, "other_collected": 0.00, "total_collected": 58000.00 },
+		{ "month": "September 2023", "rent_collected": 60500.00, "utility_collected": 0.00, "penalties_collected": 0.00, "other_collected": 0.00, "total_collected": 60500.00 },
+		{ "month": "October 2023", "rent_collected": 61200.00, "utility_collected": 0.00, "penalties_collected": 0.00, "other_collected": 0.00, "total_collected": 61200.00 },
+		{ "month": "November 2023", "rent_collected": 62700.00, "utility_collected": 0.00, "penalties_collected": 0.00, "other_collected": 0.00, "total_collected": 62700.00 }
 	]
 }

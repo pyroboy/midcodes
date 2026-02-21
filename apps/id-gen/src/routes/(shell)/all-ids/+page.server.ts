@@ -23,36 +23,57 @@ export const actions: Actions = {
 
 		try {
 			// First get the card details to get the image paths
+			console.log(`[deleteCard] Fetching card details for ${cardId}...`);
 			const [card] = await db
 				.select({
 					frontImage: idcards.frontImage,
-					backImage: idcards.backImage
+					backImage: idcards.backImage,
+					frontImageLowRes: idcards.frontImageLowRes,
+					backImageLowRes: idcards.backImageLowRes,
+					originalAssets: idcards.originalAssets
 				})
 				.from(idcards)
 				.where(eq(idcards.id, cardId))
 				.limit(1);
 
 			if (!card) {
+				console.error(`[deleteCard] Card ${cardId} not found in DB`);
 				return fail(404, { error: 'Card not found' });
 			}
+			console.log(`[deleteCard] Found card. collecting images...`);
 
 			// Delete images from R2 storage if they exist
 			const imagesToDelete: string[] = [];
 			if (card.frontImage) imagesToDelete.push(card.frontImage);
 			if (card.backImage) imagesToDelete.push(card.backImage);
+			if (card.frontImageLowRes) imagesToDelete.push(card.frontImageLowRes);
+			if (card.backImageLowRes) imagesToDelete.push(card.backImageLowRes);
+
+			// Add original assets to deletion list
+			if (card.originalAssets && typeof card.originalAssets === 'object') {
+				const assets = card.originalAssets as Record<string, { path: string }>;
+				Object.values(assets).forEach((asset) => {
+					if (asset?.path) imagesToDelete.push(asset.path);
+				});
+			}
+
+			console.log(`[deleteCard] Deleting ${imagesToDelete.length} images:`, imagesToDelete);
 
 			if (imagesToDelete.length > 0) {
 				try {
 					const { deleteFromR2 } = await import('$lib/server/s3');
 					await Promise.allSettled(imagesToDelete.map((key) => deleteFromR2(key)));
+					console.log(`[deleteCard] Images deleted from R2`);
 				} catch (storageError) {
-					console.error('Error deleting images from R2:', storageError);
+					console.error('[deleteCard] Error deleting images from R2:', storageError);
 					// Non-fatal - continue with database deletion
 				}
 			}
 
 			// Delete the card record
+			console.log(`[deleteCard] Deleting DB record for ${cardId}...`);
 			await db.delete(idcards).where(eq(idcards.id, cardId));
+			console.log(`[deleteCard] DB record deleted successfully`);
 
 			return { success: true };
 		} catch (error) {
@@ -76,35 +97,56 @@ export const actions: Actions = {
 			}
 
 			// First get all cards to get their image paths
+			console.log(`[deleteMultiple] Fetching details for ${ids.length} cards...`);
 			const cards = await db
 				.select({
 					id: idcards.id,
 					frontImage: idcards.frontImage,
-					backImage: idcards.backImage
+					backImage: idcards.backImage,
+					frontImageLowRes: idcards.frontImageLowRes,
+					backImageLowRes: idcards.backImageLowRes,
+					originalAssets: idcards.originalAssets
 				})
 				.from(idcards)
 				.where(inArray(idcards.id, ids));
+			
+			console.log(`[deleteMultiple] Found ${cards.length} cards.`);
 
 			// Collect all image paths to delete from R2
 			const imagesToDelete: string[] = [];
 			for (const card of cards) {
 				if (card.frontImage) imagesToDelete.push(card.frontImage);
 				if (card.backImage) imagesToDelete.push(card.backImage);
+				if (card.frontImageLowRes) imagesToDelete.push(card.frontImageLowRes);
+				if (card.backImageLowRes) imagesToDelete.push(card.backImageLowRes);
+
+				// Add original assets to deletion list
+				if (card.originalAssets && typeof card.originalAssets === 'object') {
+					const assets = card.originalAssets as Record<string, { path: string }>;
+					Object.values(assets).forEach((asset) => {
+						if (asset?.path) imagesToDelete.push(asset.path);
+					});
+				}
 			}
+
+			console.log(`[deleteMultiple] Deleting ${imagesToDelete.length} images...`);
 
 			// Delete all images from R2 storage
 			if (imagesToDelete.length > 0) {
 				try {
 					const { deleteFromR2 } = await import('$lib/server/s3');
 					await Promise.allSettled(imagesToDelete.map((key) => deleteFromR2(key)));
+					console.log(`[deleteMultiple] Images deleted from R2`);
 				} catch (storageError) {
-					console.error('Error deleting images from R2:', storageError);
+					console.error('[deleteMultiple] Error deleting images from R2:', storageError);
 					// Non-fatal - continue with database deletion
 				}
 			}
 
 			// Delete all card records
+			console.log(`[deleteMultiple] Deleting DB records...`);
 			await db.delete(idcards).where(inArray(idcards.id, ids));
+			console.log(`[deleteMultiple] DB records deleted successfully`);
 
 			return { success: true };
 		} catch (error) {

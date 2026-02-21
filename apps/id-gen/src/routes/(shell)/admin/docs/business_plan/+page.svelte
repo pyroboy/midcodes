@@ -196,7 +196,7 @@
 	h2 { font-size: 1.4rem; font-weight: 800; color: #1e293b; border-left: 5px solid #3b82f6; padding-left: 1.2rem; margin: 4rem 0 2rem; text-transform: uppercase; }
 	
 	.pitch-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 2rem; border-radius: 12px; }
-	.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; list-style: none; padding: 0; margin-top: 2rem; border-top: 1px solid #e2e8f0; pt: 1.5rem; }
+	.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; list-style: none; padding: 0; margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; }
 	.stats-grid li { font-weight: 700; color: #0369a1; }
 
 	.tier-card { padding: 2rem; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 1.5rem; }

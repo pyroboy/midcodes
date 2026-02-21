@@ -191,4 +191,21 @@
         font-size: 1.1rem;
         font-weight: 600;
     }
+
+    /* Print styles - hide sidebar */
+    @media print {
+        .doc-layout {
+            display: block;
+        }
+        .sidebar {
+            display: none !important;
+        }
+        .content {
+            padding: 0;
+            max-width: 100%;
+        }
+        .chapter-pagination {
+            display: none !important;
+        }
+    }
 </style>

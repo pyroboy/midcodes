@@ -10,7 +10,7 @@
 	interface Props {
 		card: any;
 		isSelected?: boolean;
-		onToggleSelect: (card: any) => void;
+		onToggleSelect: (card: any, event?: MouseEvent) => void;
 		onDownload: (card: any) => void;
 		onDelete: (card: any) => void;
 		onOpenPreview: (e: MouseEvent, card: any) => void;
@@ -95,14 +95,16 @@
 			checked={isSelected}
 			onclick={(e: MouseEvent) => {
 				e.stopPropagation();
-				onToggleSelect(card);
+				onToggleSelect(card, e);
 			}}
 			class="h-5 w-5 rounded border-muted-foreground text-primary focus:ring-primary"
 		/>
 	</div>
 
 	<Card
-		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50"
+		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50 {isSelected
+			? 'ring-2 ring-primary border-primary'
+			: ''}"
 	>
 		<!-- Image Area - uniform sizing: portrait cards are narrower to match landscape visual footprint -->
 		<div
@@ -115,6 +117,7 @@
 						alt="Card preview"
 						class="w-full h-full transition-transform duration-300 group-hover:scale-105"
 						loading="lazy"
+						decoding="async"
 					/>
 				{:else}
 					<div

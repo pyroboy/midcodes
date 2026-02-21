@@ -1369,6 +1369,12 @@
 												onfocusin={() => handleInputFocus('front', element.variableName)}
 												onfocusout={handleInputBlur}
 											>
+												<!-- Hidden input to ensure value is submitted with form -->
+												<input
+													type="hidden"
+													name={element.variableName}
+													value={formData[element.variableName]}
+												/>
 												<Select.Root
 													type="single"
 													value={selectStates[element.variableName]?.value}
@@ -1548,6 +1554,12 @@
 												onfocusin={() => handleInputFocus('back', element.variableName)}
 												onfocusout={handleInputBlur}
 											>
+												<!-- Hidden input to ensure value is submitted with form -->
+												<input
+													type="hidden"
+													name={element.variableName}
+													value={formData[element.variableName]}
+												/>
 												<Select.Root
 													type="single"
 													value={selectStates[element.variableName]?.value}

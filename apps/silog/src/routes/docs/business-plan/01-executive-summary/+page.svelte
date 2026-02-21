@@ -136,4 +136,30 @@
 
     ul { margin-bottom: 1.5rem; }
     li { margin-bottom: 0.5rem; font-size: 1.05rem; }
+
+    /* PRINT OPTIMIZATION */
+    @media print {
+        .doc-page { padding: 0; margin: 0; max-width: none; }
+        
+        .doc-header h1 { font-size: 2.5rem; margin-bottom: 1rem; line-height: 1; }
+        
+        h2 { margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1.2rem; padding-left: 0.5rem; border-left-width: 4px; }
+        
+        p, li { font-size: 0.95rem; margin-bottom: 0.5rem; line-height: 1.4; }
+        
+        .divider { margin: 1rem 0; height: 1px; }
+        
+        .highlight-box { padding: 1rem; margin: 1rem 0; box-shadow: none; border-width: 1px; }
+        .highlight-box h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+        
+        .market-grid { gap: 0.5rem; margin-bottom: 1rem; }
+        .market-card { padding: 0.75rem; }
+        .market-card h4 { font-size: 1rem; margin-bottom: 0.25rem; }
+        .market-card p { font-size: 0.85rem; }
+        
+        .stat-box { margin-bottom: 1rem; gap: 2rem; }
+        .stat .value { font-size: 1.8rem; }
+        
+        ul { margin-bottom: 0.5rem; padding-left: 1.25rem; }
+    }
 </style>
