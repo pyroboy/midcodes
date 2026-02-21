@@ -1,6 +1,6 @@
 import "../styles.js";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PACKAGES, MEATS, SIDES, FLOOR_TABLES, INIT_INV } from "../constants.js";
 import { MEAT_CATALOG, SIDES_CATALOG, PANTRY_CATALOG, initMeatStock, initSideStock, initPantryStock, RECIPES } from "../adminConstants.js";
 import { uid, sBill, sCost, sMeatG, fc } from "../helpers.js";
@@ -20,24 +20,31 @@ import { PaxForm } from "./forms/PaxForm.jsx";
 
 // Admin components
 import { StockManager } from "./admin/StockManager.jsx";
-import { YieldHub } from "./admin/YieldHub.jsx";
+
 import { RecipeView } from "./admin/RecipeView.jsx";
 import { MenuManager } from "./admin/MenuManager.jsx";
 import { MeatInputModal } from "./admin/MeatInputModal.jsx";
 import { SideInputModal } from "./admin/SideInputModal.jsx";
 import { Tag } from "./admin/Tag.jsx";
 
+/* ── localStorage helpers ── */
+const LS_PREFIX = "samgyup_";
+const lsGet = (key, fallback) => { try { const v = localStorage.getItem(LS_PREFIX + key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } };
+const lsSet = (key, val) => { try { localStorage.setItem(LS_PREFIX + key, JSON.stringify(val)); } catch {} };
+
+const DEFAULT_TABLES = FLOOR_TABLES.map(t=>({...t,status:"available",session:null}));
+
 export default function App() {
   /* ═══════════════ STATE ═══════════════ */
   const [user,      setUser]      = useState(null);
   const [view,      setView]      = useState("floor");
-  const [tables,    setTables]    = useState(FLOOR_TABLES.map(t=>({...t,status:"available",session:null})));
-  const [inv,       setInv]       = useState(INIT_INV);
+  const [tables,    setTables]    = useState(() => lsGet("tables", DEFAULT_TABLES));
+  const [inv,       setInv]       = useState(() => lsGet("inv", INIT_INV));
   const [activeId,  setActiveId]  = useState(null);
-  const [txns,      setTxns]      = useState([]);
-  const [voidLog,   setVoidLog]   = useState([]);
-  const [scpwdLog,  setScpwdLog]  = useState([]);
-  const [leftLog,   setLeftLog]   = useState([]);
+  const [txns,      setTxns]      = useState(() => lsGet("txns", []));
+  const [voidLog,   setVoidLog]   = useState(() => lsGet("voidLog", []));
+  const [scpwdLog,  setScpwdLog]  = useState(() => lsGet("scpwdLog", []));
+  const [leftLog,   setLeftLog]   = useState(() => lsGet("leftLog", []));
   const [modal,     setModal]     = useState(null);
   const [mdata,     setMdata]     = useState({});
   const [floorMenu, setFloorMenu] = useState(null);
@@ -46,20 +53,114 @@ export default function App() {
   const [pinGate,   setPinGate]   = useState(null);
 
   // Advanced stock (Admin)
-  const [meatStock,  setMeatStock]  = useState(initMeatStock);
-  const [sideStock,  setSideStock]  = useState(initSideStock);
-  const [pantryStock,setPantryStock]= useState(initPantryStock);
+  const [meatStock,  setMeatStock]  = useState(() => lsGet("meatStock", initMeatStock()));
+  const [sideStock,  setSideStock]  = useState(() => lsGet("sideStock", initSideStock()));
+  const [pantryStock,setPantryStock]= useState(() => lsGet("pantryStock", initPantryStock()));
   const [inputModal, setInputModal] = useState(null);
-  const [auditLog,   setAuditLog]   = useState([]);
+  const [auditLog,   setAuditLog]   = useState(() => lsGet("auditLog", []));
   const [showAudit,  setShowAudit]  = useState(false);
 
-  // Yield Hub
-  const [rawDeliveries, setRawDeliveries] = useState([
-    { id:"rd1", meatId:"beef_shortrib", kg:6, costPerKg:750, arrivedAt:Date.now()-86400000 },
-    { id:"rd2", meatId:"pork_samgyup",  kg:10,costPerKg:380, arrivedAt:Date.now()-43200000 },
-  ]);
-  const [yieldLog, setYieldLog] = useState([]);
-  const [rcvForm,  setRcvForm]  = useState({ meatId:"beef_shortrib", kg:"", costPerKg:"" });
+  // Receipt counter (BIR)
+  const [receiptCounter, setReceiptCounter] = useState(() => lsGet("receiptCounter", 0));
+
+  // Time alerts & stock alerts
+  const [timeAlerts, setTimeAlerts] = useState([]);
+  const [stockAlerts, setStockAlerts] = useState([]);
+
+  /* ═══════════════ PERSISTENCE ═══════════════ */
+  useEffect(() => { lsSet("tables", tables); }, [tables]);
+  useEffect(() => { lsSet("inv", inv); }, [inv]);
+  useEffect(() => { lsSet("txns", txns); }, [txns]);
+  useEffect(() => { lsSet("voidLog", voidLog); }, [voidLog]);
+  useEffect(() => { lsSet("scpwdLog", scpwdLog); }, [scpwdLog]);
+  useEffect(() => { lsSet("leftLog", leftLog); }, [leftLog]);
+  useEffect(() => { lsSet("meatStock", meatStock); }, [meatStock]);
+  useEffect(() => { lsSet("sideStock", sideStock); }, [sideStock]);
+  useEffect(() => { lsSet("pantryStock", pantryStock); }, [pantryStock]);
+  useEffect(() => { lsSet("auditLog", auditLog); }, [auditLog]);
+  useEffect(() => { lsSet("receiptCounter", receiptCounter); }, [receiptCounter]);
+
+  /* ═══════════════ BROADCAST CHANNEL (multi-tab sync) ═══════════════ */
+  const bcRef = useRef(null);
+  const ignoreNextBroadcast = useRef(false);
+
+  useEffect(() => {
+    const bc = new BroadcastChannel("samgyup_pos");
+    bcRef.current = bc;
+    bc.onmessage = (e) => {
+      const { key, value } = e.data;
+      ignoreNextBroadcast.current = true;
+      if (key === "tables") setTables(value);
+      else if (key === "inv") setInv(value);
+      else if (key === "txns") setTxns(value);
+      else if (key === "meatStock") setMeatStock(value);
+      else if (key === "sideStock") setSideStock(value);
+      else if (key === "pantryStock") setPantryStock(value);
+      else if (key === "auditLog") setAuditLog(value);
+      else if (key === "voidLog") setVoidLog(value);
+      else if (key === "receiptCounter") setReceiptCounter(value);
+    };
+    return () => bc.close();
+  }, []);
+
+  const broadcast = (key, value) => {
+    if (ignoreNextBroadcast.current) { ignoreNextBroadcast.current = false; return; }
+    bcRef.current?.postMessage({ key, value });
+  };
+
+  // Broadcast on state changes
+  useEffect(() => { broadcast("tables", tables); }, [tables]);
+  useEffect(() => { broadcast("inv", inv); }, [inv]);
+  useEffect(() => { broadcast("txns", txns); }, [txns]);
+  useEffect(() => { broadcast("meatStock", meatStock); }, [meatStock]);
+  useEffect(() => { broadcast("sideStock", sideStock); }, [sideStock]);
+  useEffect(() => { broadcast("pantryStock", pantryStock); }, [pantryStock]);
+  useEffect(() => { broadcast("auditLog", auditLog); }, [auditLog]);
+  useEffect(() => { broadcast("voidLog", voidLog); }, [voidLog]);
+  useEffect(() => { broadcast("receiptCounter", receiptCounter); }, [receiptCounter]);
+
+  /* ═══════════════ SESSION TIME LIMITS (90 min) ═══════════════ */
+  const SESSION_LIMIT_MS = 90 * 60 * 1000;
+  const [, setTick] = useState(0); // force re-render for live timers
+  useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 30000); // every 30s
+    return () => clearInterval(iv);
+  }, []);
+
+  const getTimeStatus = (openedAt) => {
+    if (!openedAt) return "ok";
+    const elapsed = Date.now() - openedAt;
+    if (elapsed >= SESSION_LIMIT_MS) return "overtime";
+    if (elapsed >= 80 * 60 * 1000) return "warning_red";
+    if (elapsed >= 60 * 60 * 1000) return "warning_yellow";
+    return "ok";
+  };
+
+  /* ═══════════════ STOCK ALERTS (low/out items) ═══════════════ */
+  useEffect(() => {
+    const alerts = [];
+    // Check basic inventory
+    Object.entries(inv).forEach(([id, v]) => {
+      if (v.stock <= 0) alerts.push({ id, name: id.replace(/_/g, " "), level: "out" });
+      else if (v.stock <= v.low) alerts.push({ id, name: id.replace(/_/g, " "), level: "low" });
+    });
+    // Check meat service pools
+    MEAT_CATALOG.forEach(m => {
+      const sv = m.variants.find(v => v.pool === "service");
+      if (sv) {
+        const cur = meatStock[sv.id]?.current ?? 0;
+        if (cur <= 0) alerts.push({ id: sv.id, name: sv.label, level: "out" });
+        else if (cur < 500) alerts.push({ id: sv.id, name: sv.label, level: "low" });
+      }
+    });
+    // Check sides
+    SIDES_CATALOG.forEach(s => {
+      const cur = sideStock[s.id]?.current ?? 0;
+      if (cur <= 0) alerts.push({ id: s.id, name: s.name, level: "out" });
+      else if (cur < s.par * 0.3) alerts.push({ id: s.id, name: s.name, level: "low" });
+    });
+    setStockAlerts(alerts);
+  }, [inv, meatStock, sideStock, pantryStock]);
 
   /* ═══════════════ DERIVED ═══════════════ */
   const atd       = tables.find(t=>t.id===activeId);
@@ -346,13 +447,13 @@ export default function App() {
   /* ═══════════════ NAVIGATION ═══════════════ */
   // Role-based nav:
   // Staff:   Floor, Reports (limited)
-  // Manager: Floor, Meat Stock, Pantry, Yield Hub, Recipes, Menu, Reports (full)
+  // Manager: Floor, Meat Stock, Pantry, Recipes, Menu, Reports (full)
   // Kitchen: Kitchen Queue
   const NAV_ITEMS = [
     { k:"floor",   icon:"⬜", label:"Floor",      roles:["staff","manager"] },
     { k:"kitchen", icon:"🍳", label:"Kitchen",    roles:["kitchen"] },
     { k:"stock",   icon:"📦", label:"Stock",      roles:["manager"] },
-    { k:"yield",   icon:"⚗️", label:"Yield Hub",  roles:["manager"] },
+
     { k:"recipes", icon:"📖", label:"Recipes",    roles:["manager"] },
     { k:"menu",    icon:"🍽️", label:"Menu",       roles:["manager"] },
     { k:"reports", icon:"📊", label:"Reports",    roles:["staff","manager"] },
@@ -407,6 +508,26 @@ export default function App() {
         <UserBadge user={user} onLogout={()=>{setUser(null);setActiveId(null);setView("floor");}}/>
       </div>
 
+      {/* ═══ STOCK ALERT BAR ═══ */}
+      {isManager && stockAlerts.length > 0 && (
+        <div style={{
+          padding:"6px 16px", background:"#451a03", borderBottom:"1px solid #92400e",
+          display:"flex", alignItems:"center", gap:8, flexShrink:0, overflow:"auto",
+        }}>
+          <span style={{fontSize:11,color:"#fbbf24",fontWeight:700,flexShrink:0}}>⚠ Low Stock:</span>
+          <div style={{display:"flex",gap:4,overflow:"auto"}} className="scr">
+            {stockAlerts.map(a => (
+              <span key={a.id} style={{
+                fontSize:10, padding:"2px 8px", borderRadius:6, flexShrink:0,
+                background: a.level==="out" ? "#7f1d1d" : "#78350f",
+                color: a.level==="out" ? "#fca5a5" : "#fde68a",
+                fontWeight:600,
+              }}>{a.level==="out"?"❌":"⚠"} {a.name}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ═══ MAIN CONTENT ═══ */}
       <div style={{flex:1,overflow:"hidden",display:"flex",position:"relative"}}>
 
@@ -416,6 +537,7 @@ export default function App() {
             <FloorMap
               tables={tables} mergeFrom={mergeFrom} transferFrom={transferFrom}
               floorMenu={floorMenu} activeId={activeId} isManager={isManager}
+              getTimeStatus={getTimeStatus}
               onTableClick={handleTableClick}
               onFloorMenuAction={handleFloorMenuAction}
               onDismissFloorMenu={()=>setFloorMenu(null)}
@@ -427,11 +549,13 @@ export default function App() {
               <RunningBill
                 table={atd} session={atd.session}
                 isManager={isManager} isKitchen={isKitchen}
+                timeStatus={getTimeStatus(atd.session.openedAt)}
                 onVoidItem={id=>voidItem(activeId,id)}
                 onVoidTable={()=>voidTable(activeId)}
                 onCheckout={()=>setModal("receipt")}
                 onAdd={()=>setModal("addItem")}
                 onChangePax={()=>{setMdata({tid:activeId});setModal("changePax");}}
+                onPrintKOT={()=>setModal("kot")}
                 onClose={()=>setActiveId(null)}
               />
             )}
@@ -456,17 +580,7 @@ export default function App() {
           />
         )}
 
-        {/* ── YIELD HUB (Manager) ── */}
-        {view==="yield"&&(
-          <div style={{flex:1,overflow:"auto",padding:"16px 20px"}} className="scr fi">
-            <YieldHub
-              rawDeliveries={rawDeliveries} setRawDeliveries={setRawDeliveries}
-              yieldLog={yieldLog} setYieldLog={setYieldLog}
-              meatStock={meatStock} adjustMeat={adjustMeat}
-              rcvForm={rcvForm} setRcvForm={setRcvForm}
-            />
-          </div>
-        )}
+
 
         {/* ── RECIPES (Manager) ── */}
         {view==="recipes"&&<RecipeView/>}
@@ -506,9 +620,49 @@ export default function App() {
         <ReceiptModal
           table={atd} session={atd.session} bill={sBill(atd.session)}
           cost={sCost(atd.session)} meatG={sMeatG(atd.session)} isManager={isManager}
+          receiptNo={receiptCounter + 1}
           onClose={()=>setModal(null)}
-          onConfirm={(method,disc,leftover)=>closeTable(activeId,method,disc,leftover)}
+          onConfirm={(method,disc,leftover)=>{
+            setReceiptCounter(p => p + 1);
+            closeTable(activeId,method,disc,leftover);
+          }}
         />
+      )}
+      {/* KOT Print Preview */}
+      {modal==="kot"&&atd?.session&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",
+          alignItems:"center",justifyContent:"center",zIndex:150,padding:16}}
+          onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
+          <div id="kot-print" style={{background:"#fff",color:"#000",borderRadius:12,width:"100%",maxWidth:320,
+            padding:"20px 16px",fontFamily:"'Courier New',monospace",fontSize:12}}>
+            <div style={{textAlign:"center",borderBottom:"2px dashed #000",paddingBottom:8,marginBottom:8}}>
+              <div style={{fontSize:16,fontWeight:700}}>🔥 SAMGYUP POS</div>
+              <div style={{fontSize:11}}>KITCHEN ORDER TICKET</div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span><strong>Table:</strong> {atd.label}</span>
+              <span><strong>Pax:</strong> {atd.session.persons}</span>
+            </div>
+            <div style={{marginBottom:8,fontSize:10,color:"#555"}}>
+              {new Date().toLocaleString("en-PH",{dateStyle:"medium",timeStyle:"short"})}
+            </div>
+            <div style={{borderTop:"1px dashed #000",paddingTop:6}}>
+              {atd.session.orders.filter(o=>!o.voided).map(o=>(
+                <div key={o.id} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px dotted #ccc"}}>
+                  <span>{o.type==="meat"?"🥩":o.type==="dish"?"🍜":o.type==="drink"?"🥤":"🥬"} {o.name}</span>
+                  <span style={{fontWeight:700}}>{o.weight_g?o.weight_g+"g":o.qty||1}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{textAlign:"center",marginTop:12,paddingTop:8,borderTop:"2px dashed #000",fontSize:10,color:"#888"}}>
+              Printed: {new Date().toLocaleTimeString("en-PH")}
+            </div>
+          </div>
+          <div style={{position:"absolute",bottom:40,display:"flex",gap:10}}>
+            <button onClick={()=>{window.print();}} style={{background:"var(--ember)",color:"#fff",padding:"10px 24px",borderRadius:10,border:"none",fontSize:14,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
+            <button onClick={()=>setModal(null)} style={{background:"var(--card)",color:"var(--muted)",padding:"10px 24px",borderRadius:10,border:"1px solid var(--border)",fontSize:14,cursor:"pointer"}}>Close</button>
+          </div>
+        </div>
       )}
       {pinGate&&(
         <PINModal reason={pinGate.reason}

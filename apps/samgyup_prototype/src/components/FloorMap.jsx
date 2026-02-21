@@ -2,6 +2,7 @@ import { fc, ela, sBill } from "../helpers.js";
 
 export function FloorMap({
   tables, mergeFrom, transferFrom, floorMenu, activeId, isManager,
+  getTimeStatus,
   onTableClick, onFloorMenuAction,
   onDismissFloorMenu, onCancelMerge, onCancelTransfer,
 }) {
@@ -107,9 +108,15 @@ export function FloorMap({
                 <span style={{fontSize:8,color:"#1f2937",lineHeight:1,marginTop:1}}>{t.seats}p</span>
                 {occ&&t.session&&(
                   <>
-                    <div style={{fontSize:8,color:clr,lineHeight:1,marginTop:2}} className="pulse">
-                      ⏱{ela(t.session.openedAt)}
-                    </div>
+                    {(() => {
+                      const ts = getTimeStatus?.(t.session.openedAt) || "ok";
+                      const timerColor = ts==="overtime"?"#dc2626":ts==="warning_red"?"#f87171":ts==="warning_yellow"?"#fbbf24":clr;
+                      return (
+                        <div style={{fontSize:8,color:timerColor,lineHeight:1,marginTop:2}}
+                          className={ts==="overtime"?"pulse":""}>                          ⏱{ela(t.session.openedAt)}{ts==="overtime"?" ⚠":""}
+                        </div>
+                      );
+                    })()}
                     <div className="hd" style={{fontSize:isVip||t.type==="large"?11:9,color:"#fff",lineHeight:1,marginTop:1}}>
                       {fc(sBill(t.session))}
                     </div>

@@ -2,8 +2,8 @@ import { PACKAGES } from "../constants.js";
 import { fc, ft, ela, sBill, sCost, sMeatG } from "../helpers.js";
 
 export function RunningBill({
-  table, session, isManager, isKitchen,
-  onVoidItem, onVoidTable, onCheckout, onAdd, onChangePax, onClose,
+  table, session, isManager, isKitchen, timeStatus,
+  onVoidItem, onVoidTable, onCheckout, onAdd, onChangePax, onPrintKOT, onClose,
 }) {
   if (!session) return null;
   const pkg = session.pkgId ? PACKAGES.find(p=>p.id===session.pkgId) : null;
@@ -34,11 +34,19 @@ export function RunningBill({
           {pkg && <span style={{ color: pkg.color }}>{pkg.emoji} {pkg.name}</span>}
           {!pkg && <span style={{ color:"#fbbf24" }}>No package — à la carte</span>}
           <span>·</span>
-          <span className="pulse" style={{ color:"var(--ember)" }}>⏱ {ela(session.openedAt)}</span>
+          <span className={timeStatus==="overtime"?"pulse":""} style={{
+            color: timeStatus==="overtime"?"#dc2626":timeStatus==="warning_red"?"#f87171":timeStatus==="warning_yellow"?"#fbbf24":"var(--ember)",
+          }}>⏱ {ela(session.openedAt)}{timeStatus==="overtime"?" ⚠ OVERTIME":""}</span>
           {session.mergedFrom?.length > 0 && (
             <span style={{ color:"#ca8a04" }}>· +{session.mergedFrom.join(",")}</span>
           )}
         </div>
+        {timeStatus==="overtime" && (
+          <div style={{marginTop:6,padding:"6px 10px",background:"#450a0a",border:"1px solid #dc2626",borderRadius:6,
+            fontSize:10,color:"#fca5a5",display:"flex",alignItems:"center",gap:6}}>
+            ⚠ Session exceeded 90 minutes! Consider checkout.
+          </div>
+        )}
       </div>
 
       {/* ── Orders list ── */}
@@ -131,6 +139,10 @@ export function RunningBill({
             color:"#fff", padding:"10px 8px", borderRadius:8, fontSize:12,
             opacity: activeOrders.length===0 ? 0.4 : 1,
           }}>💳 Checkout</button>
+          <button className="btn" onClick={onPrintKOT} style={{
+            flex:1, background:"var(--card)", color:"var(--muted)", padding:"10px 8px", borderRadius:8,
+            fontSize:11, border:"1px solid var(--border)",
+          }}>🖨 KOT</button>
         </div>
       )}
     </div>

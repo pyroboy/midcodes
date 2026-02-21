@@ -4,7 +4,7 @@ import { fc, ft } from "../helpers.js";
 
 const PENALTY_PER_HEAD = 200;
 
-export function ReceiptModal({table, session, bill, cost, meatG, isManager, onClose, onConfirm}) {
+export function ReceiptModal({table, session, bill, cost, meatG, isManager, receiptNo, onClose, onConfirm}) {
   const [method,      setMethod]      = useState("cash");
   const [discType,    setDiscType]    = useState("none");
   const [custName,    setCustName]    = useState("");
@@ -13,9 +13,20 @@ export function ReceiptModal({table, session, bill, cost, meatG, isManager, onCl
   const [leftGrams,   setLeftGrams]   = useState("");
   const [leftOverride,setLeftOverride]= useState(false);
 
-  const discAmt    = discType==="senior"?bill*0.2:discType==="promo10"?bill*0.1:0;
+  const isSCPWD   = discType==="senior"||discType==="pwd";
+  const discAmt    = isSCPWD ? bill*0.2 : discType==="promo10" ? bill*0.1 : 0;
   const leftPenalty= !leftOverride&&parseFloat(leftGrams)>0?session.persons*PENALTY_PER_HEAD:0;
   const finalBill  = bill - discAmt + leftPenalty;
+
+  // BIR Tax computation
+  const vatableSales = isSCPWD ? 0 : finalBill / 1.12;
+  const vatAmount    = isSCPWD ? 0 : finalBill - vatableSales;
+  const vatExempt    = isSCPWD ? finalBill : 0;
+
+  // Receipt number
+  const today = new Date();
+  const orNumber = `OR-${today.getFullYear()}${String(today.getMonth()+1).padStart(2,"0")}${String(today.getDate()).padStart(2,"0")}-${String(receiptNo||1).padStart(4,"0")}`;
+
   const change     = parseFloat(cash) - finalBill;
   const pkg        = PACKAGES.find(p=>p.id===session.pkgId);
 
@@ -38,7 +49,9 @@ export function ReceiptModal({table, session, bill, cost, meatG, isManager, onCl
           display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
           <div>
             <div className="hd" style={{fontSize:18}}>🧾 {table.label} — Checkout</div>
-            <div style={{fontSize:10,color:"var(--muted)"}}>{session.persons} pax · {pkg?.name} · {ft(session.openedAt)}</div>
+            <div style={{fontSize:10,color:"var(--muted)"}}
+            >{session.persons} pax · {pkg?.name} · {ft(session.openedAt)}</div>
+            <div className="mono" style={{fontSize:9,color:"#fbbf24",marginTop:2}}>{orNumber}</div>
           </div>
           <button className="btn" onClick={onClose} style={{background:"none",color:"var(--muted)",fontSize:20}}>✕</button>
         </div>
@@ -137,6 +150,28 @@ export function ReceiptModal({table, session, bill, cost, meatG, isManager, onCl
             <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid var(--border)",paddingTop:8,marginTop:5}}>
               <span className="hd" style={{fontSize:16}}>TOTAL</span>
               <span className="hd" style={{fontSize:22,color:"var(--ember)"}}>{fc(finalBill)}</span>
+            </div>
+            {/* BIR VAT Breakdown */}
+            <div style={{borderTop:"1px dashed var(--border)",marginTop:8,paddingTop:6}}>
+              {isSCPWD ? (
+                <>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--muted)"}}>
+                    <span>VAT-Exempt Sales</span><span>{fc(vatExempt)}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--muted)"}}>
+                    <span>VAT (12%)</span><span>{fc(0)}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--muted)"}}>
+                    <span>VATable Sales</span><span>{fc(vatableSales)}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"var(--muted)"}}>
+                    <span>VAT (12%)</span><span>{fc(vatAmount)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

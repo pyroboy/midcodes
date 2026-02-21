@@ -36,6 +36,7 @@ input,select{font-family:'DM Sans',sans-serif;color:var(--text)}
 .card-hover{transition:border-color .15s,box-shadow .15s}
 .card-hover:hover{border-color:var(--border3)!important;box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .img-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.05) 0%,rgba(0,0,0,.7) 100%)}
+@media print{body,body *{visibility:hidden}#kot-print,#kot-print *{visibility:visible}#kot-print{position:absolute;left:0;top:0;width:80mm}}
 .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:20px;
   font-family:'Syne',sans-serif;font-weight:700;font-size:10px;letter-spacing:.6px}
 `;
