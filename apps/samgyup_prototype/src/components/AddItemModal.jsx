@@ -263,7 +263,7 @@ export function AddItemModal({
                       <div style={{ fontSize:12, fontWeight:600 }}>{d.name}</div>
                       <div className="hd" style={{ fontSize:15, color:"#a855f7", marginTop:2 }}>{fc(d.price)}</div>
                     </div>
-                    <button className="btn" onClick={()=>onAddPaid(d)}
+                    <button className="btn" onClick={()=>{onAddPaid(d); onClose();}}
                       style={{
                         position:"absolute", top:6, right:6, width:30, height:30,
                         borderRadius:"50%", fontSize:16, lineHeight:1,

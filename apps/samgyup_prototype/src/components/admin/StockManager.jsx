@@ -2,6 +2,7 @@ import { useState } from "react";
 import { MEAT_CATALOG, SIDES_CATALOG, PANTRY_CATALOG } from "../../adminConstants.js";
 import { fc, ft } from "../../helpers.js";
 import { SectionHeader } from "./SectionHeader.jsx";
+import { PantryInputModal } from "./PantryInputModal.jsx";
 
 export function StockManager({
   meatStock, sideStock, pantryStock, auditLog,
@@ -9,21 +10,15 @@ export function StockManager({
   showAudit, onToggleAudit,
 }) {
   const [subTab, setSubTab] = useState("meats");
-  const [pantryInput, setPantryInput] = useState(null);
-  const [pAmt, setPAmt] = useState("");
-  const [pMode, setPMode] = useState("add");
+  const [pantryModal, setPantryModal] = useState(null);
 
   const today = new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 
   const pantryCategories = [...new Set(PANTRY_CATALOG.map(p=>p.category))];
 
-  const commitPantry = (pid) => {
-    const parsed = parseFloat(pAmt) || 0;
-    if (!parsed && pMode !== "set") return;
-    const cur = pantryStock[pid]?.current ?? 0;
-    const delta = pMode==="add" ? parsed : pMode==="deduct" ? -parsed : parsed - cur;
-    onPantryAdjust(pid, delta, pMode);
-    setPAmt(""); setPantryInput(null);
+  const handlePantryAdjust = (pid, delta, note, image) => {
+    onPantryAdjust(pid, delta, note, image);
+    setPantryModal(null);
   };
 
   /* stats */
@@ -250,17 +245,16 @@ export function StockManager({
                     const pct = Math.min(100, Math.round((cur / item.par) * 100));
                     const out = cur === 0; const low = !out && pct < 30;
                     const clr = out ? "#dc2626" : low ? "#ca8a04" : "#16a34a";
-                    const editing = pantryInput === item.id;
 
                     return (
                       <div key={item.id} style={{
-                        background:"var(--card)", border:`1px solid ${editing?clr+"66":"var(--border2)"}`,
+                        background:"var(--card)", border:"1px solid var(--border2)",
                         borderRadius:10, overflow:"hidden",
                       }}>
                         <div style={{
                           padding:"10px 12px", cursor:"pointer",
                           display:"flex", alignItems:"center", gap:10,
-                        }} onClick={() => setPantryInput(editing ? null : item.id)}>
+                        }} onClick={() => setPantryModal(item.id)} className="card-hover">
                           <span style={{ fontSize:22 }}>{item.icon}</span>
                           <div style={{ flex:1 }}>
                             <div style={{ fontSize:12, fontWeight:500, display:"flex", alignItems:"center", gap:6 }}>
@@ -280,32 +274,6 @@ export function StockManager({
                             <div className="mono" style={{ fontSize:9, color:"var(--muted)" }}>{fc(item.cost)}/{item.unit}</div>
                           </div>
                         </div>
-                        {editing && (
-                          <div style={{ padding:"0 12px 10px", borderTop:"1px solid var(--border)" }}>
-                            <div style={{ display:"flex", gap:4, marginTop:8, marginBottom:6 }}>
-                              {[["add","+ Add","#16a34a"],["deduct","− Deduct","#dc2626"],["set","= Set","#ca8a04"]].map(([m,l,c])=>(
-                                <button key={m} className="btn" onClick={()=>setPMode(m)} style={{
-                                  flex:1, padding:"4px", borderRadius:6, fontSize:9,
-                                  background:pMode===m?c+"22":"var(--card2)",
-                                  color:pMode===m?c:"var(--muted)",
-                                  border:`1px solid ${pMode===m?c+"44":"var(--border)"}`, fontWeight:700,
-                                }}>{l}</button>
-                              ))}
-                            </div>
-                            <div style={{ display:"flex", gap:6 }}>
-                              <input type="number" value={pAmt} onChange={e=>setPAmt(e.target.value)}
-                                placeholder={`${item.unit}...`} autoFocus
-                                style={{ flex:1, background:"var(--card2)", border:"1px solid var(--border2)",
-                                  borderRadius:6, padding:"6px 8px", fontSize:13, color:"#fff", outline:"none",
-                                  fontFamily:"'DM Mono',monospace" }}/>
-                              <button className="btn" onClick={()=>commitPantry(item.id)} style={{
-                                background:parseFloat(pAmt)>0?"#166534":"var(--card2)",
-                                color:"#fff", padding:"6px 14px", borderRadius:6, fontSize:11,
-                                opacity:parseFloat(pAmt)>0?1:0.4,
-                              }}>✓</button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -343,40 +311,106 @@ export function StockManager({
                 No stock changes yet
               </div>
             )}
-            {auditLog.map((entry, i) => {
-              const isAdd = entry.delta > 0;
-              return (
-                <div key={i} style={{
-                  padding:"8px 10px", marginBottom:4, borderRadius:8,
-                  background: isAdd ? "#052e1622" : "#450a0a22",
-                  border:`1px solid ${isAdd?"#16a34a22":"#dc262622"}`,
-                }}>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                    <span style={{ fontSize:11, fontWeight:500 }}>{entry.itemName}</span>
-                    <span className="mono" style={{
-                      fontSize:12, fontWeight:700,
-                      color: isAdd ? "#4ade80" : "#f87171",
-                    }}>{isAdd?"+":""}{entry.delta} {entry.unit||""}</span>
+            {(() => {
+              const grouped = [];
+              for (const e of auditLog) {
+                if (e.groupId) {
+                  let existingGroup = grouped.find(g => g.isGroup && g.id === e.groupId);
+                  if (existingGroup) {
+                    existingGroup.entries.push(e);
+                  } else {
+                    grouped.push({
+                      id: e.groupId, isGroup: true, entries: [e],
+                      time: e.time, title: e.note || "Grouped Order"
+                    });
+                  }
+                } else {
+                  grouped.push({ isGroup: false, entry: e });
+                }
+              }
+
+              const renderEntry = (entry, i, inGroup = false) => {
+                const isAdd = entry.delta > 0;
+                return (
+                  <div key={i} style={{
+                    padding: inGroup ? "6px 8px" : "8px 10px",
+                    marginBottom: inGroup ? 2 : 4,
+                    borderRadius: 8,
+                    background: inGroup ? "transparent" : (isAdd ? "#052e1622" : "#450a0a22"),
+                    border: inGroup ? "none" : `1px solid ${isAdd?"#16a34a22":"#dc262622"}`,
+                    borderLeft: inGroup ? `2px solid ${isAdd?"#4ade80":"#f87171"}` : undefined,
+                  }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:11, fontWeight:500 }}>{entry.itemName}</span>
+                      <span className="mono" style={{
+                        fontSize:12, fontWeight:700,
+                        color: isAdd ? "#4ade80" : "#f87171",
+                      }}>{isAdd?"+":""}{entry.delta} {entry.unit||""}</span>
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginTop:3, fontSize:9, color:"var(--muted)" }}>
+                      {!inGroup && (
+                        <span style={{ display:"flex", alignItems:"center", gap:4 }}>
+                          <span style={{
+                            width:5, height:5, borderRadius:"50%",
+                            background: entry.userRole === "manager" ? "#7c3aed" : "#1d4ed8",
+                          }}/>
+                          {entry.userName}
+                        </span>
+                      )}
+                      <span>{entry.category}</span>
+                    </div>
+                    <div style={{ fontSize:9, color:"var(--muted2)", marginTop:2 }}>
+                      {!inGroup && ft(entry.time)}
+                      {entry.note && !inGroup && <span> · {entry.note}</span>}
+                    </div>
+                    {entry.image && (
+                      <div style={{ marginTop:6 }}>
+                        <div style={{ display:"inline-flex", alignItems:"center", gap:4, background:"var(--card)", padding:"4px 6px", borderRadius:6, border:"1px solid var(--border)", fontSize:9, color:"#60a5fa", cursor:"pointer" }} onClick={(e)=>{const img=e.currentTarget.nextElementSibling; img.style.display=img.style.display==='none'?'block':'none'}}>
+                          📷 View Attachment
+                        </div>
+                        <img src={entry.image} alt="attached" style={{ display:"none", width:"100%", marginTop:4, borderRadius:6, border:"1px solid var(--border)" }} />
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginTop:3, fontSize:9, color:"var(--muted)" }}>
-                    <span style={{ display:"flex", alignItems:"center", gap:4 }}>
-                      <span style={{
-                        width:5, height:5, borderRadius:"50%",
-                        background: entry.userRole === "manager" ? "#7c3aed" : "#1d4ed8",
-                      }}/>
-                      {entry.userName}
-                    </span>
-                    <span>{entry.category}</span>
+                );
+              };
+
+              return grouped.map((g, idx) => {
+                if (!g.isGroup) return renderEntry(g.entry, idx);
+                return (
+                  <div key={idx} style={{
+                    marginBottom:4, borderRadius:8,
+                    background: "var(--card)", border: "1px solid var(--border)",
+                    overflow: "hidden"
+                  }}>
+                    <div style={{ padding:"8px 10px", borderBottom:"1px solid var(--border2)", background:"var(--card2)" }}>
+                      <div style={{ fontSize:10, fontWeight:600, color:"#fff" }}>{g.title}</div>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginTop:2, fontSize:9, color:"var(--muted)" }}>
+                        <span style={{ display:"flex", alignItems:"center", gap:4 }}>
+                          <span style={{ width:5, height:5, borderRadius:"50%", background: g.entries[0]?.userRole === "manager" ? "#7c3aed" : "#1d4ed8" }}/>
+                          {g.entries[0]?.userName}
+                        </span>
+                        <span>{ft(g.time)}</span>
+                      </div>
+                    </div>
+                    <div style={{ padding:"4px 6px" }}>
+                      {g.entries.map((e, i) => renderEntry(e, i, true))}
+                    </div>
                   </div>
-                  <div style={{ fontSize:9, color:"var(--muted2)", marginTop:2 }}>
-                    {ft(entry.time)}
-                    {entry.note && <span> · {entry.note}</span>}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         </div>
+      )}
+
+      {pantryModal && (
+        <PantryInputModal
+          pantryId={pantryModal}
+          pantryStock={pantryStock}
+          onAdjust={handlePantryAdjust}
+          onClose={() => setPantryModal(null)}
+        />
       )}
     </div>
   );

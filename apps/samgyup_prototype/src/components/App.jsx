@@ -2,7 +2,7 @@ import "../styles.js";
 
 import { useState } from "react";
 import { PACKAGES, MEATS, SIDES, FLOOR_TABLES, INIT_INV } from "../constants.js";
-import { MEAT_CATALOG, SIDES_CATALOG, PANTRY_CATALOG, initMeatStock, initSideStock, initPantryStock } from "../adminConstants.js";
+import { MEAT_CATALOG, SIDES_CATALOG, PANTRY_CATALOG, initMeatStock, initSideStock, initPantryStock, RECIPES } from "../adminConstants.js";
 import { uid, sBill, sCost, sMeatG, fc } from "../helpers.js";
 import { Chip } from "./ui/Chip.jsx";
 import { UserBadge } from "./ui/UserBadge.jsx";
@@ -98,6 +98,7 @@ export default function App() {
     if (!atd?.session) return;
     const pkg     = PACKAGES.find(p=>p.id===pkgId);
     const persons = atd.session.persons;
+    const gId     = uid(); // group ID for audit
     // Keep non-package, non-auto orders
     const kept = atd.session.orders.filter(o=>o.type!=="package"&&!o.isAuto&&!o.voided);
     const newOrders = [
@@ -107,7 +108,7 @@ export default function App() {
       ...pkg.auto_sides.map(sid=>{
         const s = SIDES.find(x=>x.id===sid); if(!s) return null;
         const qty = persons; deduct(sid,qty);
-        logAudit(s.name, "Side", -qty, s.unit, `Auto · ${pkg.name} · ${atd?.label||""} (${persons}pax)`);
+        adjustSide(sid, -qty, `Auto · ${pkg.name} · ${atd?.label||""} (${persons}pax)`, gId);
         return { type:"side", itemId:sid, name:s.name, qty, price:0, cost:s.cost*qty,
           note:`×${qty} included`, isAuto:true, time:Date.now(), id:uid(), voided:false };
       }).filter(Boolean),
@@ -119,23 +120,54 @@ export default function App() {
   // Add meat by weight
   const addMeat = (meat, grams) => {
     const g = parseFloat(grams); if(!g||g<=0) return;
+    const gId = uid();
     addOrder(activeId,{ type:"meat", itemId:meat.id, name:meat.name,
       weight_g:g, price:0, cost:(g/100)*meat.cost_per_100g, note:`${g}g`, isFree:true });
     if(inv[meat.id]) deduct(meat.id,g);
-    logAudit(meat.name, "Meat", -g, "g", `Order · ${atd?.label||""}`);
+
+    // Map general meat.id to detailed service pools
+    const MEAT_INV_MAP = {
+      meat_samgyup: "pork_samgyup_sliced",
+      meat_liempo:  "pork_liempo_sliced",
+      meat_kasim:   "pork_kasim_sliced",
+      meat_beef:    "beef_shortrib_sliced",
+      meat_chadol:  "beef_chadol_sliced"
+    };
+    
+    // Also deduct from detailed meatStock service pool to keep it in sync
+    const vId = MEAT_INV_MAP[meat.id];
+    if (vId) adjustMeat(vId, -g, `Order · ${atd?.label||""}`, gId);
   };
 
   const addSide = side => {
+    const gId = uid();
     addOrder(activeId,{ type:"side", itemId:side.id, name:side.name, qty:1,
       price:0, cost:side.cost, isFree:true });
     if(inv[side.id]) deduct(side.id,1);
-    logAudit(side.name, "Side", -1, side.unit, `Order · ${atd?.label||""}`);
+    adjustSide(side.id, -1, `Order · ${atd?.label||""}`, gId);
   };
 
-  const addPaid = item => addOrder(activeId,{
-    type:item.id.startsWith("drk")?"drink":"dish",
-    itemId:item.id, name:item.name, qty:1, price:item.price, cost:Math.round(item.price*0.35),
-  });
+  const addPaid = item => {
+    const oId = uid();
+    addOrder(activeId,{
+      type:item.id.startsWith("drk")?"drink":"dish",
+      itemId:item.id, name:item.name, qty:1, price:item.price, cost:Math.round(item.price*0.35),
+      id:oId
+    });
+
+    // Check for recipe deductions
+    const rec = RECIPES.find(r => r.dishId === item.id);
+    if (rec) {
+      const gId = `recipe_${oId}`;
+      rec.ingredients.forEach(ing => {
+        if (!ing.invId) return;
+        const note = `Recipe · ${rec.name} · ${atd?.label||""}`;
+        if (ing.source === "meat_scrap") adjustMeat(ing.invId, -ing.qty, note, gId);
+        else if (ing.source === "side") adjustSide(ing.invId, -ing.qty, note, gId);
+        else if (ing.source === "pantry") adjustPantry(ing.invId, -ing.qty, note, gId);
+      });
+    }
+  };
 
   const voidItem = (tid, orderId) => requireManager("Void order item",()=>{
     const t = tables.find(x=>x.id===tid);
@@ -254,16 +286,16 @@ export default function App() {
   };
 
   /* ── Advanced stock helpers (with audit logging) ── */
-  const logAudit = (itemName, category, delta, unit, note) => {
+  const logAudit = (itemName, category, delta, unit, note, groupId = null, image = null) => {
     setAuditLog(prev => [{
-      itemName, category, delta, unit, note,
+      itemName, category, delta, unit, note, groupId, image,
       userName: user?.name || "System",
       userRole: user?.role || "staff",
       time: Date.now(),
     }, ...prev].slice(0, 200));
   };
 
-  const adjustMeat = (variantId, delta, note = "") => {
+  const adjustMeat = (variantId, delta, note = "", groupId = null, image = null) => {
     const allVariants = MEAT_CATALOG.flatMap(m => m.variants);
     const variant = allVariants.find(v => v.id === variantId);
     setMeatStock(p => {
@@ -274,10 +306,10 @@ export default function App() {
         history: [{ delta, note, time:Date.now(), before:cur, after:next }, ...(p[variantId]?.history||[])].slice(0,30),
       }};
     });
-    if (variant) logAudit(variant.label, "Meat", delta, "g", note);
+    if (variant) logAudit(variant.label, "Meat", delta, "g", note, groupId, image);
   };
 
-  const adjustSide = (sideId, delta, note = "") => {
+  const adjustSide = (sideId, delta, note = "", groupId = null, image = null) => {
     const side = SIDES_CATALOG.find(s => s.id === sideId);
     setSideStock(p => {
       const cur = p[sideId]?.current ?? 0;
@@ -287,10 +319,10 @@ export default function App() {
         history: [{ delta, note, time:Date.now(), before:cur, after:next }, ...(p[sideId]?.history||[])].slice(0,30),
       }};
     });
-    if (side) logAudit(side.name, "Side", delta, side.unit, note);
+    if (side) logAudit(side.name, "Side", delta, side.unit, note, groupId, image);
   };
 
-  const adjustPantry = (itemId, delta, note = "") => {
+  const adjustPantry = (itemId, delta, note = "", groupId = null, image = null) => {
     const item = PANTRY_CATALOG.find(p => p.id === itemId);
     setPantryStock(p => {
       const cur = p[itemId]?.current ?? 0;
@@ -300,7 +332,7 @@ export default function App() {
         history: [{ delta, note, time:Date.now(), before:cur, after:next }, ...(p[itemId]?.history||[])].slice(0,30),
       }};
     });
-    if (item) logAudit(item.name, "Pantry", delta, item.unit, note);
+    if (item) logAudit(item.name, "Pantry", delta, item.unit, note, groupId, image);
   };
 
   /* ═══════════════ COMPUTED ═══════════════ */
