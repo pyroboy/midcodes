@@ -89,43 +89,58 @@ export function FloorMap({
                   pointerEvents:"none",zIndex:0}}/>
               )}
               <div className="tbl" onClick={()=>onTableClick(t)} style={{
-                position:"absolute",inset:0,zIndex:1,
-                background:isMergeSrc||isTransSrc?"#1f0a00":isMergeTgt?"#001a0a":isTransTgt?"#0a1020"
+                position:"absolute",inset:0,zIndex:isActive?10:1,
+                background:isActive?`${clr}25`:isMergeSrc||isTransSrc?"#1f0a00":isMergeTgt?"#001a0a":isTransTgt?"#0a1020"
                   :occ?(isVip?"#130d1f":"#1a0f05"):(isVip?"#0f0d15":isBar?"#0a1020":"#111"),
                 border:`1.5px solid ${isMergeSrc||isTransSrc?"var(--ember)"
-                  :isMergeTgt?"#16a34a":isTransTgt?"#0891b2":clr}${(occ||isMergeTgt||isTransTgt)?"":"33"}`,
+                  :isMergeTgt?"#16a34a":isTransTgt?"#0891b2":clr}${(occ||isMergeTgt||isTransTgt||isActive)?"":"33"}`,
                 borderRadius:isVip?12:isBar?20:8,
                 display:"flex",flexDirection:"column",alignItems:"center",
                 justifyContent:"center",padding:3,
-                boxShadow:isActive?`0 0 16px ${clr}60`:occ?`0 0 10px ${clr}30`:"none",
-                outline:isMenuOpen?"2px solid var(--ember)":isActive?`2px solid ${clr}`:"none",
+                boxShadow:isActive?`0 0 0 2px #0a0a0a, 0 0 0 5px ${clr}, 0 0 30px ${clr}80`:occ?`0 0 10px ${clr}30`:"none",
+                outline:isMenuOpen?"2px solid var(--ember)":"none",
               }}>
-                {occ&&<div style={{position:"absolute",top:2,right:3,fontSize:isVip?11:7,opacity:.5}}>🔥</div>}
-                <span className="hd" style={{fontSize:isVip?13:isBar?10:t.type==="large"?12:11,
-                  fontWeight:800,color:occ?clr:"#2d3748",lineHeight:1,textAlign:"center"}}>
+                {occ&&<div style={{position:"absolute",top:2,right:3,fontSize:isVip?12:9,opacity:.5}}>🔥</div>}
+                <span className="hd" style={{fontSize:isVip?16:isBar?12:t.type==="large"?14:13,
+                  fontWeight:800,color:occ?clr:"#6b7280",lineHeight:1.1,textAlign:"center",letterSpacing:0.5}}>
                   {t.label}
                 </span>
-                <span style={{fontSize:8,color:"#1f2937",lineHeight:1,marginTop:1}}>{t.seats}p</span>
+                <span style={{fontSize:10,color:occ?"#9ca3af":"#4b5563",lineHeight:1.2,marginTop:2}}>{t.seats}p</span>
                 {occ&&t.session&&(
                   <>
                     {(() => {
                       const ts = getTimeStatus?.(t.session.openedAt) || "ok";
-                      const timerColor = ts==="overtime"?"#dc2626":ts==="warning_red"?"#f87171":ts==="warning_yellow"?"#fbbf24":clr;
+                      const isOvertime = ts === "overtime";
+                      const isWarningRed = ts === "warning_red";
+                      const isWarningYellow = ts === "warning_yellow";
+                      const timerColor = isOvertime?"#fff":isWarningRed?"#fca5a5":isWarningYellow?"#fde047":"#4ade80";
+                      const bgColor = isOvertime?"#dc2626":isWarningRed?"#7f1d1d":isWarningYellow?"#713f12":"transparent";
                       return (
-                        <div style={{fontSize:8,color:timerColor,lineHeight:1,marginTop:2}}
-                          className={ts==="overtime"?"pulse":""}>                          ⏱{ela(t.session.openedAt)}{ts==="overtime"?" ⚠":""}
+                        <div style={{
+                          fontSize:isOvertime?11:10,
+                          color:timerColor,
+                          lineHeight:1.3,
+                          marginTop:3,
+                          padding:isOvertime?"3px 8px":isWarningRed||isWarningYellow?"2px 6px":"0",
+                          background:bgColor,
+                          borderRadius:4,
+                          fontWeight:isOvertime?700:isWarningRed?600:400,
+                          boxShadow:isOvertime?"0 0 8px rgba(220,38,38,0.6)":"none",
+                        }}
+                          className={isOvertime?"overtime-badge":""}>
+                          ⏱{ela(t.session.openedAt)}{(isOvertime||isWarningRed)?" ⚠":""}
                         </div>
                       );
                     })()}
-                    <div className="hd" style={{fontSize:isVip||t.type==="large"?11:9,color:"#fff",lineHeight:1,marginTop:1}}>
+                    <div className="hd" style={{fontSize:isVip||t.type==="large"?13:12,color:"#fff",lineHeight:1.2,marginTop:3,fontWeight:600,textShadow:"0 1px 2px rgba(0,0,0,0.5)"}}>
                       {fc(sBill(t.session))}
                     </div>
                     {t.session.mergedFrom?.length>0&&(
-                      <div style={{fontSize:7,color:"#ca8a04"}}>+{t.session.mergedFrom.join(",")}</div>
+                      <div style={{fontSize:9,color:"#fbbf24",marginTop:1,fontWeight:500}}>+{t.session.mergedFrom.join(",")}</div>
                     )}
                   </>
                 )}
-                {!occ&&<div style={{fontSize:7,color:"#1f2937",marginTop:2}}>tap</div>}
+                {!occ&&<div style={{fontSize:9,color:"#4b5563",marginTop:3}}>tap</div>}
               </div>
 
               {/* Floor action menu */}
@@ -168,3 +183,5 @@ export function FloorMap({
     </div>
   );
 }
+
+

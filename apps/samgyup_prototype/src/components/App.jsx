@@ -66,6 +66,7 @@ export default function App() {
   // Time alerts & stock alerts
   const [timeAlerts, setTimeAlerts] = useState([]);
   const [stockAlerts, setStockAlerts] = useState([]);
+  const [hiddenAlerts, setHiddenAlerts] = useState([]);
 
   /* ═══════════════ PERSISTENCE ═══════════════ */
   useEffect(() => { lsSet("tables", tables); }, [tables]);
@@ -191,7 +192,7 @@ export default function App() {
     const persons = parseInt(n);
     setTables(p=>p.map(t=>t.id!==tid?t:{...t,status:"occupied",
       session:{id:uid(),persons,pkgId:null,openedAt:Date.now(),orders:[],mergedFrom:[]}}));
-    setActiveId(tid); setFloorMenu(null); setModal(null);
+    setActiveId(tid); setFloorMenu(null); setModal("addItem");
   };
 
   // Select or swap package
@@ -475,7 +476,7 @@ export default function App() {
       <div style={{height:52,background:"var(--panel)",borderBottom:"1px solid var(--border)",
         display:"flex",alignItems:"center",padding:"0 16px",gap:12,flexShrink:0}}>
         <span style={{fontSize:20}}>🔥</span>
-        <span className="hd" style={{fontSize:21,color:"var(--ember)",letterSpacing:0.5}}>SAMGYUP</span>
+        <span className="hd" style={{fontSize:21,color:"var(--ember)",letterSpacing:0.5}}>WTF! SAMGYUP</span>
         <span className="mono" style={{fontSize:9,color:"var(--muted)"}}>POS</span>
         <div style={{display:"flex",gap:3,marginLeft:4}}>
           {visibleNav.map(({k,icon,label,roles:r})=>(
@@ -512,19 +513,31 @@ export default function App() {
       {isManager && stockAlerts.length > 0 && (
         <div style={{
           padding:"6px 16px", background:"#451a03", borderBottom:"1px solid #92400e",
-          display:"flex", alignItems:"center", gap:8, flexShrink:0, overflow:"auto",
-        }}>
+          display:"flex", alignItems:"center", justifyContent:"center", gap:8, flexShrink:0, overflow:"hidden",
+        }} className="stock-alert-flash">
           <span style={{fontSize:11,color:"#fbbf24",fontWeight:700,flexShrink:0}}>⚠ Low Stock:</span>
-          <div style={{display:"flex",gap:4,overflow:"auto"}} className="scr">
-            {stockAlerts.map(a => (
-              <span key={a.id} style={{
-                fontSize:10, padding:"2px 8px", borderRadius:6, flexShrink:0,
-                background: a.level==="out" ? "#7f1d1d" : "#78350f",
-                color: a.level==="out" ? "#fca5a5" : "#fde68a",
-                fontWeight:600,
-              }}>{a.level==="out"?"❌":"⚠"} {a.name}</span>
+          <div style={{display:"flex",gap:4,overflow:"auto"}} className="no-scrollbar">
+            {stockAlerts.filter(a => !hiddenAlerts.includes(a.id)).map(a => (
+              <span 
+                key={a.id} 
+                className="stock-alert-pulse"
+                style={{
+                  fontSize:10, padding:"2px 8px", borderRadius:6, flexShrink:0,
+                  background: a.level==="out" ? "#7f1d1d" : "#78350f",
+                  color: a.level==="out" ? "#fca5a5" : "#fde68a",
+                  fontWeight:600, cursor:"pointer",
+                }}
+                onClick={()=>setHiddenAlerts(prev=>[...prev, a.id])}
+                title="Click to hide"
+              >{a.level==="out"?"❌":"⚠"} {a.name} ✕</span>
             ))}
           </div>
+          {hiddenAlerts.length > 0 && (
+            <span 
+              style={{fontSize:10, color:"#fbbf24", cursor:"pointer", marginLeft:8, flexShrink:0, textDecoration:"underline"}}
+              onClick={()=>setHiddenAlerts([])}
+            >👁 {hiddenAlerts.length} hidden</span>
+          )}
         </div>
       )}
 
@@ -540,12 +553,12 @@ export default function App() {
               getTimeStatus={getTimeStatus}
               onTableClick={handleTableClick}
               onFloorMenuAction={handleFloorMenuAction}
-              onDismissFloorMenu={()=>setFloorMenu(null)}
+              onDismissFloorMenu={()=>{setFloorMenu(null);setActiveId(null);}}
               onCancelMerge={()=>setMergeFrom(null)}
               onCancelTransfer={()=>setTransferFrom(null)}
             />
             {/* Side panel — Running Bill */}
-            {activeId && atd?.session && (
+            {activeId && atd?.session ? (
               <RunningBill
                 table={atd} session={atd.session}
                 isManager={isManager} isKitchen={isKitchen}
@@ -558,6 +571,24 @@ export default function App() {
                 onPrintKOT={()=>setModal("kot")}
                 onClose={()=>setActiveId(null)}
               />
+            ) : (
+              <div style={{width: 320, background: "var(--panel)", borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative"}} className="fi">
+                {!isKitchen && (
+                  <button className="btn" disabled style={{
+                    position: "absolute", left: -36, top: "50%", transform: "translateY(-50%)",
+                    width: 72, height: 72, background: "var(--card)", color: "var(--muted)",
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    gap: 2, border: "4px solid var(--border)", borderRadius: "50%",
+                    boxShadow: "0 6px 16px rgba(0,0,0,0.3)", opacity: 0.5, zIndex: 10, cursor: "not-allowed"
+                  }}>
+                    <span style={{ fontSize: 24, lineHeight: 1, marginTop: 4 }}>➕</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.5, lineHeight: 1 }}>ADD</span>
+                  </button>
+                )}
+                <div style={{fontSize: 54, marginBottom: 16, opacity: 0.3}}>📋</div>
+                <div style={{fontSize: 16, fontWeight: 600, color: "var(--muted)"}}>No Table Selected</div>
+                <div style={{fontSize: 12, marginTop: 8, color: "var(--muted2)"}}>Tap an occupied table to view orders.</div>
+              </div>
             )}
           </>
         )}
@@ -607,6 +638,7 @@ export default function App() {
           onAddMeat={addMeat}
           onAddSide={addSide}
           onAddPaid={addPaid}
+          onChangePax={(n) => changePax(activeId, n)}
           onClose={()=>setModal(null)}
         />
       )}
@@ -636,7 +668,7 @@ export default function App() {
           <div id="kot-print" style={{background:"#fff",color:"#000",borderRadius:12,width:"100%",maxWidth:320,
             padding:"20px 16px",fontFamily:"'Courier New',monospace",fontSize:12}}>
             <div style={{textAlign:"center",borderBottom:"2px dashed #000",paddingBottom:8,marginBottom:8}}>
-              <div style={{fontSize:16,fontWeight:700}}>🔥 SAMGYUP POS</div>
+              <div style={{fontSize:16,fontWeight:700}}>🔥 WTF! SAMGYUP</div>
               <div style={{fontSize:11}}>KITCHEN ORDER TICKET</div>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>

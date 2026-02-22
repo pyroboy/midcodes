@@ -1,22 +1,248 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PACKAGES, MEATS, SIDES, DISHES, DRINKS } from "../constants.js";
 import { fc } from "../helpers.js";
+import { MWrap } from "./ui/MWrap.jsx";
+import { PaxForm } from "./forms/PaxForm.jsx";
+
+function GhostCard({ g, index }) {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    // sequential delay for the ghost animations
+    setTimeout(() => {
+      requestAnimationFrame(() => setActive(true));
+    }, index * 50);
+  }, [index]);
+  
+  // Fly towards the main running bill on the right edge of the window
+  const targetX = window.innerWidth - 100; 
+  const targetY = window.innerHeight / 2 + (index * 10);
+  
+  return (
+    <div style={{
+      position:"fixed", left:g.x, top:g.y, width:g.w, height:g.h,
+      background: "var(--ember)", 
+      borderRadius: "50%", zIndex:9999, pointerEvents:"none",
+      transition:"all 0.4s cubic-bezier(0.25, 1, 0.5, 1)",
+      transform: active ? `translate(${targetX - g.x}px, ${targetY - g.y}px) scale(0.1)` : "translate(0,0) scale(1)",
+      opacity: active ? 0 : 0.8,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+    }}/>
+  );
+}
+
+function MeatAdjuster({ currentWeight, onAdjust }) {
+  const [val, setVal] = useState(0);
+
+  const apply = () => {
+    if (val !== 0) {
+      onAdjust(val);
+      setVal(0);
+    }
+  };
+
+  const finalWeight = currentWeight + val;
+
+  return (
+    <div style={{ marginTop: 8, padding: "0 4px", width: "100%" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>
+        <span>-50g</span>
+        <span className="hd" style={{ color: val === 0 ? "var(--muted)" : "var(--ember)", fontSize: 13, fontWeight: val !== 0 ? 800 : 500 }}>
+          {val === 0 ? "Fine-tune Weight" : `${finalWeight}g`}
+        </span>
+        <span>+50g</span>
+      </div>
+      <input type="range" min="-50" max="50" step="1" value={val} 
+        onChange={e => setVal(parseInt(e.target.value))}
+        onMouseUp={apply} onTouchEnd={apply} onMouseLeave={() => val !== 0 && apply()}
+        style={{ width: "100%", accentColor: "var(--ember)", cursor: "pointer" }} 
+      />
+    </div>
+  );
+}
 
 export function AddItemModal({
   session, inv, isManager,
-  onSelectPackage, onAddMeat, onAddSide, onAddPaid, onClose,
+  onSelectPackage, onAddMeat, onAddSide, onAddPaid, onChangePax, onClose,
 }) {
   const [tab, setTab] = useState(session?.pkgId ? "meat" : "package");
   const [dishCat, setDishCat] = useState("Snacks");
   const [wMeat, setWMeat] = useState(null);
   const [wVal, setWVal] = useState("");
+  const [ghosts, setGhosts] = useState([]);
+  const [showPaxModal, setShowPaxModal] = useState(false);
+  
+  // Local pending items for the mini running bill
+  const [pState, setPState] = useState({ items: [], history: [] });
+  const pendingItems = pState.items;
 
-  const pkg = session?.pkgId ? PACKAGES.find(p=>p.id===session.pkgId) : null;
+  const setP = (updater) => {
+    setPState(s => {
+      const nextItems = updater(s.items);
+      return { items: nextItems, history: [...s.history, s.items] };
+    });
+  };
+
+  const addPending = (item, price, isMeat=false, weightG=0) => {
+    setP(prev => {
+      const existingIdx = prev.findIndex(p => p.id === item.id && !!p._isMeat === isMeat);
+      if (existingIdx !== -1) {
+        const next = [...prev];
+        const p = next.splice(existingIdx, 1)[0];
+        if (isMeat) {
+          next.push({ ...p, weightG: p.weightG + weightG, _isAutoMeat: false });
+        } else {
+          next.push({ ...p, qty: p.qty + 1 });
+        }
+        return next;
+      }
+      return [...prev, { ...item, qty: 1, _price: price, _isMeat: isMeat, weightG, uid: Date.now()+Math.random() }];
+    });
+  };
+
+  const addPendingPkg = (pkgItem) => {
+    setP(prev => {
+      const next = prev.filter(p => !p._isPkg && !p._isAutoMeat && !p._isAutoSide);
+      const persons = session?.persons || 1;
+      
+      pkgItem.meats.forEach((mId, i) => {
+        const existingIdx = next.findIndex(p => p.id === mId && p._isMeat);
+        if (existingIdx !== -1) {
+           const p = next.splice(existingIdx, 1)[0];
+           next.push({ ...p, weightG: p.weightG + (150 * persons), _isAutoMeat: true });
+        } else {
+           const mObj = MEATS.find(m => m.id === mId);
+           next.push({
+             ...mObj,
+             qty: 1, _price: 0, _isMeat: true, 
+             weightG: 150 * persons, 
+             uid: Date.now() + Math.random() + i,
+             _isAutoMeat: true
+           });
+        }
+      });
+      
+      pkgItem.auto_sides.forEach((sId, i) => {
+        const existingIdx = next.findIndex(p => p.id === sId && !p._isMeat);
+        if (existingIdx !== -1) {
+           const p = next.splice(existingIdx, 1)[0];
+           next.push({ ...p, qty: p.qty + 1, _isAutoSide: true });
+        } else {
+           const sObj = SIDES.find(s => s.id === sId);
+           if (sObj) {
+             next.push({
+               ...sObj,
+               qty: 1, _price: 0, _isMeat: false,
+               uid: Date.now() + Math.random() + i + 100,
+               _isAutoSide: true
+             });
+           }
+        }
+      });
+
+      return [
+        ...next, 
+        { ...pkgItem, qty: persons, _price: pkgItem.price, _isPkg: true, uid: Date.now()+Math.random() }
+      ];
+    });
+  };
+
+  const undoLast = () => {
+    setPState(s => {
+      if (s.history.length === 0) return s;
+      const prevItems = s.history[s.history.length - 1];
+      return { items: prevItems, history: s.history.slice(0, -1) };
+    });
+  };
+
+  const updateQty = (idx, delta) => {
+    setP(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], qty: next[idx].qty + delta };
+      if (next[idx].qty <= 0) next.splice(idx, 1);
+      return next;
+    });
+  };
+
+  const snapMeatWeightTo50 = (idx, direction) => {
+    setP(prev => {
+      const next = [...prev];
+      const p = next[idx];
+      let newWeight;
+      if (direction > 0) {
+        newWeight = Math.ceil((p.weightG + 1) / 50) * 50;
+      } else {
+        newWeight = Math.floor((p.weightG - 1) / 50) * 50;
+      }
+      next[idx] = { ...p, weightG: newWeight };
+      if (next[idx].weightG <= 0) next.splice(idx, 1);
+      return next;
+    });
+  };
+
+  const updateMeatWeight = (idx, delta) => {
+    setP(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], weightG: next[idx].weightG + delta };
+      if (next[idx].weightG <= 0) next.splice(idx, 1);
+      return next;
+    });
+  };
+
+  const removePendingItem = (idx) => {
+    setP(prev => {
+      const removed = prev[idx];
+      if (removed?._isPkg) {
+         return prev.filter((_, i) => i !== idx && !prev[i]._isAutoMeat && !prev[i]._isAutoSide);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const commitCharge = () => {
+    // Commit all pending items sequentially and trigger ghosts to main bill
+    // Then close the modal.
+    pendingItems.forEach(pi => {
+      if (pi._isPkg) {
+        onSelectPackage(pi.id);
+      } else {
+        for(let i=0; i<pi.qty; i++){
+          if (pi._isMeat) onAddMeat(pi, pi.weightG);
+          else if (pi.price !== undefined) onAddPaid(pi);
+          else onAddSide(pi);
+        }
+      }
+    });
+
+    // Spawn purely visual ghosts towards the bottom left main running bill corner
+    setGhosts([]); // clear previous
+    // calculate start position from the "Charge" button rough area
+    const startX = window.innerWidth * 0.8;
+    const startY = window.innerHeight * 0.8;
+    
+    let allGhosts = [];
+    pendingItems.forEach((pi, idx) => {
+      const ghostCount = pi._isPkg ? 1 : pi.qty;
+      for(let i=0; i<ghostCount; i++){
+        allGhosts.push({ id: "bulk"+idx+"_"+i, x: startX, y: startY, w: 20, h: 20 });
+      }
+    });
+
+    setGhosts(allGhosts);
+    
+    // Wait for the last animation to finish before closing
+    setTimeout(() => {
+      setGhosts([]);
+      onClose();
+    }, 400 + (allGhosts.length * 50)); 
+  };
+
+  const pendingPkg = pendingItems.find(p => p._isPkg);
+  const pkg = pendingPkg ? PACKAGES.find(p=>p.id===pendingPkg.id) : (session?.pkgId ? PACKAGES.find(p=>p.id===session.pkgId) : null);
 
   const commitMeat = () => {
     const g = parseFloat(wVal);
     if (!g || g <= 0 || !wMeat) return;
-    onAddMeat(wMeat, g);
+    addPending(wMeat, 0, true, g);
     setWMeat(null); setWVal("");
   };
 
@@ -31,16 +257,32 @@ export function AddItemModal({
   const IMG = { objectFit:"cover", borderRadius:8, flexShrink:0 };
 
   return (
-    <div style={{
-      position:"fixed", inset:0, background:"rgba(0,0,0,.88)",
-      display:"flex", alignItems:"center", justifyContent:"center", zIndex:150, padding:16,
-    }} onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+    <>
+      {showPaxModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 10000 }}>
+          <MWrap title="Change Pax" onClose={() => setShowPaxModal(false)}>
+            <PaxForm current={session.persons}
+              onConfirm={n => {
+                onChangePax?.(n);
+                setShowPaxModal(false);
+              }} />
+          </MWrap>
+        </div>
+      )}
+      <div style={{
+        position:"fixed", inset:0, background:"rgba(0,0,0,.88)",
+        display:"flex", alignItems:"center", justifyContent:"center", zIndex:150, padding:16,
+      }} onClick={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+        {ghosts.map((g, i) => <GhostCard key={g.id} g={g} index={i} />)}
+      
       <div className="pop" style={{
         background:"var(--panel)", border:"1px solid var(--border2)",
-        borderRadius:20, width:"100%", maxWidth:680, maxHeight:"88vh",
-        display:"flex", flexDirection:"column", overflow:"hidden",
+        borderRadius:20, width:"100%", maxWidth: 1000, height: "90vh",
+        display:"flex", overflow:"hidden",
         boxShadow:"0 40px 80px rgba(0,0,0,.7)",
       }}>
+
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", borderRight: "1px solid var(--border)"}}>
 
         {/* ── Header ── */}
         <div style={{
@@ -60,14 +302,18 @@ export function AddItemModal({
         </div>
 
         {/* ── Tabs ── */}
-        <div style={{ display:"flex", gap:3, padding:"10px 18px 0", flexShrink:0 }}>
+        <div style={{ display:"flex", gap:6, padding:"12px 18px 0", flexShrink:0 }}>
           {TABS.map(({k,icon,label})=>(
             <button key={k} className="btn" onClick={()=>{setTab(k);setWMeat(null);}} style={{
               flex:1, background:tab===k?"var(--ember)":"var(--card)",
               color:tab===k?"#fff":"var(--muted)",
-              padding:"7px 4px", borderRadius:8, fontSize:11, letterSpacing:.3,
-              border:`1px solid ${tab===k?"var(--ember)":"var(--border)"}`,
-            }}>{icon} {label}</button>
+              padding:"10px 4px", borderRadius:12, fontSize:13, letterSpacing:.3,
+              border:`1.5px solid ${tab===k?"var(--ember)":"var(--border)"}`,
+              display:"flex", flexDirection:"column", alignItems:"center", gap:4
+            }}>
+              <span style={{fontSize:20, lineHeight:1}}>{icon}</span>
+              <span>{label}</span>
+            </button>
           ))}
         </div>
         <div style={{
@@ -90,13 +336,13 @@ export function AddItemModal({
                 </div>
               )}
               {PACKAGES.map(p=>(
-                <div key={p.id} onClick={()=>{onSelectPackage(p.id);onClose();}} style={{
+                <div key={p.id} onClick={()=>addPendingPkg(p)} style={{
                   background:"var(--card)", borderRadius:14, marginBottom:8, cursor:"pointer",
-                  border:`1.5px solid ${session?.pkgId===p.id?p.color:p.color+"33"}`,
+                  border:`1.5px solid ${pkg?.id===p.id?p.color:p.color+"33"}`,
                   overflow:"hidden", transition:"border-color .15s",
                 }}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=p.color}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=session?.pkgId===p.id?p.color:p.color+"33"}>
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=pkg?.id===p.id?p.color:p.color+"33"}>
                   <div style={{ display:"flex", gap:12 }}>
                     <img src={p.image} alt={p.name} style={{ width:100, height:80, ...IMG }}/>
                     <div style={{ flex:1, padding:"10px 12px 10px 0", display:"flex", flexDirection:"column", justifyContent:"center" }}>
@@ -111,8 +357,8 @@ export function AddItemModal({
                         </div>
                       </div>
                       <div style={{ marginTop:6, display:"flex", justifyContent:"space-between", fontSize:10 }}>
-                        <span style={{ color:"#16a34a" }}>✓ {p.auto_sides.length} sides auto-added</span>
-                        {session?.pkgId===p.id&&<span style={{ color:"var(--ember)", fontWeight:700 }}>✓ ACTIVE</span>}
+                        <span style={{ color:"#16a34a" }}>✓ {p.auto_sides.length} sides, {p.meats.length * 150 * (session?.persons || 1)}g initial meats</span>
+                        {pkg?.id===p.id&&<span style={{ color:"var(--ember)", fontWeight:700 }}>✓ ACTIVE</span>}
                       </div>
                     </div>
                   </div>
@@ -216,23 +462,16 @@ export function AddItemModal({
                 const stock = inv[s.id]?.stock ?? 0;
                 const outS  = stock === 0;
                 return (
-                  <div key={s.id} style={{
+                  <div key={s.id} onClick={()=>!outS&&addPending(s, 0)} className={outS?"":"btn"} style={{
                     background:"var(--card)", borderRadius:12, overflow:"hidden",
                     border:`1px solid var(--border)`, opacity:outS?0.35:1,
-                    position:"relative",
+                    position:"relative", textAlign:"left", cursor:outS?"not-allowed":"pointer"
                   }}>
-                    <img src={s.image} alt={s.name} style={{ width:"100%", height:70, objectFit:"cover" }}/>
-                    <div style={{ padding:"6px 8px" }}>
-                      <div style={{ fontSize:11, fontWeight:500 }}>{s.name}</div>
-                      <div style={{ fontSize:9, color:"var(--muted)" }}>{stock} {s.unit} · FREE</div>
+                    <img src={s.image} alt={s.name} style={{ width:"100%", height:80, objectFit:"cover" }}/>
+                    <div style={{ padding:"8px 10px" }}>
+                      <div style={{ fontSize:12, fontWeight:600 }}>{s.name}</div>
+                      <div style={{ fontSize:10, color:"var(--muted)", marginTop:2 }}>{stock} {s.unit} · FREE</div>
                     </div>
-                    <button className="btn" onClick={()=>!outS&&onAddSide(s)} disabled={outS}
-                      style={{
-                        position:"absolute", top:4, right:4, width:28, height:28,
-                        borderRadius:"50%", fontSize:16, lineHeight:1,
-                        background:outS?"#111":"#166534bb", color:outS?"#374151":"#fff",
-                        backdropFilter:"blur(4px)", border:"1px solid rgba(255,255,255,.1)",
-                      }}>+</button>
                   </div>
                 );
               })}
@@ -254,22 +493,15 @@ export function AddItemModal({
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:8 }}>
                 {DISHES.filter(d=>d.cat===dishCat).map(d=>(
-                  <div key={d.id} style={{
+                  <div key={d.id} onClick={()=>addPending(d, d.price)} className="btn" style={{
                     background:"var(--card)", borderRadius:12, overflow:"hidden",
-                    border:"1px solid var(--border)", position:"relative",
+                    border:"1px solid var(--border)", position:"relative", textAlign:"left"
                   }}>
                     <img src={d.image} alt={d.name} style={{ width:"100%", height:100, objectFit:"cover" }}/>
                     <div style={{ padding:"8px 10px" }}>
-                      <div style={{ fontSize:12, fontWeight:600 }}>{d.name}</div>
+                      <div style={{ fontSize:13, fontWeight:600 }}>{d.name}</div>
                       <div className="hd" style={{ fontSize:15, color:"#a855f7", marginTop:2 }}>{fc(d.price)}</div>
                     </div>
-                    <button className="btn" onClick={()=>{onAddPaid(d); onClose();}}
-                      style={{
-                        position:"absolute", top:6, right:6, width:30, height:30,
-                        borderRadius:"50%", fontSize:16, lineHeight:1,
-                        background:"#4c1d95cc", color:"#c4b5fd",
-                        border:"1px solid rgba(255,255,255,.15)", backdropFilter:"blur(4px)",
-                      }}>+</button>
                   </div>
                 ))}
               </div>
@@ -280,28 +512,123 @@ export function AddItemModal({
           {tab==="drinks"&&(
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:8 }}>
               {DRINKS.map(d=>(
-                <div key={d.id} style={{
+                <div key={d.id} onClick={()=>addPending(d, d.price)} className="btn" style={{
                   background:"var(--card)", borderRadius:12, overflow:"hidden",
-                  border:"1px solid var(--border)", position:"relative",
+                  border:"1px solid var(--border)", position:"relative", textAlign:"left"
                 }}>
                   <img src={d.image} alt={d.name} style={{ width:"100%", height:80, objectFit:"cover" }}/>
-                  <div style={{ padding:"6px 8px" }}>
-                    <div style={{ fontSize:11, fontWeight:500 }}>{d.name}</div>
-                    <div className="hd" style={{ fontSize:14, color:"#3b82f6", marginTop:1 }}>{fc(d.price)}</div>
+                  <div style={{ padding:"8px 10px" }}>
+                    <div style={{ fontSize:12, fontWeight:600 }}>{d.name}</div>
+                    <div className="hd" style={{ fontSize:14, color:"#3b82f6", marginTop:2 }}>{fc(d.price)}</div>
                   </div>
-                  <button className="btn" onClick={()=>onAddPaid(d)}
-                    style={{
-                      position:"absolute", top:4, right:4, width:28, height:28,
-                      borderRadius:"50%", fontSize:16, lineHeight:1,
-                      background:"#1e3a8acc", color:"#93c5fd",
-                      border:"1px solid rgba(255,255,255,.1)", backdropFilter:"blur(4px)",
-                    }}>+</button>
                 </div>
               ))}
             </div>
           )}
+        </div> {/* end content */}
+        </div> {/* end left column */}
+        
+        {/* ── Mini Running Bill Sidebar (Right) ── */}
+        <div style={{ width: 340, background: "var(--card2)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+          <div style={{ padding: "16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div className="hd" style={{ fontSize: 16, color: "var(--ember)" }}>Pending Items</div>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>Review items before pushing to the main table bill.</div>
+            </div>
+            <button className="btn" onClick={() => setShowPaxModal(true)} style={{ background: "var(--card)", border: "1px solid var(--border)", padding: "6px 10px", borderRadius: 8, color: "var(--text)", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+              <span>👥 {session.persons} Pax</span>
+              <span style={{ fontSize: 10, color: "var(--muted)" }}>✎</span>
+            </button>
+          </div>
+          
+          <div style={{ flex: 1, overflow: "auto", padding: "12px" }} className="scr">
+            {pendingItems.length === 0 && (
+              <div style={{ textAlign: "center", color: "var(--muted)", padding: "40px 0" }}>
+                <div style={{ fontSize: 32, opacity: 0.5, marginBottom: 8 }}>🍽️</div>
+                <div style={{ fontSize: 13 }}>No pending items</div>
+              </div>
+            )}
+            
+            {pendingItems.map((p, idx) => (
+              <div key={idx} style={{ 
+                background: "var(--panel)", border: "1px solid var(--border)", 
+                borderRadius: 12, padding: "10px", marginBottom: 8,
+                display: "flex", alignItems: "center", justifyContent: "space-between"
+              }}>
+                {/* Qty Controls or Weight Display */}
+                {p._isPkg ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ background: "var(--card)", color: "#fff", padding: "4px 8px", borderRadius: 6, fontSize: 13, border: "1px solid var(--border2)" }}>
+                      {p.qty} pax
+                    </div>
+                    <button className="btn" onClick={() => removePendingItem(idx)} style={{
+                      width: 24, height: 24, borderRadius: 6, background: "var(--border)", color: "var(--muted)", border: "none", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center"
+                    }}>✕</button>
+                  </div>
+                ) : p._isMeat ? (
+                  <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{p.weightG}g total</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", background: "#450a0a", borderRadius: 8, padding: 2 }}>
+                          <button className="btn" onClick={() => snapMeatWeightTo50(idx, -1)} style={{ width: 22, height: 22, borderRadius: 6, background: "transparent", border: "none", color: "#fca5a5", fontSize: 14 }}>-</button>
+                          <div className="hd" style={{ fontSize: 13, width: 44, textAlign: "center", color: "#fca5a5", fontWeight: 700 }}>{p.weightG}g</div>
+                          <button className="btn" onClick={() => snapMeatWeightTo50(idx, 1)} style={{ width: 22, height: 22, borderRadius: 6, background: "transparent", border: "none", color: "#fca5a5", fontSize: 14 }}>+</button>
+                        </div>
+                        <button className="btn" onClick={() => removePendingItem(idx)} style={{
+                          width: 24, height: 24, borderRadius: 6, background: "var(--border)", color: "var(--muted)", border: "none", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center"
+                        }}>✕</button>
+                      </div>
+                    </div>
+                    {/* Add the MeatAdjuster Slider! */}
+                    <MeatAdjuster currentWeight={p.weightG} onAdjust={(val) => val !== 0 && updateMeatWeight(idx, val)} />
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                    <div style={{ flex: 1, paddingRight: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>
+                        {p._price > 0 ? fc(p._price) : "FREE"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--card)", padding: "4px", borderRadius: 8, border: "1px solid var(--border2)" }}>
+                      <button className="btn" onClick={() => updateQty(idx, -1)} style={{ width: 24, height: 24, borderRadius: 6, background: "var(--border)", border: "none", color: "#fff", fontSize: 14 }}>-</button>
+                      <div className="hd" style={{ fontSize: 14, width: 20, textAlign: "center", color: "#fff" }}>{p.qty}</div>
+                      <button className="btn" onClick={() => updateQty(idx, 1)} style={{ width: 24, height: 24, borderRadius: 6, background: "#166534", border: "none", color: "#fff", fontSize: 14 }}>+</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)", background: "var(--panel)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+              <span style={{ fontSize: 11, color:"var(--muted)", textTransform: "uppercase" }}>Pending Total</span>
+              <span className="hd" style={{ fontSize: 18, color: "var(--ember)" }}>{fc(pendingItems.reduce((sum, p) => sum + ((p._price||0) * p.qty), 0))}</span>
+            </div>
+            
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn" onClick={undoLast} disabled={pendingItems.length === 0} style={{
+                flex: 1, padding: "12px", background: "var(--border)", color: "var(--muted)",
+                borderRadius: 10, fontSize: 13, opacity: pendingItems.length === 0 ? 0.4 : 1
+              }}>Undo</button>
+              
+              <button className="btn" onClick={commitCharge} disabled={pendingItems.length === 0} style={{
+                flex: 2, padding: "12px", background: pendingItems.length === 0 ? "var(--card)" : "#166534", 
+                color: "#fff", borderRadius: 10, fontSize: 14, letterSpacing: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                opacity: pendingItems.length === 0 ? 0.4 : 1
+              }}>
+                ⚡ CHARGE ({pendingItems.reduce((s, p) => s + p.qty, 0)})
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

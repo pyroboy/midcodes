@@ -22,7 +22,10 @@ _gs.textContent = `
 .scr{overflow:auto;scrollbar-width:thin;scrollbar-color:#222 transparent}
 .scr::-webkit-scrollbar{width:5px}.scr::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:4px}
 .tbl{transition:transform .12s;cursor:pointer}.tbl:hover{transform:scale(1.04)}
-.pulse{animation:pu 2s infinite}@keyframes pu{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse{animation:pu 1s infinite}@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
+.overtime-badge{animation:ot-pulse 1s infinite,ot-glow 1s infinite}
+@keyframes ot-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes ot-glow{0%,100%{box-shadow:0 0 4px rgba(220,38,38,0.5)}50%{box-shadow:0 0 12px rgba(220,38,38,0.8)}}
 .fi{animation:fi .22s cubic-bezier(.16,1,.3,1)}@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .pop{animation:pop .2s cubic-bezier(.34,1.56,.64,1)}@keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
 .ring{animation:rg 2s cubic-bezier(0,0,.2,1) infinite}@keyframes rg{0%{transform:scale(.9);opacity:.8}70%{transform:scale(1.3);opacity:0}100%{opacity:0}}

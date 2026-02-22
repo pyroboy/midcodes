@@ -13,14 +13,28 @@ export function RunningBill({
   return (
     <div style={{
       width:320, background:"var(--panel)", borderLeft:"1px solid var(--border)",
-      display:"flex", flexDirection:"column", overflow:"hidden", flexShrink:0,
+      display:"flex", flexDirection:"column", position:"relative", flexShrink:0,
     }} className="fi">
+
+      {/* ── Floating Add Button ── */}
+      {!isKitchen && (
+        <button className="btn stock-alert-pulse" onClick={onAdd} style={{
+          position: "absolute", left: -36, top: "50%", transform: "translateY(-50%)",
+          width: 72, height: 72, background: "#166534", color: "#fff",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          gap: 2, border: "4px solid #11421f", borderRadius: "50%",
+          boxShadow: "0 6px 16px rgba(0,0,0,0.6)", cursor: "pointer", zIndex: 10
+        }}>
+          <span style={{ fontSize: 24, lineHeight: 1, marginTop: 4 }}>➕</span>
+          <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.5, lineHeight: 1 }}>ADD</span>
+        </button>
+      )}
 
       {/* ── Header ── */}
       <div style={{ padding:"12px 14px", borderBottom:"1px solid var(--border)", flexShrink:0 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <span className="hd" style={{ fontSize:20, color:"var(--ember)" }}>{table.label}</span>
+            <span className="hd" style={{ fontSize:26, color:"#fff", fontWeight: 800, textShadow:"0 1px 3px rgba(0,0,0,0.8)" }}>{table.label}</span>
             <button className="btn" onClick={onChangePax} style={{
               background:"var(--card)", border:"1px solid var(--border)", borderRadius:6,
               padding:"2px 8px", fontSize:10, color:"var(--muted)",
@@ -35,16 +49,26 @@ export function RunningBill({
           {!pkg && <span style={{ color:"#fbbf24" }}>No package — à la carte</span>}
           <span>·</span>
           <span className={timeStatus==="overtime"?"pulse":""} style={{
-            color: timeStatus==="overtime"?"#dc2626":timeStatus==="warning_red"?"#f87171":timeStatus==="warning_yellow"?"#fbbf24":"var(--ember)",
-          }}>⏱ {ela(session.openedAt)}{timeStatus==="overtime"?" ⚠ OVERTIME":""}</span>
+            padding: (timeStatus==="overtime"||timeStatus==="warning_red")?"3px 8px":timeStatus==="warning_yellow"?"2px 6px":"0",
+            background: timeStatus==="overtime"?"#dc2626":timeStatus==="warning_red"?"#7f1d1d":timeStatus==="warning_yellow"?"#713f12":"transparent",
+            borderRadius:4,
+            fontWeight: timeStatus==="overtime"?700:timeStatus==="warning_red"?600:400,
+            color: timeStatus==="overtime"?"#fff":timeStatus==="warning_red"?"#fca5a5":timeStatus==="warning_yellow"?"#fde047":"var(--ember)",
+          }}>⏱ {ela(session.openedAt)}{timeStatus==="overtime"?" ⚠ OVERTIME":timeStatus==="warning_red"?" ⚠":""}</span>
           {session.mergedFrom?.length > 0 && (
             <span style={{ color:"#ca8a04" }}>· +{session.mergedFrom.join(",")}</span>
           )}
         </div>
         {timeStatus==="overtime" && (
-          <div style={{marginTop:6,padding:"6px 10px",background:"#450a0a",border:"1px solid #dc2626",borderRadius:6,
-            fontSize:10,color:"#fca5a5",display:"flex",alignItems:"center",gap:6}}>
+          <div style={{marginTop:6,padding:"10px 14px",background:"#dc2626",border:"2px solid #fca5a5",borderRadius:8,
+            fontSize:13,fontWeight:600,color:"#fff",display:"flex",alignItems:"center",gap:8,boxShadow:"0 2px 8px rgba(220,38,38,0.4)"}}>
             ⚠ Session exceeded 90 minutes! Consider checkout.
+          </div>
+        )}
+        {timeStatus==="warning_red" && (
+          <div style={{marginTop:6,padding:"8px 12px",background:"#7f1d1d",border:"1px solid #dc2626",borderRadius:8,
+            fontSize:12,fontWeight:600,color:"#fca5a5",display:"flex",alignItems:"center",gap:8}}>
+            ⚠ Session approaching time limit. Consider checkout soon.
           </div>
         )}
       </div>
@@ -126,25 +150,22 @@ export function RunningBill({
       {/* ── Action buttons ── */}
       {!isKitchen && (
         <div style={{ padding:"8px 10px", borderTop:"1px solid var(--border)", display:"flex", gap:6, flexShrink:0 }}>
-          <button className="btn" onClick={onAdd} style={{
-            flex:2, background:"#166534", color:"#fff", padding:"10px 8px", borderRadius:8,
-            fontSize:12, display:"flex", alignItems:"center", justifyContent:"center", gap:4,
-          }}>➕ Add</button>
           <button className="btn" onClick={onVoidTable} style={{
             flex:1, background:"#450a0a", color:"#fca5a5", padding:"10px 8px", borderRadius:8,
-            fontSize:11,
+            fontSize:12, fontWeight:500,
           }}>🗑 Void</button>
           <button className="btn" onClick={onCheckout} disabled={activeOrders.length===0} style={{
             flex:2, background: activeOrders.length===0 ? "var(--card)" : "var(--ember)",
-            color:"#fff", padding:"10px 8px", borderRadius:8, fontSize:12,
+            color:"#fff", padding:"10px 8px", borderRadius:8, fontSize:13, fontWeight:600,
             opacity: activeOrders.length===0 ? 0.4 : 1,
           }}>💳 Checkout</button>
           <button className="btn" onClick={onPrintKOT} style={{
             flex:1, background:"var(--card)", color:"var(--muted)", padding:"10px 8px", borderRadius:8,
-            fontSize:11, border:"1px solid var(--border)",
+            fontSize:12, border:"1px solid var(--border)",
           }}>🖨 KOT</button>
         </div>
       )}
     </div>
   );
 }
+

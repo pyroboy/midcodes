@@ -35,7 +35,7 @@ export function Splash({onLogin}) {
         boxShadow:"0 32px 80px rgba(0,0,0,.6)"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{fontSize:48}}>🔥</div>
-          <div className="hd" style={{fontSize:32,color:"var(--ember)",letterSpacing:2}}>SAMGYUP</div>
+          <div className="hd" style={{fontSize:32,color:"var(--ember)",letterSpacing:2}}>WTF! SAMGYUP</div>
           <div className="mono" style={{fontSize:11,color:"var(--muted)",letterSpacing:4}}>RESTAURANT POS</div>
           <div style={{width:40,height:2,background:"var(--ember)",margin:"12px auto 0",borderRadius:2}}/>
         </div>
