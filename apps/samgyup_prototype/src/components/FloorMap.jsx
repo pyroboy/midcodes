@@ -1,4 +1,5 @@
 import { fc, ela, sBill } from "../helpers.js";
+import { PACKAGES } from "../constants.js";
 
 export function FloorMap({
   tables, mergeFrom, transferFrom, floorMenu, activeId, isManager,
@@ -79,10 +80,28 @@ export function FloorMap({
           const isTransTgt= transferFrom&&transferFrom!==t.id&&!occ;
           const isMenuOpen= floorMenu?.tid===t.id;
           const isActive  = activeId===t.id;
+          
+          // Package color indicator
+          const pkgId = t.session?.pkgId;
+          const isPork = pkgId === "pkg_pork";
+          const isBeef = pkgId === "pkg_beef";
+          const isBoth = pkgId === "pkg_both";
+          const porkColor = "#ec4899"; // pink
+          const beefColor = "#7c3aed"; // violet
 
           return (
             <div key={t.id} style={{position:"absolute",left:`${t.x}%`,top:`${t.y}%`,
               width:`${t.w}%`,height:`${t.h}%`}}>
+              {/* Package label above table */}
+              {occ && (isPork || isBeef || isBoth) && (
+                <div style={{position:"absolute",bottom:"100%",left:0,right:0,textAlign:"center",paddingBottom:2}}>
+                  <span style={{fontSize:8,fontWeight:600,lineHeight:1.2,
+                    color:isBoth?"#c084fc":isPork?porkColor:beefColor,
+                    textShadow:"0 1px 2px rgba(0,0,0,0.8)"}}>
+                    {isPork?"Unli Pork":isBeef?"Unli Beef":isBoth?"Unli Pork & Beef":""}
+                  </span>
+                </div>
+              )}
               {occ&&!isMergeSrc&&!isTransSrc&&(
                 <div className="ring" style={{position:"absolute",inset:-3,
                   borderRadius:isVip?14:10,border:`1.5px solid ${clr}`,
@@ -99,7 +118,21 @@ export function FloorMap({
                 justifyContent:"center",padding:3,
                 boxShadow:isActive?`0 0 0 2px #0a0a0a, 0 0 0 5px ${clr}, 0 0 30px ${clr}80`:occ?`0 0 10px ${clr}30`:"none",
                 outline:isMenuOpen?"2px solid var(--ember)":"none",
+                overflow:"hidden",
               }}>
+                {/* Package color indicator - left side bar */}
+                {occ && (isPork || isBeef || isBoth) && (
+                  <div style={{position:"absolute",left:0,top:0,bottom:0,width:23,display:"flex",flexDirection:"column"}}>
+                    {isPork && <div style={{position:"absolute",inset:0,background:porkColor}}/>}
+                    {isBeef && <div style={{position:"absolute",inset:0,background:beefColor}}/>}
+                    {isBoth && (
+                      <>
+                        <div style={{position:"absolute",left:0,right:0,top:0,height:"50%",background:porkColor}}/>
+                        <div style={{position:"absolute",left:0,right:0,bottom:0,height:"50%",background:beefColor}}/>
+                      </>
+                    )}
+                  </div>
+                )}
                 {occ&&<div style={{position:"absolute",top:2,right:3,fontSize:isVip?12:9,opacity:.5}}>🔥</div>}
                 <span className="hd" style={{fontSize:isVip?16:isBar?12:t.type==="large"?14:13,
                   fontWeight:800,color:occ?clr:"#6b7280",lineHeight:1.1,textAlign:"center",letterSpacing:0.5}}>
@@ -140,7 +173,6 @@ export function FloorMap({
                     )}
                   </>
                 )}
-                {!occ&&<div style={{fontSize:9,color:"#4b5563",marginTop:3}}>tap</div>}
               </div>
 
               {/* Floor action menu */}

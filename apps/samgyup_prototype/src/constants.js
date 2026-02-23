@@ -68,24 +68,38 @@ export const DRINKS = [
 ];
 
 export const FLOOR_TABLES = [
-  {id:1, label:"T1",  seats:2,x:3, y:8, w:9, h:9, type:"small"},
-  {id:2, label:"T2",  seats:2,x:3, y:22,w:9, h:9, type:"small"},
-  {id:3, label:"T3",  seats:4,x:3, y:36,w:9, h:13,type:"normal"},
-  {id:4, label:"T4",  seats:4,x:3, y:53,w:9, h:13,type:"normal"},
-  {id:5, label:"T5",  seats:4,x:19,y:8, w:12,h:13,type:"normal"},
-  {id:6, label:"T6",  seats:4,x:35,y:8, w:12,h:13,type:"normal"},
-  {id:7, label:"T7",  seats:4,x:51,y:8, w:12,h:13,type:"normal"},
-  {id:8, label:"T8",  seats:6,x:19,y:27,w:12,h:16,type:"large"},
-  {id:9, label:"T9",  seats:6,x:35,y:27,w:12,h:16,type:"large"},
-  {id:10,label:"T10", seats:6,x:51,y:27,w:12,h:16,type:"large"},
-  {id:11,label:"T11", seats:4,x:19,y:50,w:12,h:13,type:"normal"},
-  {id:12,label:"T12", seats:4,x:35,y:50,w:12,h:13,type:"normal"},
-  {id:13,label:"T13", seats:4,x:51,y:50,w:12,h:13,type:"normal"},
-  {id:14,label:"VIP1",seats:8,x:69,y:8, w:24,h:22,type:"vip"},
-  {id:15,label:"VIP2",seats:8,x:69,y:34,w:24,h:22,type:"vip"},
-  {id:16,label:"BAR1",seats:2,x:69,y:62,w:10,h:10,type:"bar"},
-  {id:17,label:"BAR2",seats:2,x:82,y:62,w:10,h:10,type:"bar"},
+  // Right Column (Top to Bottom: T1, T4, T7 etc. looks like a 3x3 grid)
+  {id:1,  label:"T1",  seats:2, x:85, y:5,  w:8,  h:12, type:"normal"},
+  {id:2,  label:"T2",  seats:4, x:85, y:20, w:8,  h:15, type:"normal"},
+  {id:3,  label:"T3",  seats:2, x:85, y:42, w:8,  h:12, type:"normal"},
+  
+  {id:4,  label:"T4",  seats:2, x:75, y:5,  w:8,  h:12, type:"normal"},
+  {id:5,  label:"T5",  seats:4, x:75, y:20, w:8,  h:15, type:"normal"},
+  {id:6,  label:"T6",  seats:4, x:75, y:42, w:8,  h:15, type:"normal"},
+  
+  {id:7,  label:"T7",  seats:2, x:65, y:5,  w:8,  h:12, type:"normal"},
+  {id:8,  label:"T8",  seats:4, x:65, y:20, w:8,  h:15, type:"normal"},
+  {id:9,  label:"T9",  seats:4, x:65, y:42, w:8,  h:15, type:"normal"},
+
+  // Middle Top Row (Left to Right: T16, T14, T12, T10)
+  {id:10, label:"T10", seats:4, x:45, y:10, w:8,  h:15, type:"normal"},
+  {id:12, label:"T12", seats:4, x:35, y:10, w:8,  h:15, type:"normal"},
+  {id:14, label:"T14", seats:4, x:25, y:10, w:8,  h:15, type:"normal"},
+  {id:16, label:"T16", seats:4, x:15, y:10, w:8,  h:15, type:"normal"},
+
+  // Middle Bottom Row (Left to Right: T18, T17, T15, T13, T11)
+  {id:11, label:"T11", seats:2, x:47, y:35, w:8,  h:12, type:"normal"},
+  {id:13, label:"T13", seats:4, x:34, y:37, w:11, h:11, type:"normal"},
+  {id:15, label:"T15", seats:2, x:26, y:35, w:7,  h:12, type:"normal"},
+  {id:17, label:"T17", seats:4, x:13, y:37, w:11, h:11, type:"normal"},
+  {id:18, label:"T18", seats:4, x:1,  y:37, w:11, h:11, type:"normal"},
+
+  // Bottom Row (Center: T19, T20)
+  {id:19, label:"T19", seats:4, x:35, y:55, w:11, h:9,  type:"normal"},
+  {id:20, label:"T20", seats:4, x:48, y:55, w:11, h:9,  type:"normal"},
 ];
+
+
 
 export const INIT_INV = {
   meat_samgyup:{stock:6000,unit:"g",low:500},meat_liempo:{stock:5000,unit:"g",low:500},
