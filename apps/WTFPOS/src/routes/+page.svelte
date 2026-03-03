@@ -1,157 +1,225 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { cn } from '$lib/utils';
+	import { setSession } from '$lib/stores/session.svelte';
+	import type { Role } from '$lib/stores/session.svelte';
 
-	type Role = 'staff' | 'manager' | 'kitchen';
+	// ─── Accounts ─────────────────────────────────────────────────────────────
 
-	const roles: { id: Role; icon: string; label: string; desc: string }[] = [
-		{ id: 'staff',   icon: '👤', label: 'Staff',         desc: 'Servers & Cashiers' },
-		{ id: 'manager', icon: '👑', label: 'Manager',       desc: 'Admin Access' },
-		{ id: 'kitchen', icon: '🍳', label: 'Kitchen Staff', desc: 'BOH Team' }
+	const ACCOUNTS: Record<string, { password: string; role: Role; displayName: string; dest: string; requiresPin?: boolean }> = {
+		staff:    { password: 'staff',    role: 'staff',   displayName: 'Maria Santos',  dest: '/floor' },
+		manager:  { password: 'manager',  role: 'manager', displayName: 'Juan Reyes',    dest: '/floor', requiresPin: true },
+		kitchen:  { password: 'kitchen',  role: 'kitchen', displayName: 'Pedro Cruz',    dest: '/kds' },
+		owner:    { password: 'owner',    role: 'owner',   displayName: 'Christopher S', dest: '/floor' }
+	};
+
+	const TEST_CARDS: { username: string; badge: string; badgeClass: string; desc: string }[] = [
+		{ username: 'staff',   badge: '👤 Staff',   badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',   desc: 'Servers & Cashiers' },
+		{ username: 'manager', badge: '👑 Manager', badgeClass: 'bg-accent-light text-accent border-accent/30', desc: 'Admin + PIN: 1234' },
+		{ username: 'kitchen', badge: '🍳 Kitchen', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', desc: 'BOH Team → KDS' },
+		{ username: 'owner',   badge: '💼 Owner',   badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',  desc: 'Multi-branch access' }
 	];
 
-	let name = $state('');
-	let selectedRole = $state<Role | null>(null);
-	let showPin = $state(false);
+	// ─── Form state ───────────────────────────────────────────────────────────
+	let username  = $state('');
+	let password  = $state('');
+	let showPass  = $state(false);
+	let error     = $state('');
 
-	// PIN modal state
-	let pin = $state('');
+	// ─── PIN modal ────────────────────────────────────────────────────────────
+	let showPin     = $state(false);
+	let pin         = $state('');
+	let pinError    = $state(false);
+	let pendingDest = $state('');
 	const MANAGER_PIN = '1234';
 
-	function selectRole(role: Role) {
-		selectedRole = role;
-		if (role === 'manager') showPin = true;
-	}
+	// ─── Login logic ──────────────────────────────────────────────────────────
+	function login() {
+		error = '';
+		const u = username.trim().toLowerCase();
+		const account = ACCOUNTS[u];
 
-	function startShift() {
-		if (!name.trim() || !selectedRole) return;
-		if (selectedRole === 'manager') {
+		if (!account) { error = 'Username not found.'; return; }
+		if (account.password !== password) { error = 'Incorrect password.'; return; }
+
+		setSession(account.displayName, account.role);
+
+		if (account.requiresPin) {
+			pendingDest = account.dest;
+			pin = '';
+			pinError = false;
 			showPin = true;
 		} else {
-			navigate();
+			goto(account.dest);
 		}
-	}
-
-	function navigate() {
-		if (selectedRole === 'kitchen') goto('/kds');
-		else goto('/floor');
 	}
 
 	function handlePinKey(key: string) {
-		if (pin.length < 4) pin += key;
-	}
-
-	function handleBackspace() {
-		pin = pin.slice(0, -1);
+		if (pin.length < 4) { pin += key; pinError = false; }
 	}
 
 	function verifyPin() {
-		if (pin === MANAGER_PIN) {
-			showPin = false;
-			navigate();
-		} else {
-			pin = '';
-		}
+		if (pin === MANAGER_PIN) { showPin = false; goto(pendingDest); }
+		else { pin = ''; pinError = true; }
 	}
 
-	const canStart = $derived(name.trim().length > 0 && selectedRole !== null);
+	// Auto-fill from test card
+	function useAccount(u: string) {
+		username = u;
+		password = ACCOUNTS[u].password;
+		error = '';
+	}
+
+	const canLogin = $derived(username.trim().length > 0 && password.length > 0);
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-surface-secondary p-4">
-	<div class="pos-card w-full max-w-[500px] gap-8 flex flex-col p-12">
-		<!-- Header -->
+<!-- Full page: login card + test credentials side panel -->
+<div class="flex min-h-screen items-center justify-center gap-8 bg-surface-secondary p-6">
+
+	<!-- ─── Login Card ───────────────────────────────────────────────────── -->
+	<div class="pos-card w-full max-w-[440px] flex flex-col gap-7 p-10">
+		<!-- Brand header -->
 		<div class="flex flex-col items-center gap-2 text-center">
 			<span class="text-5xl leading-none">🔥</span>
 			<h1 class="text-3xl font-extrabold tracking-tight text-gray-900">WTF! SAMGYUP</h1>
-			<p class="text-sm font-medium tracking-[3px] text-gray-500 uppercase">Restaurant POS</p>
-			<div class="mt-1 h-[3px] w-14 rounded-full bg-accent"></div>
+			<p class="text-sm font-medium tracking-[3px] text-gray-400 uppercase">Restaurant POS</p>
+			<div class="h-[3px] w-12 rounded-full bg-accent"></div>
 		</div>
 
-		<!-- Form -->
-		<div class="flex flex-col gap-5">
-			<!-- Name input -->
+		<!-- Inputs -->
+		<div class="flex flex-col gap-4">
 			<div class="flex flex-col gap-1.5">
-				<label for="name" class="text-xs font-semibold tracking-wide text-gray-700 uppercase">
-					Your Name
+				<label for="username" class="text-xs font-semibold uppercase tracking-wide text-gray-600">
+					Username
 				</label>
 				<input
-					id="name"
+					id="username"
 					type="text"
-					bind:value={name}
-					placeholder="Enter your name..."
-					class="pos-input text-base"
+					bind:value={username}
+					placeholder="e.g. staff"
+					class="pos-input"
+					autocomplete="username"
+					onkeydown={(e) => e.key === 'Enter' && login()}
 				/>
 			</div>
 
-			<!-- Role selection -->
-			<div class="flex flex-col gap-2">
-				<p class="text-xs font-semibold tracking-wide text-gray-700 uppercase">Role</p>
-				<div class="flex flex-col gap-2.5">
-					{#each roles as role}
-						<button
-							onclick={() => selectRole(role.id)}
-							class={cn(
-								'flex items-center gap-3.5 rounded-xl border p-4 text-left transition-all active:scale-[0.98]',
-								selectedRole === role.id
-									? 'border-accent bg-accent-light'
-									: 'border-border bg-surface hover:border-gray-300'
-							)}
-						>
-							<span class="text-2xl leading-none">{role.icon}</span>
-							<div>
-								<div class={cn('font-semibold', selectedRole === role.id ? 'text-accent' : 'text-gray-900')}>
-									{role.label}
-								</div>
-								<div class="text-sm text-gray-500">{role.desc}</div>
-							</div>
-							{#if selectedRole === role.id}
-								<span class="ml-auto text-accent">✓</span>
-							{/if}
-						</button>
-					{/each}
+			<div class="flex flex-col gap-1.5">
+				<label for="password" class="text-xs font-semibold uppercase tracking-wide text-gray-600">
+					Password
+				</label>
+				<div class="relative">
+					<input
+						id="password"
+						type={showPass ? 'text' : 'password'}
+						bind:value={password}
+						placeholder="Enter password"
+						class="pos-input pr-10"
+						autocomplete="current-password"
+						onkeydown={(e) => e.key === 'Enter' && login()}
+					/>
+					<button
+						onclick={() => (showPass = !showPass)}
+						class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+						style="min-height: unset"
+						tabindex={-1}
+					>
+						{showPass ? '🙈' : '👁'}
+					</button>
 				</div>
 			</div>
+
+			<!-- Error message -->
+			{#if error}
+				<p class="rounded-md bg-status-red-light px-3 py-2 text-sm font-medium text-status-red">
+					{error}
+				</p>
+			{/if}
 		</div>
 
-		<!-- Actions -->
-		<div class="flex flex-col gap-3">
-			<button onclick={startShift} disabled={!canStart} class="btn-primary w-full disabled:opacity-40">
-				START SHIFT
-			</button>
-			<button
-				onclick={() => canStart && navigate()}
-				disabled={!canStart}
-				class="btn-secondary w-full disabled:opacity-40"
-			>
-				CONTINUE →
-			</button>
+		<!-- Submit -->
+		<button onclick={login} disabled={!canLogin} class="btn-primary w-full text-base disabled:opacity-40">
+			LOGIN →
+		</button>
+
+		<p class="text-center text-xs text-gray-400">
+			WTF! Samgyupsal POS · v0.1-alpha
+		</p>
+	</div>
+
+	<!-- ─── Test Credentials Panel ───────────────────────────────────────── -->
+	<div class="w-[280px] flex flex-col gap-3">
+		<!-- Dev badge header -->
+		<div class="flex items-center gap-2 px-1">
+			<span class="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+				🧪 Dev — Test Accounts
+			</span>
 		</div>
 
-		<p class="text-center text-xs text-gray-400">hint: manager pin is 1234</p>
+		{#each TEST_CARDS as card (card.username)}
+			{@const acct = ACCOUNTS[card.username]}
+			<div class="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
+				<!-- Role badge + desc -->
+				<div class="flex items-center justify-between">
+					<span class={cn('rounded-full border px-3 py-0.5 text-xs font-semibold', card.badgeClass)}>
+						{card.badge}
+					</span>
+					<span class="text-xs text-gray-400">{card.desc}</span>
+				</div>
+
+				<!-- Credentials -->
+				<div class="flex flex-col gap-1 font-mono text-xs">
+					<div class="flex items-center gap-2">
+						<span class="w-16 text-gray-400">user</span>
+						<span class="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-800">{card.username}</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<span class="w-16 text-gray-400">pass</span>
+						<span class="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-800">{acct.password}</span>
+					</div>
+				</div>
+
+				<!-- Auto-fill button -->
+				<button
+					onclick={() => useAccount(card.username)}
+					class={cn(
+						'w-full rounded-md border py-2 text-xs font-semibold transition-all active:scale-[0.98]',
+						username === card.username
+							? 'border-accent bg-accent-light text-accent'
+							: 'border-border bg-surface-secondary text-gray-600 hover:border-gray-300 hover:text-gray-900'
+					)}
+					style="min-height: unset"
+				>
+					{username === card.username ? '✓ Selected' : 'Use this account →'}
+				</button>
+			</div>
+		{/each}
 	</div>
 </div>
 
-<!-- PIN Modal -->
+<!-- ─── PIN Modal ─────────────────────────────────────────────────────────── -->
 {#if showPin}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
 		<div class="pos-card w-[380px] flex flex-col items-center gap-6 py-10 px-10">
-			<!-- Header -->
 			<div class="flex flex-col items-center gap-1">
+				<span class="text-3xl">👑</span>
 				<h2 class="text-xl font-bold text-gray-900">Manager PIN</h2>
-				<p class="text-sm text-gray-500">Manager PIN Required</p>
+				<p class="text-sm text-gray-500">Enter your 4-digit PIN to continue</p>
 			</div>
 
 			<!-- Dots -->
 			<div class="flex gap-4">
 				{#each Array(4) as _, i}
-					<span
-						class={cn(
-							'h-3.5 w-3.5 rounded-full transition-all',
-							i < pin.length ? 'bg-accent scale-110' : 'bg-gray-200'
-						)}
-					></span>
+					<span class={cn(
+						'h-3.5 w-3.5 rounded-full transition-all',
+						i < pin.length
+							? pinError ? 'bg-status-red scale-110' : 'bg-accent scale-110'
+							: 'bg-gray-200'
+					)}></span>
 				{/each}
 			</div>
+			{#if pinError}
+				<p class="text-sm font-medium text-status-red -mt-2">Incorrect PIN. Try again.</p>
+			{/if}
 
 			<!-- Numpad -->
 			<div class="grid grid-cols-3 gap-2.5">
@@ -163,7 +231,6 @@
 						{key}
 					</button>
 				{/each}
-				<!-- Empty, 0, Backspace -->
 				<span></span>
 				<button
 					onclick={() => handlePinKey('0')}
@@ -172,8 +239,8 @@
 					0
 				</button>
 				<button
-					onclick={handleBackspace}
-					class="flex h-14 w-16 items-center justify-center rounded-xl bg-surface-secondary text-gray-500 hover:bg-gray-100 active:scale-95 transition-all"
+					onclick={() => { pin = pin.slice(0, -1); pinError = false; }}
+					class="flex h-14 w-16 items-center justify-center rounded-xl bg-surface-secondary text-xl text-gray-500 hover:bg-gray-100 active:scale-95 transition-all"
 				>
 					⌫
 				</button>
@@ -184,7 +251,7 @@
 			</button>
 
 			<div class="flex flex-col items-center gap-0.5">
-				<button onclick={() => { showPin = false; pin = ''; }} class="text-sm font-medium text-accent hover:text-accent-dark" style="min-height: unset">
+				<button onclick={() => { showPin = false; pin = ''; pinError = false; }} class="text-sm font-medium text-accent hover:text-accent-dark" style="min-height: unset">
 					← Back
 				</button>
 				<span class="text-xs text-gray-400">or Cancel</span>

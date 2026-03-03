@@ -2,7 +2,6 @@
 	import { kdsTickets, markItemServed } from '$lib/stores/pos.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { formatCountdown, cn } from '$lib/utils';
-	import { formatDistanceToNow } from 'date-fns';
 
 	const activeTickets = $derived(
 		kdsTickets.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
@@ -37,20 +36,18 @@
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
-	<TopBar userName="Kitchen Staff">
-		{#snippet rightSlot()}
-			<span class="badge-orange">{activeTables} Active Tables</span>
-			<span class="badge-orange">{menuOrders} Menu Orders</span>
-			<span class="badge-orange">{queueOrders} Queue Orders</span>
-			<div class="h-5 w-px bg-border"></div>
-		{/snippet}
-	</TopBar>
+	<TopBar />
 
 	<!-- Queue header -->
 	<div class="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
 		<h1 class="flex items-center gap-2 text-xl font-bold text-gray-900">
 			<span class="text-lg">🔍</span> Kitchen Queue
 		</h1>
+		<div class="flex items-center gap-2">
+			<span class="badge-orange">{activeTables} Active Tables</span>
+			<span class="badge-orange">{menuOrders} Menu Orders</span>
+			<span class="badge-orange">{queueOrders} Queue Orders</span>
+		</div>
 	</div>
 
 	{#if activeTickets.length === 0}

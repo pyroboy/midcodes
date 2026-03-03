@@ -40,9 +40,9 @@ function makeTables(): Table[] {
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 
 export const MENU_ITEMS: MenuItem[] = [
-	{ id: 'pkg-pork',    name: '🐷 Unli Pork',         category: 'packages', price: 499,  isWeightBased: false, available: true, desc: 'All-you-can-eat pork grill',    perks: '4 sides, 200g initial meats' },
-	{ id: 'pkg-beef',    name: '🐄 Unli Beef',         category: 'packages', price: 699,  isWeightBased: false, available: true, desc: 'All-you-can-eat beef grill',    perks: '5 sides, 250g initial meats' },
-	{ id: 'pkg-combo',   name: '🔥 Unli Pork & Beef',  category: 'packages', price: 899,  isWeightBased: false, available: true, desc: 'Premium pork + beef combo',    perks: '6 sides, 300g initial meats' },
+	{ id: 'pkg-pork',    name: '🐷 Unli Pork',         category: 'packages', price: 499,  isWeightBased: false, available: true, desc: 'All-you-can-eat pork grill',    perks: '4 sides, 200g initial meats', meats: ['meat-samgyup', 'meat-chadol'], autoSides: ['side-kimchi', 'side-rice'] },
+	{ id: 'pkg-beef',    name: '🐄 Unli Beef',         category: 'packages', price: 699,  isWeightBased: false, available: true, desc: 'All-you-can-eat beef grill',    perks: '5 sides, 250g initial meats', meats: ['meat-galbi', 'meat-beef'], autoSides: ['side-kimchi', 'side-rice'] },
+	{ id: 'pkg-combo',   name: '🔥 Unli Pork & Beef',  category: 'packages', price: 899,  isWeightBased: false, available: true, desc: 'Premium pork + beef combo',    perks: '6 sides, 300g initial meats', meats: ['meat-samgyup', 'meat-chadol', 'meat-galbi', 'meat-beef'], autoSides: ['side-kimchi', 'side-rice'] },
 	{ id: 'meat-samgyup',name: 'Samgyupsal',            category: 'meats',    price: 0,    isWeightBased: true,  available: true, pricePerGram: 0.65 },
 	{ id: 'meat-chadol', name: 'Chadolbaegi',           category: 'meats',    price: 0,    isWeightBased: true,  available: true, pricePerGram: 0.75 },
 	{ id: 'meat-galbi',  name: 'Galbi',                 category: 'meats',    price: 0,    isWeightBased: true,  available: true, pricePerGram: 0.90 },
@@ -62,14 +62,15 @@ export const MENU_ITEMS: MenuItem[] = [
 export const tables = $state<Table[]>(makeTables());
 export const orders = $state<Order[]>([
 	{
-		id: 'order-vip1', tableId: 'VIP1', tableNumber: 101, packageName: '🔥 Unli Pork & Beef',
+		id: 'order-vip1', tableId: 'VIP1', tableNumber: 101, packageName: '🔥 Unli Pork & Beef', packageId: 'pkg-combo', pax: 4,
 		items: [
-			{ id: 'i1', menuItemId: 'meat-samgyup', menuItemName: 'Samgyeopsal', quantity: 1, unitPrice: 0, weight: 200, status: 'served', sentAt: null, tag: 'PKG' },
-			{ id: 'i2', menuItemId: 'meat-chadol',  menuItemName: 'Chadolbaegi', quantity: 1, unitPrice: 0, weight: 150, status: 'served', sentAt: null, tag: 'PKG' },
-			{ id: 'i3', menuItemId: 'side-kimchi',  menuItemName: 'Kimchi',      quantity: 1, unitPrice: 0, weight: null, status: 'served', sentAt: null, tag: 'FREE' },
-			{ id: 'i4', menuItemId: 'side-japchae', menuItemName: 'Japchae',     quantity: 1, unitPrice: 180, weight: null, status: 'served', sentAt: null, tag: null }
+			{ id: 'i1', menuItemId: 'pkg-combo',    menuItemName: '🔥 Unli Pork & Beef', quantity: 1, unitPrice: 3596, weight: null, status: 'served', sentAt: null, tag: 'PKG' },
+			{ id: 'i2', menuItemId: 'meat-samgyup', menuItemName: 'Samgyeopsal', quantity: 1, unitPrice: 0, weight: 200, status: 'served', sentAt: null, tag: 'FREE' },
+			{ id: 'i3', menuItemId: 'meat-chadol',  menuItemName: 'Chadolbaegi', quantity: 1, unitPrice: 0, weight: 150, status: 'served', sentAt: null, tag: 'FREE' },
+			{ id: 'i4', menuItemId: 'side-kimchi',  menuItemName: 'Kimchi',      quantity: 1, unitPrice: 0, weight: null, status: 'served', sentAt: null, tag: 'FREE' },
+			{ id: 'i5', menuItemId: 'side-japchae', menuItemName: 'Japchae',     quantity: 1, unitPrice: 180, weight: null, status: 'served', sentAt: null, tag: null }
 		],
-		status: 'open', discountType: 'none', subtotal: 12056, discountAmount: 0, vatAmount: 1293, total: 12056,
+		status: 'open', discountType: 'none', subtotal: 3776, discountAmount: 0, vatAmount: 405, total: 3776,
 		payments: [], createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(), closedAt: null
 	}
 ]);
@@ -77,7 +78,7 @@ export const kdsTickets = $state<KdsTicket[]>([]);
 
 // ─── Table Actions ────────────────────────────────────────────────────────────
 
-export function openTable(tableId: string, packageName?: string): string {
+export function openTable(tableId: string, pax: number = 4, packageName?: string): string {
 	const table = tables.find((t) => t.id === tableId);
 	if (!table || table.status !== 'available') return table?.currentOrderId ?? '';
 	const orderId = nanoid();
@@ -86,7 +87,7 @@ export function openTable(tableId: string, packageName?: string): string {
 	table.remainingSeconds = SESSION_SECONDS;
 	table.currentOrderId = orderId;
 	table.billTotal = 0;
-	orders.push({ id: orderId, tableId, tableNumber: table.number, packageName: packageName ?? null, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null });
+	orders.push({ id: orderId, tableId, tableNumber: table.number, packageName: packageName ?? null, packageId: null, pax, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null });
 	return orderId;
 }
 
@@ -114,11 +115,19 @@ export function tickTimers() {
 
 export function getOrder(orderId: string) { return orders.find((o) => o.id === orderId); }
 
-export function addItemToOrder(orderId: string, item: MenuItem, qty: number, weight?: number) {
+export function addItemToOrder(orderId: string, item: MenuItem, qty: number, weight?: number, forceFree: boolean = false) {
 	const order = orders.find((o) => o.id === orderId);
 	if (!order) return;
-	const unitPrice = item.isWeightBased ? Math.round((weight ?? 0) * (item.pricePerGram ?? 0)) : item.price;
-	const tag: 'PKG' | 'FREE' | null = item.isFree ? 'FREE' : item.isWeightBased ? 'PKG' : null;
+
+	if (item.category === 'packages') {
+		order.packageId = item.id;
+		order.packageName = item.name;
+	}
+
+	const isFree = item.category === 'meats' || item.isFree || forceFree;
+	const unitPrice = isFree ? 0 : (item.category === 'packages' ? item.price * order.pax : (item.isWeightBased ? Math.round((weight ?? 0) * (item.pricePerGram ?? 0)) : item.price));
+	const tag: 'PKG' | 'FREE' | null = isFree ? 'FREE' : (item.category === 'packages' ? 'PKG' : null);
+
 	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity: qty, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag };
 	order.items.push(newItem);
 	recalcOrder(order);
@@ -131,10 +140,16 @@ export function addItemToOrder(orderId: string, item: MenuItem, qty: number, wei
 }
 
 export function recalcOrder(order: Order) {
-	const sub = order.items.filter((i) => i.status !== 'cancelled' && i.tag !== 'FREE').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+	const sub  = order.items.filter((i) => i.status !== 'cancelled' && i.tag !== 'FREE').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 	const disc = order.discountType !== 'none' ? Math.round(sub * 0.2) : 0;
-	const vat = order.discountType !== 'none' ? 0 : Math.round((sub - disc) * 0.12);
-	order.subtotal = sub; order.discountAmount = disc; order.vatAmount = vat; order.total = sub - disc + vat;
+	const net  = sub - disc;
+	// PH law (RA 9994 / RA 7277): SC/PWD discount is applied on the VAT-exclusive price;
+	// the 12% VAT on the discounted amount is also removed (customer pays zero VAT).
+	// For normal orders, prices are VAT-inclusive — extract VAT from the total.
+	const vat  = order.discountType !== 'none'
+		? 0                                        // SC/PWD: VAT-exempt
+		: Math.round(net - net / 1.12);            // Normal: VAT already embedded in price
+	order.subtotal = sub; order.discountAmount = disc; order.vatAmount = vat; order.total = net;
 }
 
 export function markItemServed(orderId: string, itemId: string) {

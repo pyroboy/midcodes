@@ -39,34 +39,34 @@ The WTF! SAMGYUP POS SOFTWARE is a custom system built exclusively for samgyupsa
 Module 1: Core Samgyup POS & System Foundation 
 
 * **Cashiering & Table Management:**
-* Visual table floor map displaying live statuses: available, occupied, or nearing time limit.
-
-
+* Visual table floor map displaying live statuses: available, occupied, cleaning, or nearing time limit.
 * 90-minute per-table countdown timer with color-coded urgency alerts.
-
-
+* **Table Reset Tracking:** Automatically tracks the "Table Reset Time" (time between payment and when the table is marked 'Available' again) for future business analytics.
+* **Pax-First Seating:** To open a table, the server must input the number of pax (guests) first, followed by the package selection. This initializes the running bill.
+* **Pax Modifications:** Any mid-session changes to the number of pax or the selected package requires a Manager PIN override to prevent unauthorized voids/discounts.
 * Per-table order entry with a categorized menu, item variations, and quantities.
-
-
 * Mid-session add-ons (meat, rice, drinks) allowed without interrupting the open transaction.
+* **Package Upgrades:** Mid-session "Upgrades" (e.g., changing from a 'Pork Only' package to 'Beef & Pork' halfway through) instantly prorates the package cost upward and unlocks the new menu items.
+* **Grace Period Voids:** A 30-second cancellation grace period allows servers to immediately delete mistaken punched items before routing to the kitchen, without requiring a Manager PIN override.
 
 
 
 
 * **Discounts & Payments:**
 * Auto-application of 20% Senior Citizen and PWD discounts, plus VAT exemption, requiring ID logging.
-
-
+* **Pro-Rata Discounts:** In AYCE settings, the 20% discount is applied on a pro-rata basis (e.g., if 1 out of 4 guests is a Senior, the discount applies to exactly 1/4th of the total bill).
 * Support for multiple payment methods (Cash, GCash, Maya) that can be processed singly or combined within one transaction.
-
-
 * Manager PIN required for all cancellations and refunds, with all actions permanently logged.
+* **Cash Drawers & Floats:** The system must enforce uniquely assigned cash drawers/floats per cashier, requiring a formal declaration of starting/ending cash before another shift takeover.
 
 
 
 
-* **Kitchen & Hardware Integration:**
-* Orders routed to a Kitchen Display System (KDS) screen in real time upon placement.
+* **Kitchen Routing (Master KDS & Weigh Station):** 
+* The system utilizes a Master KDS screen where kitchen staff see consolidated incoming orders.
+* **Dedicated Bluetooth Weighing Screen:** A specialized, high-contrast, "wet-environment" interface designed with massive hit-areas for the butcher. This screen is directly paired with a Bluetooth scale.
+* **Live Weigh-Out (Exact Deductions):** EVERY in and out transaction of meat must be weighed. When a table orders a package or a meat top-up, the butcher places the serving plate on the Bluetooth scale, and the exact weight (e.g., 148g instead of an estimated 150g) is captured and recorded against that table's order.
+* **KDS Bump Flow:** Kitchen staff use the touchscreen (or bump-bar) to mark tickets as "Complete," instantly removing them tightly from the screen and signaling the Server the food is ready for pickup.
 
 
 * Thermal receipt printing formatted for BIR compliance.
@@ -86,23 +86,19 @@ Module 1: Core Samgyup POS & System Foundation
 
 Module 2: Stock Management
 
-* **End-to-End Tracking:**
+* **End-to-End Tracking (100% Weighed):**
 * Tracks all ingredients from delivery to service and detects inventory loss/drift.
-
-
-* Fully traceable tracking per batch: raw bone-in delivery → deboning → sliced cuts → waste.
-
-
-* Automatic inventory deduction when POS orders are placed, eliminating separate manual entry.
+* Fully traceable tracking: raw bone-in delivery → deboning → sliced cuts → exact live weigh-out to customer → waste.
+* Automatic, *exact-gram* inventory deduction when meat is weighed and bumped from the Dedicated Weighing Screen to the customer table.
 
 
 
 
 * **Roles & Auditing:**
 * Role-based access for the Butcher (receiving, deboning, slicing, waste logging) and Server (served items, stock counts).
-
-
+* **Preparation Waste Only:** Waste logging strictly tracks Kitchen/Butcher preparation trimming losses, not unconsumed customer leftovers.
 * Three daily stock counts required at 10:00 AM, 4:00 PM, and 10:00 PM, with variances flagged for manager review.
+* **Dynamic Stock Counting:** Stock counts perform a dynamic reconciliation, calculating the expected inventory based on the exact minute the count is submitted against live ongoing orders.
 
 
 * Generation of variance and accuracy reports detailing received vs. sold, loss sources, and portioning accuracy.
@@ -111,37 +107,12 @@ Module 2: Stock Management
 
 
 
-Module 3: Expenses Recording 
-
-* **Expense Management:**
-* Structured daily record-keeping of all branch operating expenses organized by categories: electricity, gas, labor, supplies, and others.
-
-
-* Owner PIN required for all expense entries to prevent unauthorized or accidental submissions.
-
-
-* Automatic logging of configured recurring fixed costs (e.g., rent, subscriptions).
-
-
-* Daily and monthly expense-vs-sales summaries for profitability review.
-
-
-
-
-
-Module 4: Multi-Branch Analytics Dashboard 
+## Module 3: Multi-Branch Analytics & Reporting Dashboard
 
 * **Data Architecture:**
 * Centralized owner-level view of performance across up to two branches.
-
-
 * Complete branch-level data isolation; transactions at one branch have zero effect on the other.
-
-
 * Branch managers see only their own operational data, while the analytics dashboard remains owner-only.
-
-
-
 
 * **Global Main Navigation (Floor | Stock | Reports | Admin):**
 * The application revolves around a top-level persistent navigation menu.
@@ -149,6 +120,7 @@ Module 4: Multi-Branch Analytics Dashboard
 * **Stock:** Manages all inventory operations (receiving, counts, waste) for the currently selected branch. Displays aggregated multi-branch stock levels if "All Branches" is selected.
 * **Reports:** Consolidates analytics, sales, and reconciliation for the current branch or "All Branches".
 * **Admin:** A dedicated portal exclusively for Admin users to manage app users and view system logs.
+* **Menu Master Controls:** Menu changes (pricing, items) are strictly limited to the Admin/Owner portal and only deploy outside of active business hours to prevent sync conflicts.
 
 * 
 Reporting Suite:
@@ -156,39 +128,44 @@ Reporting Suite:
 * 
 **Consolidated EOD & Daily Reports:** A unified reporting view containing tabs/tables for "Meat Inventory Variance", "Sale Per Table Data (tabular)", and "End of Day (EOD) Cash Reconciliation".
 
+*
+**Missing Inventory (Drift) Tracking:** The variance report actively calculates and boldly flags "Drift" (meat that is missing and not accounted for by sales or logged waste) based on the periodic daily counts (e.g. 10am, Mid-day, 10pm) to immediately alert managers of potential theft or dropped items.
+
+*
+**Expense Management Entry:** A secure form nested directly within the reporting module to input branch operating expenses (electricity, labor, supplies). Automatic logging of configured recurring fixed costs.
 
 * 
-**Daily Expense Breakdown:** Itemized view of daily expenses grouped by category.
-
-
-* 
-**Monthly Expense Trend:** Month-over-month tracking by category.
-
-
-* 
-**Sales Summary & Revenue Trend:** Daily and weekly revenue totals with trend lines.
+**Daily Expense Breakdown:** Itemized view of daily expenses grouped by category (e.g., Meat Procurement, Produce/Sides, Utilities, Wages, Miscellaneous) compared against daily sales. Key data points reported include: *Total Daily Sales, Total Daily Expenses, Net Daily Cash Flow, and percentage of sales allocated to each expense category.*
 
 
 * 
-**Best-Selling Items & Meat Consumption:** Ranks items/cuts by volume sold and revenue contributed.
+**Monthly Expense Trend:** Month-over-month tracking by category. Key data points reported include: *Total Monthly Expenses, variance (percentage increase/decrease) from the previous month per category, and automated flagging of specific cost spikes (e.g., sudden increases in utility or meat supply costs).*
 
 
 * 
-**Peak Service Hours:** Heat map of covers and orders by hour across the day.
+**Sales Summary & Revenue Trend:** Daily and weekly revenue totals with historical trend lines. Key data points reported include: *Gross Sales, Net Sales (after Senior/PWD pro-rata discounts), Total Collected Tax (VAT vs Non-VAT sales), Average Receipt/Ticket Size, and Total Guest Count (Pax).*
 
 
 * 
-**Gross Profit Summary:** Revenue minus Cost of Goods Sold.
+**Best-Selling Items & Meat Consumption:** Ranks all menu items and specific meat cuts by volume sold and revenue contributed. Key data points reported include: *Total Weight Weighed-Out per meat type (in grams/kg), Cost of Goods per item, Gross Margin per item, and top-performing Add-on sides/drinks.*
 
 
 * 
-**Net Profit Summary:** Gross profit minus all operating expenses.
+**Peak Service Hours & Turnovers:** Heat map of guest covers (pax) and total orders plotted by hour across the operating day. Key data points reported include: *Busiest hours (peak vs off-peak), Average Table Occupancy Duration (minutes), and average "Table Reset Times" (Backlog feature: time gap between payment and table availability).*
+
+
+* 
+**Gross Profit Summary:** High-level financial metric displaying Total Revenue minus Cost of Goods Sold (COGS). *COGS is dynamically calculated based on the exact weighed meat deductions from the KDS and the actual declared purchasing costs.*
+
+
+* 
+**Net Profit Summary:** The definitive bottom-line performance metric. Calculated as Gross Profit minus all logged operating expenses (labor, rent, utilities, supplies) within the given period. *Displays exact take-home profit margin per branch.*
 
 
 * 
 **Branch Comparison:** Side-by-side view of revenue, expenses, margins, and attendance rates.
 
-Module 5: Administration & System Logs
+Module 4: Administration & System Logs
 
 * **Global Branch Selection:**
 * Branch selection dropdown/toggle integrated into the main navigation across all views and screens.
@@ -206,7 +183,7 @@ Module 5: Administration & System Logs
 
 
 * 
-**State Indicators:** Persistent UI indicators must display the current offline/online network status and cloud sync status.
+**State Indicators & Fallbacks:** Persistent UI indicators display current internet sync status. If the local network connection to the Kitchen KDS completely fails, the POS must explicitly trigger a critical full-screen alert indicating "KITCHEN OFFLINE: REVERT TO PAPER TICKETS/MANUAL PROCESS" to prevent silent order dropping.
 
 
 * **Core POS Interfaces:**
@@ -223,7 +200,7 @@ Module 5: Administration & System Logs
 
 
 * 
-**KDS View:** High-contrast grid view for kitchen staff to manage incoming routed orders instantly.
+**KDS & Weighing View:** High-contrast grid view for kitchen staff to manage incoming routed orders. Includes the specialized Bluetooth auto-read interface for the butcher to quickly weigh and dispatch meat plates using knuckle-sized buttons optimized for wet/greasy environments.
 
 
 

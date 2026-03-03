@@ -31,6 +31,8 @@ export interface MenuItem {
 	desc?: string;
 	perks?: string;
 	isFree?: boolean;
+	meats?: string[];      // IDs of meat MenuItems included in this package
+	autoSides?: string[];  // IDs of side MenuItems auto-included with this package
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -62,6 +64,8 @@ export interface Order {
 	tableId: string;
 	tableNumber: number;
 	packageName: string | null;
+	packageId: string | null;  // tracks active package for table card indicator
+	pax: number;               // number of diners
 	items: OrderItem[];
 	status: 'open' | 'pending_payment' | 'paid' | 'cancelled';
 	discountType: DiscountType;
