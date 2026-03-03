@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	body {
+		@apply bg-surface-secondary text-gray-900 antialiased;
+		font-family: 'Inter', system-ui, sans-serif;
+	}
+
+	/* Touch target minimum — POS touchscreens need generous hit areas */
+	button,
+	[role='button'],
+	a {
+		min-height: 44px;
+	}
+
+	.no-select {
+		-webkit-user-select: none;
+		user-select: none;
+	}
+}
+
+@layer components {
+	/* Card ------------------------------------------------------------------ */
+	.pos-card {
+		@apply rounded-xl bg-surface border border-border p-4;
+	}
+
+	/* Buttons --------------------------------------------------------------- */
+	.btn {
+		@apply inline-flex items-center justify-center gap-2 rounded-md font-semibold
+		       transition-all active:scale-95 no-select cursor-pointer;
+		min-height: 48px;
+	}
+
+	.btn-primary  { @apply btn bg-accent hover:bg-accent-dark text-white px-6; }
+	.btn-secondary { @apply btn bg-surface border border-border hover:bg-gray-50 text-gray-900 px-6; }
+	.btn-danger   { @apply btn bg-status-red hover:bg-red-600 text-white px-6; }
+	.btn-success  { @apply btn bg-status-green hover:bg-emerald-600 text-white px-6; }
+	.btn-ghost    { @apply btn hover:bg-gray-100 text-gray-700 px-4; }
+
+	/* Badge ----------------------------------------------------------------- */
+	.badge        { @apply inline-flex items-center justify-center rounded-full px-3 text-xs font-semibold h-7; }
+	.badge-orange { @apply badge bg-accent-light text-accent; }
+	.badge-green  { @apply badge bg-status-green-light text-status-green; }
+	.badge-yellow { @apply badge bg-status-yellow-light text-status-yellow; }
+	.badge-red    { @apply badge bg-status-red-light text-status-red; }
+
+	/* TopBar ----------------------------------------------------------------- */
+	.topbar {
+		@apply flex h-14 items-center justify-between border-b border-border bg-surface px-5;
+	}
+
+	/* Input ------------------------------------------------------------------ */
+	.pos-input {
+		@apply w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm
+		       text-gray-900 placeholder:text-gray-400 outline-none
+		       focus:border-accent focus:ring-2 focus:ring-orange-100 transition-all;
+	}
+}

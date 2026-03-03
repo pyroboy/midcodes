@@ -1,0 +1,851 @@
+# 🔥 WTF! SAMGYUP POS — App Layout Guide
+# Complete Screen-by-Screen Text Layout (PRD2-Aligned)
+
+> **Aligned to:** PRD2.md (4-module architecture)
+> **Source:** Extracted from actual component source files
+> **Purpose:** Reference guide for all text, labels, headings, and UI elements
+
+---
+
+## COMPLETE USER FLOW
+
+```
+Splash (Login) → [PIN Modal if Manager] → Top Bar (Navigation)
+    ├── Floor Plan View ──→ Running Bill ──→ Add Item Modal ──→ Checkout / Receipt
+    ├── Kitchen Queue View (Kitchen Staff only)
+    ├── Stock Management (Manager only)
+    │     ├── Meats Tab
+    │     ├── Sides Tab
+    │     └── Pantry Tab + Audit Log Sidebar
+    ├── Menu Manager (Manager only)
+    └── Reports View
+          ├── X-Reading
+          ├── Z-Reading
+          ├── Analytics
+          ├── Voids
+          ├── SC/PWD Log
+          ├── Leftover Log
+          ├── Audit Trail
+          └── eSales Export
+```
+
+---
+
+## MODULE 1: CORE SAMGYUP POS & SYSTEM FOUNDATION
+
+---
+
+### SCREEN 1: SPLASH / LOGIN
+
+**File:** `Splash.jsx`
+
+```
+┌──────────────────────────────────────┐
+│              🔥                       │
+│          WTF! SAMGYUP                │
+│         RESTAURANT POS               │
+│           ─── (divider)              │
+│                                      │
+│  YOUR NAME                           │
+│  ┌──────────────────────────────┐    │
+│  │ Enter your name...           │    │
+│  └──────────────────────────────┘    │
+│                                      │
+│  ROLE                                │
+│  ┌──────────────────────────────┐    │
+│  │ 👤 Staff                     │    │
+│  │    Servers & Cashiers        │    │
+│  ├──────────────────────────────┤    │
+│  │ 👑 Manager                   │    │
+│  │    Admin Access              │    │
+│  ├──────────────────────────────┤    │
+│  │ 🍳 Kitchen Staff             │    │
+│  │    BOH Team                  │    │
+│  └──────────────────────────────┘    │
+│                                      │
+│  [ START SHIFT ] or [ CONTINUE → ]   │
+│                                      │
+│  hint: manager pin is 1234           │
+└──────────────────────────────────────┘
+```
+
+**Text Elements:**
+- Header: `🔥` (icon), `WTF! SAMGYUP` (brand), `RESTAURANT POS` (subtitle)
+- Label: `YOUR NAME`, `ROLE`
+- Input placeholder: `Enter your name...`
+- Role cards:
+  - `👤 Staff` — `Servers & Cashiers`
+  - `👑 Manager` — `Admin Access`
+  - `🍳 Kitchen Staff` — `BOH Team`
+- Button: `START SHIFT` (staff/kitchen) / `CONTINUE →` (manager)
+- Footer hint: `hint: manager pin is 1234`
+
+---
+
+### SCREEN 1B: PIN MODAL (Manager Login & Overrides)
+
+**File:** `PINModal.jsx`
+
+```
+┌──────────────────────────┐
+│           🔐              │
+│       Manager PIN         │
+│     {reason text}         │
+│                           │
+│      ● ● ○ ○  (dots)     │
+│                           │
+│    [ 1 ] [ 2 ] [ 3 ]     │
+│    [ 4 ] [ 5 ] [ 6 ]     │
+│    [ 7 ] [ 8 ] [ 9 ]     │
+│    [   ] [ 0 ] [ ⌫ ]     │
+│                           │
+│     [ VERIFY PIN ]        │
+│        ← Back             │
+│       or Cancel           │
+└──────────────────────────┘
+```
+
+**Text Elements:**
+- Header: `🔐`, `Manager PIN`, `Manager PIN Required` (on login)
+- Dynamic: `{reason}` — e.g., "Void order item", "Void entire table"
+- Buttons: `VERIFY PIN`, `← Back` (login), `Cancel` (override)
+- Number pad: `1–9`, `0`, `⌫`
+
+---
+
+### SCREEN 2: TOP BAR (Global Navigation)
+
+**File:** `App.jsx`
+
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ 🔥  WTF! SAMGYUP  POS  │ [⬜ Floor] [📦 Stock] [📖 Recipes] [🍽️ Menu] [📊 Reports] │ {occ} occ  {free} free │ 👤 {Name} (role) [Logout] │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Navigation Items (role-based):**
+
+| Key       | Icon | Label     | Visible to        |
+|-----------|------|-----------|--------------------|
+| `floor`   | ⬜   | Floor     | Staff, Manager     |
+| `kitchen` | 🍳   | Kitchen   | Kitchen            |
+| `stock`   | 📦   | Stock     | Manager            |
+| `recipes` | 📖   | Recipes   | Manager            |
+| `menu`    | 🍽️   | Menu      | Manager            |
+| `reports` | 📊   | Reports   | Staff, Manager     |
+
+**Status Chips:**
+- `{N} occ` (orange) — occupied tables
+- `{N} free` (green) — available tables
+- `{N}kg servable` (green, stock view only)
+
+**Stock Alert Bar (Manager only):**
+- `⚠ Low Stock:` + per-item badges:
+  - `❌ {item name} ✕` (out of stock)
+  - `⚠ {item name} ✕` (low stock)
+- `👁 {N} hidden` (toggle for dismissed alerts)
+
+---
+
+### SCREEN 3: FLOOR PLAN VIEW
+
+**File:** `FloorMap.jsx`
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  FLOOR PLAN  ─────────  ● Available  ● Occupied  ● VIP  ● Bar│
+│                                                               │
+│  ┌────────────────────────────┐    ┌──────────────────┐       │
+│  │     MAIN DINING            │    │  VIP / PRIVATE   │       │
+│  │                            │    │                  │       │
+│  │  ┌─────┐  ┌─────┐         │    │  ┌────────┐      │       │
+│  │  │ T1  │  │ T2  │  ...    │    │  │ VIP1   │      │       │
+│  │  │ 2p  │  │ 2p  │         │    │  │ 8p     │      │       │
+│  │  │⏱ 45m│  │     │         │    │  │⏱ 1:20  │      │       │
+│  │  │₱2,394│  │     │         │    │  │₱12,450 │      │       │
+│  │  └─────┘  └─────┘         │    │  └────────┘      │       │
+│  │                            │    ├──────────────────┤       │
+│  │                            │    │     BAR          │       │
+│  │                            │    │  ┌─────┐┌─────┐  │       │
+│  │                            │    │  │BAR1 ││BAR2 │  │       │
+│  │                            │    │  └─────┘└─────┘  │       │
+│  ├────────────────────────────┘    └──────────────────┘       │
+│  │  🍳 KITCHEN COUNTER   🚪 ENTRANCE                          │
+│  └────────────────────────────────────────────────────────────┘
+│                                                               │
+│  WINDOW (rotated label on left edge)                          │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Labels (fixed on map):**
+- `FLOOR PLAN` (section header)
+- `MAIN DINING`, `VIP / PRIVATE`, `BAR`, `WINDOW`
+- `🍳 KITCHEN COUNTER`, `🚪 ENTRANCE`
+
+**Legend:**
+- `● Available` (green), `● Occupied` (orange), `● VIP` (purple), `● Bar` (cyan)
+
+**Per Table (occupied):**
+- `{T-label}` (e.g., T1, VIP1, BAR1)
+- `{seats}p` (capacity)
+- `🔥` (fire icon)
+- `⏱{elapsed}` / `⏱{elapsed} ⚠` (timer with warning)
+- `{₱bill}` (running bill total)
+- `Unli Pork` / `Unli Beef` / `Unli Pork & Beef` (package label above table)
+- `+{merged tables}` (merge indicator)
+
+**Merge/Transfer Indicators:**
+- `🔀 Merging from {label} — tap occupied table to merge into`
+- `🔄 Transferring from {label} — tap empty table`
+
+**Context Menu (tap occupied table twice):**
+- `{T-label} Actions` (header)
+- `📋 View Orders`
+- `👥 Change Pax`
+- `🔀 Merge Table` (manager)
+- `🔄 Transfer Table` (manager)
+- `🗑 Void Table` (manager, red)
+
+**Empty Side Panel (no table selected):**
+- `📋` (large icon)
+- `No Table Selected`
+- `Tap an occupied table to view orders.`
+
+---
+
+### SCREEN 4: RUNNING BILL (Side Panel)
+
+**File:** `RunningBill.jsx`
+
+```
+┌──────────────────────────────┐
+│  ➕      {T-label}  👥 {N} pax│
+│  ADD           ✕ (close)     │
+│  {emoji} {Package Name} ·    │
+│  ⏱ {elapsed} ⚠ OVERTIME      │
+│  + {merged labels}           │
+│                              │
+│  ⚠ Session exceeded 90 min! │
+│  Consider checkout.          │
+│                              │
+│  Order List:                 │
+│  ┌──────────────────────────┐│
+│  │ {name} {weight}g   PKG   ││
+│  │ {note} · {time}   ₱{$$}  ││
+│  │                     ✕     ││
+│  │ {name}         FREE       ││
+│  │ {name}         VOID       ││
+│  │  voided by {name}         ││
+│  └──────────────────────────┘│
+│                              │
+│  🍽️ No orders yet            │
+│  Tap "➕ Add" below to start │
+│                              │
+│  {N} items · 🥩 {N}g         │
+│  cost ≈₱{N} (manager only)  │
+│  BILL           ₱{total}    │
+│                              │
+│  [🗑 Void] [💳 Checkout] [🖨 KOT]│
+└──────────────────────────────┘
+```
+
+**Text Elements:**
+- Header: `{T-label}`, `👥 {N} pax`
+- Package line: `{emoji} {Package Name}` or `No package — à la carte`
+- Timer: `⏱ {elapsed}` with states: normal / `⚠` warning / `⚠ OVERTIME`
+- Alert: `⚠ Session exceeded 90 minutes! Consider checkout.`
+- Alert: `⚠ Session approaching time limit. Consider checkout soon.`
+- Empty state: `🍽️`, `No orders yet`, `Tap "➕ Add" below to start`
+- Order tags: `PKG`, `FREE`, `VOID`, `{weight}g`
+- Footer: `{N} items · 🥩 {N}g`, `cost ≈{₱N}`, `BILL ₱{total}`
+- Buttons: `🗑 Void`, `💳 Checkout`, `🖨 KOT`
+- Floating button: `➕ ADD`
+
+---
+
+### SCREEN 5: ADD ITEM MODAL
+
+**File:** `AddItemModal.jsx`
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  LEFT PANEL                          │  RIGHT PANEL      │
+│  ➕ Add to Order                     │  Pending Items     │
+│  {emoji} {Package} · {N} pax        │  Review items      │
+│                                      │  before pushing    │
+│  TABS:                               │  to the main bill. │
+│  [🎫 Package][🥩 Meats][🥬 Sides]   │  👥 {N} Pax  ✎     │
+│  [🍜 Dishes][🥤 Drinks]             │                    │
+│  FREE — inventory tracked / PAID ITEM│  {item list}       │
+│                                      │  ┌────────────┐   │
+│  CONTENT varies by tab:             │  │ {name}      │   │
+│                                      │  │ {weight}g   │   │
+│  * Package: cards with price/pax    │  │ [-] 150g [+]│   │
+│  * Meats: grid with weighing        │  │ Fine-tune   │   │
+│  * Sides: grid with stock           │  │ [==slider==]│   │
+│  * Dishes: sub-tabs + grid          │  └────────────┘   │
+│  * Drinks: grid with pricing        │                    │
+│                                      │  PENDING TOTAL     │
+│                                      │  ₱{total}          │
+│                                      │                    │
+│                                      │ [Undo] [⚡ CHARGE] │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Header:**
+- `➕ Add to Order`
+- `{emoji} {Package Name} · {N} pax` or `{N} pax · No package selected`
+
+**Tabs:**
+- `🎫 Package`, `🥩 Meats`, `🥬 Sides`, `🍜 Dishes`, `🥤 Drinks`
+
+**Sub-header:** `FREE — inventory tracked` (package/meat/sides) or `PAID ITEM` (dishes/drinks)
+
+**Package Tab:**
+- Warning: `⚠ Selecting a new package will replace the current one ({name})`
+- Per package card:
+  - `{emoji} {name}`, `{description}`
+  - `{₱price}/pax`, `= ₱{total}`
+  - `✓ {N} sides, {N}g initial meats`
+  - `✓ ACTIVE` (current)
+
+**Meat Tab:**
+- Empty: `🎫`, `Select a package first to add meats`, `[Go to Packages]`
+- Per meat card: `{name}`, `≈{₱cost}/100g` (manager), stock status:
+  - `Not in package`, `Out of stock`, `⚠ Low — {N}g`, `{N}g available`
+  - `FREE · tap to weigh`
+- Weight entry: `← Back to meats`, `{name}`, `{N}g available · FREE with {pkg}`
+  - Preset buttons: `100g`, `150g`, `200g`, `250g`, `300g`, `500g`
+  - Input placeholder: `Enter grams...`
+  - Button: `ADD {N}g {meat name}`
+
+**Sides Tab:**
+- Per card: `{name}`, `{stock} {unit} · FREE`
+
+**Dishes Tab:**
+- Sub-tabs: `Snacks`, `Rice`, `Noodles`, `Soup`
+- Per card: `{name}`, `₱{price}`
+
+**Drinks Tab:**
+- Per card: `{name}`, `₱{price}`
+
+**Pending Sidebar (right):**
+- Header: `Pending Items`, `Review items before pushing to the main table bill.`
+- Pax button: `👥 {N} Pax ✎`
+- Empty: `🍽️`, `No pending items`
+- Package item: `{N} pax`
+- Meat item: `{name}`, `{N}g total`, `Fine-tune Weight`, slider `-50g` to `+50g`
+- Side/dish/drink item: `{name}`, `₱{price}` or `FREE`, qty `[-] {N} [+]`
+- Footer: `PENDING TOTAL ₱{total}`
+- Buttons: `Undo`, `⚡ CHARGE ({N})`
+
+---
+
+### SCREEN 6: CHECKOUT / RECEIPT MODAL
+
+**File:** `ReceiptModal.jsx`
+
+```
+┌──────────────────────────────┐
+│  🧾 {T-label} — Checkout     │
+│  {N} pax · {Package} · {time}│
+│  {OR number}                 │
+│                              │
+│  Line Items:                 │
+│  {name} ({weight}g)  ₱{price}│
+│  {name}              free    │
+│                              │
+│  📊 {N}g meat · est. cost    │
+│  ₱{N} · margin ≈₱{N}        │
+│  (manager only)              │
+│                              │
+│  DISCOUNT                    │
+│  [None][Senior 20%][PWD 20%] │
+│  [Promo 10%]                 │
+│  ┌────────────┐┌───────────┐ │
+│  │Customer name││ID number  │ │
+│  └────────────┘└───────────┘ │
+│                              │
+│  LEFTOVER PENALTY (₱200/pax) │
+│  ┌───────────────────┐       │
+│  │Leftover grams     │ □ Ovr │
+│  └───────────────────┘       │
+│  +₱{N} penalty ({N} pax×₱200)│
+│                              │
+│  Subtotal           ₱{N}    │
+│  Discount          −₱{N}    │
+│  Leftover penalty  +₱{N}    │
+│  ─────────────────────────  │
+│  TOTAL              ₱{N}    │
+│                              │
+│  VATable Sales      ₱{N}    │
+│  VAT (12%)          ₱{N}    │
+│  VAT-Exempt Sales   ₱{N}    │
+│                              │
+│  [💵 Cash][💳 Card][📱 GCash]│
+│  ┌───────────────────┐       │
+│  │ Cash tendered...  │       │
+│  └───────────────────┘       │
+│  CHANGE: ₱{N}               │
+│                              │
+│  [ ✓ CONFIRM & CLOSE TABLE ] │
+└──────────────────────────────┘
+```
+
+**Text Elements:**
+- Header: `🧾 {T-label} — Checkout`, `{N} pax · {Package} · {time}`, `{OR-YYYYMMDD-XXXX}`
+- Manager info: `📊 {N}g meat · est. cost ₱{N} · margin ≈₱{N}`
+- Section: `DISCOUNT`
+  - Buttons: `None`, `Senior 20%`, `PWD 20%`, `Promo 10%`
+  - Inputs: `Customer name *`, `ID number *`
+- Section: `LEFTOVER PENALTY (₱200/PAX)`
+  - Input: `Leftover grams (0 = none)`
+  - Checkbox: `Override` (manager)
+  - Text: `+₱{N} penalty ({N} pax × ₱200)`
+- Totals: `Subtotal`, `Discount`, `Leftover penalty`, `TOTAL`
+- Tax: `VATable Sales`, `VAT (12%)`, `VAT-Exempt Sales`
+- Payment: `💵 Cash`, `💳 Card`, `📱 GCash`
+  - Input: `Cash tendered...`
+  - Computed: `CHANGE: ₱{N}`
+- Button: `✓ CONFIRM & CLOSE TABLE`
+
+---
+
+### SCREEN 6B: KOT (Kitchen Order Ticket) PRINT PREVIEW
+
+**File:** `App.jsx` (modal)
+
+```
+┌──────────────────────────┐
+│   🔥 WTF! SAMGYUP         │
+│  KITCHEN ORDER TICKET     │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─     │
+│ Table: {label}  Pax: {N}  │
+│ {date/time}               │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─     │
+│ 🥩 {name}         {N}g    │
+│ 🍜 {name}            1    │
+│ 🥤 {name}            1    │
+│ 🥬 {name}            1    │
+│ ═ ═ ═ ═ ═ ═ ═ ═ ═ ═     │
+│ Printed: {time}           │
+└──────────────────────────┘
+  [🖨 Print]  [Close]
+```
+
+---
+
+### SCREEN 6C: RECEIPT PREVIEW (Reports)
+
+**File:** `Reports.jsx` → `ReceiptPreview`
+
+```
+┌──────────────────────────┐
+│  {Business Name}          │
+│  {Business Address}       │
+│  VAT REG TIN: {tin}      │
+│  MIN: {serial}            │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─    │
+│ Receipt No: {OR-XXXX}    │
+│ Date: {date}             │
+│ Table: {label} | Pax: {N}│
+│ Cashier: {name}          │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─    │
+│ {qty}x {item}    ₱{price}│
+│ Discount         −₱{N}   │
+│ Leftover Penalty  ₱{N}   │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─    │
+│ TOTAL DUE         ₱{N}   │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─    │
+│ VATable Sales     ₱{N}   │
+│ VAT Amount (12%)  ₱{N}   │
+│ VAT Exempt Sales  ₱{N}   │
+│ Zero Rated Sales   0.00  │
+│                          │
+│ PTU No: {ptu}            │
+│ {footer text}            │
+│                          │
+│    [Close Preview]       │
+└──────────────────────────┘
+```
+
+---
+
+### SCREEN 7: KITCHEN QUEUE VIEW
+
+**File:** `KitchenView.jsx`
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  🍳 Kitchen Queue   [{N} Active Tables] [{N} Meat Orders]│
+│                     [{N} Dish Orders]                     │
+│                                                          │
+│  😴  No active tables                                    │
+│      Kitchen queue is clear                              │
+│                                                          │
+│  ┌─────────────────────┐  ┌─────────────────────┐       │
+│  │ {T-label}           │  │ {T-label}           │       │
+│  │ {N} pax · {Package} │  │ {N} pax · à la carte│       │
+│  │          ⏱ {elapsed} │  │          ⏱ {elapsed} │       │
+│  │                     │  │                     │       │
+│  │ 🥩 MEATS — {N}g total│  │ 🥩 MEATS — {N}g     │       │
+│  │ 🥩 {name}     {N}g   │  │                     │       │
+│  │                     │  │ 🍜 DISHES & DRINKS   │       │
+│  │ 🍜 DISHES & DRINKS   │  │ {name}    {time}    │       │
+│  │ {name}    {time}    │  │                     │       │
+│  │                     │  │ 🥬 SIDE REQUESTS     │       │
+│  │ 🥬 SIDE REQUESTS     │  │ {name}    {time}    │       │
+│  │ {name}    {time}    │  │                     │       │
+│  │                     │  │ No actionable orders│       │
+│  └─────────────────────┘  └─────────────────────┘       │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Text Elements:**
+- Header: `🍳 Kitchen Queue`
+- Stat pills: `{N} Active Tables`, `{N} Meat Orders`, `{N} Dish Orders`
+- Empty state: `😴`, `No active tables`, `Kitchen queue is clear`
+- Per table card header: `{T-label}`, `{N} pax · {Package}` or `{N} pax · à la carte`, `⏱ {elapsed}`
+- Sections: `🥩 MEATS — {N}g total`, `🍜 DISHES & DRINKS`, `🥬 SIDE REQUESTS`
+- Empty card: `No actionable orders yet`
+
+---
+
+## MODULE 2: MEAT & PANTRY INVENTORY SYSTEM
+
+---
+
+### SCREEN 8: STOCK MANAGEMENT
+
+**File:** `StockManager.jsx`
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  📦 Stock Management                                    {date}       │
+│  Meat, sides, and pantry inventory              [🕐 Audit Log ▸]   │
+│                                                                      │
+│  [🥩 Meats] [🥬 Sides({N})] [📦 Pantry({N})]                       │
+│                                                                      │
+│  [{N}kg Servable Meat] [{N} Low Sides] [{N} Low Pantry]             │
+│                                                                      │
+│  ══ MEATS TAB ══                                                     │
+│  🥩 Meat Inventory · All weights in grams                            │
+│  ┌─────────────────────────────┐                                     │
+│  │ [image]           ✓ OK/LOW/OUT│                                   │
+│  │ {Meat Name}                  │                                    │
+│  │ {korean name}        {N}g    │                                    │
+│  │ Servable / Par Level         │                                    │
+│  │ {N}g / {N}g                  │                                    │
+│  │ [████████░░] progress bar    │                                    │
+│  │                              │                                    │
+│  │ Variants:                    │                                    │
+│  │  {icon} {Variant Label}      │                                    │
+│  │         {sub desc}    {N}g   │                                    │
+│  │  ...                         │                                    │
+│  │ Cost: ₱{N}/kg                │                                    │
+│  │ Servable value: ₱{N}        │                                    │
+│  └─────────────────────────────┘                                     │
+│                                                                      │
+│  ══ SIDES TAB ══                                                     │
+│  🥬 Sides & Accompaniments · Tap a card to restock or deduct        │
+│  ┌────────────────┐                                                  │
+│  │ [image]  {icon} │                                                 │
+│  │ {name}          │                                                 │
+│  │ [████░░] {N}    │                                                 │
+│  │ Par: {N}        │                                                 │
+│  └────────────────┘                                                  │
+│                                                                      │
+│  ══ PANTRY TAB ══                                                    │
+│  {CATEGORY NAME}  (uppercase, e.g. STAPLES, SAUCES, PRODUCE)        │
+│  ┌──────────────────────────────────────┐                            │
+│  │ {icon} {name}    OUT/LOW             │                            │
+│  │        [████░░] {N} {unit}           │                            │
+│  │               par: {N}  ₱{N}/{unit}  │                            │
+│  └──────────────────────────────────────┘                            │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Audit Log Sidebar (toggle):**
+```
+┌────────────────────┐
+│  🕐 Audit Log      │
+│  {N} entries    ✕   │
+│                    │
+│  No stock changes  │
+│  yet               │
+│                    │
+│  Grouped entries:  │
+│  ┌────────────────┐│
+│  │ {title}        ││
+│  │ ● {userName}   ││
+│  │ {time}         ││
+│  │ {itemName}     ││
+│  │ +{N} g / -{N} g││
+│  │ {category}     ││
+│  │ {note}         ││
+│  │ 📷 View Attach.││
+│  └────────────────┘│
+└────────────────────┘
+```
+
+**Text Elements:**
+- Header: `📦 Stock Management`, `Meat, sides, and pantry inventory`
+- Toggle: `🕐 Audit Log ▸` / `🕐 Audit Log ◂`
+- Sub-tabs: `🥩 Meats`, `🥬 Sides`, `📦 Pantry` (with badge counts for low items)
+- Stat pills: `{N}kg Servable Meat`, `{N} Low Sides`, `{N} Low Pantry`
+- Meat section: `🥩 Meat Inventory · All weights in grams`
+  - Tags: `✓ OK`, `✓ LOW`, `✓ OUT`
+  - Labels: `Servable / Par Level`, `Cost: ₱{N}/kg`, `Servable value: ₱{N}`
+- Sides section: `🥬 Sides & Accompaniments · Tap a card to restock or deduct`
+  - Labels: `Par: {N}`
+- Pantry section: Category headers (e.g., `STAPLES`, `SAUCES`, `PRODUCE`, `SUPPLIES`)
+  - Tags: `OUT`, `LOW`
+  - Labels: `par: {N}`, `₱{N}/{unit}`
+- Audit: `🕐 Audit Log`, `{N} entries`, `No stock changes yet`, `📷 View Attachment`
+
+---
+
+## MODULE 3: EXPENSES RECORDING (Future — PRD2 Spec)
+
+> **Note:** The Expenses module is specified in PRD2 but not yet implemented in the prototype.
+> The following is the PRD2 specification for reference.
+
+**PRD2 Expense Entry Interface Requirements:**
+- Secure, PIN-protected dropdown forms for categorizing daily expenses
+- Categories: electricity, gas, labor, supplies, others
+- Owner PIN required for all expense entries
+- Automatic logging of recurring fixed costs (rent, subscriptions)
+- Daily and monthly expense-vs-sales summaries
+
+---
+
+## MODULE 4: MULTI-BRANCH ANALYTICS DASHBOARD
+
+---
+
+### SCREEN 9: REPORTS VIEW
+
+**File:** `Reports.jsx`
+
+**Tab Bar:**
+```
+[X-Read] [Z-Read] [📊 Analytics] [Voids({N})] [SC/PWD] [Leftover] [Audit] [eSales]
+⚠ Limited (Staff)  ← shown for staff role
+```
+
+---
+
+#### 9A: X-READING / Z-READING
+
+```
+X-Reading (Mid-Day) — {Day, Month Date, Year}
+  or
+Z-Reading (End of Day) — {Day, Month Date, Year}
+
+  ⚠️ Perform Z-Reading to finalize today's sales
+     and increment the Z-Counter.
+  [Execute Z-Reading now]
+
+┌────────────────┐ ┌────────────────┐ ┌────────────────┐
+│ Gross Sales    │ │ Voids/Refunds  │ │ Discounts      │
+│ ₱{N}           │ │ ₱{N}           │ │ ₱{N}           │
+├────────────────┤ ├────────────────┤ ├────────────────┤
+│ VATable Sales  │ │ VAT Amount(12%)│ │ VAT Exempt     │
+│ ₱{N}           │ │ ₱{N}           │ │ ₱{N}           │
+├────────────────┤ ├────────────────┤ ├────────────────┤
+│ Net Sales      │ │ Grand Acc Total│ │ Z-Counter      │
+│ ₱{N}           │ │ ₱{N}           │ │ {N}            │
+├────────────────┤ ├────────────────┤ ├────────────────┤
+│ Beginning OR   │ │ Ending OR      │ │ Total Txns     │
+│ {XXXX}         │ │ {XXXX}         │ │ {N}            │
+└────────────────┘ └────────────────┘ └────────────────┘
+
+Today's Transactions
+  📋 No transactions today
+
+  OR-{XXXX}  {T-label}  {N} pax · {N}g · {time} · {cashier}  {METHOD}  ₱{total}
+```
+
+**Text Elements:**
+- `X-Reading (Mid-Day)` / `Z-Reading (End of Day)` + date
+- Z-Read warning: `⚠️ Perform Z-Reading to finalize today's sales and increment the Z-Counter.`
+- Button: `Execute Z-Reading now`
+- Stat cards: `Gross Sales`, `Voids / Refunds`, `Discounts (SC/PWD)`, `VATable Sales`, `VAT Amount (12%)`, `VAT Exempt Sales`, `Net Sales`, `Grand Acc. Total`, `Z-Counter`, `Beginning OR`, `Ending OR`, `Total Txns`
+- Section: `Today's Transactions`
+- Empty: `📋 No transactions today`
+
+---
+
+#### 9B: SALES ANALYTICS
+
+```
+📊 Sales Analytics (All Time)
+  📊 No transaction data yet
+
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│Total Revenue│ │ Total Pax   │ │ Total Voids │ │Meat Consumpt│
+│ ₱{N}        │ │ {N}         │ │ ₱{N}        │ │ {N} kg      │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+
+┌──────────────────────┐  ┌──────────────────────┐
+│ 🏆 Best Sellers       │  │ 💳 Payment Methods    │
+│ No à la carte yet    │  │                      │
+│ {rank} {emoji} {name}│  │ {METHOD}             │
+│        {bar} {N}× ₱{N}│  │ {N} txns     ₱{N}   │
+│                      │  │              {N}%    │
+└──────────────────────┘  └──────────────────────┘
+```
+
+---
+
+#### 9C: VOID LOG
+
+```
+Void & Exception Audit
+  ✅ No voids recorded
+
+  {name}
+  {table} · by {name} · approved by {name} · {time}
+  {reason}                                    ₱{price}
+
+  Total voided value: ₱{N} (manager only)
+```
+
+---
+
+#### 9D: SC/PWD DISCOUNT LOG
+
+```
+Senior Citizen / PWD Discount Log
+BIR-required audit trail for all tax-exempt transactions.
+  📄 No SC/PWD discounts applied
+
+  {name}    ID: {number}          [SENIOR] / [PWD]
+  Gross         Discount       Net
+  ₱{N}          ₱{N}           ₱{N}
+  {table} · {cashier} · {time}
+```
+
+---
+
+#### 9E: LEFTOVER LOG
+
+```
+Leftover / Penalty Fee Log
+Tracks ₱200/head leftover penalty charges
+  🍖 No leftover penalties recorded
+
+  {T-label}                [MANAGER OVERRIDE]
+  Persons      Leftover       Penalty
+  {N}          {N}g           ₱{N}
+  {cashier} · {time} · override by {name}
+```
+
+---
+
+#### 9F: SYSTEM AUDIT TRAIL
+
+```
+System Audit Trail
+System logs tracking critical operations and inventory tweaks.
+  ⚠️ You are viewing limited audit logs. (staff)
+  🔎 No audit trails found
+
+  {itemName}                 [{category}]
+  +{N} {unit} / -{N} {unit}
+  {note}
+  {time} · {userName} ({userRole})
+```
+
+---
+
+#### 9G: eSALES EXPORT
+
+```
+eSales Export
+Generate standardized BIR eSales report for submission.
+
+  Year         Month (1-12)
+  ┌────────┐   ┌────────┐
+  │ {YYYY} │   │ {MM}   │
+  └────────┘   └────────┘
+
+  [📥 Export JSON Data]
+```
+
+
+
+### SCREEN 11: MENU MANAGER (Manager)
+
+**File:** `MenuManager.jsx`
+
+```
+🍽️ Menu Management
+{N} items across {N} categories
+
+  [{icon} {Category} ({N})] ...
+
+  ┌──────────────────────────────────────┐
+  │ {icon}(large)                        │
+  │ {Category Name}                      │
+  │ {N} items · {description}            │
+  │                        Avg. Margin   │
+  │                         {N}%         │
+  └──────────────────────────────────────┘
+
+  ┌──────────────────────────┐
+  │ [image]        ₱{price}  │
+  │                {category}│
+  │ {emoji} {name}           │
+  │ {description}            │
+  │                          │
+  │ Package: {N} meats ·     │
+  │   {N} auto-sides         │
+  │ Unlimited grill ·        │
+  │   Per person pricing     │
+  │                          │
+  │                          │
+  │ [▼ Show {N} ingredients] │
+  │ {ingredient list}        │
+  │ ♻ Uses kitchen scraps    │
+  │                          │
+  │ ● Ready to serve (drinks)│
+  └──────────────────────────┘
+```
+
+**Text Elements:**
+- Header: `🍽️ Menu Management`, `{N} items across {N} categories`
+- Categories: `🎫 Unlimited Grill`, `🥟 Snacks`, `🍚 Rice`, `🍜 Noodles`, `🍲 Soup`, `🥤 Drinks`
+- Hero banner: `{icon}`, `{Category Name}`, `{N} items · {description}`
+  - Descriptions: `Unlimited grill packages with auto-sides`, `Ready to serve beverages`, `All items have linked recipes for cost tracking`
+  - `Avg. Margin {N}%`
+- Package card metadata: `{N} meats · {N} auto-sides`, `Unlimited grill · Per person pricing`
+- Cost labels: `COST`, `MARGIN`, `%`, `PREP`
+- Ingredient toggle: `▼ Show {N} ingredients` / `▲ Hide ingredients`
+- Scrap note: `♻ Uses kitchen scraps — reduces waste cost`
+- Drink note: `● Ready to serve`
+
+---
+
+## SHARED UI COMPONENTS
+
+### Open Table Form
+**File:** `OpenForm.jsx`
+- Title: `Open {T-label}`
+- Default pax: 2, range 1-12
+
+### Change Pax Form
+**File:** `PaxForm.jsx`
+- Title: `Change Pax`
+- Shows current pax, allow adjustment
+
+### Modal Wrapper
+**File:** `MWrap.jsx`
+- Generic wrapper with `{title}` and close button `✕`
+
+### Chips & Badges
+**File:** `Chip.jsx`, `UserBadge.jsx`, `Tag.jsx`, `TCM.jsx`
+- Chip: `{label}` with color dot
+- UserBadge: `{emoji} {Name}` with role color (Staff=blue, Manager=purple, Kitchen=orange), `Logout` button
+- Tag: colored label
+- TCM: text-in-circle micro-badge (e.g., `CASH`, `GCASH`, `SENIOR`, `PWD`)
