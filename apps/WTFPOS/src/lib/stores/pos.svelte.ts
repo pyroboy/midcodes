@@ -4,6 +4,8 @@
  */
 import type { Table, Order, MenuItem, KdsTicket, TableZone } from '$lib/types';
 import { nanoid } from 'nanoid';
+import { deductFromStock } from '$lib/stores/stock.svelte';
+import { log } from '$lib/stores/audit.svelte';
 
 const SESSION_SECONDS = 90 * 60;
 
@@ -88,12 +90,15 @@ export function openTable(tableId: string, pax: number = 4, packageName?: string
 	table.currentOrderId = orderId;
 	table.billTotal = 0;
 	orders.push({ id: orderId, tableId, tableNumber: table.number, packageName: packageName ?? null, packageId: null, pax, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null });
+	log.tableOpened(table.label, packageName ?? null, pax);
 	return orderId;
 }
 
 export function closeTable(tableId: string) {
 	const table = tables.find((t) => t.id === tableId);
 	if (!table) return;
+	const order = table.currentOrderId ? orders.find(o => o.id === table.currentOrderId) : null;
+	if (order) log.tableClosed(table.label, order.total);
 	table.status = 'available';
 	table.sessionStartedAt = null;
 	table.remainingSeconds = null;
@@ -133,6 +138,14 @@ export function addItemToOrder(orderId: string, item: MenuItem, qty: number, wei
 	recalcOrder(order);
 	const table = tables.find((t) => t.id === order.tableId);
 	if (table) table.billTotal = order.total;
+
+	// Auto-deduct from stock
+	const deductQty = item.isWeightBased ? (weight ?? 0) : qty;
+	if (deductQty > 0) deductFromStock(item.id, deductQty, order.tableId, order.id);
+
+	// Audit log
+	const tableLabel = tables.find(t => t.id === order.tableId)?.label ?? order.tableId;
+	log.itemCharged(item.name, tableLabel, weight ?? null, qty);
 	const ticket = kdsTickets.find((t) => t.orderId === orderId);
 	const kdsItem = { id: newItem.id, menuItemName: item.name, quantity: qty, status: 'pending' as const, weight, category: item.category };
 	if (ticket) ticket.items.push(kdsItem);
@@ -154,7 +167,7 @@ export function recalcOrder(order: Order) {
 
 export function markItemServed(orderId: string, itemId: string) {
 	const t = kdsTickets.find((t) => t.orderId === orderId);
-	if (t) { const i = t.items.find((i) => i.id === itemId); if (i) i.status = 'served'; }
+	if (t) { const i = t.items.find((i) => i.id === itemId); if (i) { i.status = 'served'; log.itemServed(i.menuItemName, t.tableNumber); } }
 	const o = orders.find((o) => o.id === orderId);
 	if (o) { const i = o.items.find((i) => i.id === itemId); if (i) i.status = 'served'; }
 }

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import type { Role } from '$lib/stores/session.svelte';
+	import { log } from '$lib/stores/audit.svelte';
+
 
 	interface UserRecord {
 		id: string;
@@ -94,7 +96,10 @@
 								<button
 									onclick={() => {
 										const u = users.find(u => u.id === user.id);
-										if (u) u.status = u.status === 'active' ? 'inactive' : 'active';
+										if (u) {
+											u.status = u.status === 'active' ? 'inactive' : 'active';
+											log.userStatusChanged(u.displayName, u.status);
+										}
 									}}
 									class="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors"
 									style="min-height: unset"
@@ -120,37 +125,37 @@
 			</div>
 			<div class="flex flex-col gap-4">
 				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Display Name</label>
-					<input type="text" placeholder="Full name" class="pos-input" />
+					<label for="displayName" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Display Name</label>
+					<input id="displayName" type="text" placeholder="Full name" class="pos-input" />
 				</div>
 				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Username</label>
-					<input type="text" placeholder="Login username" class="pos-input" />
+					<label for="username" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Username</label>
+					<input id="username" type="text" placeholder="Login username" class="pos-input" />
 				</div>
 				<div class="grid grid-cols-2 gap-3">
 					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Role</label>
-						<select class="pos-input">
+						<label for="role" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Role</label>
+						<select id="role" class="pos-input">
 							<option>staff</option>
 							<option>kitchen</option>
 							<option>manager</option>
 						</select>
 					</div>
 					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label>
-						<select class="pos-input">
+						<label for="branch" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label>
+						<select id="branch" class="pos-input">
 							<option>Quezon City</option>
 							<option>Makati</option>
 						</select>
 					</div>
 				</div>
 				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Temporary Password</label>
-					<input type="password" placeholder="Set initial password" class="pos-input" />
+					<label for="tempPass" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Temporary Password</label>
+					<input id="tempPass" type="password" placeholder="Set initial password" class="pos-input" />
 				</div>
 			</div>
 			<div class="flex gap-2">
-				<button class="btn-primary flex-1">Create User</button>
+				<button onclick={() => { log.userCreated('New User', 'staff', 'QC'); showAdd = false; }} class="btn-primary flex-1">Create User</button>
 				<button onclick={() => (showAdd = false)} class="btn-secondary flex-1">Cancel</button>
 			</div>
 		</div>

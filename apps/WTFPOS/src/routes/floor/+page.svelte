@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { tables, orders, openTable, tickTimers, MENU_ITEMS, addItemToOrder } from '$lib/stores/pos.svelte';
-	import type { Table, MenuItem, MenuCategory } from '$lib/types';
+	import type { Table, MenuItem, MenuCategory, DiscountType } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { formatCountdown, formatPeso, cn } from '$lib/utils';
+	import { log } from '$lib/stores/audit.svelte';
+	import { recalcOrder } from '$lib/stores/pos.svelte';
 
 	// ─── Timer ───────────────────────────────────────────────────────────────
 	$effect(() => {
@@ -51,6 +53,27 @@
 	}
 
 	function closeBill() {
+		selectedTableId = null;
+		showAddItem = false;
+	}
+
+	function applyDiscount(type: DiscountType) {
+		if (!activeOrder || !selectedTable) return;
+		const prev = activeOrder.discountType;
+		activeOrder.discountType = (prev === type) ? 'none' : type;
+		recalcOrder(activeOrder);
+		if (selectedTable) selectedTable.billTotal = activeOrder.total;
+		if (activeOrder.discountType === 'none') {
+			log.discountRemoved(selectedTable.label);
+		} else {
+			log.discountApplied(selectedTable.label, activeOrder.discountType, activeOrder.discountAmount);
+		}
+	}
+
+	function checkout(method: string = 'Cash') {
+		if (!activeOrder || !selectedTable) return;
+		log.tableClosed(selectedTable.label, activeOrder.total, method);
+		activeOrder.status = 'paid';
 		selectedTableId = null;
 		showAddItem = false;
 	}
@@ -427,7 +450,7 @@
 				<!-- Actions -->
 				<div class="flex gap-2 px-5 pb-5">
 					<button class="btn-danger flex-1 text-sm" style="min-height: 44px">🗑 Void</button>
-					<button class="btn-success flex-1 text-sm" style="min-height: 44px">💳 Checkout</button>
+					<button onclick={() => checkout('Cash')} class="btn-success flex-1 text-sm" style="min-height: 44px">💳 Checkout</button>
 					<button class="btn-secondary px-3 text-sm" style="min-height: 44px">🖨 KOT</button>
 				</div>
 			</div>
