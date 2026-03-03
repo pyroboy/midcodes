@@ -5,19 +5,46 @@
 	import type { Role } from '$lib/stores/session.svelte';
 
 	// ─── Accounts ─────────────────────────────────────────────────────────────
+	import type { LocationId } from '$lib/stores/session.svelte';
+	import { LOCATIONS } from '$lib/stores/session.svelte';
 
-	const ACCOUNTS: Record<string, { password: string; role: Role; displayName: string; dest: string; requiresPin?: boolean }> = {
-		staff:    { password: 'staff',    role: 'staff',   displayName: 'Maria Santos',  dest: '/floor' },
-		manager:  { password: 'manager',  role: 'manager', displayName: 'Juan Reyes',    dest: '/floor', requiresPin: true },
-		kitchen:  { password: 'kitchen',  role: 'kitchen', displayName: 'Pedro Cruz',    dest: '/kds' },
-		owner:    { password: 'owner',    role: 'owner',   displayName: 'Christopher S', dest: '/floor' }
+	type Account = { password: string; role: Role; displayName: string; dest: string; requiresPin?: boolean; locationId: LocationId };
+
+	const ACCOUNTS: Record<string, Account> = {
+		// ── Alta Cita · QC ──────────────────────────────────────────────────
+		'maria':  { password: 'maria',  role: 'staff',   displayName: 'Maria Santos',  dest: '/floor',   locationId: 'qc'    },
+		'juan':   { password: 'juan',   role: 'manager', displayName: 'Juan Reyes',    dest: '/floor',   requiresPin: true, locationId: 'qc'    },
+		'pedro':  { password: 'pedro',  role: 'kitchen', displayName: 'Pedro Cruz',    dest: '/kitchen', locationId: 'qc'    },
+		// ── Alona · Makati ──────────────────────────────────────────────────
+		'ana':    { password: 'ana',    role: 'staff',   displayName: 'Ana Lim',       dest: '/floor',   locationId: 'mkti'  },
+		'carlo':  { password: 'carlo',  role: 'manager', displayName: 'Carlo Ramos',   dest: '/floor',   requiresPin: true, locationId: 'mkti'  },
+		'jose':   { password: 'jose',   role: 'kitchen', displayName: 'Jose Santos',   dest: '/kitchen', locationId: 'mkti'  },
+		// ── QC Warehouse ────────────────────────────────────────────────────
+		'noel':   { password: 'noel',   role: 'staff',   displayName: 'Noel Garcia',   dest: '/stock',   locationId: 'wh-qc' },
+		// ── Management (all-locations) ───────────────────────────────────────
+		'chris':  { password: 'chris',  role: 'owner',   displayName: 'Christopher S', dest: '/floor',   locationId: 'all'   },
 	};
 
-	const TEST_CARDS: { username: string; badge: string; badgeClass: string; desc: string }[] = [
-		{ username: 'staff',   badge: '👤 Staff',   badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',   desc: 'Servers & Cashiers' },
-		{ username: 'manager', badge: '👑 Manager', badgeClass: 'bg-accent-light text-accent border-accent/30', desc: 'Admin + PIN: 1234' },
-		{ username: 'kitchen', badge: '🍳 Kitchen', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', desc: 'BOH Team → KDS' },
-		{ username: 'owner',   badge: '💼 Owner',   badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',  desc: 'Multi-branch access' }
+	const roleBadge: Record<Role, { label: string; cls: string }> = {
+		staff:   { label: 'Staff',   cls: 'bg-blue-50 text-blue-700 border-blue-200'          },
+		manager: { label: 'Manager', cls: 'bg-accent-light text-accent border-accent/30'       },
+		kitchen: { label: 'Kitchen', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+		owner:   { label: 'Owner',   cls: 'bg-purple-50 text-purple-700 border-purple-200'    },
+		admin:   { label: 'Admin',   cls: 'bg-gray-100 text-gray-700 border-gray-300'         },
+	};
+
+	const locationBadge: Record<LocationId, { label: string; cls: string }> = {
+		'qc':    { label: 'Alta Cita', cls: 'bg-sky-50 text-sky-700 border-sky-200'          },
+		'mkti':  { label: 'Alona',     cls: 'bg-teal-50 text-teal-700 border-teal-200'       },
+		'wh-qc': { label: 'Warehouse', cls: 'bg-amber-50 text-amber-700 border-amber-200'    },
+		'all':   { label: 'All',       cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+	};
+
+	const TEST_GROUPS: { heading: string; usernames: string[] }[] = [
+		{ heading: '🏠 Alta Cita · QC',   usernames: ['maria', 'juan', 'pedro'] },
+		{ heading: '🏠 Alona · Makati',    usernames: ['ana', 'carlo', 'jose']   },
+		{ heading: '🏭 QC Warehouse',      usernames: ['noel']                   },
+		{ heading: '💼 Management',        usernames: ['chris']                  },
 	];
 
 	// ─── Form state ───────────────────────────────────────────────────────────
@@ -42,7 +69,7 @@
 		if (!account) { error = 'Username not found.'; return; }
 		if (account.password !== password) { error = 'Incorrect password.'; return; }
 
-		setSession(account.displayName, account.role);
+		setSession(account.displayName, account.role, account.locationId);
 
 		if (account.requiresPin) {
 			pendingDest = account.dest;
@@ -63,11 +90,19 @@
 		else { pin = ''; pinError = true; }
 	}
 
-	// Auto-fill from test card
+	// Auto-fill from test card click
 	function useAccount(u: string) {
 		username = u;
 		password = ACCOUNTS[u].password;
 		error = '';
+	}
+
+	// One-click login (fill + submit)
+	function quickLogin(u: string) {
+		username = u;
+		password = ACCOUNTS[u].password;
+		error = '';
+		login();
 	}
 
 	const canLogin = $derived(username.trim().length > 0 && password.length > 0);
@@ -147,50 +182,64 @@
 	</div>
 
 	<!-- ─── Test Credentials Panel ───────────────────────────────────────── -->
-	<div class="w-[280px] flex flex-col gap-3">
+	<div class="w-[300px] flex flex-col gap-3">
 		<!-- Dev badge header -->
 		<div class="flex items-center gap-2 px-1">
 			<span class="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
 				🧪 Dev — Test Accounts
 			</span>
+			<span class="text-xs text-gray-400">click to login</span>
 		</div>
 
-		{#each TEST_CARDS as card (card.username)}
-			{@const acct = ACCOUNTS[card.username]}
-			<div class="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
-				<!-- Role badge + desc -->
-				<div class="flex items-center justify-between">
-					<span class={cn('rounded-full border px-3 py-0.5 text-xs font-semibold', card.badgeClass)}>
-						{card.badge}
-					</span>
-					<span class="text-xs text-gray-400">{card.desc}</span>
+		{#each TEST_GROUPS as group}
+			<div class="rounded-xl border border-border bg-surface overflow-hidden">
+				<!-- Group heading -->
+				<div class="bg-gray-50 border-b border-border px-3 py-2">
+					<p class="text-xs font-semibold text-gray-500">{group.heading}</p>
 				</div>
 
-				<!-- Credentials -->
-				<div class="flex flex-col gap-1 font-mono text-xs">
-					<div class="flex items-center gap-2">
-						<span class="w-16 text-gray-400">user</span>
-						<span class="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-800">{card.username}</span>
-					</div>
-					<div class="flex items-center gap-2">
-						<span class="w-16 text-gray-400">pass</span>
-						<span class="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-800">{acct.password}</span>
-					</div>
-				</div>
+				<!-- User rows -->
+				<div class="divide-y divide-border">
+					{#each group.usernames as u (u)}
+						{@const acct = ACCOUNTS[u]}
+						{@const rb = roleBadge[acct.role]}
+						{@const lb = locationBadge[acct.locationId]}
+						<button
+							onclick={() => quickLogin(u)}
+							class={cn(
+								'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-secondary active:scale-[0.99]',
+								username === u && 'bg-accent-light'
+							)}
+							style="min-height: unset"
+						>
+							<!-- Avatar initial -->
+							<div class="h-8 w-8 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600 select-none">
+								{acct.displayName[0]}
+							</div>
 
-				<!-- Auto-fill button -->
-				<button
-					onclick={() => useAccount(card.username)}
-					class={cn(
-						'w-full rounded-md border py-2 text-xs font-semibold transition-all active:scale-[0.98]',
-						username === card.username
-							? 'border-accent bg-accent-light text-accent'
-							: 'border-border bg-surface-secondary text-gray-600 hover:border-gray-300 hover:text-gray-900'
-					)}
-					style="min-height: unset"
-				>
-					{username === card.username ? '✓ Selected' : 'Use this account →'}
-				</button>
+							<!-- Name + badges -->
+							<div class="flex-1 min-w-0">
+								<p class="text-sm font-semibold text-gray-900 truncate leading-tight">{acct.displayName}</p>
+								<div class="flex items-center gap-1 mt-0.5 flex-wrap">
+									<span class={cn('rounded border px-1.5 py-0 text-[10px] font-semibold leading-4', rb.cls)}>
+										{rb.label}
+									</span>
+									<span class={cn('rounded border px-1.5 py-0 text-[10px] font-semibold leading-4', lb.cls)}>
+										{lb.label}
+									</span>
+									{#if acct.requiresPin}
+										<span class="rounded border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-orange-700">
+											PIN
+										</span>
+									{/if}
+								</div>
+							</div>
+
+							<!-- Arrow -->
+							<span class="text-gray-300 text-sm flex-shrink-0">›</span>
+						</button>
+					{/each}
+				</div>
 			</div>
 		{/each}
 	</div>

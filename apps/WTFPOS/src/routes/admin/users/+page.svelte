@@ -1,7 +1,17 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import type { Role } from '$lib/stores/session.svelte';
+	import { ROLE_NAV_ACCESS } from '$lib/stores/session.svelte';
 	import { log } from '$lib/stores/audit.svelte';
+
+	/** Friendly tab name map for display */
+	const TAB_LABELS: Record<string, string> = {
+		'/floor': 'Floor',
+		'/kitchen': 'Kitchen',
+		'/stock': 'Stock',
+		'/reports': 'Reports',
+		'/admin': 'Admin'
+	};
 
 
 	interface UserRecord {
@@ -16,11 +26,11 @@
 
 	let users = $state<UserRecord[]>([
 		{ id: 'u1', displayName: 'Christopher S.',  username: 'owner',   role: 'owner',   branch: 'All',               status: 'active',   lastLogin: 'Today 9:00 AM' },
-		{ id: 'u2', displayName: 'Juan Reyes',      username: 'manager', role: 'manager', branch: 'Quezon City',       status: 'active',   lastLogin: 'Today 10:15 AM' },
-		{ id: 'u3', displayName: 'Maria Santos',    username: 'staff',   role: 'staff',   branch: 'Quezon City',       status: 'active',   lastLogin: 'Today 11:00 AM' },
-		{ id: 'u4', displayName: 'Pedro Cruz',      username: 'kitchen', role: 'kitchen', branch: 'Quezon City',       status: 'active',   lastLogin: 'Today 9:30 AM' },
-		{ id: 'u5', displayName: 'Ana Reyes',       username: 'staff2',  role: 'staff',   branch: 'Makati',            status: 'active',   lastLogin: 'Mar 2, 3:00 PM' },
-		{ id: 'u6', displayName: 'Lito Gutierrez',  username: 'mgr2',    role: 'manager', branch: 'Makati',            status: 'inactive', lastLogin: 'Feb 28, 5:00 PM' }
+		{ id: 'u2', displayName: 'Juan Reyes',      username: 'manager', role: 'manager', branch: 'Alta Cita',       status: 'active',   lastLogin: 'Today 10:15 AM' },
+		{ id: 'u3', displayName: 'Maria Santos',    username: 'staff',   role: 'staff',   branch: 'Alta Cita',       status: 'active',   lastLogin: 'Today 11:00 AM' },
+		{ id: 'u4', displayName: 'Pedro Cruz',      username: 'kitchen', role: 'kitchen', branch: 'Alta Cita',       status: 'active',   lastLogin: 'Today 9:30 AM' },
+		{ id: 'u5', displayName: 'Ana Reyes',       username: 'staff2',  role: 'staff',   branch: 'Alona',            status: 'active',   lastLogin: 'Mar 2, 3:00 PM' },
+		{ id: 'u6', displayName: 'Lito Gutierrez',  username: 'mgr2',    role: 'manager', branch: 'Alona',            status: 'inactive', lastLogin: 'Feb 28, 5:00 PM' }
 	]);
 
 	const roleConfig: Record<Role, { label: string; class: string }> = {
@@ -54,6 +64,7 @@
 					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Username</th>
 					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Role</th>
 					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Branch</th>
+					<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Visible Tabs</th>
 					<th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Status</th>
 					<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Last Login</th>
 					<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Actions</th>
@@ -77,6 +88,13 @@
 							</span>
 						</td>
 						<td class="px-4 py-3 text-gray-500">{user.branch}</td>
+						<td class="px-4 py-3">
+							<div class="flex flex-wrap gap-1">
+								{#each ROLE_NAV_ACCESS[user.role] ?? [] as tab}
+									<span class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">{TAB_LABELS[tab] ?? tab}</span>
+								{/each}
+							</div>
+						</td>
 						<td class="px-4 py-3 text-center">
 							<span class={cn(
 								'rounded-full px-2.5 py-0.5 text-xs font-semibold',
@@ -144,8 +162,9 @@
 					<div class="flex flex-col gap-1.5">
 						<label for="branch" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label>
 						<select id="branch" class="pos-input">
-							<option>Quezon City</option>
-							<option>Makati</option>
+							<option value="qc">Alta Cita</option>
+							<option value="mkti">Alona</option>
+							<option value="all">All Branches</option>
 						</select>
 					</div>
 				</div>

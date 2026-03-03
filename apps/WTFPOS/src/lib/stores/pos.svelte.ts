@@ -6,37 +6,21 @@ import type { Table, Order, MenuItem, KdsTicket, TableZone } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { deductFromStock } from '$lib/stores/stock.svelte';
 import { log } from '$lib/stores/audit.svelte';
+import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 
 const SESSION_SECONDS = 90 * 60;
 
 // ─── Mock Table Layout — matching POS DESIGN.pen floor zones ─────────────────
 
 function makeTables(): Table[] {
-	return [
-		// Main Dining — T1-T8
+	// Helper to generate tables for a specific location
+	const gen = (locationId: string, prefix: string) => [
+		// Main Dining
 		...Array.from({ length: 8 }, (_, i) => ({
-			id: `T${i + 1}`,
-			number: i + 1,
-			label: `T${i + 1}`,
-			zone: 'main' as TableZone,
-			capacity: i < 6 ? 4 : 2,
-			status: 'available' as const,
-			sessionStartedAt: null,
-			remainingSeconds: null,
-			currentOrderId: null,
-			billTotal: null
-		})),
-		// VIP / Private
-		{
-			id: 'VIP1', number: 101, label: 'VIP1', zone: 'vip' as TableZone,
-			capacity: 8, status: 'occupied' as const,
-			sessionStartedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-			remainingSeconds: 45 * 60, currentOrderId: 'order-vip1', billTotal: 12056
-		},
-		// Bar
-		{ id: 'BAR1', number: 201, label: 'BAR1', zone: 'bar' as TableZone, capacity: 2, status: 'available' as const, sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null },
-		{ id: 'BAR2', number: 202, label: 'BAR2', zone: 'bar' as TableZone, capacity: 2, status: 'available' as const, sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null }
+			id: `${prefix}-T${i + 1}`, locationId, number: i + 1, label: `T${i + 1}`, zone: 'main' as TableZone, capacity: i < 6 ? 4 : 2, status: 'available' as const, sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null
+		}))
 	];
+	return [...gen('qc', 'QC'), ...gen('mkti', 'MK')];
 }
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
@@ -62,25 +46,14 @@ export const MENU_ITEMS: MenuItem[] = [
 // ─── Reactive State ───────────────────────────────────────────────────────────
 
 export const tables = $state<Table[]>(makeTables());
-export const orders = $state<Order[]>([
-	{
-		id: 'order-vip1', tableId: 'VIP1', tableNumber: 101, packageName: '🔥 Unli Pork & Beef', packageId: 'pkg-combo', pax: 4,
-		items: [
-			{ id: 'i1', menuItemId: 'pkg-combo',    menuItemName: '🔥 Unli Pork & Beef', quantity: 1, unitPrice: 3596, weight: null, status: 'served', sentAt: null, tag: 'PKG' },
-			{ id: 'i2', menuItemId: 'meat-samgyup', menuItemName: 'Samgyeopsal', quantity: 1, unitPrice: 0, weight: 200, status: 'served', sentAt: null, tag: 'FREE' },
-			{ id: 'i3', menuItemId: 'meat-chadol',  menuItemName: 'Chadolbaegi', quantity: 1, unitPrice: 0, weight: 150, status: 'served', sentAt: null, tag: 'FREE' },
-			{ id: 'i4', menuItemId: 'side-kimchi',  menuItemName: 'Kimchi',      quantity: 1, unitPrice: 0, weight: null, status: 'served', sentAt: null, tag: 'FREE' },
-			{ id: 'i5', menuItemId: 'side-japchae', menuItemName: 'Japchae',     quantity: 1, unitPrice: 180, weight: null, status: 'served', sentAt: null, tag: null }
-		],
-		status: 'open', discountType: 'none', subtotal: 3776, discountAmount: 0, vatAmount: 405, total: 3776,
-		payments: [], createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(), closedAt: null
-	}
-]);
+export const orders = $state<Order[]>([]);
 export const kdsTickets = $state<KdsTicket[]>([]);
 
 // ─── Table Actions ────────────────────────────────────────────────────────────
 
 export function openTable(tableId: string, pax: number = 4, packageName?: string): string {
+	// Warehouse locations have no tables — guard against accidental calls
+	if (isWarehouseSession()) return '';
 	const table = tables.find((t) => t.id === tableId);
 	if (!table || table.status !== 'available') return table?.currentOrderId ?? '';
 	const orderId = nanoid();
@@ -89,8 +62,33 @@ export function openTable(tableId: string, pax: number = 4, packageName?: string
 	table.remainingSeconds = SESSION_SECONDS;
 	table.currentOrderId = orderId;
 	table.billTotal = 0;
-	orders.push({ id: orderId, tableId, tableNumber: table.number, packageName: packageName ?? null, packageId: null, pax, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null });
+	orders.push({ id: orderId, locationId: table.locationId, orderType: 'dine-in', tableId, tableNumber: table.number, packageName: packageName ?? null, packageId: null, pax, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null, notes: '' });
 	log.tableOpened(table.label, packageName ?? null, pax);
+	return orderId;
+}
+
+export function createTakeoutOrder(customerName: string = 'Walk-in'): string {
+	const orderId = nanoid();
+	orders.push({
+		id: orderId,
+		locationId: (session.locationId === 'all' || session.locationId === 'wh-qc') ? 'qc' : session.locationId,
+		orderType: 'takeout',
+		customerName,
+		tableId: null,
+		tableNumber: null,
+		packageName: null,
+		packageId: null,
+		pax: 1,
+		items: [],
+		status: 'open',
+		discountType: 'none',
+		subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0,
+		payments: [],
+		createdAt: new Date().toISOString(),
+		closedAt: null,
+		notes: ''
+	});
+	log.tableOpened(`Takeout (${customerName})`, null, 1);
 	return orderId;
 }
 
@@ -120,7 +118,7 @@ export function tickTimers() {
 
 export function getOrder(orderId: string) { return orders.find((o) => o.id === orderId); }
 
-export function addItemToOrder(orderId: string, item: MenuItem, qty: number, weight?: number, forceFree: boolean = false) {
+export function addItemToOrder(orderId: string, item: MenuItem, qty: number, weight?: number, forceFree: boolean = false, notes?: string) {
 	const order = orders.find((o) => o.id === orderId);
 	if (!order) return;
 
@@ -133,7 +131,7 @@ export function addItemToOrder(orderId: string, item: MenuItem, qty: number, wei
 	const unitPrice = isFree ? 0 : (item.category === 'packages' ? item.price * order.pax : (item.isWeightBased ? Math.round((weight ?? 0) * (item.pricePerGram ?? 0)) : item.price));
 	const tag: 'PKG' | 'FREE' | null = isFree ? 'FREE' : (item.category === 'packages' ? 'PKG' : null);
 
-	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity: qty, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag };
+	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity: qty, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes };
 	order.items.push(newItem);
 	recalcOrder(order);
 	const table = tables.find((t) => t.id === order.tableId);
@@ -141,15 +139,15 @@ export function addItemToOrder(orderId: string, item: MenuItem, qty: number, wei
 
 	// Auto-deduct from stock
 	const deductQty = item.isWeightBased ? (weight ?? 0) : qty;
-	if (deductQty > 0) deductFromStock(item.id, deductQty, order.tableId, order.id);
+	if (deductQty > 0) deductFromStock(item.id, deductQty, order.tableId ?? 'takeout', order.id);
 
 	// Audit log
-	const tableLabel = tables.find(t => t.id === order.tableId)?.label ?? order.tableId;
+	const tableLabel = order.tableId ? (tables.find(t => t.id === order.tableId)?.label ?? order.tableId) : 'Takeout';
 	log.itemCharged(item.name, tableLabel, weight ?? null, qty);
 	const ticket = kdsTickets.find((t) => t.orderId === orderId);
-	const kdsItem = { id: newItem.id, menuItemName: item.name, quantity: qty, status: 'pending' as const, weight, category: item.category };
+	const kdsItem = { id: newItem.id, menuItemName: item.name, quantity: qty, status: 'pending' as const, weight, category: item.category, notes };
 	if (ticket) ticket.items.push(kdsItem);
-	else kdsTickets.push({ orderId, tableNumber: order.tableNumber, items: [kdsItem], createdAt: new Date().toISOString() });
+	else kdsTickets.push({ orderId, tableNumber: order.tableNumber, customerName: order.customerName, items: [kdsItem], createdAt: new Date().toISOString() });
 }
 
 export function recalcOrder(order: Order) {

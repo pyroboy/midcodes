@@ -9,13 +9,13 @@
 
 	// Historical seed rows for week/month
 	const weekRows = [
-		{ tableId: 'T1',   label: 'T1',   zone: 'main', sessions: 14, pax: 52,  grossSales: 34020,  discounts: 2100, netSales: 31920 },
-		{ tableId: 'T2',   label: 'T2',   zone: 'main', sessions: 12, pax: 44,  grossSales: 28460,  discounts: 3200, netSales: 25260 },
-		{ tableId: 'VIP1', label: 'VIP1', zone: 'vip',  sessions: 5,  pax: 30,  grossSales: 58200,  discounts: 0,    netSales: 58200 },
+		{ tableId: 'T1', label: 'T1', zone: 'main', sessions: 14, pax: 52,  grossSales: 34020,  discounts: 2100, netSales: 31920 },
+		{ tableId: 'T2', label: 'T2', zone: 'main', sessions: 12, pax: 44,  grossSales: 28460,  discounts: 3200, netSales: 25260 },
+		{ tableId: 'T3', label: 'T3', zone: 'main', sessions: 10, pax: 36,  grossSales: 22800,  discounts: 1200, netSales: 21600 },
 	];
 	const monthRows = [
-		{ tableId: 'T1',   label: 'T1',   zone: 'main', sessions: 60, pax: 220, grossSales: 142000, discounts: 8500, netSales: 133500 },
-		{ tableId: 'VIP1', label: 'VIP1', zone: 'vip',  sessions: 22, pax: 132, grossSales: 248600, discounts: 0,    netSales: 248600 },
+		{ tableId: 'T1', label: 'T1', zone: 'main', sessions: 60, pax: 220, grossSales: 142000, discounts: 8500, netSales: 133500 },
+		{ tableId: 'T2', label: 'T2', zone: 'main', sessions: 52, pax: 188, grossSales: 120600, discounts: 6200, netSales: 114400 },
 	];
 
 	const rows = $derived(period === 'today' ? liveRows : period === 'week' ? weekRows : monthRows);
@@ -29,8 +29,6 @@
 
 	const zoneColor: Record<string, string> = {
 		main: 'bg-blue-50 text-blue-600',
-		vip:  'bg-purple-50 text-purple-600',
-		bar:  'bg-amber-50 text-amber-600',
 	};
 </script>
 

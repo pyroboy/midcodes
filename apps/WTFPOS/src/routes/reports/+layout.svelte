@@ -54,7 +54,7 @@
 	<div class="shrink-0 bg-white border-b border-border px-6 pt-3 pb-0 flex flex-col gap-2">
 		<div class="flex items-center gap-3">
 			<h1 class="text-xl font-bold text-gray-900 tracking-tight shrink-0">Consolidated Reports</h1>
-			{#if session.branch === 'all'}
+			{#if session.locationId === 'all'}
 				<span class="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700">
 					🌐 All Branches
 				</span>

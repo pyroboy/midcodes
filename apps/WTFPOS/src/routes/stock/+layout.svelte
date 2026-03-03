@@ -7,7 +7,7 @@
 	let { children }: { children: import('svelte').Snippet } = $props();
 
 	let currentRoute = $derived(page.url.pathname);
-	const isAllBranches = $derived(session.branch === 'all');
+	const isAllBranches = $derived(session.locationId === 'all');
 
 	const tabs = [
 		{ href: '/stock/inventory', label: 'Current Inventory' },

@@ -1,34 +1,85 @@
 /**
  * Global Session State — Svelte 5 Runes
- * Holds the currently logged-in user and selected branch.
- * Read/written by TopBar and any page that needs role/branch context.
+ * Holds the currently logged-in user and selected location.
+ * Locations can be 'retail' (tables + POS + KDS) or 'warehouse' (inventory only).
  */
 
-export type Role     = 'staff' | 'manager' | 'kitchen' | 'owner' | 'admin';
-export type BranchId = 'qc' | 'mkti' | 'all';
+export type Role         = 'staff' | 'manager' | 'kitchen' | 'owner' | 'admin';
+export type LocationType = 'retail' | 'warehouse';
+export type LocationId   = 'qc' | 'mkti' | 'wh-qc' | 'all';
 
-export interface Branch { id: BranchId; name: string; }
+/** @deprecated Use LocationId */
+export type BranchId = LocationId;
 
-export const BRANCHES: Branch[] = [
-	{ id: 'qc',   name: 'Quezon City Branch' },
-	{ id: 'mkti', name: 'Makati Branch' },
-	{ id: 'all',  name: 'All Branches' }
+export interface Location {
+	id: LocationId;
+	name: string;
+	type: LocationType;
+}
+
+/** @deprecated Use Location */
+export interface Branch { id: LocationId; name: string; }
+
+export const LOCATIONS: Location[] = [
+	{ id: 'qc',    name: 'Alta Cita (QC)',       type: 'retail'    },
+	{ id: 'mkti',  name: 'Alona (Makati)',        type: 'retail'    },
+	{ id: 'wh-qc', name: 'QC Central Warehouse', type: 'warehouse' },
+	{ id: 'all',   name: 'All Locations',         type: 'retail'    },
 ];
 
-/** Roles that can see cross-branch data and the Admin tab */
+/** @deprecated Use LOCATIONS */
+export const BRANCHES = LOCATIONS;
+
+/** Roles that can see cross-location data and the Admin tab */
 export const ELEVATED_ROLES: Role[] = ['owner', 'admin', 'manager'];
 export const ADMIN_ROLES: Role[]    = ['owner', 'admin'];
 
+/** Which top-level nav tabs each role can access */
+export const ROLE_NAV_ACCESS: Record<Role, string[]> = {
+	staff:   ['/floor'],
+	kitchen: ['/kitchen', '/stock'],
+	manager: ['/floor', '/kitchen', '/stock', '/reports'],
+	owner:   ['/floor', '/kitchen', '/stock', '/reports', '/admin'],
+	admin:   ['/floor', '/kitchen', '/stock', '/reports', '/admin'],
+};
+
 export const session = $state({
-	userName: '',
-	role: 'staff' as Role,
-	/** branch is always 'qc' for non-elevated roles */
-	branch: 'qc' as BranchId
+	userName:   '',
+	role:       'staff' as Role,
+	/** Current location; replaces the old 'branch' field */
+	locationId: 'qc' as LocationId,
+	/** True when the user cannot switch locations */
+	isLocked:   false,
 });
 
-export function setSession(userName: string, role: Role) {
+// ─── Location Helpers ─────────────────────────────────────────────────────────
+
+export function getCurrentLocation(): Location | undefined {
+	return LOCATIONS.find(l => l.id === session.locationId);
+}
+
+/** True when the current location is a warehouse (inventory-only, no POS/floor) */
+export function isWarehouseSession(): boolean {
+	return getCurrentLocation()?.type === 'warehouse';
+}
+
+export function isRetailSession(): boolean {
+	return !isWarehouseSession();
+}
+
+export function setSession(userName: string, role: Role, locationId: LocationId = 'qc') {
 	session.userName = userName;
 	session.role     = role;
-	// Non-elevated roles are always scoped to a single branch
-	session.branch   = ELEVATED_ROLES.includes(role) ? session.branch : 'qc';
+
+	const isElevated = ELEVATED_ROLES.includes(role);
+
+	// Non-elevated roles cannot be placed in the aggregate 'all' view
+	if (!isElevated && locationId === 'all') {
+		session.locationId = 'qc';
+	} else {
+		session.locationId = locationId;
+	}
+
+	// Non-elevated roles are locked to their assigned location
+	session.isLocked = !isElevated;
 }

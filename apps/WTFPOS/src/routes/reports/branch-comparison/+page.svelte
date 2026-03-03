@@ -19,16 +19,16 @@
 
 	const data: Record<Period, BranchData[]> = {
 		today: [
-			{ name: 'Quezon City', grossRevenue: 34696, netRevenue: 33748, totalExpenses: 8767, grossProfit: 19168, netProfit: 10401, grossMarginPct: 56.8, netMarginPct: 30.8, pax: 46, avgTicket: 734 },
-			{ name: 'Makati',      grossRevenue: 28400, netRevenue: 27200, totalExpenses: 7200, grossProfit: 15600, netProfit: 8400,  grossMarginPct: 57.4, netMarginPct: 30.9, pax: 38, avgTicket: 716 }
+			{ name: 'Alta Cita', grossRevenue: 34696, netRevenue: 33748, totalExpenses: 8767, grossProfit: 19168, netProfit: 10401, grossMarginPct: 56.8, netMarginPct: 30.8, pax: 46, avgTicket: 734 },
+			{ name: 'Alona',     grossRevenue: 28400, netRevenue: 27200, totalExpenses: 7200, grossProfit: 15600, netProfit: 8400,  grossMarginPct: 57.4, netMarginPct: 30.9, pax: 38, avgTicket: 716 }
 		],
 		week: [
-			{ name: 'Quezon City', grossRevenue: 198400, netRevenue: 175020, totalExpenses: 60817, grossProfit: 102620, netProfit: 41803, grossMarginPct: 58.6, netMarginPct: 23.9, pax: 232, avgTicket: 754 },
-			{ name: 'Makati',      grossRevenue: 172600, netRevenue: 158400, totalExpenses: 55200, grossProfit: 92400,  netProfit: 37200, grossMarginPct: 58.3, netMarginPct: 23.5, pax: 210, avgTicket: 754 }
+			{ name: 'Alta Cita', grossRevenue: 198400, netRevenue: 175020, totalExpenses: 60817, grossProfit: 102620, netProfit: 41803, grossMarginPct: 58.6, netMarginPct: 23.9, pax: 232, avgTicket: 754 },
+			{ name: 'Alona',     grossRevenue: 172600, netRevenue: 158400, totalExpenses: 55200, grossProfit: 92400,  netProfit: 37200, grossMarginPct: 58.3, netMarginPct: 23.5, pax: 210, avgTicket: 754 }
 		],
 		month: [
-			{ name: 'Quezon City', grossRevenue: 824000, netRevenue: 722000, totalExpenses: 261600, grossProfit: 424000, netProfit: 162400, grossMarginPct: 58.7, netMarginPct: 22.5, pax: 960, avgTicket: 752 },
-			{ name: 'Makati',      grossRevenue: 716000, netRevenue: 648000, totalExpenses: 238400, grossProfit: 380000, netProfit: 141600, grossMarginPct: 58.6, netMarginPct: 21.9, pax: 880, avgTicket: 736 }
+			{ name: 'Alta Cita', grossRevenue: 824000, netRevenue: 722000, totalExpenses: 261600, grossProfit: 424000, netProfit: 162400, grossMarginPct: 58.7, netMarginPct: 22.5, pax: 960, avgTicket: 752 },
+			{ name: 'Alona',     grossRevenue: 716000, netRevenue: 648000, totalExpenses: 238400, grossProfit: 380000, netProfit: 141600, grossMarginPct: 58.6, netMarginPct: 21.9, pax: 880, avgTicket: 736 }
 		]
 	};
 

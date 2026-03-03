@@ -7,18 +7,19 @@ import { log } from '$lib/stores/audit.svelte';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type StockStatus = 'ok' | 'low' | 'critical';
+export type StockStatus   = 'ok' | 'low' | 'critical';
 export type StockCategory = 'Meats' | 'Sides' | 'Dishes' | 'Drinks';
-export type CountPeriod = '10am' | '4pm' | '10pm';
-export type MeatAnimal   = 'Pork' | 'Beef';
-export type MeatCutType  = 'Bone-In' | 'Bone-Out' | 'Bones' | 'Trimmings';
-
+export type CountPeriod   = '10am' | '4pm' | '10pm';
+export type MeatAnimal    = 'Pork' | 'Beef';
+export type MeatCutType   = 'Bone-In' | 'Bone-Out' | 'Bones' | 'Trimmings';
+/** The Branch or Warehouse where this stock is physically located */
 export interface StockItem {
 	id: string;
 	/** Maps to a menuItemId from POS (e.g. 'meat-samgyup') */
 	menuItemId: string;
 	name: string;
 	category: StockCategory;
+	locationId: string; // Changed from location: StockLocation
 	openingStock: number;
 	unit: string;
 	minLevel: number;
@@ -78,19 +79,24 @@ export interface StockCount {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const STOCK_ITEMS_LIST: { menuItemId: string; name: string; category: StockCategory; unit: string; minLevel: number }[] = [
-	{ menuItemId: 'meat-samgyup', name: 'Samgyupsal (Pork Belly)',   category: 'Meats',  unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'meat-chadol',  name: 'Chadolbaegi (Beef Brisket)',category: 'Meats',  unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'meat-galbi',   name: 'Galbi (Short Ribs)',        category: 'Meats',  unit: 'g',        minLevel: 1500 },
-	{ menuItemId: 'meat-beef',    name: 'US Beef Belly',             category: 'Meats',  unit: 'g',        minLevel: 1000 },
-	{ menuItemId: 'side-kimchi',  name: 'Kimchi',                    category: 'Sides',  unit: 'portions', minLevel: 10 },
-	{ menuItemId: 'side-japchae', name: 'Japchae',                   category: 'Sides',  unit: 'portions', minLevel: 8 },
-	{ menuItemId: 'side-rice',    name: 'Steamed Rice',              category: 'Sides',  unit: 'portions', minLevel: 15 },
-	{ menuItemId: 'dish-jjigae',  name: 'Doenjang Jjigae',           category: 'Dishes', unit: 'bowls',    minLevel: 5 },
-	{ menuItemId: 'dish-bibim',   name: 'Bibimbap',                  category: 'Dishes', unit: 'bowls',    minLevel: 5 },
-	{ menuItemId: 'drink-soju',   name: 'Soju (Original)',           category: 'Drinks', unit: 'bottles',  minLevel: 12 },
-	{ menuItemId: 'drink-beer',   name: 'San Miguel Beer',           category: 'Drinks', unit: 'bottles',  minLevel: 12 },
-	{ menuItemId: 'drink-tea',    name: 'Iced Tea',                  category: 'Drinks', unit: 'liters',   minLevel: 5 },
+export const STOCK_ITEMS_LIST: { menuItemId: string; name: string; category: StockCategory; locationId: string; unit: string; minLevel: number }[] = [
+	// ── QC Branch Stock ──────────────────────────────────────────────────────
+	{ menuItemId: 'meat-samgyup',    name: 'Samgyupsal (Pork Belly)',    category: 'Meats',  locationId: 'qc', unit: 'g',        minLevel: 2000 },
+	{ menuItemId: 'meat-chadol',     name: 'Chadolbaegi (Beef Brisket)', category: 'Meats',  locationId: 'qc', unit: 'g',        minLevel: 2000 },
+	{ menuItemId: 'side-kimchi',     name: 'Kimchi',                     category: 'Sides',  locationId: 'qc', unit: 'portions', minLevel: 10   },
+	{ menuItemId: 'side-rice',       name: 'Steamed Rice',               category: 'Sides',  locationId: 'qc', unit: 'portions', minLevel: 15   },
+	{ menuItemId: 'drink-soju',      name: 'Soju (Original)',            category: 'Drinks', locationId: 'qc', unit: 'bottles',  minLevel: 12   },
+
+	// ── Makati Branch Stock ──────────────────────────────────────────────────
+	{ menuItemId: 'meat-samgyup',    name: 'Samgyupsal (Pork Belly)',    category: 'Meats',  locationId: 'mkti', unit: 'g',        minLevel: 2000 },
+	{ menuItemId: 'meat-chadol',     name: 'Chadolbaegi (Beef Brisket)', category: 'Meats',  locationId: 'mkti', unit: 'g',        minLevel: 2000 },
+	{ menuItemId: 'drink-soju',      name: 'Soju (Original)',            category: 'Drinks', locationId: 'mkti', unit: 'bottles',  minLevel: 12   },
+
+	// ── Central Warehouse Stock ──────────────────────────────────────────────
+	{ menuItemId: 'meat-samgyup',    name: 'Samgyupsal (Bulk)',          category: 'Meats',  locationId: 'wh-qc', unit: 'g',        minLevel: 10000 },
+	{ menuItemId: 'meat-chadol',     name: 'Chadolbaegi (Bulk)',         category: 'Meats',  locationId: 'wh-qc', unit: 'g',        minLevel: 10000 },
+	{ menuItemId: 'meat-galbi',      name: 'Galbi (Bulk)',               category: 'Meats',  locationId: 'wh-qc', unit: 'g',        minLevel: 5000  },
+	{ menuItemId: 'side-noodles',    name: 'Dangmyeon Bulk',             category: 'Sides',  locationId: 'wh-qc', unit: 'portions', minLevel: 50    },
 ];
 
 export const WASTE_REASONS = ['Dropped / Spilled', 'Expired', 'Unusable (damaged)', 'Overcooked', 'Trimming (bone/fat)', 'Other'] as const;
@@ -103,7 +109,8 @@ export const stockItems = $state<StockItem[]>(
 		menuItemId: s.menuItemId,
 		name: s.name,
 		category: s.category,
-		openingStock: getOpeningStock(s.menuItemId),
+		locationId: s.locationId,
+		openingStock: getOpeningStock(s.menuItemId, s.locationId),
 		unit: s.unit,
 		minLevel: s.minLevel,
 	}))
@@ -121,13 +128,7 @@ export const wasteEntries = $state<WasteEntry[]>([
 	{ id: 'w3', stockItemId: 'si-9', itemName: 'Soju (Original)',     qty: 1,   unit: 'bottles', reason: 'Unusable (damaged)',   loggedBy: 'Maria S.', loggedAt: '2:10 PM' },
 ]);
 
-export const deductions = $state<Deduction[]>([
-	// Seed: VIP1 existing order consumed these
-	{ id: 'ded1', stockItemId: 'si-0', qty: 200, tableId: 'VIP1', orderId: 'order-vip1', timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString() },
-	{ id: 'ded2', stockItemId: 'si-1', qty: 150, tableId: 'VIP1', orderId: 'order-vip1', timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString() },
-	{ id: 'ded3', stockItemId: 'si-4', qty: 1,   tableId: 'VIP1', orderId: 'order-vip1', timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
-	{ id: 'ded4', stockItemId: 'si-5', qty: 1,   tableId: 'VIP1', orderId: 'order-vip1', timestamp: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
-]);
+export const deductions = $state<Deduction[]>([]);
 
 export const stockCounts = $state<StockCount[]>(
 	stockItems.map(s => ({
@@ -241,6 +242,24 @@ export function adjustStock(
 	});
 }
 
+/** Set stock to an absolute value by computing the delta and calling adjustStock */
+export function setStock(
+	stockItemId: string,
+	itemName: string,
+	targetQty: number,
+	unit: string,
+	reason: string,
+	meatAnimal?: MeatAnimal,
+	meatCut?: MeatCutType,
+	loggedBy: string = 'Staff'
+) {
+	const current = getCurrentStock(stockItemId);
+	const delta = targetQty - current;
+	if (delta === 0) return;
+	const type = delta > 0 ? 'add' : 'deduct';
+	adjustStock(stockItemId, itemName, type, Math.abs(delta), unit, reason || 'Manual stock set', meatAnimal, meatCut, loggedBy);
+}
+
 /** Called by POS when items are charged to a table */
 export function deductFromStock(menuItemId: string, qty: number, tableId: string, orderId: string) {
 	const item = stockItems.find(s => s.menuItemId === menuItemId);
@@ -266,12 +285,13 @@ export function submitCount(stockItemId: string, period: CountPeriod, value: num
 
 // ─── Seed Helpers ─────────────────────────────────────────────────────────────
 
-function getOpeningStock(menuItemId: string): number {
+function getOpeningStock(menuItemId: string, locationId: string): number {
+	if (locationId === 'wh-qc') return 50000; // Large stock for warehouse
 	const map: Record<string, number> = {
 		'meat-samgyup': 4200, 'meat-chadol': 3000, 'meat-galbi': 2000, 'meat-beef': 3000,
-		'side-kimchi': 20, 'side-japchae': 10, 'side-rice': 30,
+		'side-kimchi': 20, 'side-japchae': 10, 'side-rice': 30, 'side-noodles': 18, 'side-seaweed': 24,
 		'dish-jjigae': 12, 'dish-bibim': 5,
-		'drink-soju': 24, 'drink-beer': 18, 'drink-tea': 8,
+		'drink-soju': 24, 'drink-beer': 18, 'drink-tea': 8, 'drink-makgeolli': 12, 'drink-cider': 24,
 	};
 	return map[menuItemId] ?? 0;
 }
@@ -279,9 +299,9 @@ function getOpeningStock(menuItemId: string): number {
 function getMorningCount(menuItemId: string): number | null {
 	const map: Record<string, number> = {
 		'meat-samgyup': 4180, 'meat-chadol': 2950, 'meat-galbi': 1920, 'meat-beef': 3000,
-		'side-kimchi': 20, 'side-japchae': 10, 'side-rice': 30,
+		'side-kimchi': 20, 'side-japchae': 10, 'side-rice': 30, 'side-noodles': 18, 'side-seaweed': 24,
 		'dish-jjigae': 12, 'dish-bibim': 5,
-		'drink-soju': 30, 'drink-beer': 18, 'drink-tea': 8,
+		'drink-soju': 30, 'drink-beer': 18, 'drink-tea': 8, 'drink-makgeolli': 12, 'drink-cider': 24,
 	};
 	return map[menuItemId] ?? null;
 }
@@ -289,9 +309,9 @@ function getMorningCount(menuItemId: string): number | null {
 function getAfternoonCount(menuItemId: string): number | null {
 	const map: Record<string, number> = {
 		'meat-samgyup': 2100, 'meat-chadol': 1800, 'meat-galbi': 900, 'meat-beef': 2600,
-		'side-kimchi': 18, 'side-japchae': 6, 'side-rice': 25,
+		'side-kimchi': 18, 'side-japchae': 6, 'side-rice': 25, 'side-noodles': 14, 'side-seaweed': 20,
 		'dish-jjigae': 10, 'dish-bibim': 3,
-		'drink-soju': 24, 'drink-beer': 18, 'drink-tea': 8,
+		'drink-soju': 24, 'drink-beer': 18, 'drink-tea': 8, 'drink-makgeolli': 9, 'drink-cider': 18,
 	};
 	return map[menuItemId] ?? null;
 }

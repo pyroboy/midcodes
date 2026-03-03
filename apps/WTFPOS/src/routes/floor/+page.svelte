@@ -1,11 +1,34 @@
 <script lang="ts">
-	import { tables, orders, openTable, tickTimers, MENU_ITEMS, addItemToOrder } from '$lib/stores/pos.svelte';
-	import type { Table, MenuItem, MenuCategory, DiscountType } from '$lib/types';
+	import { tables as allTables, orders as allOrders, openTable, tickTimers, MENU_ITEMS, addItemToOrder, createTakeoutOrder } from '$lib/stores/pos.svelte';
+	import type { Table, MenuItem, MenuCategory, DiscountType, Order } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { formatCountdown, formatPeso, cn } from '$lib/utils';
 	import { log } from '$lib/stores/audit.svelte';
 	import { recalcOrder } from '$lib/stores/pos.svelte';
+
+	// Deterministic floor plan positions for up to 12 tables
+	const FLOOR_POSITIONS = [
+		{ x: 40,  y: 50  },
+		{ x: 200, y: 35  },
+		{ x: 360, y: 52  },
+		{ x: 520, y: 38  },
+		{ x: 45,  y: 205 },
+		{ x: 205, y: 195 },
+		{ x: 368, y: 212 },
+		{ x: 528, y: 198 },
+		{ x: 60,  y: 355 },
+		{ x: 215, y: 345 },
+		{ x: 375, y: 360 },
+		{ x: 535, y: 348 },
+	];
+
+	// ─── Branch-filtered tables/orders ───────────────────────────────────────────
+	const tables = $derived(session.locationId === 'all' ? allTables : allTables.filter(t => t.branchId === session.locationId));
+	const orders = $derived(session.locationId === 'all' ? allOrders : allOrders.filter(o => o.branchId === session.locationId));
+
+	// Takeout orders for current branch (open only)
+	const takeoutOrders = $derived(orders.filter(o => o.orderType === 'takeout' && o.status === 'open'));
 
 	// ─── Timer ───────────────────────────────────────────────────────────────
 	$effect(() => {
@@ -13,27 +36,34 @@
 		return () => clearInterval(id);
 	});
 
-	// ─── Floor stats ─────────────────────────────────────────────────────────
+	// ─── Floor stats ──────────────────────────────────────────────────────────
 	const occupied = $derived(tables.filter((t) => t.status !== 'available').length);
 	const free     = $derived(tables.filter((t) => t.status === 'available').length);
 
 	const mainTables = $derived(tables.filter((t) => t.zone === 'main'));
-	const vipTables  = $derived(tables.filter((t) => t.zone === 'vip'));
-	const barTables  = $derived(tables.filter((t) => t.zone === 'bar'));
 
-	// ─── Running Bill Drawer ─────────────────────────────────────────────────
-	let selectedTableId = $state<string | null>(null);
+	// ─── Selected Order (dine-in or takeout) ──────────────────────────────────
+	let selectedTableId    = $state<string | null>(null);
+	let selectedTakeoutId  = $state<string | null>(null);
+
 	const selectedTable = $derived(selectedTableId ? tables.find((t) => t.id === selectedTableId) : null);
-	const activeOrder   = $derived(
-		selectedTable?.currentOrderId
-			? orders.find((o) => o.id === selectedTable.currentOrderId)
-			: null
-	);
-	const activePax = $derived(activeOrder?.pax ?? 4);
+
+	// Active order: either from a table or from a takeout selection
+	const activeOrder = $derived((): Order | undefined => {
+		if (selectedTakeoutId) return orders.find(o => o.id === selectedTakeoutId);
+		if (selectedTable?.currentOrderId) return orders.find(o => o.id === selectedTable.currentOrderId);
+		return undefined;
+	});
+
+	// Helper to get the active order regardless of type
+	const currentActiveOrder = $derived(activeOrder());
+
+	const activePax = $derived(currentActiveOrder?.pax ?? 1);
 
 	let paxModalTable = $state<Table | null>(null);
 
 	function handleTableClick(table: Table) {
+		selectedTakeoutId = null;
 		if (table.status === 'available') {
 			paxModalTable = table;
 		} else {
@@ -42,9 +72,15 @@
 		}
 	}
 
+	function handleTakeoutClick(order: Order) {
+		selectedTableId = null;
+		selectedTakeoutId = order.id;
+		showAddItem = false;
+	}
+
 	function confirmPax(pax: number) {
 		if (paxModalTable) {
-			const orderId = openTable(paxModalTable.id, pax);
+			openTable(paxModalTable.id, pax);
 			selectedTableId = paxModalTable.id;
 			showAddItem = true;
 			activeCategory = 'packages';
@@ -53,29 +89,53 @@
 	}
 
 	function closeBill() {
-		selectedTableId = null;
+		selectedTableId   = null;
+		selectedTakeoutId = null;
 		showAddItem = false;
 	}
 
 	function applyDiscount(type: DiscountType) {
-		if (!activeOrder || !selectedTable) return;
-		const prev = activeOrder.discountType;
-		activeOrder.discountType = (prev === type) ? 'none' : type;
-		recalcOrder(activeOrder);
-		if (selectedTable) selectedTable.billTotal = activeOrder.total;
-		if (activeOrder.discountType === 'none') {
-			log.discountRemoved(selectedTable.label);
+		const order = currentActiveOrder;
+		if (!order) return;
+		const prev = order.discountType;
+		order.discountType = (prev === type) ? 'none' : type;
+		recalcOrder(order);
+		if (selectedTable) selectedTable.billTotal = order.total;
+		if (order.discountType === 'none') {
+			log.discountRemoved(selectedTable?.label ?? `Takeout`);
 		} else {
-			log.discountApplied(selectedTable.label, activeOrder.discountType, activeOrder.discountAmount);
+			log.discountApplied(selectedTable?.label ?? `Takeout`, order.discountType, order.discountAmount);
 		}
 	}
 
 	function checkout(method: string = 'Cash') {
-		if (!activeOrder || !selectedTable) return;
-		log.tableClosed(selectedTable.label, activeOrder.total, method);
-		activeOrder.status = 'paid';
+		const order = currentActiveOrder;
+		if (!order) return;
+		const label = order.orderType === 'takeout'
+			? `Takeout (${order.customerName ?? 'Walk-in'})`
+			: (selectedTable?.label ?? '');
+		log.tableClosed(label, order.total, method);
+		order.status = 'paid';
+		closeBill();
+	}
+
+	// ─── New Takeout Modal ────────────────────────────────────────────────────
+	let showTakeoutModal = $state(false);
+	let takeoutName = $state('');
+
+	function openTakeoutModal() {
+		takeoutName = '';
+		showTakeoutModal = true;
+	}
+
+	function confirmTakeout() {
+		const name = takeoutName.trim() || 'Walk-in';
+		const orderId = createTakeoutOrder(name);
+		selectedTakeoutId = orderId;
 		selectedTableId = null;
-		showAddItem = false;
+		showAddItem = true;
+		activeCategory = 'dishes';
+		showTakeoutModal = false;
 	}
 
 	// ─── Add to Order Modal ───────────────────────────────────────────────────
@@ -90,11 +150,13 @@
 		{ id: 'drinks',   label: '🥤 Drinks' }
 	];
 
-	// Filter out packages if there's already one in the active order
+	// Takeout hides "packages" + "meats"; dine-in hides packages if already set
 	const visibleCategories = $derived(
-		activeOrder?.packageId 
-			? categories.filter(c => c.id !== 'packages') 
-			: categories
+		currentActiveOrder?.orderType === 'takeout'
+			? categories.filter(c => c.id !== 'packages' && c.id !== 'meats')
+			: (currentActiveOrder?.packageId
+				? categories.filter(c => c.id !== 'packages')
+				: categories)
 	);
 
 	const filteredItems = $derived(MENU_ITEMS.filter((m) => m.category === activeCategory && m.available));
@@ -114,17 +176,13 @@
 
 	function tapItem(item: MenuItem) {
 		if (item.category === 'packages') {
-			// Wipe pending items, set this as the only package
 			pendingItems = [{ item, qty: 1, forceFree: false }];
-			
-			// Auto generated meats
 			if (item.meats) {
 				for (const meatId of item.meats) {
 					const meat = MENU_ITEMS.find(m => m.id === meatId);
 					if (meat) pendingItems.push({ item: meat, qty: 1, weight: 150 * activePax, forceFree: true });
 				}
 			}
-			// Auto generated sides
 			if (item.autoSides) {
 				for (const sideId of item.autoSides) {
 					const side = MENU_ITEMS.find(m => m.id === sideId);
@@ -134,13 +192,7 @@
 			activeCategory = 'meats';
 			return;
 		}
-
-		if (item.isWeightBased) { 
-			weightScreenItem = item; 
-			weightInput = ''; 
-			return; 
-		}
-		
+		if (item.isWeightBased) { weightScreenItem = item; weightInput = ''; return; }
 		const existing = pendingItems.find((p) => p.item.id === item.id);
 		if (existing) existing.qty++;
 		else pendingItems.push({ item, qty: 1, forceFree: false });
@@ -155,7 +207,7 @@
 	function changeQty(idx: number, delta: number) {
 		const p = pendingItems[idx];
 		if (p.item.isWeightBased) {
-			p.weight = Math.max(0, (p.weight || 0) + delta * 50); // snap 50g
+			p.weight = Math.max(0, (p.weight || 0) + delta * 50);
 			if (p.weight === 0) pendingItems.splice(idx, 1);
 		} else {
 			p.qty += delta;
@@ -163,10 +215,11 @@
 		}
 	}
 
-	function chargeToTable() {
-		if (!activeOrder) return;
+	function chargeToOrder() {
+		const order = currentActiveOrder;
+		if (!order) return;
 		for (const p of pendingItems) {
-			addItemToOrder(activeOrder.id, p.item, p.qty, p.weight, p.forceFree);
+			addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree);
 		}
 		pendingItems = [];
 		showAddItem = false;
@@ -183,27 +236,123 @@
 		return base + 'table-card-occupied';
 	}
 
-	function timerClass(t: Table) {
-		if (t.status === 'critical') return 'text-status-red font-mono font-bold text-sm';
-		if (t.status === 'warning')  return 'text-status-yellow font-mono font-bold text-sm';
-		return 'text-accent font-mono font-bold text-sm';
-	}
-
 	function timerBadgeClass(t: Table) {
 		if (t.status === 'critical') return 'bg-status-red-light text-status-red';
 		if (t.status === 'warning')  return 'bg-status-yellow-light text-status-yellow';
 		return 'bg-accent-light text-accent';
+	}
+
+	// ─── Takeout ticket number label ──────────────────────────────────────────
+	function takeoutLabel(order: Order) {
+		const idx = takeoutOrders.indexOf(order);
+		return `#TO${String(idx + 1).padStart(2, '0')}`;
 	}
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
 	<TopBar />
 
-	{#if session.branch === 'all'}
-		<div class="flex flex-1 flex-col items-center justify-center gap-4 bg-gray-50">
-			<span class="text-5xl">🔒</span>
-			<h2 class="text-xl font-bold text-gray-700">Select a specific branch to view the Floor Plan</h2>
-			<p class="text-sm text-gray-400">Use the branch selector in the top bar to choose a branch.</p>
+	{#if session.locationId === 'all'}
+		<!-- ─── All Branches Overview ─────────────────────────────────────────── -->
+		<div class="flex flex-1 flex-col overflow-hidden bg-surface-secondary">
+
+			<!-- Top bar -->
+			<div class="flex items-center justify-between border-b border-border px-5 py-2.5">
+				<div class="flex items-center gap-2.5">
+					<span class="relative flex h-2.5 w-2.5">
+						<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-green opacity-60"></span>
+						<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-green"></span>
+					</span>
+					<span class="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">ALL BRANCHES — LIVE</span>
+				</div>
+				<span class="text-[11px] font-mono uppercase tracking-wider text-gray-600">read only · order taking disabled</span>
+			</div>
+
+			<!-- Two-panel split -->
+			<div class="flex flex-1 divide-x divide-border overflow-hidden">
+				{#each [
+					{ id: 'qc',   name: 'Alta Cita' },
+					{ id: 'mkti', name: 'Alona'     }
+				] as branch (branch.id)}
+					{@const bTables = allTables.filter(t => t.branchId === branch.id)}
+					{@const bOrders = allOrders.filter(o => o.branchId === branch.id && o.status === 'open')}
+					{@const bOcc    = bTables.filter(t => t.status !== 'available').length}
+					{@const bFree   = bTables.filter(t => t.status === 'available').length}
+					{@const bSales  = bOrders.reduce((s, o) => s + o.total, 0)}
+
+					<div class="flex flex-1 flex-col overflow-hidden">
+
+						<!-- Branch header -->
+						<div class="flex items-center justify-between border-b border-border bg-surface px-4 py-2.5">
+							<span class="text-sm font-bold uppercase tracking-wide text-gray-900">{branch.name}</span>
+							<div class="flex items-center gap-3 text-[11px] font-mono font-bold">
+								<span class="text-status-red">{bOcc} OCC</span>
+								<span class="text-status-green">{bFree} FREE</span>
+								<span class="text-accent font-bold">{formatPeso(bSales)}</span>
+							</div>
+						</div>
+
+						<!-- Floor snapshot -->
+						<div class="relative overflow-hidden" style="min-height: 340px;">
+							{#each bTables as t, idx (t.id)}
+								{@const tOrder = bOrders.find(o => o.id === t.currentOrderId)}
+								{@const pos = FLOOR_POSITIONS[idx] ?? { x: (idx % 4) * 155 + 40, y: Math.floor(idx / 4) * 155 + 40 }}
+								<div
+									class={cn(
+										'absolute flex flex-col rounded-lg px-2.5 py-2',
+										t.status === 'available' ? 'border border-status-green bg-status-green-light' :
+										t.status === 'critical'  ? 'border border-status-red bg-status-red-light' :
+										t.status === 'warning'   ? 'border border-status-yellow bg-status-yellow-light' :
+										                           'border border-accent bg-accent-light'
+									)}
+									style="left: {pos.x}px; top: {pos.y}px; width: 82px;"
+								>
+									<span class="text-xs font-bold text-gray-900">{t.label}</span>
+									{#if t.status !== 'available'}
+										<span class={cn('text-[10px] font-mono',
+											t.status === 'critical' ? 'text-status-red' :
+											t.status === 'warning'  ? 'text-status-yellow' : 'text-accent'
+										)}>
+											{t.remainingSeconds !== null ? formatCountdown(t.remainingSeconds) : '–'}
+										</span>
+										{#if tOrder}<span class="text-[10px] font-mono text-gray-400">{tOrder.pax}p</span>{/if}
+										{#if t.billTotal}<span class="text-[10px] font-mono text-accent font-bold">{formatPeso(t.billTotal)}</span>{/if}
+									{:else}
+										<span class="text-[10px] font-mono text-status-green">free</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+
+						<!-- Active orders strip -->
+						<div class="flex flex-col gap-1.5 border-t border-border bg-surface px-4 py-3">
+							<span class="text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">Active Orders</span>
+							{#if bOrders.length === 0}
+								<span class="text-[11px] font-mono text-gray-400">No active orders</span>
+							{:else}
+								{#each bOrders.slice(0, 4) as order}
+									{@const oTable = allTables.find(t => t.id === order.tableId)}
+									<div class="flex items-center justify-between text-[11px] font-mono">
+										<span class="truncate text-gray-700">
+											{#if order.orderType === 'takeout'}
+												📦 {order.customerName ?? 'Walk-in'}
+											{:else}
+												🪑 {oTable?.label ?? '?'} · {order.packageName ?? '–'} · {order.pax}p
+											{/if}
+										</span>
+										<span class="ml-3 shrink-0 font-bold text-accent">{formatPeso(order.total)}</span>
+									</div>
+								{/each}
+								{#if bOrders.length > 4}
+									<span class="text-[10px] font-mono text-gray-400">+{bOrders.length - 4} more orders</span>
+								{/if}
+							{/if}
+						</div>
+
+					</div>
+				{/each}
+			</div>
+
 		</div>
 	{:else}
 	<!-- Main: floor + optional bill drawer -->
@@ -217,156 +366,137 @@
 					<span class="badge-orange">{occupied} occ</span>
 					<span class="badge-green">{free} free</span>
 				</div>
-				<!-- Legend -->
-				<div class="flex items-center gap-4 text-xs text-gray-500">
-					{#each [['bg-status-green','Available'],['bg-accent','Occupied'],['bg-status-yellow','⚠ Low time'],['bg-status-red','🔴 Critical']] as [color, label]}
-						<span class="flex items-center gap-1.5">
-							<span class="h-2.5 w-2.5 rounded-full {color}"></span>{label}
-						</span>
-					{/each}
+				<div class="flex items-center gap-4">
+					<!-- Legend -->
+					<div class="flex items-center gap-4 text-xs text-gray-500">
+						{#each [['bg-status-green','Available'],['bg-accent','Occupied'],['bg-status-yellow','⚠ Low time'],['bg-status-red','🔴 Critical']] as [color, label]}
+							<span class="flex items-center gap-1.5">
+								<span class="h-2.5 w-2.5 rounded-full {color}"></span>{label}
+							</span>
+						{/each}
+					</div>
+					<!-- New Takeout button -->
+					<button
+						onclick={openTakeoutModal}
+						class="flex items-center gap-2 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-accent hover:bg-orange-100 transition-colors"
+						style="min-height: 40px"
+					>
+						📦 New Takeout
+					</button>
 				</div>
 			</div>
 
-			<!-- Two-column layout: Main Dining | Right zones -->
-			<div class="flex gap-5 h-full">
-				<!-- Main Dining -->
-				<div class="flex-1 rounded-xl border border-border bg-surface p-5 flex flex-col gap-4">
-					<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Main Dining</h2>
-					<div class="flex flex-wrap gap-3">
-						{#each mainTables as table (table.id)}
-							<button
-								onclick={() => handleTableClick(table)}
-								class={cn(tableCardClass(table), selectedTableId === table.id && 'ring-2 ring-offset-2 ring-accent')}
-								aria-label="Table {table.label}"
-							>
-								<div class="flex w-full items-start justify-between">
-									<span class="text-base font-extrabold text-gray-900 z-10">{table.label}</span>
-									{#if table.status !== 'available'}
-										<span class={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold z-10', timerBadgeClass(table))}>
-											{table.remainingSeconds !== null ? formatCountdown(table.remainingSeconds) : ''}
-										</span>
-									{/if}
-								</div>
-								<div class="mt-1 text-xs text-gray-400 z-10">
-									{#if table.currentOrderId}
-										{@const o = orders.find(ord => ord.id === table.currentOrderId)}
-										{o?.pax ?? table.capacity}p
-									{:else}
-										{table.capacity}p
-									{/if}
-								</div>
-								{#if table.billTotal}
-									<div class="mt-1 font-mono text-sm font-bold text-gray-900 z-10">
-										{formatPeso(table.billTotal)}
-									</div>
+			<!-- Floor map canvas -->
+			<div class="flex-1 rounded-xl border border-border bg-surface p-5 flex flex-col gap-4">
+				<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Main Dining</h2>
+				<div class="relative" style="min-height: 340px;">
+					{#each mainTables as table, idx (table.id)}
+						{@const pos = FLOOR_POSITIONS[idx] ?? { x: (idx % 4) * 155 + 40, y: Math.floor(idx / 4) * 155 + 40 }}
+						<button
+							onclick={() => handleTableClick(table)}
+							class={cn(tableCardClass(table), selectedTableId === table.id && 'ring-2 ring-offset-2 ring-accent')}
+							style="position: absolute; left: {pos.x}px; top: {pos.y}px; width: 92px;"
+							aria-label="Table {table.label}"
+						>
+							<div class="flex w-full items-start justify-between">
+								<span class="text-base font-extrabold text-gray-900 z-10">{table.label}</span>
+								{#if table.status !== 'available'}
+									<span class={cn('rounded-full px-1.5 py-0.5 text-[9px] font-semibold z-10', timerBadgeClass(table))}>
+										{table.remainingSeconds !== null ? formatCountdown(table.remainingSeconds) : ''}
+									</span>
 								{/if}
+							</div>
+							<div class="mt-1 text-xs text-gray-400 z-10">
 								{#if table.currentOrderId}
-									{@const order = orders.find(o => o.id === table.currentOrderId)}
-									{#if order?.packageId === 'pkg-pork'}
-										<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-pink-400"></div>
-									{:else if order?.packageId === 'pkg-beef'}
-										<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500"></div>
-									{:else if order?.packageId === 'pkg-combo'}
-										<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-pink-400 to-purple-500"></div>
-									{/if}
+									{@const o = orders.find(ord => ord.id === table.currentOrderId)}
+									{o?.pax ?? table.capacity}p
+								{:else}
+									{table.capacity}p
 								{/if}
-							</button>
-						{/each}
-					</div>
+							</div>
+							{#if table.billTotal}
+								<div class="mt-1 font-mono text-xs font-bold text-gray-900 z-10">
+									{formatPeso(table.billTotal)}
+								</div>
+							{/if}
+							{#if table.currentOrderId}
+								{@const order = orders.find(o => o.id === table.currentOrderId)}
+								{#if order?.packageId === 'pkg-pork'}
+									<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-pink-400"></div>
+								{:else if order?.packageId === 'pkg-beef'}
+									<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500"></div>
+								{:else if order?.packageId === 'pkg-combo'}
+									<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-pink-400 to-purple-500"></div>
+								{/if}
+							{/if}
+						</button>
+					{/each}
 
-					<!-- Kitchen / Entrance labels (decorative) -->
-					<div class="mt-auto flex gap-6 text-xs text-gray-400">
-						<span>🍳 KITCHEN COUNTER</span>
+					<!-- Decorative labels -->
+					<div class="absolute bottom-2 left-2 flex gap-6 text-xs text-gray-300">
+						<span>🍳 KITCHEN</span>
 						<span>🚪 ENTRANCE</span>
 					</div>
 				</div>
 
-				<!-- Right zones -->
-				<div class="flex w-[260px] flex-col gap-4">
-					<!-- VIP / Private -->
-					<div class="rounded-xl border border-status-purple/30 bg-status-purple-light p-4 flex flex-col gap-3">
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-status-purple">VIP / Private</h2>
-						<div class="flex flex-wrap gap-3">
-							{#each vipTables as table (table.id)}
+				<!-- Takeout Lane -->
+				{#if takeoutOrders.length > 0}
+					<div class="border-t border-dashed border-orange-200 pt-4 flex flex-col gap-3">
+						<h2 class="text-xs font-semibold uppercase tracking-wider text-accent flex items-center gap-2">
+							📦 Takeout Orders
+							<span class="rounded-full bg-accent px-2 py-0.5 text-[10px] text-white font-bold">{takeoutOrders.length}</span>
+						</h2>
+						<div class="flex flex-wrap gap-2">
+							{#each takeoutOrders as order (order.id)}
 								<button
-									onclick={() => handleTableClick(table)}
-									class={cn(tableCardClass(table), selectedTableId === table.id && 'ring-2 ring-offset-2 ring-accent')}
+									onclick={() => handleTakeoutClick(order)}
+									class={cn(
+										'relative flex flex-col gap-1 rounded-xl border-2 border-dashed px-4 py-3 text-left transition-all active:scale-[0.98]',
+										selectedTakeoutId === order.id
+											? 'border-accent bg-accent-light'
+											: 'border-orange-200 bg-orange-50 hover:border-orange-300'
+									)}
+									style="min-width: 120px"
 								>
-									<div class="flex w-full items-start justify-between">
-										<span class="text-base font-extrabold text-gray-900 z-10">{table.label}</span>
-										{#if table.remainingSeconds !== null}
-											<span class={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold z-10', timerBadgeClass(table))}>
-												{formatCountdown(table.remainingSeconds)}
-											</span>
-										{/if}
-									</div>
-									<div class="mt-1 text-xs text-gray-400 z-10">
-										{#if table.currentOrderId}
-											{@const o = orders.find(ord => ord.id === table.currentOrderId)}
-											{o?.pax ?? table.capacity}p
-										{:else}
-											{table.capacity}p
-										{/if}
-									</div>
-									{#if table.billTotal}
-										<div class="mt-1 font-mono text-sm font-bold text-gray-900 z-10">
-											{formatPeso(table.billTotal)}
-										</div>
-									{/if}
-									{#if table.currentOrderId}
-										{@const order = orders.find(o => o.id === table.currentOrderId)}
-										{#if order?.packageId === 'pkg-pork'}
-											<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-pink-400"></div>
-										{:else if order?.packageId === 'pkg-beef'}
-											<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500"></div>
-										{:else if order?.packageId === 'pkg-combo'}
-											<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-pink-400 to-purple-500"></div>
-										{/if}
+									<span class="font-mono text-[11px] font-bold text-accent">{takeoutLabel(order)}</span>
+									<span class="text-sm font-semibold text-gray-900">{order.customerName ?? 'Walk-in'}</span>
+									<span class="font-mono text-xs font-bold text-gray-700">{formatPeso(order.total)}</span>
+									<span class="text-[10px] text-gray-400">{order.items.filter(i => i.status !== 'cancelled').length} items</span>
+									{#if selectedTakeoutId === order.id}
+										<span class="absolute top-1.5 right-1.5 rounded bg-accent px-1.5 py-0.5 text-[9px] font-bold text-white">OPEN</span>
 									{/if}
 								</button>
 							{/each}
 						</div>
 					</div>
-
-					<!-- Bar -->
-					<div class="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
-						<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Bar</h2>
-						<div class="flex flex-wrap gap-3">
-							{#each barTables as table (table.id)}
-								<button
-									onclick={() => handleTableClick(table)}
-									class={cn(tableCardClass(table), selectedTableId === table.id && 'ring-2 ring-offset-2 ring-accent')}
-								>
-									<span class="text-sm font-extrabold text-gray-900 z-10">{table.label}</span>
-									<div class="text-xs text-gray-400 z-10">
-										{#if table.currentOrderId}
-											{@const o = orders.find(ord => ord.id === table.currentOrderId)}
-											{o?.pax ?? table.capacity}p
-										{:else}
-											{table.capacity}p
-										{/if}
-									</div>
-									{#if table.currentOrderId}
-										{@const order = orders.find(o => o.id === table.currentOrderId)}
-										{#if order?.packageId === 'pkg-pork'}
-											<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-pink-400"></div>
-										{:else if order?.packageId === 'pkg-beef'}
-											<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500"></div>
-										{:else if order?.packageId === 'pkg-combo'}
-											<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-pink-400 to-purple-500"></div>
-										{/if}
-									{/if}
-								</button>
-							{/each}
-						</div>
-					</div>
-				</div>
+				{/if}
 			</div>
 		</div>
 
-		<!-- Running Bill Drawer -->
-		{#if selectedTable && activeOrder}
-			<div class="flex w-[380px] shrink-0 flex-col border-l border-border bg-surface overflow-y-auto">
+		<!-- Running Bill Drawer (dine-in or takeout) -->
+		<div class="flex w-[380px] shrink-0 flex-col border-l border-border bg-surface overflow-y-auto">
+		{#if !currentActiveOrder}
+			<!-- Empty state: no table or takeout selected -->
+			<div class="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center select-none">
+				<div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-secondary text-3xl">
+					🧾
+				</div>
+				<div class="flex flex-col gap-1.5">
+					<span class="text-sm font-semibold text-gray-700">No Table Selected</span>
+					<span class="text-xs text-gray-400 leading-relaxed">Tap an occupied table on the floor plan to view its running bill here.</span>
+				</div>
+				<div class="mt-2 flex flex-col items-center gap-2 text-xs text-gray-400">
+					<span class="flex items-center gap-1.5">
+						<span class="h-2 w-2 rounded-full bg-status-green inline-block"></span>
+						Green = available — tap to open
+					</span>
+					<span class="flex items-center gap-1.5">
+						<span class="h-2 w-2 rounded-full bg-accent inline-block"></span>
+						Orange = occupied — tap to view bill
+					</span>
+				</div>
+			</div>
+		{:else}
 				<!-- Bill Header -->
 				<div class="flex flex-col gap-3 border-b border-border px-5 py-4">
 					<div class="flex items-center justify-between">
@@ -378,19 +508,31 @@
 							+ ADD
 						</button>
 						<div class="flex items-center gap-2.5">
-							<span class="text-xl font-extrabold text-gray-900">{selectedTable.label}</span>
-							<span class="flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-1 text-xs font-medium text-gray-600">
-								👥 {activeOrder.pax} pax
-							</span>
+							{#if currentActiveOrder.orderType === 'takeout'}
+								<span class="flex items-center gap-1.5">
+									<span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">📦 TAKEOUT</span>
+									<span class="text-xl font-extrabold text-gray-900">{currentActiveOrder.customerName ?? 'Walk-in'}</span>
+								</span>
+							{:else}
+								<span class="text-xl font-extrabold text-gray-900">{selectedTable?.label}</span>
+								<span class="flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-1 text-xs font-medium text-gray-600">
+									👥 {currentActiveOrder.pax} pax
+								</span>
+							{/if}
 						</div>
 						<button onclick={closeBill} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>
 					</div>
-					{#if activeOrder.packageName}
+					{#if currentActiveOrder.orderType === 'takeout'}
+						<div class="flex items-center gap-2 rounded-lg bg-orange-50 border border-dashed border-orange-200 px-3 py-1.5">
+							<span class="font-mono text-xs font-bold text-accent">{takeoutLabel(currentActiveOrder)}</span>
+							<span class="text-xs text-gray-500">· Takeout · no timer</span>
+						</div>
+					{:else if currentActiveOrder.packageName}
 						<div class="flex items-center justify-between">
-							<span class="text-sm font-semibold text-gray-900">🔥 {activeOrder.packageName}</span>
-							{#if selectedTable.remainingSeconds !== null}
-								<span class={cn('rounded-full px-2.5 py-1 text-xs font-semibold', timerBadgeClass(selectedTable))}>
-									⏱ {Math.floor(selectedTable.remainingSeconds / 60)}m
+							<span class="text-sm font-semibold text-gray-900">🔥 {currentActiveOrder.packageName}</span>
+							{#if selectedTable?.remainingSeconds !== null}
+								<span class={cn('rounded-full px-2.5 py-1 text-xs font-semibold', timerBadgeClass(selectedTable!))}>
+									⏱ {Math.floor((selectedTable?.remainingSeconds ?? 0) / 60)}m
 								</span>
 							{/if}
 						</div>
@@ -399,7 +541,7 @@
 
 				<!-- Order items -->
 				<div class="flex-1 divide-y divide-border-light px-5">
-					{#each activeOrder.items as item (item.id)}
+					{#each currentActiveOrder.items as item (item.id)}
 						<div class={cn('flex items-start justify-between py-3', item.status === 'cancelled' && 'opacity-50')}>
 							<div class="flex flex-col gap-0.5">
 								<div class="flex items-center gap-2">
@@ -409,7 +551,7 @@
 									{/if}
 								</div>
 								<span class="text-xs text-gray-400">
-									{new Date(activeOrder.createdAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+									{new Date(currentActiveOrder.createdAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
 								</span>
 								{#if item.status === 'cancelled'}
 									<span class="text-xs italic text-status-red">voided by Manager</span>
@@ -436,14 +578,11 @@
 				<!-- Bill Summary -->
 				<div class="border-t border-border px-5 py-4 flex flex-col gap-1">
 					<div class="flex justify-between text-sm text-gray-500">
-						<span>{activeOrder.items.filter(i => i.status !== 'cancelled').length} items</span>
-						<span class="font-mono text-xs text-gray-400">
-							cost ≈{formatPeso(activeOrder.subtotal * 0.3)}
-						</span>
+						<span>{currentActiveOrder.items.filter(i => i.status !== 'cancelled').length} items</span>
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-base font-bold text-gray-900">BILL</span>
-						<span class="font-mono text-2xl font-extrabold text-gray-900">{formatPeso(activeOrder.total)}</span>
+						<span class="font-mono text-2xl font-extrabold text-gray-900">{formatPeso(currentActiveOrder.total)}</span>
 					</div>
 				</div>
 
@@ -453,43 +592,52 @@
 					<button onclick={() => checkout('Cash')} class="btn-success flex-1 text-sm" style="min-height: 44px">💳 Checkout</button>
 					<button class="btn-secondary px-3 text-sm" style="min-height: 44px">🖨 KOT</button>
 				</div>
-			</div>
 		{/if}
+		</div>
 	</div>
-	{/if}<!-- end branch lock -->
+	{/if}
 </div>
 
 <!-- ─── Add to Order Modal ────────────────────────────────────────────────────── -->
-{#if showAddItem && activeOrder}
+{#if showAddItem && currentActiveOrder}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
 		<div class="flex h-[700px] w-full max-w-[1100px] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
 			<!-- Left panel -->
 			<div class="flex flex-1 flex-col overflow-hidden">
 				<!-- Header -->
 				<div class="flex flex-col gap-1.5 border-b border-border px-6 py-4">
-					<h2 class="text-xl font-bold text-gray-900">➕ Add to Order</h2>
-					<p class="text-sm text-gray-500">🔥 {activeOrder.packageName ?? selectedTable?.label} · 4 pax</p>
+					{#if currentActiveOrder.orderType === 'takeout'}
+						<div class="flex items-center gap-2">
+							<span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">📦 TAKEOUT</span>
+							<h2 class="text-xl font-bold text-gray-900">Add to Takeout</h2>
+						</div>
+						<p class="text-sm text-gray-500">{currentActiveOrder.customerName ?? 'Walk-in'} · {takeoutLabel(currentActiveOrder)}</p>
+					{:else}
+						<h2 class="text-xl font-bold text-gray-900">➕ Add to Order</h2>
+						<p class="text-sm text-gray-500">🔥 {currentActiveOrder.packageName ?? selectedTable?.label} · {currentActiveOrder.pax} pax</p>
+					{/if}
 				</div>
 
-				<!-- Category tabs -->
-				<div class="flex gap-1 border-b border-border px-6">
+				<!-- Category tabs (POS-style big buttons) -->
+				<div class="flex gap-2 border-b border-border bg-surface-secondary px-6 py-3">
 					{#each visibleCategories as cat}
 						<button
 							onclick={() => (activeCategory = cat.id)}
 							class={cn(
-								'flex h-11 items-center px-3.5 text-sm font-medium transition-colors',
+								'flex flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95',
 								activeCategory === cat.id
-									? 'border-b-2 border-accent text-accent'
-									: 'text-gray-500 hover:text-gray-900'
+									? 'bg-accent text-white shadow-md'
+									: 'border border-border bg-surface text-gray-600 hover:border-gray-300 hover:bg-gray-50'
 							)}
-							style="min-height: unset"
+							style="min-height: 72px"
 						>
-							{cat.label}
+							<span class="text-2xl leading-none">{cat.label.split(' ')[0]}</span>
+							<span class="text-[11px] font-bold uppercase tracking-wide">{cat.label.split(' ').slice(1).join(' ')}</span>
 						</button>
 					{/each}
 				</div>
 
-				<!-- FREE banner for sides/packages -->
+				<!-- FREE banner -->
 				{#if activeCategory === 'sides' || activeCategory === 'packages'}
 					<div class="flex items-center gap-2 bg-status-green-light px-6 py-2.5">
 						<span class="text-xs font-semibold text-status-green">FREE — inventory tracked</span>
@@ -502,7 +650,6 @@
 						<div class="flex h-full flex-col items-center justify-center gap-6">
 							<h3 class="text-3xl font-bold text-gray-900">{weightScreenItem.name}</h3>
 							<p class="text-sm text-gray-500">Enter weight from scale (grams)</p>
-							
 							<div class="flex flex-wrap items-center justify-center gap-3 w-[400px]">
 								{#each [100, 150, 200, 250, 300, 400] as preset}
 									<button onclick={() => commitMeat(preset)} class="btn-secondary font-mono w-[30%]">
@@ -510,7 +657,6 @@
 									</button>
 								{/each}
 							</div>
-							
 							<div class="mt-4 flex flex-col items-center gap-3">
 								<span class="text-xs font-semibold uppercase text-gray-400">Custom Amount</span>
 								<div class="flex items-center gap-3">
@@ -524,7 +670,6 @@
 									<button onclick={() => commitMeat(parseFloat(weightInput))} class="btn-primary">Add</button>
 								</div>
 							</div>
-							
 							<div class="mt-8">
 								<button onclick={() => weightScreenItem = null} class="btn-ghost flex items-center gap-2">
 									← Back to Meats
@@ -576,10 +721,7 @@
 			<div class="flex w-[320px] shrink-0 flex-col border-l border-border bg-surface-secondary">
 				<div class="flex flex-col gap-1.5 border-b border-border px-5 py-4">
 					<h3 class="text-base font-bold text-gray-900">Pending Items</h3>
-					<p class="text-xs text-gray-500">Review items before pushing to the main bill.</p>
-					<div class="mt-1 flex items-center gap-2 rounded-md bg-white border border-border px-3 py-1.5 w-fit">
-						<span class="text-xs font-semibold text-gray-700">👥 {activePax} Pax</span>
-					</div>
+					<p class="text-xs text-gray-500">Review items before pushing to the bill.</p>
 				</div>
 
 				<div class="flex-1 overflow-y-auto divide-y divide-border px-5">
@@ -619,7 +761,7 @@
 					<div class="flex gap-2">
 						<button onclick={undoPending} class="btn-secondary flex-1 text-sm" style="min-height: 44px">Undo</button>
 						<button
-							onclick={chargeToTable}
+							onclick={chargeToOrder}
 							disabled={pendingItems.length === 0}
 							class="flex flex-1 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-dark active:scale-95 disabled:opacity-40"
 							style="min-height: 44px"
@@ -647,6 +789,31 @@
 			</div>
 			<div class="flex gap-2 mt-2">
 				<button class="btn-ghost flex-1" onclick={() => paxModalTable = null}>Cancel</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- New Takeout Modal -->
+{#if showTakeoutModal}
+	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+		<div class="pos-card w-[340px] flex flex-col gap-5">
+			<div class="flex flex-col gap-1">
+				<h3 class="text-lg font-bold text-gray-900">📦 New Takeout Order</h3>
+				<p class="text-sm text-gray-500">Enter customer name or alias (optional)</p>
+			</div>
+			<input
+				type="text"
+				bind:value={takeoutName}
+				placeholder="e.g. Maria, Table 5 pickup, etc."
+				class="pos-input"
+				onkeydown={(e) => e.key === 'Enter' && confirmTakeout()}
+			/>
+			<div class="flex gap-2">
+				<button class="btn-ghost flex-1" onclick={() => showTakeoutModal = false}>Cancel</button>
+				<button class="btn-primary flex-1" onclick={confirmTakeout}>
+					✓ Create Order
+				</button>
 			</div>
 		</div>
 	</div>

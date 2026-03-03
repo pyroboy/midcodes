@@ -29,12 +29,14 @@ export const auditLog = $state<LogEntry[]>([
 	{ id: 'l-3',  isoTimestamp: ts(-15), timestamp: fmt(-15), user: 'Pedro Cruz',     role: 'kitchen', action: 'order',   description: 'Marked Samgyupsal (T5) as served',             branch: 'QC' },
 	{ id: 'l-4',  isoTimestamp: ts(-30), timestamp: fmt(-30), user: 'Maria Santos',   role: 'staff',   action: 'stock',   description: 'Logged 150g Galbi as waste — Dropped',        branch: 'QC' },
 	{ id: 'l-5',  isoTimestamp: ts(-45), timestamp: fmt(-45), user: 'Juan Reyes',     role: 'manager', action: 'payment', description: 'Closed T1 — Cash ₱4,820.00',                  branch: 'QC' },
-	{ id: 'l-6',  isoTimestamp: ts(-60), timestamp: fmt(-60), user: 'Maria Santos',   role: 'staff',   action: 'order',   description: 'Opened VIP1 — 🔥 Unli Pork & Beef · 4 pax',  branch: 'QC' },
+	{ id: 'l-6',  isoTimestamp: ts(-60), timestamp: fmt(-60), user: 'Maria Santos',   role: 'staff',   action: 'order',   description: 'Opened T5 — 🔥 Unli Pork & Beef · 4 pax',     branch: 'QC' },
 	{ id: 'l-7',  isoTimestamp: ts(-90), timestamp: fmt(-90), user: 'Pedro Cruz',     role: 'kitchen', action: 'stock',   description: 'Stock count submitted — Afternoon session',    branch: 'QC' },
 	{ id: 'l-8',  isoTimestamp: ts(-120),timestamp: fmt(-120),user: 'Ana Reyes',      role: 'staff',   action: 'order',   description: 'Added 2× Iced Tea to T3',                     branch: 'MKTI' },
 	{ id: 'l-9',  isoTimestamp: ts(-180),timestamp: fmt(-180),user: 'Pedro Cruz',     role: 'kitchen', action: 'stock',   description: 'Received 5,000g Samgyupsal — Metro Meat Co.', branch: 'QC' },
 	{ id: 'l-10', isoTimestamp: ts(-240),timestamp: fmt(-240),user: 'Maria Santos',   role: 'staff',   action: 'auth',    description: 'Login — Maria Santos (staff)',                 branch: 'QC' },
 ]);
+
+import { session } from '$lib/stores/session.svelte';
 
 // ─── Action: Log ─────────────────────────────────────────────────────────────
 
@@ -48,9 +50,9 @@ export function writeLog(
 		id: nanoid(),
 		isoTimestamp: now.toISOString(),
 		timestamp: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
-		user:   opts.user   ?? 'Staff',
-		role:   opts.role   ?? 'staff',
-		branch: opts.branch ?? 'QC',
+		user:   opts.user   ?? (session.userName || 'Staff'),
+		role:   opts.role   ?? session.role,
+		branch: opts.branch ?? (session.locationId === 'qc' ? 'QC' : session.locationId === 'mkti' ? 'MKTI' : session.locationId === 'wh-qc' ? 'WH-QC' : session.locationId.toUpperCase()),
 		action,
 		description,
 		meta: opts.meta,
@@ -83,8 +85,8 @@ export const log = {
 		writeLog('payment', `Checkout ${tableLabel} — ₱${total.toFixed(2)}${method ? ` (${method})` : ''}`),
 
 	/** KDS: item marked as served */
-	itemServed: (itemName: string, tableNumber: number) =>
-		writeLog('order', `Served: ${itemName} → T${tableNumber}`),
+	itemServed: (itemName: string, tableNumber: number | null) =>
+		writeLog('order', `Served: ${itemName} → ${tableNumber !== null ? `T${tableNumber}` : 'Takeout'}`),
 
 	/** EOD: report submitted */
 	eodSubmitted: () =>

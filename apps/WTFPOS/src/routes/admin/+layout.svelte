@@ -27,7 +27,7 @@
 		<div class="flex items-center gap-3">
 			<h1 class="text-xl font-bold text-gray-900 tracking-tight">Admin Portal</h1>
 			<span class="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700">
-				{session.branch === 'all' ? '🌐 All Branches' : session.branch.toUpperCase()}
+				{session.locationId === 'all' ? '🌐 All Locations' : session.locationId.toUpperCase()}
 			</span>
 		</div>
 		<nav class="flex space-x-1">
