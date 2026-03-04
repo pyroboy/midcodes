@@ -791,9 +791,14 @@ export function recalcSubBills(order: Order): void {
 	for (const sb of order.subBills) {
 		const items = order.items.filter(i => sb.itemIds.includes(i.id) && i.status !== 'cancelled' && i.tag !== 'FREE');
 		sb.subtotal = items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-		if (order.discountType !== 'none' && order.subtotal > 0) {
-			sb.discountAmount = Math.round(sb.subtotal * 0.2);
-			sb.vatAmount = 0; // SC/PWD: VAT-exempt
+		if ((order.discountType === 'senior' || order.discountType === 'pwd') && order.subtotal > 0) {
+			const qualifyingPax = order.discountPax ?? order.pax;
+			const totalPax = order.pax > 0 ? order.pax : 1;
+			sb.discountAmount = Math.round(sb.subtotal * (qualifyingPax / totalPax) * 0.2);
+			sb.vatAmount = 0; // SC/PWD: VAT-exempt on qualifying portion
+		} else if ((order.discountType === 'comp' || order.discountType === 'service_recovery' || order.discountType === 'promo') && order.subtotal > 0) {
+			sb.discountAmount = sb.subtotal; // full write-off
+			sb.vatAmount = 0;
 		} else {
 			sb.discountAmount = 0;
 			sb.vatAmount = Math.round(sb.subtotal - sb.subtotal / 1.12);
