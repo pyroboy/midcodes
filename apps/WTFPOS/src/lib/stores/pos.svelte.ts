@@ -298,7 +298,11 @@ export function addItemToOrder(orderId: string, item: MenuItem, qty: number, wei
 export function recalcOrder(order: Order) {
 	const sub  = order.items.filter((i) => i.status !== 'cancelled' && i.tag !== 'FREE').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 	let disc = 0;
-	if (order.discountType === 'senior' || order.discountType === 'pwd') disc = Math.round(sub * 0.2);
+	if (order.discountType === 'senior' || order.discountType === 'pwd') {
+		const qualifyingPax = order.discountPax ?? order.pax;
+		const totalPax = order.pax > 0 ? order.pax : 1;
+		disc = Math.round(sub * (qualifyingPax / totalPax) * 0.2);
+	}
 	else if (order.discountType === 'comp' || order.discountType === 'service_recovery' || order.discountType === 'promo') disc = sub;
 
 	const net  = sub - disc;
@@ -369,6 +373,32 @@ export function markItemServed(orderId: string, itemId: string) {
 			}
 		}
 	}
+}
+
+/**
+ * Reject an order item from KDS (kitchen refusal) - marks item as cancelled
+ * and recalculates the order total
+ */
+export function rejectOrderItem(orderId: string, itemId: string): boolean {
+	const order = orders.find(o => o.id === orderId);
+	if (!order) return false;
+	
+	const item = order.items.find(i => i.id === itemId);
+	if (!item || item.status === 'cancelled') return false;
+	
+	// Mark as cancelled
+	item.status = 'cancelled';
+	
+	// Recalculate order totals
+	recalcOrder(order);
+	
+	// Update table bill total
+	const table = tables.find(t => t.id === order.tableId);
+	if (table) {
+		table.billTotal = order.total;
+	}
+	
+	return true;
 }
 
 export function recallTicket(orderId: string) {
@@ -524,6 +554,128 @@ export function transferTable(fromTableId: string, toTableId: string): boolean {
 
 	log.tableTransferred(fromTable.label, toTable.label);
 	return true;
+}
+
+// ─── Table Merge ─────────────────────────────────────────────────────────────
+
+export function mergeTables(primaryTableId: string, secondaryTableId: string): {
+	success: boolean;
+	error?: string;
+	primaryOrderId?: string;
+} {
+	const primaryTable = tables.find(t => t.id === primaryTableId);
+	const secondaryTable = tables.find(t => t.id === secondaryTableId);
+
+	if (!primaryTable || !secondaryTable) {
+		return { success: false, error: 'One or both tables not found' };
+	}
+
+	if (primaryTable.locationId !== secondaryTable.locationId) {
+		return { success: false, error: 'Tables must be in the same location' };
+	}
+
+	if (!primaryTable.currentOrderId || !secondaryTable.currentOrderId) {
+		return { success: false, error: 'Both tables must have active orders' };
+	}
+
+	const primaryOrder = orders.find(o => o.id === primaryTable.currentOrderId);
+	const secondaryOrder = orders.find(o => o.id === secondaryTable.currentOrderId);
+
+	if (!primaryOrder || !secondaryOrder) {
+		return { success: false, error: 'Could not find orders for both tables' };
+	}
+
+	if (primaryOrder.status !== 'open' || secondaryOrder.status !== 'open') {
+		return { success: false, error: 'Both orders must be open' };
+	}
+
+	// Handle different packages - keep the primary table's package
+	// Add a note about the package difference if they differ
+	if (secondaryOrder.packageId && secondaryOrder.packageId !== primaryOrder.packageId) {
+		// Add package items from secondary order as individual items
+		// They will be marked as 'FREE' if they were meats
+		const secondaryPkgItems = secondaryOrder.items.filter(i => 
+			i.tag === 'PKG' || (i.tag === 'FREE' && secondaryOrder.packageId && 
+			menuItems.find(m => m.id === secondaryOrder.packageId)?.meats?.includes(i.menuItemId))
+		);
+		
+		for (const item of secondaryPkgItems) {
+			const menuItem = menuItems.find(m => m.id === item.menuItemId);
+			if (menuItem) {
+				// Add as individual item (not part of primary package)
+				primaryOrder.items.push({
+					...item,
+					id: nanoid(), // New ID for the merged item
+					tag: null, // Not part of primary package
+					unitPrice: menuItem.price, // Charge at menu price
+					notes: item.notes ? `${item.notes} (from ${secondaryTable.label})` : `Added from ${secondaryTable.label}`
+				});
+			}
+		}
+	}
+
+	// Merge all non-package items from secondary order
+	const secondaryItems = secondaryOrder.items.filter(i => 
+		i.tag !== 'PKG' && !(i.tag === 'FREE' && secondaryOrder.packageId)
+	);
+
+	for (const item of secondaryItems) {
+		primaryOrder.items.push({
+			...item,
+			id: nanoid(), // New ID for the merged item
+			notes: item.notes ? `${item.notes} (from ${secondaryTable.label})` : `Added from ${secondaryTable.label}`
+			});
+	}
+
+	// Update pax (add secondary table's pax)
+	const combinedPax = primaryOrder.pax + secondaryOrder.pax;
+	primaryOrder.pax = combinedPax;
+
+	// If primary has package, update package quantity
+	if (primaryOrder.packageId) {
+		const pkgItem = primaryOrder.items.find(i => 
+			i.menuItemId === primaryOrder.packageId && i.tag === 'PKG'
+		);
+		if (pkgItem) {
+			pkgItem.quantity = combinedPax;
+		}
+	}
+
+	// Recalculate totals
+	recalcOrder(primaryOrder);
+	primaryTable.billTotal = primaryOrder.total;
+
+	// Merge KDS tickets
+	const primaryTicket = kdsTickets.find(t => t.orderId === primaryOrder.id);
+	const secondaryTicket = kdsTickets.find(t => t.orderId === secondaryOrder.id);
+
+	if (primaryTicket && secondaryTicket) {
+		// Add non-cancelled items from secondary ticket
+		const itemsToMerge = secondaryTicket.items.filter(i => i.status !== 'cancelled');
+		primaryTicket.items.push(...itemsToMerge.map(i => ({ ...i, id: nanoid() })));
+		
+		// Remove secondary ticket
+		const secondaryTicketIndex = kdsTickets.findIndex(t => t.orderId === secondaryOrder.id);
+		if (secondaryTicketIndex !== -1) {
+			kdsTickets.splice(secondaryTicketIndex, 1);
+		}
+	}
+
+	// Close secondary order (mark as cancelled with merge reason)
+	secondaryOrder.status = 'cancelled';
+	secondaryOrder.closedAt = new Date().toISOString();
+	secondaryOrder.notes = `Merged into ${primaryTable.label}`;
+	
+	// Reset secondary table
+	secondaryTable.status = 'available';
+	secondaryTable.sessionStartedAt = null;
+	secondaryTable.elapsedSeconds = null;
+	secondaryTable.currentOrderId = null;
+	secondaryTable.billTotal = null;
+
+	log.tableClosed(secondaryTable.label, 0, `MERGED into ${primaryTable.label}`);
+
+	return { success: true, primaryOrderId: primaryOrder.id };
 }
 
 // ─── Package Change ──────────────────────────────────────────────────────────

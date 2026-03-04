@@ -3,6 +3,7 @@
     import { formatPeso, cn } from '$lib/utils';
     import { printBill, confirmHeldPayment, cancelHeldPayment } from '$lib/stores/pos.svelte';
     import { advanceTakeoutStatus } from '$lib/stores/pos.svelte';
+    import type { KitchenAlert } from '$lib/stores/alert.svelte';
 
     interface Props {
         order: Order | undefined;
@@ -15,6 +16,9 @@
         onchangepackage: () => void;
         onsplit: () => void;
         onchangepax: () => void;
+        onmerge?: () => void;
+        pendingRejections?: KitchenAlert[];
+        onacknowledgeRejection?: (alertId: string) => void;
     }
 
     let { 
@@ -27,7 +31,10 @@
         ontransfer, 
         onchangepackage, 
         onsplit,
-        onchangepax
+        onchangepax,
+        onmerge,
+        pendingRejections = [],
+        onacknowledgeRejection
     }: Props = $props();
 
     function takeoutLabel(takeoutOrders: Order[], order: Order) {
@@ -41,6 +48,14 @@
         if (t.status === 'warning')  return 'bg-yellow-400 text-gray-900 font-bold';
         if (t.status === 'billing') return 'bg-orange-500 text-white font-bold';
         return 'bg-emerald-500 text-white';
+    }
+
+    function formatTimeAgo(isoTimestamp: string): string {
+        const diff = Date.now() - new Date(isoTimestamp).getTime();
+        const minutes = Math.floor(diff / 60000);
+        if (minutes < 1) return 'just now';
+        if (minutes < 60) return `${minutes}m ago`;
+        return `${Math.floor(minutes / 60)}h ago`;
     }
 </script>
 
@@ -127,6 +142,48 @@
             {/if}
         </div>
 
+        <!-- Kitchen Rejection Alerts -->
+        {#if pendingRejections.length > 0}
+            <div class="mx-4 mb-3 rounded-lg border-2 border-status-red bg-status-red-light p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="flex items-center gap-1.5 text-xs font-bold text-status-red uppercase tracking-wider">
+                        <span class="animate-pulse">🚨</span> Kitchen Rejections ({pendingRejections.length})
+                    </span>
+                    {#if onacknowledgeRejection}
+                        <button 
+                            onclick={() => {
+                                for (const alert of pendingRejections) {
+                                    onacknowledgeRejection?.(alert.id);
+                                }
+                            }}
+                            class="text-[10px] font-semibold text-status-red hover:underline"
+                        >
+                            Acknowledge All
+                        </button>
+                    {/if}
+                </div>
+                <div class="flex flex-col gap-2">
+                    {#each pendingRejections as alert (alert.id)}
+                        <div class="flex items-start justify-between rounded bg-white p-2 shadow-sm">
+                            <div class="flex flex-col gap-0.5">
+                                <span class="text-xs font-semibold text-gray-900">{alert.itemName}</span>
+                                <span class="text-[10px] text-gray-500">{alert.reason}</span>
+                                <span class="text-[9px] text-gray-400">{formatTimeAgo(alert.createdAt)}</span>
+                            </div>
+                            {#if onacknowledgeRejection}
+                                <button 
+                                    onclick={() => onacknowledgeRejection?.(alert.id)}
+                                    class="rounded bg-status-red px-2 py-1 text-[10px] font-bold text-white hover:bg-red-600 transition-colors"
+                                >
+                                    ✓
+                                </button>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
+            </div>
+        {/if}
+
         <div class="flex-1 divide-y divide-border-light px-5">
             {#each order.items as item (item.id)}
                 <div class={cn('flex items-start justify-between py-3', item.status === 'cancelled' && 'opacity-50')}>
@@ -188,7 +245,7 @@
                 <button onclick={() => printBill(order.id)} class="btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800" style="min-height: 44px">🖨</button>
             </div>
             {/if}
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
                 {#if order.orderType === 'dine-in' && table}
                     <button onclick={ontransfer} class="btn-secondary flex-1 text-xs" style="min-height: 38px">🔀 Transfer</button>
                     <button onclick={onchangepax} class="btn-secondary flex-1 text-xs" style="min-height: 38px">👥 Pax</button>
@@ -198,6 +255,9 @@
                 {/if}
                 {#if order.items.filter(i => i.status !== 'cancelled').length > 0}
                     <button onclick={onsplit} class="btn-secondary flex-1 text-xs" style="min-height: 38px">✂️ Split Bill</button>
+                {/if}
+                {#if order.orderType === 'dine-in' && table && onmerge}
+                    <button onclick={onmerge} class="btn-secondary flex-1 text-xs" style="min-height: 38px">➕ Merge Table</button>
                 {/if}
             </div>
         </div>

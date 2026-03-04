@@ -110,6 +110,8 @@ export interface Order {
 	items: OrderItem[];
 	status: 'open' | 'pending_payment' | 'paid' | 'cancelled';
 	discountType: DiscountType;
+	discountPax?: number;   // qualifying SC/PWD persons (defaults to pax if unset)
+	discountIds?: string[]; // SC/PWD ID numbers, one per qualifying person
 	subtotal: number;
 	discountAmount: number;
 	vatAmount: number;

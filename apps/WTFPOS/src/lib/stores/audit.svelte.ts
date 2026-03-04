@@ -81,8 +81,20 @@ export const log = {
 		writeLog('payment', `Discount removed on ${tableLabel}`),
 
 	/** POS: order checked out / table closed */
-	tableClosed: (tableLabel: string, total: number, method?: string) =>
-		writeLog('payment', `Checkout ${tableLabel} — ₱${total.toFixed(2)}${method ? ` (${method})` : ''}`),
+	tableClosed: (tableLabel: string, total: number, method?: string, durationSeconds?: number) => {
+		const dur = durationSeconds != null
+			? ` [${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s]`
+			: '';
+		writeLog('payment', `Checkout ${tableLabel} — ₱${total.toFixed(2)}${method ? ` (${method})` : ''}${dur}`);
+	},
+
+	/** POS: table voided with no chargeable items (walkout before ordering) */
+	zeroValueCancellation: (tableLabel: string, reason?: string, durationSeconds?: number) => {
+		const dur = durationSeconds != null
+			? ` [seated ${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s]`
+			: '';
+		writeLog('payment', `Zero-value cancellation: ${tableLabel}${reason ? ` — ${reason}` : ''}${dur}`);
+	},
 
 	/** KDS: item marked as served */
 	itemServed: (itemName: string, tableNumber: number | null) =>

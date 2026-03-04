@@ -307,6 +307,36 @@ export function deductFromStock(menuItemId: string, qty: number, tableId: string
 	}
 }
 
+/**
+ * Restore stock when an item is rejected/cancelled from KDS
+ * Creates a stock adjustment to add the quantity back
+ */
+export function restoreStock(menuItemId: string, qty: number, tableId: string, orderId: string) {
+	const item = stockItems.find(s => s.menuItemId === menuItemId);
+	if (!item) return; // item not tracked in stock
+
+	// Find and remove the deduction for this order item
+	const deductionIndex = deductions.findIndex(d => 
+		d.stockItemId === item.id && d.orderId === orderId && d.qty === qty
+	);
+	if (deductionIndex !== -1) {
+		deductions.splice(deductionIndex, 1);
+	}
+
+	// Create a stock adjustment to add the quantity back
+	adjustStock(
+		item.id,
+		item.name,
+		'add',
+		qty,
+		item.unit,
+		`Restored from KDS rejection — Order ${orderId.slice(-6)}`,
+		undefined,
+		undefined,
+		'Kitchen'
+	);
+}
+
 /** Tier 3: Returns active deliveries nearing expiration (within 3 days) */
 export function getSpoilageAlerts() {
 	const todayMs = Date.now();

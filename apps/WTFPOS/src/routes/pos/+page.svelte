@@ -1,6 +1,7 @@
 <script lang="ts">
     import { tables as allTables, orders as allOrders, openTable, tickTimers, menuItems, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance } from '$lib/stores/pos.svelte';
     import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
+    import { getPendingRejectionsForTable, acknowledgeAlert, type KitchenAlert } from '$lib/stores/alert.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
     import TopBar from '$lib/components/TopBar.svelte';
     import AlertBanner from '$lib/components/AlertBanner.svelte';
@@ -20,6 +21,7 @@
     import PaxModal from '$lib/components/pos/PaxModal.svelte';
     import PaxChangeModal from '$lib/components/pos/PaxChangeModal.svelte';
     import LeftoverPenaltyModal from '$lib/components/pos/LeftoverPenaltyModal.svelte';
+    import MergeTablesModal from '$lib/components/pos/MergeTablesModal.svelte';
     import { session } from '$lib/stores/session.svelte';
 
     // ─── Branch-filtered tables/orders ───────────────────────────────────────────
@@ -67,7 +69,13 @@
     let showTakeoutModal = $state(false);
     let showPaxChange = $state(false);
     let showLeftoverPenalty = $state(false);
+    let showMergeModal = $state(false);
     let paxModalTable = $state<Table | null>(null);
+
+    // ─── Kitchen Rejection Alerts ──────────────────────────────────────────────
+    const pendingRejections = $derived<KitchenAlert[]>(
+        getPendingRejectionsForTable(selectedTableId)
+    );
 
     // ─── Receipt State ────────────────────────────────────────────────────────
     let showReceipt = $state(false);
@@ -275,6 +283,9 @@
                 onchangepackage={() => showPackageChange = true}
                 onsplit={() => showSplitBill = true}
                 onchangepax={() => showPaxChange = true}
+                onmerge={() => showMergeModal = true}
+                {pendingRejections}
+                onacknowledgeRejection={(alertId) => acknowledgeAlert(alertId)}
             />
         </div>
     {/if}
@@ -388,3 +399,14 @@
         showCheckout = true;
     }}
 />
+
+{#if showMergeModal && selectedTable}
+    <MergeTablesModal
+        primaryTable={selectedTable}
+        onclose={() => showMergeModal = false}
+        onmerge={(targetTableId) => {
+            showMergeModal = false;
+            selectedTableId = targetTableId;
+        }}
+    />
+{/if}
