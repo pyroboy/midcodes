@@ -64,7 +64,7 @@
                                     t.status === 'critical' ? 'text-status-red' :
                                     t.status === 'warning'  ? 'text-status-yellow' : 'text-accent'
                                 )}>
-                                    {t.remainingSeconds !== null ? formatCountdown(t.remainingSeconds) : '–'}
+                                    {t.elapsedSeconds !== null ? formatCountdown(t.elapsedSeconds) : '–'}
                                 </span>
                                 {#if tOrder}<span class="text-[10px] font-mono text-gray-400">{tOrder.pax}p</span>{/if}
                                 {#if t.billTotal}<span class="text-[10px] font-mono text-accent font-bold">{formatPeso(t.billTotal)}</span>{/if}

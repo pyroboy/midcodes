@@ -59,7 +59,7 @@
                         <span class="rounded-full px-1.5 py-0.5 text-[9px] font-semibold z-10 bg-gray-500 text-white">🔧</span>
                     {:else if table.status !== 'available'}
                         <span class={cn('rounded-full px-1.5 py-0.5 text-[9px] font-semibold z-10', timerBadgeClass(table))}>
-                            {table.remainingSeconds !== null ? formatCountdown(table.remainingSeconds) : ''}
+                            {table.elapsedSeconds !== null ? formatCountdown(table.elapsedSeconds) : ''}
                         </span>
                     {/if}
                 </div>

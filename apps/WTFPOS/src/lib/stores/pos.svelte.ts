@@ -27,7 +27,7 @@ function makeTables(): Table[] {
 			x: FLOOR_POSITIONS[i]?.x ?? (i % 4) * 155 + 40,
 			y: FLOOR_POSITIONS[i]?.y ?? Math.floor(i / 4) * 155 + 40,
 			width: 92, height: 92,
-			status: 'available' as const, sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null
+			status: 'available' as const, sessionStartedAt: null, elapsedSeconds: null, currentOrderId: null, billTotal: null
 		}))
 	];
 	return [...gen('qc', 'QC'), ...gen('mkti', 'MK')];
@@ -109,7 +109,7 @@ export function openTable(tableId: string, pax: number = 4, packageName?: string
 	const orderId = nanoid();
 	table.status = 'occupied';
 	table.sessionStartedAt = new Date().toISOString();
-	table.remainingSeconds = SESSION_SECONDS;
+	table.elapsedSeconds = 0;
 	table.currentOrderId = orderId;
 	table.billTotal = 0;
 	orders.push({ id: orderId, locationId: table.locationId, orderType: 'dine-in', tableId, tableNumber: table.number, packageName: packageName ?? null, packageId: null, pax, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null, billPrinted: false, notes: '' });
@@ -150,7 +150,7 @@ export function closeTable(tableId: string) {
 	// Audit logging is handled by the caller (confirmCheckout) which has payment context
 	table.status = 'available';
 	table.sessionStartedAt = null;
-	table.remainingSeconds = null;
+	table.elapsedSeconds = null;
 	table.currentOrderId = null;
 	table.billTotal = null;
 }
@@ -177,15 +177,15 @@ export function setTableMaintenance(tableId: string, isMaintenance: boolean) {
 
 export function tickTimers() {
 	for (const table of tables) {
-		if (table.status === 'available' || table.status === 'maintenance' || table.remainingSeconds === null) continue;
-		table.remainingSeconds = Math.max(0, table.remainingSeconds - 1);
+		if (table.status === 'available' || table.status === 'maintenance' || table.elapsedSeconds === null) continue;
+		table.elapsedSeconds += 1;
 
 		// Only update status based on timer if not in billing or critical locked states
 		// billing = waiting for payment, should not revert to occupied/warning
 		const lockedStatuses: TableStatus[] = ['billing', 'maintenance'];
 		if (!lockedStatuses.includes(table.status)) {
-			if (table.remainingSeconds <= 5 * 60) table.status = 'critical';
-			else if (table.remainingSeconds <= 15 * 60) table.status = 'warning';
+			if (table.elapsedSeconds >= SESSION_SECONDS - (5 * 60)) table.status = 'critical';
+			else if (table.elapsedSeconds >= SESSION_SECONDS - (15 * 60)) table.status = 'warning';
 			else table.status = 'occupied';
 		}
 	}
@@ -209,7 +209,7 @@ export function addTable(locationId: string, label: string, capacity: number, x:
 	tables.push({
 		id, locationId, number, label, zone: 'main', capacity,
 		x, y, width: 92, height: 92,
-		status: 'available', sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null
+		status: 'available', sessionStartedAt: null, elapsedSeconds: null, currentOrderId: null, billTotal: null
 	});
 }
 
@@ -330,7 +330,7 @@ export function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'wri
 		if (table) {
 			table.status = 'available';
 			table.sessionStartedAt = null;
-			table.remainingSeconds = null;
+			table.elapsedSeconds = null;
 			table.currentOrderId = null;
 			table.billTotal = null;
 		}
@@ -503,7 +503,7 @@ export function transferTable(fromTableId: string, toTableId: string): boolean {
 	// Transfer table state
 	toTable.status = fromTable.status;
 	toTable.sessionStartedAt = fromTable.sessionStartedAt;
-	toTable.remainingSeconds = fromTable.remainingSeconds;
+	toTable.elapsedSeconds = fromTable.elapsedSeconds;
 	toTable.currentOrderId = fromTable.currentOrderId;
 	toTable.billTotal = fromTable.billTotal;
 
@@ -518,7 +518,7 @@ export function transferTable(fromTableId: string, toTableId: string): boolean {
 	// Reset source table
 	fromTable.status = 'available';
 	fromTable.sessionStartedAt = null;
-	fromTable.remainingSeconds = null;
+	fromTable.elapsedSeconds = null;
 	fromTable.currentOrderId = null;
 	fromTable.billTotal = null;
 

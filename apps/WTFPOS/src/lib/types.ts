@@ -16,7 +16,7 @@ export interface Table {
 	shape?: 'rect' | 'circle';
 	status: TableStatus;
 	sessionStartedAt: string | null;
-	remainingSeconds: number | null;
+	elapsedSeconds: number | null;
 	currentOrderId: string | null;
 	billTotal: number | null;
 }

@@ -118,9 +118,9 @@
             {:else if order.packageName}
                 <div class="flex items-center justify-between">
                     <span class="text-sm font-semibold text-gray-900">🔥 {order.packageName}</span>
-                    {#if table?.remainingSeconds !== null}
-                        <span class={cn('rounded-full px-2.5 py-1 text-xs font-semibold', timerBadgeClass(table))}>
-                            ⏱ {Math.floor((table?.remainingSeconds ?? 0) / 60)}m
+                    {#if table?.elapsedSeconds !== null}
+                        <span class="rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                            ⏱ {Math.floor((table?.elapsedSeconds ?? 0) / 60)}m
                         </span>
                     {/if}
                 </div>

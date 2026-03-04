@@ -50,7 +50,7 @@
 	</div>
 
 	<!-- Countdown or status -->
-	{#if table.remainingSeconds !== null}
+	{#if table.elapsedSeconds !== null}
 		<div
 			class={cn(
 				'font-mono text-xl font-bold',
@@ -59,7 +59,7 @@
 				table.status === 'occupied' && 'text-table-occupied'
 			)}
 		>
-			{formatCountdown(table.remainingSeconds)}
+			{formatCountdown(table.elapsedSeconds)}
 		</div>
 		<div class="text-xs text-white/40">{statusLabel[table.status]}</div>
 	{:else}
