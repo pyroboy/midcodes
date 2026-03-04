@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from 'svelte';
     import type { Order, Table, DiscountType } from '$lib/types';
     import { closeTable, recalcOrder, holdPayment } from '$lib/stores/pos.svelte';
     import { printReceipt } from '$lib/stores/hardware.svelte';
@@ -23,6 +24,11 @@
     let showPinForDiscount = $state(false);
     let pendingDiscountType = $state<DiscountType>('none');
 
+    // SC/PWD per-person inputs (Fix 1 + Fix 2)
+    let discountPaxInput = $state<number>(untrack(() => order.discountPax ?? 1));
+    let discountIdsInput = $state<string[]>([]);
+    const showScPwdSection = $derived(order.discountType === 'senior' || order.discountType === 'pwd');
+
     const cashChange = $derived(cashTendered - order.total);
     const hasItems = $derived(order.items.filter(i => i.status !== 'cancelled').length > 0);
     const canConfirmCheckout = $derived(
@@ -37,6 +43,19 @@
         cashTendered = order.total;
     }
 
+    function applyScPwdPax(newPax: number) {
+        discountPaxInput = Math.max(1, Math.min(newPax, order.pax));
+        discountIdsInput = Array.from({ length: discountPaxInput }, (_, i) => discountIdsInput[i] ?? '');
+        order.discountPax = discountPaxInput;
+        order.discountIds = [...discountIdsInput];
+        recalcOrder(order);
+        if (table) table.billTotal = order.total;
+    }
+
+    function syncDiscountIds() {
+        order.discountIds = [...discountIdsInput];
+    }
+
     function applyDiscount(type: DiscountType) {
         // Comp and Service Recovery require manager PIN (100% write-offs)
         if ((type === 'comp' || type === 'service_recovery') && order.discountType !== type) {
@@ -46,6 +65,16 @@
         }
         const prev = order.discountType;
         order.discountType = (prev === type) ? 'none' : type;
+        // Reset or initialize SC/PWD pax + IDs when toggling
+        if (order.discountType === 'none') {
+            discountPaxInput = order.pax;
+            discountIdsInput = [];
+            order.discountPax = undefined;
+            order.discountIds = undefined;
+        } else if (order.discountType === 'senior' || order.discountType === 'pwd') {
+            discountPaxInput = order.discountPax ?? 1;
+            discountIdsInput = Array.from({ length: discountPaxInput }, (_, i) => order.discountIds?.[i] ?? '');
+        }
         recalcOrder(order);
         if (table) table.billTotal = order.total;
         const tableLabel = order.orderType === 'takeout'
@@ -116,12 +145,15 @@
         order.closedAt = new Date().toISOString();
         order.closedBy = session.userName || 'Staff';
 
+        // Capture duration before closeTable() clears elapsedSeconds (Fix 3)
+        const capturedElapsed = table?.elapsedSeconds ?? null;
+
         // Free the table for dine-in
         if (order.tableId) {
             closeTable(order.tableId);
         }
 
-        log.tableClosed(label, order.total, methodLabel);
+        log.tableClosed(label, order.total, methodLabel, capturedElapsed ?? undefined);
         checkoutError = '';
         checkoutLoading = false;
         onsuccess();
@@ -186,6 +218,60 @@
                 </button>
             {/each}
         </div>
+
+        {#if showScPwdSection}
+            <div class="flex flex-col gap-3 border-b border-border px-6 py-4 bg-surface-secondary">
+                <!-- Qualifying pax stepper -->
+                <div class="flex items-center justify-between">
+                    <div class="flex flex-col gap-0.5">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                            Qualifying Persons ({order.discountType === 'senior' ? 'Senior Citizen' : 'PWD'})
+                        </span>
+                        <span class="text-[10px] text-gray-400">
+                            {discountPaxInput} of {order.pax} pax qualify for 20% discount
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button
+                            onclick={() => applyScPwdPax(discountPaxInput - 1)}
+                            disabled={discountPaxInput <= 1}
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
+                        >−</button>
+                        <span class="w-8 text-center font-mono text-xl font-extrabold text-gray-900">{discountPaxInput}</span>
+                        <button
+                            onclick={() => applyScPwdPax(discountPaxInput + 1)}
+                            disabled={discountPaxInput >= order.pax}
+                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
+                        >+</button>
+                    </div>
+                </div>
+                <!-- SC/PWD ID inputs -->
+                <div class="flex flex-col gap-2">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ID Numbers (optional)</span>
+                    {#each discountIdsInput as _, i}
+                        <div class="flex items-center gap-2">
+                            <span class="w-20 shrink-0 text-xs font-semibold text-gray-500">
+                                {order.discountType === 'senior' ? 'SC' : 'PWD'} ID #{i + 1}
+                            </span>
+                            <input
+                                type="text"
+                                bind:value={discountIdsInput[i]}
+                                oninput={syncDiscountIds}
+                                placeholder="e.g. 12345678"
+                                class="pos-input flex-1 text-sm"
+                            />
+                        </div>
+                    {/each}
+                </div>
+                <!-- Live discount preview -->
+                <div class="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+                    <span class="text-xs font-semibold text-emerald-700">
+                        Discount ({discountPaxInput}/{order.pax} pax × 20%)
+                    </span>
+                    <span class="font-mono text-sm font-bold text-emerald-700">−{formatPeso(order.discountAmount)}</span>
+                </div>
+            </div>
+        {/if}
 
         <div class="flex flex-col gap-3 border-b border-border px-6 py-4">
             <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Payment Method</span>

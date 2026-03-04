@@ -244,8 +244,13 @@ export function confirmHeldPayment(orderId: string) {
 	const label = order.tableId
 		? (tables.find(t => t.id === order.tableId)?.label ?? '')
 		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	// Capture duration before closeTable() clears it (Fix 3)
+	const capturedElapsed = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.elapsedSeconds ?? null)
+		: null;
 	if (order.tableId) closeTable(order.tableId);
 	log.paymentConfirmed(label, order.total, method === 'gcash' ? 'GCash' : 'Maya');
+	log.tableClosed(label, order.total, method === 'gcash' ? 'GCash' : 'Maya', capturedElapsed ?? undefined);
 }
 
 export function cancelHeldPayment(orderId: string) {
@@ -329,9 +334,12 @@ export function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'wri
 	for (const item of order.items) {
 		if (item.status !== 'cancelled') item.status = 'cancelled';
 	}
+	// Capture elapsed seconds before closeTable() clears it (Fix 3)
+	let capturedElapsed: number | null = null;
 	if (order.tableId) {
 		const table = tables.find(t => t.id === order.tableId);
 		if (table) {
+			capturedElapsed = table.elapsedSeconds;
 			table.status = 'available';
 			table.sessionStartedAt = null;
 			table.elapsedSeconds = null;
@@ -342,7 +350,13 @@ export function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'wri
 	const label = order.tableId
 		? (tables.find(t => t.id === order.tableId)?.label ?? order.tableId)
 		: `Takeout (${order.customerName ?? 'Walk-in'})`;
-	log.tableClosed(label, 0, `VOID (${reason ?? 'unknown'})`);
+	// Zero-value cancellation: no chargeable items were ever added (Fix 4)
+	const isZeroValue = order.subtotal === 0;
+	if (isZeroValue) {
+		log.zeroValueCancellation(label, reason, capturedElapsed ?? undefined);
+	} else {
+		log.tableClosed(label, 0, `VOID (${reason ?? 'unknown'})`, capturedElapsed ?? undefined);
+	}
 }
 
 export function markItemServed(orderId: string, itemId: string) {
@@ -828,8 +842,12 @@ export function paySubBill(orderId: string, subBillId: string, method: PaymentMe
 		}
 		order.status = 'paid';
 		order.closedAt = new Date().toISOString();
+		// Capture duration before closeTable() clears it (Fix 3)
+		const capturedElapsed = order.tableId
+			? (tables.find(t => t.id === order.tableId)?.elapsedSeconds ?? null)
+			: null;
 		if (order.tableId) closeTable(order.tableId);
-		log.tableClosed(tableLabel, order.total, 'Split');
+		log.tableClosed(tableLabel, order.total, 'Split', capturedElapsed ?? undefined);
 	}
 }
 
