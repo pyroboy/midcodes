@@ -17,8 +17,6 @@
     import CheckoutModal from '$lib/components/pos/CheckoutModal.svelte';
     import PaxModal from '$lib/components/pos/PaxModal.svelte';
     import { session } from '$lib/stores/session.svelte';
-    import { log } from '$lib/stores/audit.svelte';
-    import { recalcOrder } from '$lib/stores/pos.svelte';
 
     // ─── Branch-filtered tables/orders ───────────────────────────────────────────
     const tables = $derived(session.locationId === 'all' ? allTables : allTables.filter(t => t.locationId === session.locationId));
@@ -42,7 +40,7 @@
     let selectedTableId    = $state<string | null>(null);
     let selectedTakeoutId  = $state<string | null>(null);
 
-    const selectedTable = $derived(selectedTableId ? tables.find((t) => t.id === selectedTableId) : null);
+    const selectedTable = $derived(selectedTableId ? (tables.find((t) => t.id === selectedTableId) ?? null) : null);
 
     // Active order: either from a table or from a takeout selection
     const currentActiveOrder = $derived<Order | undefined>(
