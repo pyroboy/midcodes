@@ -36,11 +36,11 @@ export const ADMIN_ROLES: Role[]    = ['owner', 'admin'];
 
 /** Which top-level nav tabs each role can access */
 export const ROLE_NAV_ACCESS: Record<Role, string[]> = {
-	staff:   ['/floor'],
+	staff:   ['/pos'],
 	kitchen: ['/kitchen', '/stock'],
-	manager: ['/floor', '/kitchen', '/stock', '/reports'],
-	owner:   ['/floor', '/kitchen', '/stock', '/reports', '/admin'],
-	admin:   ['/floor', '/kitchen', '/stock', '/reports', '/admin'],
+	manager: ['/pos', '/kitchen', '/stock', '/reports'],
+	owner:   ['/pos', '/kitchen', '/stock', '/reports', '/admin'],
+	admin:   ['/pos', '/kitchen', '/stock', '/reports', '/admin'],
 };
 
 export const session = $state({

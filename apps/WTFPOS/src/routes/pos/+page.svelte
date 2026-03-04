@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tables as allTables, orders as allOrders, openTable, tickTimers, MENU_ITEMS, addItemToOrder, createTakeoutOrder } from '$lib/stores/pos.svelte';
+	import { tables as allTables, orders as allOrders, openTable, closeTable, cleanTable, printBill, voidOrder, tickTimers, MENU_ITEMS, addItemToOrder, createTakeoutOrder } from '$lib/stores/pos.svelte';
 	import type { Table, MenuItem, MenuCategory, DiscountType, Order } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import { session } from '$lib/stores/session.svelte';
@@ -7,25 +7,11 @@
 	import { log } from '$lib/stores/audit.svelte';
 	import { recalcOrder } from '$lib/stores/pos.svelte';
 
-	// Deterministic floor plan positions for up to 12 tables
-	const FLOOR_POSITIONS = [
-		{ x: 40,  y: 50  },
-		{ x: 200, y: 35  },
-		{ x: 360, y: 52  },
-		{ x: 520, y: 38  },
-		{ x: 45,  y: 205 },
-		{ x: 205, y: 195 },
-		{ x: 368, y: 212 },
-		{ x: 528, y: 198 },
-		{ x: 60,  y: 355 },
-		{ x: 215, y: 345 },
-		{ x: 375, y: 360 },
-		{ x: 535, y: 348 },
-	];
+
 
 	// ─── Branch-filtered tables/orders ───────────────────────────────────────────
-	const tables = $derived(session.locationId === 'all' ? allTables : allTables.filter(t => t.branchId === session.locationId));
-	const orders = $derived(session.locationId === 'all' ? allOrders : allOrders.filter(o => o.branchId === session.locationId));
+	const tables = $derived(session.locationId === 'all' ? allTables : allTables.filter(t => t.locationId === session.locationId));
+	const orders = $derived(session.locationId === 'all' ? allOrders : allOrders.filter(o => o.locationId === session.locationId));
 
 	// Takeout orders for current branch (open only)
 	const takeoutOrders = $derived(orders.filter(o => o.orderType === 'takeout' && o.status === 'open'));
@@ -66,6 +52,8 @@
 		selectedTakeoutId = null;
 		if (table.status === 'available') {
 			paxModalTable = table;
+		} else if (table.status === 'dirty') {
+			cleanTable(table.id);
 		} else {
 			selectedTableId = table.id;
 			showAddItem = false;
@@ -108,16 +96,104 @@
 		}
 	}
 
-	function checkout(method: string = 'Cash') {
-		const order = currentActiveOrder;
-		if (!order) return;
+	// ─── Checkout Modal ──────────────────────────────────────────────────────
+	let showCheckout = $state(false);
+	let checkoutMethod = $state<'cash' | 'gcash' | 'maya'>('cash');
+	let cashTendered = $state<number>(0);
+
+	const checkoutOrder = $derived(showCheckout ? currentActiveOrder : null);
+	const cashChange = $derived(checkoutOrder ? Math.max(0, cashTendered - checkoutOrder.total) : 0);
+	const canConfirmCheckout = $derived(
+		checkoutOrder
+			? (checkoutMethod !== 'cash' || cashTendered >= checkoutOrder.total)
+			: false
+	);
+
+	function openCheckout() {
+		if (!currentActiveOrder || currentActiveOrder.items.filter(i => i.status !== 'cancelled').length === 0) return;
+		checkoutMethod = 'cash';
+		cashTendered = 0;
+		showCheckout = true;
+	}
+
+	function confirmCheckout() {
+		const order = checkoutOrder;
+		if (!order || !canConfirmCheckout) return;
+
+		const methodLabel = checkoutMethod === 'cash' ? 'Cash' : checkoutMethod === 'gcash' ? 'GCash' : 'Maya';
 		const label = order.orderType === 'takeout'
 			? `Takeout (${order.customerName ?? 'Walk-in'})`
 			: (selectedTable?.label ?? '');
-		log.tableClosed(label, order.total, method);
+
+		// Record payment
+		order.payments.push({
+			method: checkoutMethod === 'maya' ? 'gcash' : checkoutMethod,
+			amount: checkoutMethod === 'cash' ? cashTendered : order.total
+		});
 		order.status = 'paid';
+		order.closedAt = new Date().toISOString();
+
+		// Snapshot receipt data before closing
+		receiptOrder = order;
+		receiptChange = checkoutMethod === 'cash' ? cashTendered - order.total : 0;
+		receiptMethod = methodLabel;
+
+		// Free the table for dine-in
+		if (order.tableId) {
+			closeTable(order.tableId);
+		}
+
+		log.tableClosed(label, order.total, methodLabel);
+		showCheckout = false;
+		showReceipt = true;
 		closeBill();
 	}
+
+	function selectCashPreset(amount: number) {
+		cashTendered = amount;
+	}
+
+	function exactCash() {
+		if (checkoutOrder) cashTendered = checkoutOrder.total;
+	}
+
+	// ─── Receipt Modal ───────────────────────────────────────────────────────
+	let showReceipt = $state(false);
+	let receiptOrder = $state<Order | null>(null);
+	let receiptChange = $state(0);
+	let receiptMethod = $state('');
+
+	// ─── Void Flow ───────────────────────────────────────────────────────────
+	let showVoidConfirm = $state(false);
+	let voidPin = $state('');
+	let voidPinError = $state(false);
+	const MANAGER_PIN = '1234';
+
+	function openVoidConfirm() {
+		if (!currentActiveOrder) return;
+		voidPin = '';
+		voidPinError = false;
+		showVoidConfirm = true;
+	}
+
+	function confirmVoid() {
+		if (voidPin !== MANAGER_PIN) {
+			voidPinError = true;
+			return;
+		}
+		const order = currentActiveOrder;
+		if (!order) return;
+		voidOrder(order.id);
+		showVoidConfirm = false;
+		closeBill();
+	}
+
+	// ─── Order History ───────────────────────────────────────────────────────
+	let showHistory = $state(false);
+	const closedOrders = $derived(
+		orders.filter(o => o.status === 'paid' || o.status === 'cancelled')
+			.sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
+	);
 
 	// ─── New Takeout Modal ────────────────────────────────────────────────────
 	let showTakeoutModal = $state(false);
@@ -229,17 +305,26 @@
 
 	// ─── Table card style helpers ─────────────────────────────────────────────
 	function tableCardClass(t: Table) {
-		let base = 'relative overflow-hidden ';
-		if (t.status === 'available') return base + 'table-card-available';
-		if (t.status === 'critical')  return base + 'table-card-critical';
-		if (t.status === 'warning')   return base + 'table-card-warning';
-		return base + 'table-card-occupied';
+		let base = 'relative overflow-hidden transition-all ';
+		
+		// Status colors
+		if (t.status === 'available') return base + 'border border-gray-300 bg-white hover:border-accent shadow-sm';
+		if (t.status === 'dirty') return base + 'border border-gray-600 bg-gray-700 text-gray-200';
+		if (t.status === 'billing') return base + 'border border-orange-500 bg-orange-100 shadow-md';
+		
+		// Unli-time critical blinking (if it's not billing/dirty)
+		if (t.status === 'critical') return base + 'border-2 border-red-500 bg-status-green-light animate-border-pulse-red ring-2 ring-red-500 ring-offset-2';
+		if (t.status === 'warning') return base + 'border-2 border-yellow-400 bg-status-green-light shadow-md animate-border-pulse-yellow';
+		
+		return base + 'border-2 border-emerald-500 bg-emerald-50 shadow-md'; 
 	}
 
 	function timerBadgeClass(t: Table) {
-		if (t.status === 'critical') return 'bg-status-red-light text-status-red';
-		if (t.status === 'warning')  return 'bg-status-yellow-light text-status-yellow';
-		return 'bg-accent-light text-accent';
+		if (t.status === 'critical') return 'bg-red-500 text-white font-bold animate-pulse';
+		if (t.status === 'warning')  return 'bg-yellow-400 text-gray-900 font-bold';
+		if (t.status === 'billing') return 'bg-orange-500 text-white font-bold';
+		if (t.status === 'dirty') return 'bg-gray-800 text-white font-bold';
+		return 'bg-emerald-500 text-white';
 	}
 
 	// ─── Takeout ticket number label ──────────────────────────────────────────
@@ -274,8 +359,8 @@
 					{ id: 'qc',   name: 'Alta Cita' },
 					{ id: 'mkti', name: 'Alona'     }
 				] as branch (branch.id)}
-					{@const bTables = allTables.filter(t => t.branchId === branch.id)}
-					{@const bOrders = allOrders.filter(o => o.branchId === branch.id && o.status === 'open')}
+					{@const bTables = allTables.filter(t => t.locationId === branch.id)}
+					{@const bOrders = allOrders.filter(o => o.locationId === branch.id && o.status === 'open')}
 					{@const bOcc    = bTables.filter(t => t.status !== 'available').length}
 					{@const bFree   = bTables.filter(t => t.status === 'available').length}
 					{@const bSales  = bOrders.reduce((s, o) => s + o.total, 0)}
@@ -296,7 +381,6 @@
 						<div class="relative overflow-hidden" style="min-height: 340px;">
 							{#each bTables as t, idx (t.id)}
 								{@const tOrder = bOrders.find(o => o.id === t.currentOrderId)}
-								{@const pos = FLOOR_POSITIONS[idx] ?? { x: (idx % 4) * 155 + 40, y: Math.floor(idx / 4) * 155 + 40 }}
 								<div
 									class={cn(
 										'absolute flex flex-col rounded-lg px-2.5 py-2',
@@ -305,7 +389,7 @@
 										t.status === 'warning'   ? 'border border-status-yellow bg-status-yellow-light' :
 										                           'border border-accent bg-accent-light'
 									)}
-									style="left: {pos.x}px; top: {pos.y}px; width: 82px;"
+									style="left: {t.x}px; top: {t.y}px; width: {t.width ?? 82}px;"
 								>
 									<span class="text-xs font-bold text-gray-900">{t.label}</span>
 									{#if t.status !== 'available'}
@@ -362,18 +446,17 @@
 			<!-- Header row -->
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-3">
-					<h1 class="text-lg font-bold text-gray-900">FLOOR PLAN</h1>
+					<h1 class="text-lg font-bold text-gray-900">POS</h1>
 					<span class="badge-orange">{occupied} occ</span>
 					<span class="badge-green">{free} free</span>
 				</div>
 				<div class="flex items-center gap-4">
 					<!-- Legend -->
-					<div class="flex items-center gap-4 text-xs text-gray-500">
-						{#each [['bg-status-green','Available'],['bg-accent','Occupied'],['bg-status-yellow','⚠ Low time'],['bg-status-red','🔴 Critical']] as [color, label]}
-							<span class="flex items-center gap-1.5">
-								<span class="h-2.5 w-2.5 rounded-full {color}"></span>{label}
-							</span>
-						{/each}
+					<div class="flex items-center gap-3 text-xs font-semibold text-gray-600">
+						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-white border border-gray-300"></span>Available</span>
+						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-emerald-500"></span>Dining (Green)</span>
+						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Ready / Bill (Orange)</span>
+						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-gray-700"></span>Dirty (Dark Gray)</span>
 					</div>
 					<!-- New Takeout button -->
 					<button
@@ -383,6 +466,14 @@
 					>
 						📦 New Takeout
 					</button>
+					<!-- Order History button -->
+					<button
+						onclick={() => showHistory = true}
+						class="flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+						style="min-height: 40px"
+					>
+						🧾 History {#if closedOrders.length > 0}<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">{closedOrders.length}</span>{/if}
+					</button>
 				</div>
 			</div>
 
@@ -390,12 +481,11 @@
 			<div class="flex-1 rounded-xl border border-border bg-surface p-5 flex flex-col gap-4">
 				<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Main Dining</h2>
 				<div class="relative" style="min-height: 340px;">
-					{#each mainTables as table, idx (table.id)}
-						{@const pos = FLOOR_POSITIONS[idx] ?? { x: (idx % 4) * 155 + 40, y: Math.floor(idx / 4) * 155 + 40 }}
+					{#each mainTables as table (table.id)}
 						<button
 							onclick={() => handleTableClick(table)}
 							class={cn(tableCardClass(table), selectedTableId === table.id && 'ring-2 ring-offset-2 ring-accent')}
-							style="position: absolute; left: {pos.x}px; top: {pos.y}px; width: 92px;"
+							style="position: absolute; left: {table.x}px; top: {table.y}px; width: {table.width ?? 92}px; height: {table.height ?? 92}px;"
 							aria-label="Table {table.label}"
 						>
 							<div class="flex w-full items-start justify-between">
@@ -454,7 +544,9 @@
 										'relative flex flex-col gap-1 rounded-xl border-2 border-dashed px-4 py-3 text-left transition-all active:scale-[0.98]',
 										selectedTakeoutId === order.id
 											? 'border-accent bg-accent-light'
-											: 'border-orange-200 bg-orange-50 hover:border-orange-300'
+											: order.items.length === 0
+												? 'border-blue-400 bg-blue-50 hover:bg-blue-100 shadow-sm'
+												: 'border-orange-200 bg-orange-50 hover:border-orange-300'
 									)}
 									style="min-width: 120px"
 								>
@@ -464,6 +556,8 @@
 									<span class="text-[10px] text-gray-400">{order.items.filter(i => i.status !== 'cancelled').length} items</span>
 									{#if selectedTakeoutId === order.id}
 										<span class="absolute top-1.5 right-1.5 rounded bg-accent px-1.5 py-0.5 text-[9px] font-bold text-white">OPEN</span>
+									{:else if order.items.length === 0}
+										<span class="absolute top-1.5 right-1.5 rounded bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white">NEW</span>
 									{/if}
 								</button>
 							{/each}
@@ -587,11 +681,22 @@
 				</div>
 
 				<!-- Actions -->
-				<div class="flex gap-2 px-5 pb-5">
-					<button class="btn-danger flex-1 text-sm" style="min-height: 44px">🗑 Void</button>
-					<button onclick={() => checkout('Cash')} class="btn-success flex-1 text-sm" style="min-height: 44px">💳 Checkout</button>
-					<button class="btn-secondary px-3 text-sm" style="min-height: 44px">🖨 KOT</button>
-				</div>
+				{#if selectedTable?.status === 'dirty'}
+					<div class="flex flex-col gap-2 px-5 pb-5">
+						<div class="rounded-lg bg-gray-100 p-4 text-center border border-gray-300">
+							<p class="text-xs font-bold text-gray-600 uppercase tracking-widest mb-3">Table Needs Cleaning</p>
+							<button onclick={() => { cleanTable(selectedTable.id); closeBill(); }} class="btn-primary w-full shadow-md">
+								✨ Mark as Clean
+							</button>
+						</div>
+					</div>
+				{:else}
+					<div class="flex gap-2 px-5 pb-5">
+						<button onclick={openVoidConfirm} class="btn-danger flex-1 text-sm" style="min-height: 44px">🗑 Void</button>
+						<button onclick={openCheckout} class="btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white" style="min-height: 44px">💳 Checkout</button>
+						<button onclick={() => printBill(currentActiveOrder.id)} class="btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800" style="min-height: 44px">🖨 Print Bill</button>
+					</div>
+				{/if}
 		{/if}
 		</div>
 	</div>
@@ -794,6 +899,181 @@
 	</div>
 {/if}
 
+<!-- ─── Checkout Modal ──────────────────────────────────────────────────────── -->
+{#if showCheckout && checkoutOrder}
+	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+		<div class="pos-card w-[460px] flex flex-col gap-0 overflow-hidden p-0">
+
+			<!-- Header -->
+			<div class="flex items-center justify-between border-b border-border px-6 py-4">
+				<div class="flex items-center gap-3">
+					<span class="text-lg font-bold text-gray-900">Checkout</span>
+					{#if checkoutOrder.orderType === 'takeout'}
+						<span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">TAKEOUT</span>
+					{:else}
+						<span class="text-sm font-semibold text-gray-500">{selectedTable?.label}</span>
+					{/if}
+				</div>
+				<button onclick={() => showCheckout = false} class="text-gray-400 hover:text-gray-600 text-lg" style="min-height: unset">✕</button>
+			</div>
+
+			<!-- Bill Breakdown -->
+			<div class="flex flex-col gap-2 border-b border-border px-6 py-4 bg-surface-secondary">
+				<div class="flex justify-between text-sm text-gray-600">
+					<span>Subtotal ({checkoutOrder.items.filter(i => i.status !== 'cancelled').length} items)</span>
+					<span class="font-mono font-semibold">{formatPeso(checkoutOrder.subtotal)}</span>
+				</div>
+				{#if checkoutOrder.discountType !== 'none'}
+					<div class="flex justify-between text-sm text-status-green">
+						<span>Discount ({checkoutOrder.discountType === 'senior' ? 'Senior 20%' : 'PWD 20%'})</span>
+						<span class="font-mono font-semibold">-{formatPeso(checkoutOrder.discountAmount)}</span>
+					</div>
+				{/if}
+				<div class="flex justify-between text-sm text-gray-500">
+					<span>VAT {checkoutOrder.discountType === 'senior' || checkoutOrder.discountType === 'pwd' ? '(exempt)' : '(inclusive)'}</span>
+					<span class="font-mono">{formatPeso(checkoutOrder.vatAmount)}</span>
+				</div>
+				<div class="flex justify-between border-t border-border pt-2 mt-1">
+					<span class="text-base font-bold text-gray-900">TOTAL</span>
+					<span class="font-mono text-2xl font-extrabold text-gray-900">{formatPeso(checkoutOrder.total)}</span>
+				</div>
+			</div>
+
+			<!-- Discount Toggles -->
+			<div class="flex items-center gap-2 border-b border-border px-6 py-3">
+				<span class="text-xs font-semibold text-gray-500 mr-auto">Discount:</span>
+				<button
+					onclick={() => applyDiscount('senior')}
+					class={cn(
+						'rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+						checkoutOrder.discountType === 'senior'
+							? 'bg-status-green text-white'
+							: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
+					)}
+					style="min-height: 32px"
+				>
+					👴 Senior
+				</button>
+				<button
+					onclick={() => applyDiscount('pwd')}
+					class={cn(
+						'rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+						checkoutOrder.discountType === 'pwd'
+							? 'bg-status-green text-white'
+							: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
+					)}
+					style="min-height: 32px"
+				>
+					♿ PWD
+				</button>
+			</div>
+
+			<!-- Payment Method -->
+			<div class="flex flex-col gap-3 border-b border-border px-6 py-4">
+				<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Payment Method</span>
+				<div class="grid grid-cols-3 gap-2">
+					{#each [
+						{ id: 'cash' as const, label: '💵 Cash' },
+						{ id: 'gcash' as const, label: '📱 GCash' },
+						{ id: 'maya' as const, label: '📱 Maya' }
+					] as method}
+						<button
+							onclick={() => { checkoutMethod = method.id; if (method.id !== 'cash') cashTendered = 0; }}
+							class={cn(
+								'flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all active:scale-95',
+								checkoutMethod === method.id
+									? 'bg-accent text-white shadow-md'
+									: 'border border-border bg-surface text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+							)}
+							style="min-height: 48px"
+						>
+							{method.label}
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Cash Tendered (only for cash) -->
+			{#if checkoutMethod === 'cash'}
+				<div class="flex flex-col gap-3 border-b border-border px-6 py-4">
+					<div class="flex items-center justify-between">
+						<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Cash Tendered</span>
+						<button onclick={exactCash} class="text-xs font-semibold text-accent hover:underline" style="min-height: unset">Exact</button>
+					</div>
+
+					<!-- Amount display -->
+					<div class="flex items-center justify-center rounded-xl bg-surface-secondary border border-border py-3">
+						<span class={cn(
+							'font-mono text-3xl font-extrabold',
+							cashTendered > 0 ? 'text-gray-900' : 'text-gray-300'
+						)}>
+							{cashTendered > 0 ? formatPeso(cashTendered) : '₱0.00'}
+						</span>
+					</div>
+
+					<!-- Quick denominations -->
+					<div class="grid grid-cols-4 gap-2">
+						{#each [20, 50, 100, 200, 500, 1000, 1500, 2000] as amount}
+							<button
+								onclick={() => selectCashPreset(amount)}
+								class={cn(
+									'rounded-lg py-2 font-mono text-sm font-bold transition-all active:scale-95',
+									cashTendered === amount
+										? 'bg-accent text-white'
+										: 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
+								)}
+								style="min-height: 40px"
+							>
+								₱{amount.toLocaleString()}
+							</button>
+						{/each}
+					</div>
+
+					<!-- Custom input -->
+					<input
+						type="number"
+						bind:value={cashTendered}
+						placeholder="Enter custom amount"
+						class="pos-input text-center font-mono text-lg"
+						min="0"
+					/>
+
+					<!-- Change -->
+					{#if cashTendered >= checkoutOrder.total}
+						<div class="flex items-center justify-between rounded-xl bg-status-green-light border border-status-green/20 px-4 py-3">
+							<span class="text-sm font-semibold text-status-green">Change</span>
+							<span class="font-mono text-2xl font-extrabold text-status-green">{formatPeso(cashChange)}</span>
+						</div>
+					{:else if cashTendered > 0}
+						<div class="flex items-center justify-between rounded-xl bg-status-red-light border border-status-red/20 px-4 py-2">
+							<span class="text-xs font-semibold text-status-red">Short by {formatPeso(checkoutOrder.total - cashTendered)}</span>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- Confirm / Cancel -->
+			<div class="flex gap-3 px-6 py-4">
+				<button
+					onclick={() => showCheckout = false}
+					class="btn-ghost flex-1"
+					style="min-height: 48px"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={confirmCheckout}
+					disabled={!canConfirmCheckout}
+					class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-base font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+					style="min-height: 48px"
+				>
+					✓ Confirm Payment
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <!-- New Takeout Modal -->
 {#if showTakeoutModal}
 	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -815,6 +1095,259 @@
 					✓ Create Order
 				</button>
 			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ─── Receipt Modal ──────────────────────────────────────────────────────── -->
+{#if showReceipt && receiptOrder}
+	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+		<div class="pos-card w-[380px] flex flex-col gap-0 overflow-hidden p-0">
+			<!-- Receipt Header -->
+			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-5 bg-surface">
+				<span class="text-2xl">✓</span>
+				<span class="text-lg font-bold text-gray-900">Payment Successful</span>
+				<span class="text-xs text-gray-500">
+					{receiptOrder.orderType === 'takeout'
+						? `Takeout — ${receiptOrder.customerName ?? 'Walk-in'}`
+						: `Table ${receiptOrder.tableNumber}`}
+				</span>
+			</div>
+
+			<!-- Receipt Body -->
+			<div class="flex flex-col gap-2 border-b border-dashed border-gray-300 px-6 py-4 font-mono text-sm">
+				{#each receiptOrder.items.filter(i => i.status !== 'cancelled') as item}
+					<div class="flex justify-between">
+						<span class="text-gray-700 truncate max-w-[200px]">
+							{item.quantity > 1 ? `${item.quantity}× ` : ''}{item.menuItemName}
+							{#if item.weight}<span class="text-gray-400"> {item.weight}g</span>{/if}
+						</span>
+						{#if item.tag === 'FREE'}
+							<span class="text-status-green text-xs font-bold">FREE</span>
+						{:else}
+							<span class="text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+						{/if}
+					</div>
+				{/each}
+
+				<div class="border-t border-dashed border-gray-200 my-1"></div>
+
+				<div class="flex justify-between text-gray-600">
+					<span>Subtotal</span>
+					<span>{formatPeso(receiptOrder.subtotal)}</span>
+				</div>
+				{#if receiptOrder.discountType !== 'none'}
+					<div class="flex justify-between text-status-green">
+						<span>Discount ({receiptOrder.discountType === 'senior' ? 'SC' : 'PWD'} 20%)</span>
+						<span>-{formatPeso(receiptOrder.discountAmount)}</span>
+					</div>
+				{/if}
+				<div class="flex justify-between text-gray-500 text-xs">
+					<span>VAT {receiptOrder.discountType !== 'none' ? '(exempt)' : '(inclusive)'}</span>
+					<span>{formatPeso(receiptOrder.vatAmount)}</span>
+				</div>
+				<div class="flex justify-between font-bold text-gray-900 text-base border-t border-gray-200 pt-1">
+					<span>TOTAL</span>
+					<span>{formatPeso(receiptOrder.total)}</span>
+				</div>
+
+				<div class="border-t border-dashed border-gray-200 mt-1 pt-2">
+					<div class="flex justify-between">
+						<span class="text-gray-600">Paid via</span>
+						<span class="font-bold text-gray-900">{receiptMethod}</span>
+					</div>
+					{#if receiptMethod === 'Cash'}
+						<div class="flex justify-between">
+							<span class="text-gray-600">Tendered</span>
+							<span>{formatPeso(receiptOrder.total + receiptChange)}</span>
+						</div>
+						<div class="flex justify-between text-status-green font-bold">
+							<span>Change</span>
+							<span>{formatPeso(receiptChange)}</span>
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Receipt Footer -->
+			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-3 text-center">
+				<span class="text-[10px] text-gray-400 font-mono">
+					{new Date(receiptOrder.closedAt ?? '').toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
+				</span>
+				<span class="text-[10px] text-gray-400 font-mono">WTF! Samgyupsal — Thank you!</span>
+			</div>
+
+			<div class="flex gap-3 px-6 py-4">
+				<button
+					onclick={() => { showReceipt = false; receiptOrder = null; }}
+					class="btn-primary flex-1"
+					style="min-height: 44px"
+				>
+					Done
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ─── Void Confirmation Modal (Manager PIN) ─────────────────────────────── -->
+{#if showVoidConfirm}
+	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+		<div class="pos-card w-[340px] flex flex-col gap-4">
+			<div class="flex flex-col gap-1">
+				<h3 class="text-lg font-bold text-status-red">Void Order</h3>
+				<p class="text-sm text-gray-500">This will cancel the entire order and free the table. Enter Manager PIN to confirm.</p>
+			</div>
+
+			<!-- PIN dots -->
+			<div class="flex flex-col gap-2">
+				<div class="flex justify-center gap-3">
+					{#each [0, 1, 2, 3] as idx}
+						<div class={cn(
+							'h-4 w-4 rounded-full border-2 transition-all',
+							idx < voidPin.length
+								? (voidPinError ? 'bg-status-red border-status-red' : 'bg-accent border-accent')
+								: 'border-gray-300'
+						)}></div>
+					{/each}
+				</div>
+				{#if voidPinError}
+					<p class="text-center text-xs font-semibold text-status-red">Incorrect PIN. Try again.</p>
+				{/if}
+			</div>
+
+			<!-- Numpad -->
+			<div class="grid grid-cols-3 gap-2">
+				{#each [1,2,3,4,5,6,7,8,9] as num}
+					<button
+						onclick={() => { voidPinError = false; if (voidPin.length < 4) voidPin += String(num); }}
+						class="btn-secondary h-12 text-lg font-bold"
+						style="min-height: 48px"
+					>{num}</button>
+				{/each}
+				<button
+					onclick={() => { voidPin = ''; voidPinError = false; }}
+					class="btn-ghost h-12 text-sm"
+					style="min-height: 48px"
+				>Clear</button>
+				<button
+					onclick={() => { voidPinError = false; if (voidPin.length < 4) voidPin += '0'; }}
+					class="btn-secondary h-12 text-lg font-bold"
+					style="min-height: 48px"
+				>0</button>
+				<button
+					onclick={() => { voidPin = voidPin.slice(0, -1); voidPinError = false; }}
+					class="btn-ghost h-12 text-sm"
+					style="min-height: 48px"
+				>⌫</button>
+			</div>
+
+			<div class="flex gap-2 mt-1">
+				<button class="btn-ghost flex-1" onclick={() => showVoidConfirm = false} style="min-height: 44px">Cancel</button>
+				<button
+					onclick={confirmVoid}
+					disabled={voidPin.length !== 4}
+					class="btn-danger flex-1 disabled:opacity-40"
+					style="min-height: 44px"
+				>Confirm Void</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ─── Order History Modal ────────────────────────────────────────────────── -->
+{#if showHistory}
+	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+		<div class="flex h-[600px] w-full max-w-[700px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+			<!-- Header -->
+			<div class="flex items-center justify-between border-b border-border px-6 py-4">
+				<div class="flex items-center gap-3">
+					<h2 class="text-lg font-bold text-gray-900">Order History</h2>
+					<span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">{closedOrders.length} orders</span>
+				</div>
+				<button onclick={() => showHistory = false} class="text-gray-400 hover:text-gray-600 text-lg" style="min-height: unset">✕</button>
+			</div>
+
+			<!-- Orders list -->
+			<div class="flex-1 overflow-y-auto divide-y divide-border">
+				{#if closedOrders.length === 0}
+					<div class="flex h-full items-center justify-center text-sm text-gray-400">
+						No completed orders yet
+					</div>
+				{:else}
+					{#each closedOrders as order (order.id)}
+						{@const orderTable = order.tableId ? allTables.find(t => t.id === order.tableId) : null}
+						<div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50">
+							<div class="flex flex-col gap-0.5">
+								<div class="flex items-center gap-2">
+									<span class="text-sm font-semibold text-gray-900">
+										{#if order.orderType === 'takeout'}
+											📦 {order.customerName ?? 'Walk-in'}
+										{:else}
+											🪑 {orderTable?.label ?? `T${order.tableNumber}`}
+										{/if}
+									</span>
+									{#if order.packageName}
+										<span class="text-xs text-gray-400">{order.packageName}</span>
+									{/if}
+									{#if order.status === 'cancelled'}
+										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
+									{:else}
+										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">PAID</span>
+									{/if}
+								</div>
+								<div class="flex items-center gap-2 text-xs text-gray-400">
+									<span>{order.pax} pax</span>
+									<span>·</span>
+									<span>{order.items.filter(i => i.status !== 'cancelled').length} items</span>
+									<span>·</span>
+									<span>{order.closedAt ? new Date(order.closedAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+									{#if order.payments.length > 0}
+										<span>·</span>
+										<span class="capitalize">{order.payments[0].method}</span>
+									{/if}
+								</div>
+							</div>
+							<div class="flex items-center gap-3">
+								<span class={cn(
+									'font-mono text-sm font-bold',
+									order.status === 'cancelled' ? 'text-gray-400 line-through' : 'text-gray-900'
+								)}>
+									{formatPeso(order.total)}
+								</span>
+								{#if order.status === 'paid'}
+									<button
+										onclick={() => {
+											receiptOrder = order;
+											const cashPayment = order.payments.find(p => p.method === 'cash');
+											receiptChange = cashPayment ? cashPayment.amount - order.total : 0;
+											receiptMethod = order.payments[0]?.method === 'cash' ? 'Cash' : order.payments[0]?.method === 'gcash' ? 'GCash' : 'Card';
+											showReceipt = true;
+										}}
+										class="text-xs font-semibold text-accent hover:underline"
+										style="min-height: unset"
+									>
+										View
+									</button>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				{/if}
+			</div>
+
+			<!-- Summary footer -->
+			{#if closedOrders.length > 0}
+				{@const paidOrders = closedOrders.filter(o => o.status === 'paid')}
+				{@const totalSales = paidOrders.reduce((s, o) => s + o.total, 0)}
+				<div class="flex items-center justify-between border-t border-border px-6 py-3 bg-surface-secondary">
+					<span class="text-sm font-semibold text-gray-600">{paidOrders.length} paid · {closedOrders.length - paidOrders.length} voided</span>
+					<div class="flex items-center gap-2">
+						<span class="text-xs text-gray-500">Total Sales</span>
+						<span class="font-mono text-lg font-extrabold text-gray-900">{formatPeso(totalSales)}</span>
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}

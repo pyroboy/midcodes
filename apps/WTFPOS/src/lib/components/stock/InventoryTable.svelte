@@ -3,17 +3,16 @@
 	import {
 		stockItems, getCurrentStock, getStockStatus,
 		adjustStock, setStock,
-		type StockStatus, type StockCategory, type StockItem, type StockLocation,
+		type StockStatus, type StockCategory, type StockItem,
 		type MeatAnimal, type MeatCutType
 	} from '$lib/stores/stock.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { LayoutGrid, List, Search, Plus, Minus, X, Pencil, MapPin } from 'lucide-svelte';
 
-	const locationStyle: Record<StockLocation, { badge: string; icon: string }> = {
-		'Walk-In Freezer': { badge: 'bg-blue-50 text-blue-700 border border-blue-200',   icon: '🧊' },
-		'Chiller':         { badge: 'bg-cyan-50 text-cyan-700 border border-cyan-200',    icon: '❄️' },
-		'Dry Storage':     { badge: 'bg-amber-50 text-amber-700 border border-amber-200', icon: '📦' },
-		'Bar':             { badge: 'bg-purple-50 text-purple-700 border border-purple-200', icon: '🍺' },
+	const locationStyle: Record<string, { badge: string; label: string }> = {
+		'qc':    { badge: 'bg-sky-50 text-sky-700 border border-sky-200',      label: 'Alta Cita' },
+		'mkti':  { badge: 'bg-teal-50 text-teal-700 border border-teal-200',   label: 'Alona'     },
+		'wh-qc': { badge: 'bg-amber-50 text-amber-700 border border-amber-200', label: 'Warehouse' },
 	};
 
 	const isAggregated = $derived(session.locationId === 'all');
@@ -39,11 +38,13 @@
 	interface InventoryItem extends StockItem { currentStock: number; status: StockStatus }
 
 	const items = $derived(
-		stockItems.map(s => ({
-			...s,
-			currentStock: getCurrentStock(s.id),
-			status: getStockStatus(s.id),
-		} as InventoryItem))
+		stockItems
+			.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
+			.map(s => ({
+				...s,
+				currentStock: getCurrentStock(s.id),
+				status: getStockStatus(s.id),
+			} as InventoryItem))
 	);
 
 	const filtered = $derived(
@@ -224,10 +225,10 @@
 							<span class={cn('rounded-full px-2 py-0.5 text-xs font-medium', categoryStyle[item.category].badge)}>
 								{item.category}
 							</span>
-							{#if isAggregated}
-								<span class={cn('flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium', locationStyle[item.location].badge)}>
-									<span class="text-[10px] leading-none">{locationStyle[item.location].icon}</span>
-									{item.location}
+							{#if isAggregated && locationStyle[item.locationId]}
+								<span class={cn('flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', locationStyle[item.locationId].badge)}>
+									<MapPin class="w-2.5 h-2.5 flex-shrink-0" />
+									{locationStyle[item.locationId].label}
 								</span>
 							{/if}
 						</div>
@@ -288,10 +289,10 @@
 							</td>
 							<td class="px-4 py-3">
 								<p class="font-medium text-gray-900">{item.name}</p>
-								{#if isAggregated}
-									<span class={cn('mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', locationStyle[item.location].badge)}>
+								{#if isAggregated && locationStyle[item.locationId]}
+									<span class={cn('mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', locationStyle[item.locationId].badge)}>
 										<MapPin class="w-2.5 h-2.5 flex-shrink-0" />
-										{item.location}
+										{locationStyle[item.locationId].label}
 									</span>
 								{/if}
 							</td>

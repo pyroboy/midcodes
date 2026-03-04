@@ -43,7 +43,19 @@ export default {
 				xl: '16px'
 			},
 			animation: {
-				'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+				'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'border-pulse-red': 'borderPulseRed 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'border-pulse-yellow': 'borderPulseYellow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+			},
+			keyframes: {
+				borderPulseRed: {
+					'0%, 100%': { borderColor: 'rgba(239, 68, 68, 1)' }, // red-500
+					'50%': { borderColor: 'rgba(239, 68, 68, 0.3)' },
+				},
+				borderPulseYellow: {
+					'0%, 100%': { borderColor: 'rgba(250, 204, 21, 1)' }, // yellow-400
+					'50%': { borderColor: 'rgba(250, 204, 21, 0.3)' },
+				}
 			}
 		}
 	},

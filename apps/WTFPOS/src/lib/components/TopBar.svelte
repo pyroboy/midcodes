@@ -10,7 +10,7 @@
 	const warehouseLocations = $derived(LOCATIONS.filter(l => l.type === 'warehouse'));
 
 	const allNavLinks = [
-		{ href: '/floor',   label: 'Floor',   icon: '🪑' },
+		{ href: '/pos',     label: 'POS',     icon: '💻' },
 		{ href: '/kitchen', label: 'Kitchen', icon: '🍳' },
 		{ href: '/stock',   label: 'Stock',   icon: '📦' },
 		{ href: '/reports', label: 'Reports', icon: '📊' },
@@ -18,7 +18,7 @@
 	];
 
 	/** Floor and Kitchen are retail-only — hidden when in a warehouse location */
-	const RETAIL_ONLY = new Set(['/floor', '/kitchen']);
+	const RETAIL_ONLY = new Set(['/pos', '/kitchen']);
 
 	const navLinks = $derived(
 		allNavLinks

@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import { meatVarianceToday } from '$lib/stores/reports.svelte';
+	import { session } from '$lib/stores/session.svelte';
+
+	const locationLabel: Record<string, string> = {
+		'qc': 'Alta Cita', 'mkti': 'Alona', 'wh-qc': 'Warehouse'
+	};
 
 	type Trend = 'ok' | 'high' | 'low';
 
@@ -59,9 +64,14 @@
 			</tr>
 		</thead>
 		<tbody class="divide-y divide-border">
-			{#each rows as row (row.cut)}
+			{#each rows as row (row.id)}
 				<tr class="hover:bg-gray-50">
-					<td class="px-4 py-3 font-medium text-gray-900">{row.cut}</td>
+					<td class="px-4 py-3 font-medium text-gray-900">
+						{row.cut}
+						{#if session.locationId === 'all' && locationLabel[row.locationId]}
+							<span class="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">{locationLabel[row.locationId]}</span>
+						{/if}
+					</td>
 					<td class="px-4 py-3 text-right font-mono text-gray-500">{row.opening.toLocaleString()}g</td>
 					<td class="px-4 py-3 text-right font-mono text-gray-500">
 						{row.deliveries > 0 ? `+${row.deliveries.toLocaleString()}g` : '—'}

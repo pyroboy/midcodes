@@ -12,17 +12,17 @@
 
 	const ACCOUNTS: Record<string, Account> = {
 		// ── Alta Cita · QC ──────────────────────────────────────────────────
-		'maria':  { password: 'maria',  role: 'staff',   displayName: 'Maria Santos',  dest: '/floor',   locationId: 'qc'    },
-		'juan':   { password: 'juan',   role: 'manager', displayName: 'Juan Reyes',    dest: '/floor',   requiresPin: true, locationId: 'qc'    },
+		'maria':  { password: 'maria',  role: 'staff',   displayName: 'Maria Santos',  dest: '/pos',     locationId: 'qc'    },
+		'juan':   { password: 'juan',   role: 'manager', displayName: 'Juan Reyes',    dest: '/pos',     requiresPin: true, locationId: 'qc'    },
 		'pedro':  { password: 'pedro',  role: 'kitchen', displayName: 'Pedro Cruz',    dest: '/kitchen', locationId: 'qc'    },
 		// ── Alona · Makati ──────────────────────────────────────────────────
-		'ana':    { password: 'ana',    role: 'staff',   displayName: 'Ana Lim',       dest: '/floor',   locationId: 'mkti'  },
-		'carlo':  { password: 'carlo',  role: 'manager', displayName: 'Carlo Ramos',   dest: '/floor',   requiresPin: true, locationId: 'mkti'  },
+		'ana':    { password: 'ana',    role: 'staff',   displayName: 'Ana Lim',       dest: '/pos',     locationId: 'mkti'  },
+		'carlo':  { password: 'carlo',  role: 'manager', displayName: 'Carlo Ramos',   dest: '/pos',     requiresPin: true, locationId: 'mkti'  },
 		'jose':   { password: 'jose',   role: 'kitchen', displayName: 'Jose Santos',   dest: '/kitchen', locationId: 'mkti'  },
 		// ── QC Warehouse ────────────────────────────────────────────────────
 		'noel':   { password: 'noel',   role: 'staff',   displayName: 'Noel Garcia',   dest: '/stock',   locationId: 'wh-qc' },
 		// ── Management (all-locations) ───────────────────────────────────────
-		'chris':  { password: 'chris',  role: 'owner',   displayName: 'Christopher S', dest: '/floor',   locationId: 'all'   },
+		'chris':  { password: 'chris',  role: 'owner',   displayName: 'Christopher S', dest: '/pos',     locationId: 'all'   },
 	};
 
 	const roleBadge: Record<Role, { label: string; cls: string }> = {

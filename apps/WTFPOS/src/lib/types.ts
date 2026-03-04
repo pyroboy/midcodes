@@ -1,7 +1,7 @@
 // ─── Floor Layout ─────────────────────────────────────────────────────────────
 
 export type TableZone = 'main';
-export type TableStatus = 'available' | 'occupied' | 'warning' | 'critical';
+export type TableStatus = 'available' | 'occupied' | 'warning' | 'critical' | 'billing' | 'dirty';
 
 export interface Table {
 	id: string;
@@ -10,6 +10,11 @@ export interface Table {
 	label: string;
 	zone: TableZone;
 	capacity: number;
+	x: number;
+	y: number;
+	width?: number;
+	height?: number;
+	shape?: 'rect' | 'circle';
 	status: TableStatus;
 	sessionStartedAt: string | null;
 	remainingSeconds: number | null;
@@ -91,6 +96,7 @@ export interface Order {
 	payments: Payment[];
 	createdAt: string;
 	closedAt: string | null;
+	billPrinted: boolean;
 	notes?: string;
 }
 

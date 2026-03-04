@@ -9,8 +9,8 @@ import { session } from '$lib/stores/session.svelte';
 
 // Branch-filtered getters — $derived can't be exported from modules, so we
 // filter inside each exported function call (which runs in a reactive context).
-function getOrders() { return session.locationId === 'all' ? allOrders : allOrders.filter(o => o.branchId === session.locationId); }
-function getTables() { return session.locationId === 'all' ? allTables : allTables.filter(t => t.branchId === session.locationId); }
+function getOrders() { return session.locationId === 'all' ? allOrders : allOrders.filter(o => o.locationId === session.locationId); }
+function getTables() { return session.locationId === 'all' ? allTables : allTables.filter(t => t.locationId === session.locationId); }
 
 const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -19,7 +19,7 @@ export function liveOrders() { return getOrders(); }
 export function todayClosedOrders() { return getOrders().filter(o => o.status === 'paid'); }
 
 export function salesSummary() {
-	const os = getOrders();
+	const os = getOrders().filter(o => o.status === 'paid');
 	const grossSales   = os.reduce((s, o) => s + o.subtotal, 0);
 	const discounts    = os.reduce((s, o) => s + o.discountAmount, 0);
 	const netSales     = os.reduce((s, o) => s + o.total, 0);
@@ -31,7 +31,7 @@ export function salesSummary() {
 
 export function tableSalesToday() {
 	const grouped: Record<string, { tableId: string; label: string; zone: string; sessions: number; pax: number; grossSales: number; discounts: number; netSales: number }> = {};
-	for (const order of getOrders()) {
+	for (const order of getOrders().filter(o => o.status === 'paid')) {
 		const key = order.tableId ?? 'takeout';
 		const table = order.tableId ? getTables().find(t => t.id === order.tableId) : null;
 		if (!grouped[key]) {
@@ -72,7 +72,7 @@ export function bestSellersMeat() {
 
 export function bestSellersAddons() {
 	const qtsByItem: Record<string, { name: string; qty: number; revenue: number }> = {};
-	for (const order of getOrders()) {
+	for (const order of getOrders().filter(o => o.status === 'paid')) {
 		for (const item of order.items) {
 			if (item.tag === 'FREE' || item.tag === 'PKG') continue;
 			const menuItem = MENU_ITEMS.find(m => m.id === item.menuItemId);
@@ -88,7 +88,10 @@ export function bestSellersAddons() {
 }
 
 export function meatVarianceToday() {
-	const meatStockItems = stockItems.filter(s => s.category === 'Meats');
+	const meatStockItems = stockItems.filter(s =>
+		s.category === 'Meats' &&
+		(session.locationId === 'all' || s.locationId === session.locationId)
+	);
 	return meatStockItems.map(s => {
 		const totalDelivered = deliveries.filter(d => d.stockItemId === s.id).reduce((t, d) => t + d.qty, 0);
 		const totalConsumed  = deductions.filter(d => d.stockItemId === s.id).reduce((t, d) => t + d.qty, 0);
@@ -98,7 +101,9 @@ export function meatVarianceToday() {
 		const variancePct    = available > 0 ? Math.round(((totalConsumed - expectedConsumed) / available) * 100) : 0;
 		const trend          = variancePct < -15 ? 'high' : variancePct > 10 ? 'low' : 'ok';
 		return {
+			id: s.id,
 			cut: s.name,
+			locationId: s.locationId,
 			opening: s.openingStock,
 			deliveries: totalDelivered,
 			consumed: totalConsumed,
@@ -110,13 +115,14 @@ export function meatVarianceToday() {
 }
 
 export function eodSummary() {
-	const os = getOrders();
+	const os = getOrders().filter(o => o.status === 'paid');
 	const gross  = os.reduce((s, o) => s + o.subtotal, 0);
 	const disc   = os.reduce((s, o) => s + o.discountAmount, 0);
 	const net    = os.reduce((s, o) => s + o.total, 0);
 	const vat    = os.reduce((s, o) => s + o.vatAmount, 0);
-	const cash   = Math.round(net * 0.53);
-	const card   = Math.round(net * 0.41);
-	const gcash  = net - cash - card;
+	// Derive payment breakdown from actual order.payments[]
+	const cash   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'cash').reduce((t, p) => t + Math.min(p.amount, o.total), 0), 0);
+	const gcash  = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'gcash').reduce((t, p) => t + p.amount, 0), 0);
+	const card   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'card').reduce((t, p) => t + p.amount, 0), 0);
 	return { date: today, grossSales: gross, discounts: disc, netSales: net, vatAmount: vat, cash, card, gcash };
 }

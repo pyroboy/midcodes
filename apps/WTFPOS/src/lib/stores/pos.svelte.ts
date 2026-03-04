@@ -12,12 +12,22 @@ const SESSION_SECONDS = 90 * 60;
 
 // ─── Mock Table Layout — matching POS DESIGN.pen floor zones ─────────────────
 
+const FLOOR_POSITIONS = [
+	{ x: 40,  y: 50  }, { x: 200, y: 35  }, { x: 360, y: 52  }, { x: 520, y: 38  },
+	{ x: 45,  y: 205 }, { x: 205, y: 195 }, { x: 368, y: 212 }, { x: 528, y: 198 },
+	{ x: 60,  y: 355 }, { x: 215, y: 345 }, { x: 375, y: 360 }, { x: 535, y: 348 },
+];
+
 function makeTables(): Table[] {
 	// Helper to generate tables for a specific location
 	const gen = (locationId: string, prefix: string) => [
 		// Main Dining
 		...Array.from({ length: 8 }, (_, i) => ({
-			id: `${prefix}-T${i + 1}`, locationId, number: i + 1, label: `T${i + 1}`, zone: 'main' as TableZone, capacity: i < 6 ? 4 : 2, status: 'available' as const, sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null
+			id: `${prefix}-T${i + 1}`, locationId, number: i + 1, label: `T${i + 1}`, zone: 'main' as TableZone, capacity: i < 6 ? 4 : 2, 
+			x: FLOOR_POSITIONS[i]?.x ?? (i % 4) * 155 + 40,
+			y: FLOOR_POSITIONS[i]?.y ?? Math.floor(i / 4) * 155 + 40,
+			width: 92, height: 92,
+			status: 'available' as const, sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null
 		}))
 	];
 	return [...gen('qc', 'QC'), ...gen('mkti', 'MK')];
@@ -62,7 +72,7 @@ export function openTable(tableId: string, pax: number = 4, packageName?: string
 	table.remainingSeconds = SESSION_SECONDS;
 	table.currentOrderId = orderId;
 	table.billTotal = 0;
-	orders.push({ id: orderId, locationId: table.locationId, orderType: 'dine-in', tableId, tableNumber: table.number, packageName: packageName ?? null, packageId: null, pax, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null, notes: '' });
+	orders.push({ id: orderId, locationId: table.locationId, orderType: 'dine-in', tableId, tableNumber: table.number, packageName: packageName ?? null, packageId: null, pax, items: [], status: 'open', discountType: 'none', subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0, payments: [], createdAt: new Date().toISOString(), closedAt: null, billPrinted: false, notes: '' });
 	log.tableOpened(table.label, packageName ?? null, pax);
 	return orderId;
 }
@@ -86,6 +96,7 @@ export function createTakeoutOrder(customerName: string = 'Walk-in'): string {
 		payments: [],
 		createdAt: new Date().toISOString(),
 		closedAt: null,
+		billPrinted: false,
 		notes: ''
 	});
 	log.tableOpened(`Takeout (${customerName})`, null, 1);
@@ -95,22 +106,75 @@ export function createTakeoutOrder(customerName: string = 'Walk-in'): string {
 export function closeTable(tableId: string) {
 	const table = tables.find((t) => t.id === tableId);
 	if (!table) return;
-	const order = table.currentOrderId ? orders.find(o => o.id === table.currentOrderId) : null;
-	if (order) log.tableClosed(table.label, order.total);
-	table.status = 'available';
+	// Audit logging is handled by the caller (confirmCheckout) which has payment context
+	// After checkout, table is dirty instead of immediately available
+	table.status = 'dirty';
 	table.sessionStartedAt = null;
 	table.remainingSeconds = null;
 	table.currentOrderId = null;
 	table.billTotal = null;
 }
 
+export function cleanTable(tableId: string) {
+	const table = tables.find((t) => t.id === tableId);
+	if (!table) return;
+	table.status = 'available';
+}
+
+export function printBill(orderId: string) {
+	const order = orders.find(o => o.id === orderId);
+	if (!order) return;
+	order.billPrinted = true;
+	if (order.tableId) {
+		const t = tables.find(t => t.id === order.tableId);
+		if (t && t.status !== 'dirty') {
+			t.status = 'billing';
+		}
+	}
+}
+
 export function tickTimers() {
 	for (const table of tables) {
-		if (table.status === 'available' || table.remainingSeconds === null) continue;
+		if (table.status === 'available' || table.status === 'dirty' || table.remainingSeconds === null) continue;
 		table.remainingSeconds = Math.max(0, table.remainingSeconds - 1);
-		if (table.remainingSeconds <= 5 * 60) table.status = 'critical';
-		else if (table.remainingSeconds <= 15 * 60) table.status = 'warning';
-		else table.status = 'occupied';
+		
+		// Unli timers: warnings are an overlay visual while color statuses dictates the state.
+		// However, for pure fallback data modeling, we will preserve the critical/warning strings
+		// and use CSS logic in POS page to decouple them.
+		if (table.status !== 'billing') {
+			if (table.remainingSeconds <= 5 * 60) table.status = 'critical';
+			else if (table.remainingSeconds <= 15 * 60) table.status = 'warning';
+			else table.status = 'occupied';
+		}
+	}
+}
+
+export function updateTableLayout(tableUpdates: Pick<Table, 'id' | 'x' | 'y' | 'width' | 'height'>[]) {
+	for (const update of tableUpdates) {
+		const t = tables.find(t => t.id === update.id);
+		if (t) {
+			t.x = update.x;
+			t.y = update.y;
+			if (update.width !== undefined) t.width = update.width;
+			if (update.height !== undefined) t.height = update.height;
+		}
+	}
+}
+
+export function addTable(locationId: string, label: string, capacity: number, x: number, y: number) {
+	const number = tables.filter(t => t.locationId === locationId).length + 1;
+	const id = `${locationId === 'qc' ? 'QC' : 'MK'}-T${number}-${nanoid(4)}`;
+	tables.push({
+		id, locationId, number, label, zone: 'main', capacity,
+		x, y, width: 92, height: 92,
+		status: 'available', sessionStartedAt: null, remainingSeconds: null, currentOrderId: null, billTotal: null
+	});
+}
+
+export function deleteTable(tableId: string) {
+	const index = tables.findIndex(t => t.id === tableId);
+	if (index !== -1) {
+		tables.splice(index, 1);
 	}
 }
 
@@ -161,6 +225,30 @@ export function recalcOrder(order: Order) {
 		? 0                                        // SC/PWD: VAT-exempt
 		: Math.round(net - net / 1.12);            // Normal: VAT already embedded in price
 	order.subtotal = sub; order.discountAmount = disc; order.vatAmount = vat; order.total = net;
+}
+
+export function voidOrder(orderId: string) {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.status === 'paid' || order.status === 'cancelled') return;
+	order.status = 'cancelled';
+	order.closedAt = new Date().toISOString();
+	for (const item of order.items) {
+		if (item.status !== 'cancelled') item.status = 'cancelled';
+	}
+	if (order.tableId) {
+		const table = tables.find(t => t.id === order.tableId);
+		if (table) {
+			table.status = 'dirty';
+			table.sessionStartedAt = null;
+			table.remainingSeconds = null;
+			table.currentOrderId = null;
+			table.billTotal = null;
+		}
+	}
+	const label = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.label ?? order.tableId)
+		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.tableClosed(label, 0, 'VOID');
 }
 
 export function markItemServed(orderId: string, itemId: string) {

@@ -9,14 +9,15 @@
 
 	// Guard: non-admin roles get redirected
 	$effect(() => {
-		if (!ADMIN_ROLES.includes(session.role)) goto('/floor');
+		if (!ADMIN_ROLES.includes(session.role)) goto('/pos');
 	});
 
 	let currentRoute = $derived(page.url.pathname);
 
 	const tabs = [
 		{ href: '/admin/users', label: '👤 Users' },
-		{ href: '/admin/logs',  label: '📋 Activity Logs' }
+		{ href: '/admin/logs',  label: '📋 Activity Logs' },
+		{ href: '/admin/floor-editor', label: '🪑 Floor Editor' }
 	];
 </script>
 
