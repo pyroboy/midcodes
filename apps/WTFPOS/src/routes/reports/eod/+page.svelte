@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
 	import { eodSummary } from '$lib/stores/reports.svelte';
+	import { allExpenses } from '$lib/stores/expenses.svelte';
 
 	const summary = $derived(eodSummary());
 
 	let closingActual = $state(0);
 	const openingCash    = 5000;
-	const cashExpenses   = 1250; // placeholder until Expenses module is live
+	const cashExpenses   = $derived(
+		allExpenses
+			.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString() && e.paidBy === 'Cash from Register')
+			.reduce((s, e) => s + e.amount, 0)
+	);
 	const closingExpected = $derived(openingCash + summary.cash - cashExpenses);
 	const cashVariance    = $derived(closingActual - closingExpected);
 

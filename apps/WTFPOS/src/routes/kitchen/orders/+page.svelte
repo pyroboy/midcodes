@@ -1,8 +1,12 @@
 <script lang="ts">
-	import { kdsTickets, markItemServed, toggleMenuItemAvailability, menuItems } from '$lib/stores/pos.svelte';
+	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket } from '$lib/stores/pos.svelte';
+	import { refuseItem } from '$lib/stores/alert.svelte';
 	import { formatCountdown, cn } from '$lib/utils';
 	import { printKitchenOrder } from '$lib/stores/hardware.svelte';
 	import { TriangleAlert } from 'lucide-svelte';
+	import KdsHistoryModal from '$lib/components/kitchen/KdsHistoryModal.svelte';
+
+	let showKdsHistory = $state(false);
 
 	// Auto-print incoming tickets
 	$effect(() => {
@@ -87,6 +91,21 @@
 		<span class="badge-orange">{activeTables} Active Tables</span>
 		<span class="badge-orange">{menuOrders} Menu Orders</span>
 		<span class="badge-orange">{queueOrders} In Queue</span>
+		<button
+			onclick={() => recallLastTicket()}
+			disabled={kdsTicketHistory.length === 0}
+			class="rounded-lg border border-accent bg-accent-light px-3 py-1.5 text-xs font-bold text-accent hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+			style="min-height: 32px"
+		>
+			↩ Recall Last
+		</button>
+		<button
+			onclick={() => showKdsHistory = true}
+			class="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+			style="min-height: 32px"
+		>
+			📋 History {#if kdsTicketHistory.length > 0}<span class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold">{kdsTicketHistory.length}</span>{/if}
+		</button>
 	</div>
 </div>
 
@@ -148,6 +167,16 @@
 									</div>
 									<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
 										<button
+											onclick={() => {
+												const reason = prompt(`Reason for refusing ${item.menuItemName}?`);
+												if (reason) refuseItem(ticket.orderId, ticket.tableNumber, item.menuItemName, reason);
+											}}
+											class="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-600 hover:bg-red-200"
+											title="Refuse Item"
+										>
+											Refuse
+										</button>
+										<button
 											onclick={() => handleSoldOut(item.menuItemName)}
 											class={cn('rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider', isSoldOut(item.menuItemName) ? 'bg-status-red text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
 											title="Toggle availability in POS"
@@ -179,6 +208,16 @@
 										<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
 									</div>
 									<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
+										<button
+											onclick={() => {
+												const reason = prompt(`Reason for refusing ${item.menuItemName}?`);
+												if (reason) refuseItem(ticket.orderId, ticket.tableNumber, item.menuItemName, reason);
+											}}
+											class="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-600 hover:bg-red-200"
+											title="Refuse Item"
+										>
+											Refuse
+										</button>
 										<button
 											onclick={() => handleSoldOut(item.menuItemName)}
 											class={cn('rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider', isSoldOut(item.menuItemName) ? 'bg-status-red text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
@@ -232,3 +271,5 @@
 		{/each}
 	</div>
 {/if}
+
+<KdsHistoryModal isOpen={showKdsHistory} onClose={() => showKdsHistory = false} />

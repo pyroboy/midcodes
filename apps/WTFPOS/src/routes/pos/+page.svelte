@@ -1,7 +1,9 @@
 <script lang="ts">
-    import { tables as allTables, orders as allOrders, openTable, tickTimers, menuItems, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus } from '$lib/stores/pos.svelte';
+    import { tables as allTables, orders as allOrders, openTable, tickTimers, menuItems, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance } from '$lib/stores/pos.svelte';
+    import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
     import TopBar from '$lib/components/TopBar.svelte';
+    import AlertBanner from '$lib/components/AlertBanner.svelte';
     import TransferTableModal from '$lib/components/pos/TransferTableModal.svelte';
     import PackageChangeModal from '$lib/components/pos/PackageChangeModal.svelte';
     import SplitBillModal from '$lib/components/pos/SplitBillModal.svelte';
@@ -16,6 +18,8 @@
     import AddItemModal from '$lib/components/pos/AddItemModal.svelte';
     import CheckoutModal from '$lib/components/pos/CheckoutModal.svelte';
     import PaxModal from '$lib/components/pos/PaxModal.svelte';
+    import PaxChangeModal from '$lib/components/pos/PaxChangeModal.svelte';
+    import LeftoverPenaltyModal from '$lib/components/pos/LeftoverPenaltyModal.svelte';
     import { session } from '$lib/stores/session.svelte';
 
     // ─── Branch-filtered tables/orders ───────────────────────────────────────────
@@ -32,8 +36,9 @@
     });
 
     // ─── Floor stats ──────────────────────────────────────────────────────────
-    const occupied = $derived(tables.filter((t) => t.status !== 'available').length);
+    const occupied = $derived(tables.filter((t) => t.status !== 'available' && t.status !== 'maintenance').length);
     const free     = $derived(tables.filter((t) => t.status === 'available').length);
+    const maintenance = $derived(tables.filter((t) => t.status === 'maintenance').length);
     const mainTables = $derived(tables.filter((t) => t.zone === 'main'));
 
     // ─── Selected Order (dine-in or takeout) ──────────────────────────────────
@@ -60,6 +65,8 @@
     let showSplitBill = $state(false);
     let showHistory = $state(false);
     let showTakeoutModal = $state(false);
+    let showPaxChange = $state(false);
+    let showLeftoverPenalty = $state(false);
     let paxModalTable = $state<Table | null>(null);
 
     // ─── Receipt State ────────────────────────────────────────────────────────
@@ -75,13 +82,24 @@
     );
 
     // ─── Handlers ─────────────────────────────────────────────────────────────
+    const isManager = $derived(ELEVATED_ROLES.includes(session.role));
+
     function handleTableClick(table: Table) {
         selectedTakeoutId = null;
+        if (table.status === 'maintenance') return; // Can't interact with maintenance tables
         if (table.status === 'available') {
             paxModalTable = table;
         } else {
             selectedTableId = table.id;
             showAddItem = false;
+        }
+    }
+
+    function handleToggleMaintenance(table: Table) {
+        if (table.status === 'maintenance') {
+            setTableMaintenance(table.id, false);
+        } else if (table.status === 'available') {
+            setTableMaintenance(table.id, true);
         }
     }
 
@@ -165,9 +183,12 @@
                 }
                 barcodeBuffer = '';
             }
-        } else if (e.key.length === 1) { 
+        } else if (e.key.length === 1) {
             // Only capture single characters (letters, numbers)
-            barcodeBuffer += e.key;
+            // Limit buffer size to prevent memory issues with rapid keystrokes
+            if (barcodeBuffer.length < 20) {
+                barcodeBuffer += e.key;
+            }
             clearTimeout(barcodeTimeout);
             barcodeTimeout = setTimeout(() => { barcodeBuffer = ''; }, 100);
         }
@@ -177,6 +198,7 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
+    <AlertBanner />
     <TopBar />
 
     {#if session.locationId === 'all'}
@@ -196,6 +218,9 @@
                             <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-white border border-gray-300"></span>Available</span>
                             <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-emerald-500"></span>Dining (Green)</span>
                             <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Ready / Bill (Orange)</span>
+                            {#if maintenance > 0}
+                                <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-gray-400"></span>🔧 Maint ({maintenance})</span>
+                            {/if}
                         </div>
                         <button
                             onclick={openTakeoutModal}
@@ -234,11 +259,18 @@
                 table={selectedTable}
                 onclose={closeBill}
                 onadditem={() => showAddItem = true}
-                oncheckout={() => showCheckout = true}
+                oncheckout={() => {
+                    if (currentActiveOrder?.packageId) {
+                        showLeftoverPenalty = true;
+                    } else {
+                        showCheckout = true;
+                    }
+                }}
                 onvoid={() => showVoidConfirm = true}
                 ontransfer={() => showTransferModal = true}
                 onchangepackage={() => showPackageChange = true}
                 onsplit={() => showSplitBill = true}
+                onchangepax={() => showPaxChange = true}
             />
         </div>
     {/if}
@@ -329,3 +361,19 @@
         oncomplete={handleSplitComplete}
     />
 {/if}
+
+<PaxChangeModal
+    isOpen={showPaxChange}
+    order={currentActiveOrder ?? null}
+    onClose={() => showPaxChange = false}
+/>
+
+<LeftoverPenaltyModal
+    isOpen={showLeftoverPenalty}
+    order={currentActiveOrder ?? null}
+    onClose={() => showLeftoverPenalty = false}
+    onPreCheckout={() => {
+        showLeftoverPenalty = false;
+        showCheckout = true;
+    }}
+/>

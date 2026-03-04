@@ -221,7 +221,7 @@ export function logWaste(stockItemId: string, itemName: string, qty: number, uni
 		loggedBy,
 		loggedAt: new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
 	});
-	log.wastLogged(itemName, qty, unit, reason);
+	log.wasteLogged(itemName, qty, unit, reason);
 }
 
 export function adjustStock(

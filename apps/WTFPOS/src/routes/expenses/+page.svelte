@@ -1,12 +1,119 @@
 <script lang="ts">
-	// Module 3 — Expense Recording
-	// Coming in Phase 3
+    import { allExpenses, addExpense, deleteExpense, expenseCategories } from '$lib/stores/expenses.svelte';
+    import { session } from '$lib/stores/session.svelte';
+    import { formatPeso } from '$lib/utils';
+
+    const branchExpenses = $derived(
+        session.locationId === 'all' ? allExpenses : allExpenses.filter(e => e.locationId === session.locationId)
+    );
+
+    let category = $state(expenseCategories[0]);
+    let amount = $state('');
+    let description = $state('');
+    let paidBy = $state('Petty Cash');
+
+    function handleSubmit(e: Event) {
+        e.preventDefault();
+        const numAmount = parseFloat(amount);
+        if (!numAmount || numAmount <= 0) return;
+        addExpense(category, numAmount, description, paidBy);
+        amount = '';
+        description = '';
+    }
 </script>
 
-<div class="flex h-full items-center justify-center">
-	<div class="text-center text-white/40">
-		<div class="text-5xl mb-4">💰</div>
-		<h2 class="text-xl font-semibold text-white/70 mb-2">Expense Recording</h2>
-		<p class="text-sm">Expenses module — Phase 3</p>
-	</div>
+<div class="flex h-full flex-col p-6 gap-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Expenses</h1>
+        <div class="text-right">
+            <p class="text-sm font-semibold text-gray-500">Total Recorded (All Time)</p>
+            <p class="text-xl font-bold text-status-red">{formatPeso(branchExpenses.reduce((s, e) => s + e.amount, 0))}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-[320px_1fr] gap-6 h-full min-h-0 pb-10">
+        <!-- Input Form -->
+        <form onsubmit={handleSubmit} class="flex flex-col gap-4 rounded-xl border border-border bg-white p-5 shadow-sm h-fit">
+            <h2 class="font-bold text-gray-900">Record Expense</h2>
+            
+            <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Category</label>
+                <select bind:value={category} class="pos-input">
+                    {#each expenseCategories as cat}
+                        <option value={cat}>{cat}</option>
+                    {/each}
+                </select>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Amount (₱)</label>
+                <input type="number" step="0.01" min="0" bind:value={amount} required class="pos-input text-lg font-mono font-bold text-status-red" placeholder="0.00" />
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Description</label>
+                <input type="text" bind:value={description} required class="pos-input" placeholder="e.g., Unbox wet wipes" />
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Paid By</label>
+                <select bind:value={paidBy} class="pos-input">
+                    <option value="Petty Cash">Petty Cash</option>
+                    <option value="Cash from Register">Cash from Register</option>
+                    <option value="Company Card">Company Card</option>
+                    <option value="Owner's Pocket">Owner's Pocket</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-primary mt-2 flex items-center justify-center gap-2">
+                <span>➕</span> Record Expense
+            </button>
+        </form>
+
+        <!-- List -->
+        <div class="flex flex-col rounded-xl border border-border bg-white shadow-sm overflow-hidden h-[calc(100vh-160px)]">
+            <div class="border-b border-border bg-gray-50 px-4 py-3 shrink-0">
+                <h2 class="font-bold text-gray-900">Expense Log</h2>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                {#if branchExpenses.length === 0}
+                    <div class="flex h-full flex-col items-center justify-center text-gray-400">
+                        <div class="mb-2 text-4xl">📝</div>
+                        <p>No expenses recorded yet.</p>
+                    </div>
+                {:else}
+                    <table class="w-full text-sm">
+                        <thead class="sticky top-0 bg-white shadow-sm z-10">
+                            <tr class="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-gray-400 [&>th]:px-4 [&>th]:py-3">
+                                <th>Time</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Source</th>
+                                <th class="text-right">Amount</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            {#each branchExpenses as exp (exp.id)}
+                                <tr class="hover:bg-gray-50 transition-colors [&>td]:px-4 [&>td]:py-3">
+                                    <td class="whitespace-nowrap text-gray-500">
+                                        {new Date(exp.createdAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+                                    </td>
+                                    <td class="font-medium text-gray-900">{exp.category}</td>
+                                    <td class="text-gray-600">{exp.description}</td>
+                                    <td class="text-gray-500">{exp.paidBy}</td>
+                                    <td class="text-right font-mono font-bold text-status-red">
+                                        {formatPeso(exp.amount)}
+                                    </td>
+                                    <td class="text-right">
+                                        <button onclick={() => deleteExpense(exp.id)} class="text-gray-400 hover:text-status-red p-1 rounded font-bold">✕</button>
+                                    </td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                {/if}
+            </div>
+        </div>
+    </div>
 </div>

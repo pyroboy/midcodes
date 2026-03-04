@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
+	import { allExpenses, expenseCategories } from '$lib/stores/expenses.svelte';
 
 	interface MonthlyRow {
 		category: string;
@@ -10,19 +11,53 @@
 		flagged: boolean;
 	}
 
-	const rows: MonthlyRow[] = [
-		{ category: 'Meat Procurement',  icon: '🥩', current: 298000, previous: 275000, variance: 8.4,   flagged: false },
-		{ category: 'Produce & Sides',   icon: '🥬', current: 74800,  previous: 71200,  variance: 5.1,   flagged: false },
-		{ category: 'Utilities',         icon: '💡', current: 45200,  previous: 32400,  variance: 39.5,  flagged: true },
-		{ category: 'Wages',             icon: '👷', current: 144000, previous: 144000, variance: 0,     flagged: false },
-		{ category: 'Rent',              icon: '🏠', current: 50000,  previous: 50000,  variance: 0,     flagged: false },
-		{ category: 'Miscellaneous',     icon: '📦', current: 22400,  previous: 18600,  variance: 20.4,  flagged: true }
-	];
+	const categoryIcons: Record<string, string> = {
+		'Meat Procurement': '🥩',
+		'Produce & Sides': '🥬',
+		'Utilities': '💡',
+		'Wages': '👷',
+		'Rent': '🏠',
+		'Miscellaneous': '📦'
+	};
 
-	const totalCurrent  = rows.reduce((s, r) => s + r.current, 0);
-	const totalPrevious = rows.reduce((s, r) => s + r.previous, 0);
-	const totalVariance = ((totalCurrent - totalPrevious) / totalPrevious * 100);
-	const flaggedCount  = rows.filter(r => r.flagged).length;
+	// We only have live data for current month. For previous month, we'll use placeholder data
+	const prevMonthData: Record<string, number> = {
+		'Meat Procurement': 275000,
+		'Produce & Sides': 71200,
+		'Utilities': 32400,
+		'Wages': 144000,
+		'Rent': 50000,
+		'Miscellaneous': 18600
+	};
+
+	const currentMonthExpenses = $derived(
+		allExpenses.filter(e => {
+			const d = new Date(e.createdAt);
+			const now = new Date();
+			return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+		})
+	);
+
+	const rows = $derived(expenseCategories.map(cat => {
+		const current = currentMonthExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+		const previous = prevMonthData[cat] || 1; // avoid division by zero
+		const rawVariance = ((current - previous) / previous) * 100;
+		const variance = isNaN(rawVariance) ? 0 : rawVariance;
+		
+		return {
+			category: cat,
+			icon: categoryIcons[cat] || '📦',
+			current,
+			previous,
+			variance,
+			flagged: variance > 15
+		};
+	}).filter(r => r.current > 0 || r.previous > 1));
+
+	const totalCurrent  = $derived(rows.reduce((s, r) => s + r.current, 0));
+	const totalPrevious = $derived(rows.reduce((s, r) => s + r.previous, 0));
+	const totalVariance = $derived(totalPrevious > 0 ? ((totalCurrent - totalPrevious) / totalPrevious * 100) : 0);
+	const flaggedCount  = $derived(rows.filter(r => r.flagged).length);
 </script>
 
 <!-- Summary cards -->

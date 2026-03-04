@@ -2,7 +2,7 @@
  * POS Global State — Svelte 5 Runes
  * State is mutated directly (fine in .svelte.ts with $state)
  */
-import type { Table, Order, MenuItem, KdsTicket, TableZone, TakeoutStatus, SplitType, SubBill, PaymentMethod } from '$lib/types';
+import type { Table, Order, MenuItem, KdsTicket, TableZone, TableStatus, TakeoutStatus, SplitType, SubBill, PaymentMethod } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { deductFromStock } from '$lib/stores/stock.svelte';
 import { log } from '$lib/stores/audit.svelte';
@@ -92,6 +92,13 @@ export const tables = $state<Table[]>(makeTables());
 export const orders = $state<Order[]>([]);
 export const kdsTickets = $state<KdsTicket[]>([]);
 
+// KDS ticket history — bumped tickets stored for recall
+export interface KdsHistoryEntry extends KdsTicket {
+	bumpedAt: string;
+	bumpedBy: string;
+}
+export const kdsTicketHistory = $state<KdsHistoryEntry[]>([]);
+
 // ─── Table Actions ────────────────────────────────────────────────────────────
 
 export function openTable(tableId: string, pax: number = 4, packageName?: string): string {
@@ -160,15 +167,23 @@ export function printBill(orderId: string) {
 	}
 }
 
+export function setTableMaintenance(tableId: string, isMaintenance: boolean) {
+	const table = tables.find(t => t.id === tableId);
+	if (!table) return;
+	if (isMaintenance && table.status !== 'available') return; // Can only mark empty tables
+	table.status = isMaintenance ? 'maintenance' : 'available';
+	log.tableMaintenanceToggled(table.label, isMaintenance);
+}
+
 export function tickTimers() {
 	for (const table of tables) {
-		if (table.status === 'available' || table.remainingSeconds === null) continue;
+		if (table.status === 'available' || table.status === 'maintenance' || table.remainingSeconds === null) continue;
 		table.remainingSeconds = Math.max(0, table.remainingSeconds - 1);
-		
-		// Unli timers: warnings are an overlay visual while color statuses dictates the state.
-		// However, for pure fallback data modeling, we will preserve the critical/warning strings
-		// and use CSS logic in POS page to decouple them.
-		if (table.status !== 'billing') {
+
+		// Only update status based on timer if not in billing or critical locked states
+		// billing = waiting for payment, should not revert to occupied/warning
+		const lockedStatuses: TableStatus[] = ['billing', 'maintenance'];
+		if (!lockedStatuses.includes(table.status)) {
 			if (table.remainingSeconds <= 5 * 60) table.status = 'critical';
 			else if (table.remainingSeconds <= 15 * 60) table.status = 'warning';
 			else table.status = 'occupied';
@@ -203,6 +218,45 @@ export function deleteTable(tableId: string) {
 	if (index !== -1) {
 		tables.splice(index, 1);
 	}
+}
+
+// ─── Pending Payment Hold ────────────────────────────────────────────────────
+
+export function holdPayment(orderId: string, method: 'gcash' | 'maya') {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.status !== 'open') return;
+	order.status = 'pending_payment';
+	order.pendingPaymentMethod = method;
+	const label = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.label ?? '')
+		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.paymentHeld(label);
+}
+
+export function confirmHeldPayment(orderId: string) {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.status !== 'pending_payment') return;
+	const method = order.pendingPaymentMethod ?? 'gcash';
+	order.payments.push({ method, amount: order.total });
+	order.status = 'paid';
+	order.closedAt = new Date().toISOString();
+	order.closedBy = session.userName || 'Staff';
+	const label = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.label ?? '')
+		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	if (order.tableId) closeTable(order.tableId);
+	log.paymentConfirmed(label, order.total, method === 'gcash' ? 'GCash' : 'Maya');
+}
+
+export function cancelHeldPayment(orderId: string) {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.status !== 'pending_payment') return;
+	order.status = 'open';
+	order.pendingPaymentMethod = undefined;
+	const label = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.label ?? '')
+		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.paymentCancelled(label);
 }
 
 // ─── Order Actions ────────────────────────────────────────────────────────────
@@ -264,6 +318,10 @@ export function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'wri
 	order.status = 'cancelled';
 	if (reason) order.cancelReason = reason;
 	order.closedAt = new Date().toISOString();
+	// Reset takeout status when voided
+	if (order.orderType === 'takeout') {
+		order.takeoutStatus = 'new';
+	}
 	for (const item of order.items) {
 		if (item.status !== 'cancelled') item.status = 'cancelled';
 	}
@@ -285,7 +343,19 @@ export function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'wri
 
 export function markItemServed(orderId: string, itemId: string) {
 	const t = kdsTickets.find((t) => t.orderId === orderId);
-	if (t) { const i = t.items.find((i) => i.id === itemId); if (i) { i.status = 'served'; log.itemServed(i.menuItemName, t.tableNumber); } }
+	if (t) {
+		const i = t.items.find((i) => i.id === itemId);
+		if (i) { i.status = 'served'; log.itemServed(i.menuItemName, t.tableNumber); }
+		// Auto-archive to history when all items in the ticket are served/cancelled
+		const active = t.items.filter(it => it.status !== 'cancelled');
+		if (active.length > 0 && active.every(it => it.status === 'served')) {
+			kdsTicketHistory.unshift({
+				...structuredClone(t),
+				bumpedAt: new Date().toISOString(),
+				bumpedBy: session.userName || 'Staff',
+			});
+		}
+	}
 	const o = orders.find((o) => o.id === orderId);
 	if (o) {
 		const i = o.items.find((i) => i.id === itemId);
@@ -299,6 +369,96 @@ export function markItemServed(orderId: string, itemId: string) {
 			}
 		}
 	}
+}
+
+export function recallTicket(orderId: string) {
+	const histIdx = kdsTicketHistory.findIndex(h => h.orderId === orderId);
+	if (histIdx === -1) return;
+	const entry = kdsTicketHistory[histIdx];
+	// Restore items to 'pending' in the KDS ticket
+	const ticket = kdsTickets.find(t => t.orderId === orderId);
+	if (ticket) {
+		for (const item of ticket.items) {
+			if (item.status === 'served') item.status = 'pending';
+		}
+	}
+	// Also restore in the actual order
+	const order = orders.find(o => o.id === orderId);
+	if (order) {
+		for (const item of order.items) {
+			if (item.status === 'served') item.status = 'pending';
+		}
+	}
+	kdsTicketHistory.splice(histIdx, 1);
+	log.kdsTicketRecalled(entry.tableNumber);
+}
+
+export function recallLastTicket() {
+	if (kdsTicketHistory.length === 0) return;
+	recallTicket(kdsTicketHistory[0].orderId);
+}
+
+// ─── Pax Change (Late Joiner) ────────────────────────────────────────────────
+
+export function changePax(orderId: string, newPax: number) {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.status !== 'open' || newPax < 1) return;
+	const oldPax = order.pax;
+	if (newPax === oldPax) return;
+	if (!order.originalPax) order.originalPax = oldPax;
+	order.pax = newPax;
+
+	// If order has a package, update the PKG line item quantity (price is per-pax)
+	if (order.packageId) {
+		const pkgItem = order.items.find(i => i.menuItemId === order.packageId && i.tag === 'PKG');
+		if (pkgItem) {
+			pkgItem.quantity = newPax;
+		}
+		recalcOrder(order);
+		const table = tables.find(t => t.id === order.tableId);
+		if (table) table.billTotal = order.total;
+	}
+
+	const tableLabel = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.label ?? '')
+		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.paxChanged(tableLabel, oldPax, newPax);
+}
+
+// ─── Leftover Penalty ────────────────────────────────────────────────────────
+
+export function applyLeftoverPenalty(orderId: string, weightGrams: number, ratePerHundredGrams: number = 50) {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || weightGrams <= 0) return;
+	const penalty = Math.ceil(weightGrams / 100) * ratePerHundredGrams;
+	order.leftoverPenaltyAmount = penalty;
+	order.items.push({
+		id: nanoid(), menuItemId: 'penalty-leftover', menuItemName: 'Leftover Penalty',
+		quantity: 1, unitPrice: penalty, weight: weightGrams, status: 'served', sentAt: null, tag: null,
+		notes: `${weightGrams}g leftover @ ₱${ratePerHundredGrams}/100g`
+	});
+	recalcOrder(order);
+	const table = tables.find(t => t.id === order.tableId);
+	if (table) table.billTotal = order.total;
+	const label = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.label ?? '')
+		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.leftoverPenaltyApplied(label, weightGrams, penalty);
+}
+
+export function waiveLeftoverPenalty(orderId: string) {
+	const order = orders.find(o => o.id === orderId);
+	if (!order) return;
+	const idx = order.items.findIndex(i => i.menuItemId === 'penalty-leftover');
+	if (idx !== -1) order.items.splice(idx, 1);
+	order.leftoverPenaltyAmount = undefined;
+	recalcOrder(order);
+	const table = tables.find(t => t.id === order.tableId);
+	if (table) table.billTotal = order.total;
+	const label = order.tableId
+		? (tables.find(t => t.id === order.tableId)?.label ?? '')
+		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.leftoverPenaltyWaived(label);
 }
 
 // ─── Takeout Lifecycle ───────────────────────────────────────────────────────
@@ -417,7 +577,7 @@ export function changePackage(orderId: string, newPackageId: string): {
 
 export function initEqualSplit(orderId: string, splitCount: number): void {
 	const order = orders.find(o => o.id === orderId);
-	if (!order || order.total <= 0) return;
+	if (!order || order.total <= 0 || splitCount <= 0) return;
 
 	order.splitType = 'equal';
 	const perPerson = Math.floor(order.total / splitCount);

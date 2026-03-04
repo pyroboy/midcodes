@@ -15,7 +15,9 @@
 				{ href: '/reports/meat-variance', label: 'Meat Variance' },
 				{ href: '/reports/table-sales',   label: 'Table Sales' },
 				{ href: '/reports/voids-discounts',label: 'Voids & Discounts' },
-				{ href: '/reports/eod',           label: 'End of Day' }
+				{ href: '/reports/x-read',        label: 'X-Read' },
+				{ href: '/reports/eod',           label: 'End of Day' },
+				{ href: '/reports/staff-performance', label: 'Staff Perf.' }
 			]
 		},
 		{

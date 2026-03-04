@@ -1,9 +1,11 @@
 <script lang="ts">
     import type { Order, Table, DiscountType } from '$lib/types';
-    import { closeTable, recalcOrder } from '$lib/stores/pos.svelte';
+    import { closeTable, recalcOrder, holdPayment } from '$lib/stores/pos.svelte';
     import { printReceipt } from '$lib/stores/hardware.svelte';
     import { log } from '$lib/stores/audit.svelte';
+    import { session } from '$lib/stores/session.svelte';
     import { formatPeso, cn } from '$lib/utils';
+    import ManagerPinModal from './ManagerPinModal.svelte';
 
     interface Props {
         order: Order;
@@ -18,10 +20,13 @@
     let checkoutError = $state('');
     let checkoutMethod = $state<'cash' | 'gcash' | 'maya'>('cash');
     let cashTendered = $state<number>(0);
+    let showPinForDiscount = $state(false);
+    let pendingDiscountType = $state<DiscountType>('none');
 
     const cashChange = $derived(cashTendered - order.total);
+    const hasItems = $derived(order.items.filter(i => i.status !== 'cancelled').length > 0);
     const canConfirmCheckout = $derived(
-        checkoutMethod !== 'cash' || cashTendered >= order.total
+        hasItems && (checkoutMethod !== 'cash' || cashTendered >= order.total)
     );
 
     function selectCashPreset(amount: number) {
@@ -33,10 +38,37 @@
     }
 
     function applyDiscount(type: DiscountType) {
+        // Comp and Service Recovery require manager PIN (100% write-offs)
+        if ((type === 'comp' || type === 'service_recovery') && order.discountType !== type) {
+            pendingDiscountType = type;
+            showPinForDiscount = true;
+            return;
+        }
         const prev = order.discountType;
         order.discountType = (prev === type) ? 'none' : type;
         recalcOrder(order);
         if (table) table.billTotal = order.total;
+        const tableLabel = order.orderType === 'takeout'
+            ? `Takeout (${order.customerName ?? 'Walk-in'})`
+            : (table?.label ?? '');
+        if (order.discountType !== 'none') {
+            log.discountApplied(tableLabel, order.discountType, order.discountAmount);
+        } else {
+            log.discountRemoved(tableLabel);
+        }
+    }
+
+    function handlePinConfirmed() {
+        showPinForDiscount = false;
+        order.discountType = pendingDiscountType;
+        recalcOrder(order);
+        if (table) table.billTotal = order.total;
+        const tableLabel = order.orderType === 'takeout'
+            ? `Takeout (${order.customerName ?? 'Walk-in'})`
+            : (table?.label ?? '');
+        log.discountApplied(tableLabel, order.discountType, order.discountAmount);
+        log.managerPinVerified(`${pendingDiscountType} discount on ${tableLabel}`);
+        pendingDiscountType = 'none';
     }
 
     async function confirmCheckout() {
@@ -52,12 +84,15 @@
             if (!printResult.success) {
                 checkoutError = printResult.error || 'Unknown Printer Error';
                 order.printStatus = 'failed';
-                return; 
+                checkoutLoading = false;
+                return;
             }
 
             finalizeCheckout(false);
-        } finally {
-            if (checkoutError) checkoutLoading = false;
+        } catch (err) {
+            checkoutError = err instanceof Error ? err.message : 'Unknown error during checkout';
+            order.printStatus = 'failed';
+            checkoutLoading = false;
         }
     }
 
@@ -79,6 +114,7 @@
         });
         order.status = 'paid';
         order.closedAt = new Date().toISOString();
+        order.closedBy = session.userName || 'Staff';
 
         // Free the table for dine-in
         if (order.tableId) {
@@ -250,6 +286,16 @@
                 >
                     Cancel
                 </button>
+                {#if checkoutMethod !== 'cash'}
+                    <button
+                        onclick={() => { holdPayment(order.id, checkoutMethod === 'maya' ? 'maya' : 'gcash'); onclose(); }}
+                        class="btn-secondary flex-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                        style="min-height: 48px"
+                        disabled={!hasItems || checkoutLoading}
+                    >
+                        ⏳ Hold Payment
+                    </button>
+                {/if}
                 <button
                     onclick={confirmCheckout}
                     disabled={!canConfirmCheckout || checkoutLoading}
@@ -267,3 +313,12 @@
         {/if}
     </div>
 </div>
+
+<ManagerPinModal
+    isOpen={showPinForDiscount}
+    title="Authorize Discount"
+    description="Comp and Service Recovery discounts write off the entire bill. Enter Manager PIN to authorize."
+    confirmLabel="Authorize"
+    onClose={() => { showPinForDiscount = false; pendingDiscountType = 'none'; }}
+    onConfirm={handlePinConfirmed}
+/>

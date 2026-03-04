@@ -1,7 +1,7 @@
 // ─── Floor Layout ─────────────────────────────────────────────────────────────
 
 export type TableZone = 'main';
-export type TableStatus = 'available' | 'occupied' | 'warning' | 'critical' | 'billing';
+export type TableStatus = 'available' | 'occupied' | 'warning' | 'critical' | 'billing' | 'maintenance';
 export interface Table {
 	id: string;
 	locationId: string; // Changed from branchId
@@ -74,7 +74,7 @@ export interface OrderItem {
 
 export type DiscountType = 'none' | 'senior' | 'pwd' | 'promo' | 'comp' | 'service_recovery';
 export type OrderType = 'dine-in' | 'takeout';
-export type PaymentMethod = 'cash' | 'card' | 'gcash';
+export type PaymentMethod = 'cash' | 'card' | 'gcash' | 'maya';
 
 export interface Payment {
 	method: PaymentMethod;
@@ -120,6 +120,10 @@ export interface Order {
 	billPrinted: boolean;
 	notes?: string;
 	cancelReason?: 'mistake' | 'walkout' | 'write_off';
+	closedBy?: string;              // staff who finalized the payment
+	originalPax?: number;           // tracks original pax before mid-service changes
+	leftoverPenaltyAmount?: number; // penalty for AYCE leftover waste
+	pendingPaymentMethod?: PaymentMethod; // method held for delayed e-wallet confirmation
 	takeoutStatus?: TakeoutStatus;  // only for takeout orders
 	splitType?: SplitType;
 	subBills?: SubBill[];

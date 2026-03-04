@@ -6,6 +6,8 @@
 import { orders as allOrders, tables as allTables, menuItems } from '$lib/stores/pos.svelte';
 import { stockItems, deliveries, deductions, getCurrentStock } from '$lib/stores/stock.svelte';
 import { session } from '$lib/stores/session.svelte';
+import { log } from '$lib/stores/audit.svelte';
+import { nanoid } from 'nanoid';
 
 // Branch-filtered getters — $derived can't be exported from modules, so we
 // filter inside each exported function call (which runs in a reactive context).
@@ -125,6 +127,91 @@ export function eodSummary() {
 	const gcash  = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'gcash').reduce((t, p) => t + p.amount, 0), 0);
 	const card   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'card').reduce((t, p) => t + p.amount, 0), 0);
 	return { date: today, grossSales: gross, discounts: disc, netSales: net, vatAmount: vat, cash, card, gcash };
+}
+
+// ─── X-Read Mid-Shift Audit ──────────────────────────────────────────────────
+
+export interface XReadSnapshot {
+	id: string;
+	timestamp: string;
+	grossSales: number;
+	discounts: number;
+	netSales: number;
+	vatAmount: number;
+	totalPax: number;
+	cash: number;
+	gcash: number;
+	card: number;
+	voidCount: number;
+	discountCount: number;
+	generatedBy: string;
+}
+
+export const xReadHistory = $state<XReadSnapshot[]>([]);
+
+export function generateXRead(): XReadSnapshot {
+	const summary = eodSummary();
+	const voids = getOrders().filter(o => o.status === 'cancelled');
+	const discounted = getOrders().filter(o => o.status === 'paid' && o.discountType !== 'none');
+	const paid = getOrders().filter(o => o.status === 'paid');
+	const totalPax = paid.reduce((s, o) => s + (o.pax ?? 0), 0);
+
+	const snapshot: XReadSnapshot = {
+		id: nanoid(),
+		timestamp: new Date().toISOString(),
+		grossSales: summary.grossSales,
+		discounts: summary.discounts,
+		netSales: summary.netSales,
+		vatAmount: summary.vatAmount,
+		totalPax,
+		cash: summary.cash,
+		gcash: summary.gcash,
+		card: summary.card,
+		voidCount: voids.length,
+		discountCount: discounted.length,
+		generatedBy: session.userName || 'Staff',
+	};
+	xReadHistory.unshift(snapshot);
+	log.xReadGenerated();
+	return snapshot;
+}
+
+// ─── Staff Performance ───────────────────────────────────────────────────────
+
+export function staffPerformance() {
+	const paid = getOrders().filter(o => o.status === 'paid' && o.closedBy);
+	const byStaff: Record<string, {
+		name: string;
+		ordersClosed: number;
+		totalRevenue: number;
+		avgTicket: number;
+		voidCount: number;
+		discountCount: number;
+	}> = {};
+
+	for (const order of paid) {
+		const name = order.closedBy!;
+		if (!byStaff[name]) byStaff[name] = { name, ordersClosed: 0, totalRevenue: 0, avgTicket: 0, voidCount: 0, discountCount: 0 };
+		byStaff[name].ordersClosed++;
+		byStaff[name].totalRevenue += order.total;
+		if (order.discountType !== 'none') byStaff[name].discountCount++;
+	}
+
+	// Count voids per user from cancelled orders
+	const cancelled = getOrders().filter(o => o.status === 'cancelled');
+	for (const order of cancelled) {
+		// Attribute to closedBy if available, else skip
+		const name = order.closedBy;
+		if (!name) continue;
+		if (!byStaff[name]) byStaff[name] = { name, ordersClosed: 0, totalRevenue: 0, avgTicket: 0, voidCount: 0, discountCount: 0 };
+		byStaff[name].voidCount++;
+	}
+
+	for (const staff of Object.values(byStaff)) {
+		staff.avgTicket = staff.ordersClosed > 0 ? Math.round(staff.totalRevenue / staff.ordersClosed) : 0;
+	}
+
+	return Object.values(byStaff).sort((a, b) => b.totalRevenue - a.totalRevenue);
 }
 
 export function voidsAndDiscountsSummary() {

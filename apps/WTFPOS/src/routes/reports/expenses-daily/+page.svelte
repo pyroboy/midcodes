@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
+	import { allExpenses, expenseCategories } from '$lib/stores/expenses.svelte';
+	import { eodSummary } from '$lib/stores/reports.svelte';
 
 	type Period = 'today' | 'week' | 'month';
 	let period = $state<Period>('today');
@@ -11,42 +13,52 @@
 		pctOfSales: number;
 	}
 
-	const dailySales = 34696;
-
-	const data: Record<Period, { sales: number; items: ExpenseItem[] }> = {
-		today: {
-			sales: 34696,
-			items: [
-				{ category: 'Meat Procurement',  icon: '🥩', amount: 12800, pctOfSales: 36.9 },
-				{ category: 'Produce & Sides',   icon: '🥬', amount: 3200,  pctOfSales: 9.2 },
-				{ category: 'Utilities',         icon: '💡', amount: 1450,  pctOfSales: 4.2 },
-				{ category: 'Wages',             icon: '👷', amount: 4800,  pctOfSales: 13.8 },
-				{ category: 'Miscellaneous',     icon: '📦', amount: 850,   pctOfSales: 2.4 }
-			]
-		},
-		week: {
-			sales: 198400,
-			items: [
-				{ category: 'Meat Procurement',  icon: '🥩', amount: 72500,  pctOfSales: 36.5 },
-				{ category: 'Produce & Sides',   icon: '🥬', amount: 18200,  pctOfSales: 9.2 },
-				{ category: 'Utilities',         icon: '💡', amount: 10150,  pctOfSales: 5.1 },
-				{ category: 'Wages',             icon: '👷', amount: 33600,  pctOfSales: 16.9 },
-				{ category: 'Miscellaneous',     icon: '📦', amount: 5400,   pctOfSales: 2.7 }
-			]
-		},
-		month: {
-			sales: 824000,
-			items: [
-				{ category: 'Meat Procurement',  icon: '🥩', amount: 298000, pctOfSales: 36.2 },
-				{ category: 'Produce & Sides',   icon: '🥬', amount: 74800,  pctOfSales: 9.1 },
-				{ category: 'Utilities',         icon: '💡', amount: 45200,  pctOfSales: 5.5 },
-				{ category: 'Wages',             icon: '👷', amount: 144000, pctOfSales: 17.5 },
-				{ category: 'Miscellaneous',     icon: '📦', amount: 22400,  pctOfSales: 2.7 }
-			]
-		}
+	const categoryIcons: Record<string, string> = {
+		'Meat Procurement': '🥩',
+		'Produce & Sides': '🥬',
+		'Utilities': '💡',
+		'Wages': '👷',
+		'Rent': '🏠',
+		'Miscellaneous': '📦'
 	};
 
-	const current = $derived(data[period]);
+	const salesData = {
+		get today() { return eodSummary().netSales || 34696; },
+		week: 198400,
+		month: 824000
+	};
+
+	function filterExpensesByPeriod(p: Period) {
+		const now = new Date();
+		return allExpenses.filter(e => {
+			const d = new Date(e.createdAt);
+			if (p === 'today') return d.toDateString() === now.toDateString();
+			if (p === 'week') return (now.getTime() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
+			if (p === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+			return false;
+		});
+	}
+
+	function getExpenseItems(p: Period): ExpenseItem[] {
+		const sales = salesData[p];
+		const exp = filterExpensesByPeriod(p);
+		
+		return expenseCategories.map(cat => {
+			const amount = exp.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+			const pctOfSales = sales > 0 ? Number(((amount / sales) * 100).toFixed(1)) : 0;
+			return {
+				category: cat,
+				icon: categoryIcons[cat] || '📦',
+				amount,
+				pctOfSales
+			};
+		}).filter(i => i.amount > 0);
+	}
+
+	const current = $derived({
+		sales: salesData[period],
+		items: getExpenseItems(period)
+	});
 	const totalExpenses = $derived(current.items.reduce((s, i) => s + i.amount, 0));
 	const netCashFlow = $derived(current.sales - totalExpenses);
 </script>

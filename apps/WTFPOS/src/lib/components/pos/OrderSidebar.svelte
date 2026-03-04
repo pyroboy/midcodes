@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Table, Order } from '$lib/types';
     import { formatPeso, cn } from '$lib/utils';
-    import { printBill } from '$lib/stores/pos.svelte';
+    import { printBill, confirmHeldPayment, cancelHeldPayment } from '$lib/stores/pos.svelte';
     import { advanceTakeoutStatus } from '$lib/stores/pos.svelte';
 
     interface Props {
@@ -14,6 +14,7 @@
         ontransfer: () => void;
         onchangepackage: () => void;
         onsplit: () => void;
+        onchangepax: () => void;
     }
 
     let { 
@@ -25,7 +26,8 @@
         onvoid, 
         ontransfer, 
         onchangepackage, 
-        onsplit 
+        onsplit,
+        onchangepax
     }: Props = $props();
 
     function takeoutLabel(takeoutOrders: Order[], order: Order) {
@@ -171,14 +173,25 @@
         </div>
 
         <div class="flex flex-col gap-2 px-5 pb-5">
+            {#if order.status === 'pending_payment'}
+                <div class="flex items-center justify-center gap-2 rounded-lg bg-cyan-50 border border-cyan-200 px-3 py-2 mb-1">
+                    <span class="text-xs font-bold text-cyan-700 uppercase tracking-wider">⏳ Awaiting {order.pendingPaymentMethod === 'maya' ? 'Maya' : 'GCash'} Confirmation</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick={() => cancelHeldPayment(order.id)} class="btn-ghost flex-1 text-sm border border-gray-300" style="min-height: 44px">Cancel Hold</button>
+                    <button onclick={() => confirmHeldPayment(order.id)} class="btn-success flex-1 text-sm bg-cyan-600 hover:bg-cyan-700 text-white" style="min-height: 44px">✓ Confirm Payment</button>
+                </div>
+            {:else}
             <div class="flex gap-2">
                 <button onclick={onvoid} class="btn-danger flex-1 text-sm" style="min-height: 44px">🗑 Void</button>
                 <button onclick={oncheckout} class="btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white" style="min-height: 44px">💳 Checkout</button>
                 <button onclick={() => printBill(order.id)} class="btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800" style="min-height: 44px">🖨</button>
             </div>
+            {/if}
             <div class="flex gap-2">
                 {#if order.orderType === 'dine-in' && table}
                     <button onclick={ontransfer} class="btn-secondary flex-1 text-xs" style="min-height: 38px">🔀 Transfer</button>
+                    <button onclick={onchangepax} class="btn-secondary flex-1 text-xs" style="min-height: 38px">👥 Pax</button>
                 {/if}
                 {#if order.packageId && order.orderType === 'dine-in'}
                     <button onclick={onchangepackage} class="btn-secondary flex-1 text-xs" style="min-height: 38px">🔄 Change Pkg</button>

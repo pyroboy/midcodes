@@ -97,7 +97,7 @@ export const log = {
 		writeLog('stock', `Received ${qty.toLocaleString()}${unit} ${itemName} — ${supplier}`),
 
 	/** Stock: waste logged */
-	wastLogged: (itemName: string, qty: number, unit: string, reason: string) =>
+	wasteLogged: (itemName: string, qty: number, unit: string, reason: string) =>
 		writeLog('stock', `Waste: ${qty}${unit} ${itemName} — ${reason}`),
 
 	/** Stock: count submitted */
@@ -160,15 +160,69 @@ export const log = {
 
 	cashDrawerOpened: (reason: string, requestedBy: string) =>
 		writeLog('admin', `Cash drawer opened manually (${reason}) — by ${requestedBy}`),
+
+	// ─── Manager PIN ─────────────────────────────────────────────────────
+
+	managerPinVerified: (action: string) =>
+		writeLog('admin', `Manager PIN verified for: ${action}`),
+
+	// ─── Pending Payment ─────────────────────────────────────────────────
+
+	paymentHeld: (tableLabel: string) =>
+		writeLog('payment', `Payment held — awaiting confirmation: ${tableLabel}`),
+
+	paymentConfirmed: (tableLabel: string, total: number, method: string) =>
+		writeLog('payment', `Held payment confirmed: ${tableLabel} — ₱${total.toFixed(2)} (${method})`),
+
+	paymentCancelled: (tableLabel: string) =>
+		writeLog('payment', `Payment hold cancelled: ${tableLabel}`),
+
+	// ─── Table Maintenance ───────────────────────────────────────────────
+
+	tableMaintenanceToggled: (tableLabel: string, isMaintenance: boolean) =>
+		writeLog('admin', `Table ${tableLabel} ${isMaintenance ? 'set to maintenance (out of order)' : 'returned to service'}`),
+
+	// ─── X-Read ──────────────────────────────────────────────────────────
+
+	xReadGenerated: () =>
+		writeLog('admin', 'X-Read mid-shift report generated'),
+
+	// ─── KDS Recall ──────────────────────────────────────────────────────
+
+	kdsTicketRecalled: (tableNumber: number | null) =>
+		writeLog('order', `KDS ticket recalled for ${tableNumber !== null ? `T${tableNumber}` : 'Takeout'}`),
+
+	// ─── Pax Change ──────────────────────────────────────────────────────
+
+	paxChanged: (tableLabel: string, oldPax: number, newPax: number) =>
+		writeLog('order', `Pax changed on ${tableLabel}: ${oldPax} → ${newPax}`),
+
+	// ─── Leftover Penalty ────────────────────────────────────────────────
+
+	leftoverPenaltyApplied: (tableLabel: string, weightGrams: number, penalty: number) =>
+		writeLog('order', `Leftover penalty: ${tableLabel} — ${weightGrams}g → ₱${penalty.toFixed(2)}`),
+
+	leftoverPenaltyWaived: (tableLabel: string) =>
+		writeLog('order', `Leftover penalty waived: ${tableLabel}`),
+
+	// ─── Kitchen Refusal ─────────────────────────────────────────────────
+
+	kitchenRefusal: (itemName: string, tableNumber: number | null, reason: string) =>
+		writeLog('order', `Kitchen refused: ${itemName} for ${tableNumber !== null ? `T${tableNumber}` : 'Takeout'} — ${reason}`),
+
+	// ─── Yield Tracking ──────────────────────────────────────────────────
+
+	yieldRecorded: (itemName: string, rawWeight: number, cleanedWeight: number, yieldPct: number) =>
+		writeLog('stock', `Yield: ${itemName} — ${rawWeight}g raw → ${cleanedWeight}g cleaned (${yieldPct.toFixed(1)}%)`),
 };
 
 // ─── Seed Helpers ─────────────────────────────────────────────────────────────
 
 function ts(minutesAgo: number): string {
-	return new Date(Date.now() + minutesAgo * 60 * 1000).toISOString();
+	return new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
 }
 
 function fmt(minutesAgo: number): string {
-	return new Date(Date.now() + minutesAgo * 60 * 1000)
+	return new Date(Date.now() - minutesAgo * 60 * 1000)
 		.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
 }
