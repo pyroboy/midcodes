@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { unacknowledgedAlerts, acknowledgeAlert } from '$lib/stores/alert.svelte';
+	import { getUnacknowledgedAlerts, acknowledgeAlert } from '$lib/stores/alert.svelte';
+	let unacknowledgedAlerts = $derived(getUnacknowledgedAlerts());
 
 	function formatTime(iso: string) {
 		return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });

@@ -201,15 +201,15 @@
 			
 			{#if activeTable}
 				<div class="flex flex-col gap-4">
-					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-gray-500 uppercase">Label</label>
+					<label class="flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-gray-500 uppercase">Label</span>
 						<input type="text" bind:value={editLabel} class="pos-input" />
-					</div>
+					</label>
 					
-					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-gray-500 uppercase">Capacity (Pax)</label>
+					<label class="flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-gray-500 uppercase">Capacity (Pax)</span>
 						<input type="number" bind:value={editCapacity} class="pos-input" min="1" max="20" />
-					</div>
+					</label>
 
 					<div class="flex gap-2 pt-2">
 						<button onclick={saveProperties} class="btn-secondary flex-1">Apply</button>

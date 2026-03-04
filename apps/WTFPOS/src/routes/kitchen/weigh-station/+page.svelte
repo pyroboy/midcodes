@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { kdsTickets } from '$lib/stores/pos.svelte';
 	import { cn } from '$lib/utils';
+	import YieldCalculatorModal from '$lib/components/kitchen/YieldCalculatorModal.svelte';
 
 	// Pending meat orders across all tickets
 	const pendingMeatOrders = $derived(
@@ -22,6 +23,7 @@
 	let selectedOrder = $state<typeof pendingMeatOrders[number] | null>(null);
 	let weightInput = $state('');
 	let dispatched = $state<{ table: number | null; name: string; weight: number; time: string }[]>([]);
+	let showYieldCalc = $state(false);
 
 	// Shift totals
 	const totalDispatched = $derived(dispatched.reduce((s, d) => s + d.weight, 0));
@@ -166,11 +168,14 @@
 
 	<!-- RIGHT: Dispatched log -->
 	<div class="w-72 shrink-0 border-l border-gray-700 flex flex-col">
-		<div class="px-5 py-4 border-b border-gray-700">
-			<h2 class="text-lg font-extrabold tracking-tight">📦 DISPATCHED</h2>
-			<p class="text-xs text-gray-400 mt-0.5">
-				{dispatched.length} items · {(totalDispatched / 1000).toFixed(1)}kg total
-			</p>
+		<div class="px-5 py-4 border-b border-gray-700 flex justify-between items-center">
+			<div>
+				<h2 class="text-lg font-extrabold tracking-tight">📦 DISPATCHED</h2>
+				<p class="text-xs text-gray-400 mt-0.5">
+					{dispatched.length} items · {(totalDispatched / 1000).toFixed(1)}kg total
+				</p>
+			</div>
+			<button onclick={() => showYieldCalc = true} class="rounded-lg bg-gray-800 px-3 py-2 text-xs font-bold text-accent border border-gray-600 hover:bg-gray-700 hover:text-orange-400 transition-colors">Yield %</button>
 		</div>
 
 		<div class="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5">
@@ -199,3 +204,5 @@
 		</div>
 	</div>
 </div>
+
+<YieldCalculatorModal isOpen={showYieldCalc} onClose={() => showYieldCalc = false} />

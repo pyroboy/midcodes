@@ -54,8 +54,10 @@
 									{/if}
 									{#if order.status === 'cancelled'}
 										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
-									{:else}
+									{:else if order.status === 'paid'}
 										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">PAID</span>
+									{:else}
+										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-600 border border-orange-200">UNPAID</span>
 									{/if}
 								</div>
 								<div class="flex items-center gap-2 text-xs text-gray-400">
@@ -77,7 +79,7 @@
 								)}>
 									{formatPeso(order.total)}
 								</span>
-								{#if order.status === 'paid'}
+								{#if order.status !== 'cancelled'}
 									<button
 										onclick={() => onViewOrder(order)}
 										class="text-xs font-semibold text-accent hover:underline"
@@ -85,7 +87,7 @@
 									>
 										View
 									</button>
-									{/if}
+								{/if}
 							</div>
 						</div>
 					{/each}
@@ -95,9 +97,11 @@
 			<!-- Summary footer -->
 			{#if orders.length > 0}
 				{@const paidOrders = orders.filter(o => o.status === 'paid')}
+				{@const voidedOrders = orders.filter(o => o.status === 'cancelled')}
+				{@const unpaidOrders = orders.filter(o => o.status !== 'paid' && o.status !== 'cancelled')}
 				{@const totalSales = paidOrders.reduce((s, o) => s + o.total, 0)}
 				<div class="flex items-center justify-between border-t border-border px-6 py-3 bg-surface-secondary">
-					<span class="text-sm font-semibold text-gray-600">{paidOrders.length} paid · {orders.length - paidOrders.length} voided</span>
+					<span class="text-sm font-semibold text-gray-600">{paidOrders.length} paid · {unpaidOrders.length} unpaid · {voidedOrders.length} voided</span>
 					<div class="flex items-center gap-2">
 						<span class="text-xs text-gray-500">Total Sales</span>
 						<span class="font-mono text-lg font-extrabold text-gray-900">{formatPeso(totalSales)}</span>

@@ -75,10 +75,14 @@
     let receiptChange = $state(0);
     let receiptMethod = $state('');
 
-    // ─── Closed Orders for History ────────────────────────────────────────────
+    // ─── Closed/Orphaned Orders for History ──────────────────────────────────
     const closedOrders = $derived(
-        orders.filter(o => o.status === 'paid' || o.status === 'cancelled')
-            .sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
+        orders.filter(o => 
+            o.status === 'paid' || 
+            o.status === 'cancelled' ||
+            (o.orderType === 'takeout' && o.takeoutStatus === 'picked_up') ||
+            (o.orderType === 'dine-in' && !tables.some(t => t.currentOrderId === o.id))
+        ).sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
     );
 
     // ─── Handlers ─────────────────────────────────────────────────────────────
@@ -330,11 +334,18 @@
     tables={allTables}
     onClose={() => showHistory = false}
     onViewOrder={(order) => {
-        receiptOrder = order;
-        const cashPayment = order.payments.find(p => p.method === 'cash');
-        receiptChange = cashPayment ? cashPayment.amount - order.total : 0;
-        receiptMethod = order.payments[0]?.method === 'cash' ? 'Cash' : order.payments[0]?.method === 'gcash' ? 'GCash' : 'Card';
-        showReceipt = true;
+        if (order.status === 'paid') {
+            receiptOrder = order;
+            const cashPayment = order.payments.find(p => p.method === 'cash');
+            receiptChange = cashPayment ? cashPayment.amount - order.total : 0;
+            receiptMethod = order.payments[0]?.method === 'cash' ? 'Cash' : order.payments[0]?.method === 'gcash' ? 'GCash' : 'Card';
+            showReceipt = true;
+        } else {
+            // If it's unpaid (orphaned), load it into the sidebar for checkout
+            selectedTakeoutId = order.id; // Using takeout ID works even for orphaned dine-ins to force it into sidebar
+            selectedTableId = null;
+            showHistory = false;
+        }
     }}
 />
 

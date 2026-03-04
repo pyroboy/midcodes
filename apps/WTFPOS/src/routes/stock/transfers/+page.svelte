@@ -90,25 +90,25 @@
 					<h3 class="font-bold text-gray-900">Select Item to Transfer</h3>
 				</div>
 
-				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Source Item (From {sourceLocationId.toUpperCase()})</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Source Item (From {sourceLocationId.toUpperCase()})</span>
 					<select bind:value={formStockMenuItemId} class="pos-input">
-						<option value="" disabled selected>-- Select an item --</option>
+						<option value="" disabled>Select an item to transfer...</option>
 						{#each sourceItems as item}
 							<option value={item.menuItemId}>{item.name} ({item.category})</option>
 						{/each}
 					</select>
-				</div>
+				</label>
 				
 				<div class="grid grid-cols-[1fr_auto] gap-4">
-					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Transfer Quantity</label>
+					<label class="flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Transfer Quantity</span>
 						<input type="number" bind:value={formQty} class="pos-input font-mono" min="0" step="0.1" placeholder="0.0" />
-					</div>
-					<div class="flex flex-col gap-1.5 w-24">
-						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</label>
+					</label>
+					<label class="flex flex-col gap-1.5 w-24">
+						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</span>
 						<input type="text" class="pos-input bg-gray-50 font-mono text-center text-gray-500" value={selectedSourceItem?.unit ?? '-'} disabled />
-					</div>
+					</label>
 				</div>
 			</div>
 
@@ -120,7 +120,7 @@
 				</div>
 
 				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Destination Branch</label>
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Destination Branch</span>
 					<div class="flex flex-col gap-2">
 						{#each destinationLocations as loc}
 							<label class={cn(
@@ -140,10 +140,10 @@
 		</div>
 
 		<div class="border-t border-border pt-6 mt-2 flex flex-col md:flex-row items-end gap-6 w-full">
-			<div class="flex-1 flex flex-col gap-1.5 w-full">
-				<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Transfer Reason / Notes</label>
+			<label class="flex-1 flex flex-col gap-1.5 w-full">
+				<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Transfer Reason / Notes</span>
 				<input type="text" bind:value={formNotes} class="pos-input" placeholder="e.g. Weekly replenishment run" />
-			</div>
+			</label>
 			
 			<button 
 				onclick={handleTransfer} 

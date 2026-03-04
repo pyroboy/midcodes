@@ -195,46 +195,47 @@
 			</div>
 
 			<div class="flex flex-col gap-4">
-				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item</span>
 					<select bind:value={formStockItemId} class="pos-input">
-						{#each activeItems as s}
-							<option value={s.id}>{s.name} ({s.category})</option>
+						<option value="" disabled>Select an item...</option>
+						{#each activeItems as item}
+							<option value={item.id}>{item.name} ({item.unit})</option>
 						{/each}
 					</select>
-				</div>
+				</label>
 
 				<div class="flex gap-4">
-					<div class="flex-1 flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</label>
+					<label class="flex-1 flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</span>
 						<input type="number" bind:value={formQty} class="pos-input font-mono" min="0" step="0.1" />
-					</div>
-					<div class="flex-1 flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</label>
+					</label>
+					<label class="flex-1 flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</span>
 						<input type="text" class="pos-input bg-gray-50" value={activeItems.find(s => s.id === formStockItemId)?.unit ?? ''} disabled />
-					</div>
+					</label>
 				</div>
 				
 				<div class="flex gap-4 border-t border-border pt-4">
-					<div class="flex-1 flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-accent uppercase tracking-wider">Batch No (Optional)</label>
+					<label class="flex-1 flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-accent uppercase tracking-wider">Batch No (Optional)</span>
 						<input type="text" bind:value={formBatchNo} class="pos-input font-mono" placeholder="e.g. B-2024-05" />
-					</div>
-					<div class="flex-1 flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-status-red uppercase tracking-wider">Expiry (Optional)</label>
+					</label>
+					<label class="flex-1 flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-status-red uppercase tracking-wider">Expiry (Optional)</span>
 						<input type="date" bind:value={formExpiryDate} class="pos-input" />
-					</div>
+					</label>
 				</div>
 
-				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</span>
 					<input type="text" bind:value={formSupplier} class="pos-input" placeholder="e.g. Monterey Meats" />
-				</div>
+				</label>
 
-				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Notes</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Notes</span>
 					<input type="text" bind:value={formNotes} class="pos-input" placeholder="Optional notes" />
-				</div>
+				</label>
 			</div>
 
 			<div class="flex gap-3 mt-2">

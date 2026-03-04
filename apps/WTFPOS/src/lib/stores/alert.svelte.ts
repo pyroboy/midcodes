@@ -19,7 +19,9 @@ export interface KitchenAlert {
 
 export const alerts = $state<KitchenAlert[]>([]);
 
-export const unacknowledgedAlerts = $derived(alerts.filter(a => !a.acknowledgedBy));
+export function getUnacknowledgedAlerts() {
+	return alerts.filter(a => !a.acknowledgedBy);
+}
 
 export function refuseItem(orderId: string, tableNumber: number | null, itemName: string, reason: string) {
 	alerts.unshift({

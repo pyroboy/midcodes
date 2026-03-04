@@ -36,34 +36,34 @@
         <form onsubmit={handleSubmit} class="flex flex-col gap-4 rounded-xl border border-border bg-white p-5 shadow-sm h-fit">
             <h2 class="font-bold text-gray-900">Record Expense</h2>
             
-            <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Category</label>
+            <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Category</span>
                 <select bind:value={category} class="pos-input">
                     {#each expenseCategories as cat}
                         <option value={cat}>{cat}</option>
                     {/each}
                 </select>
-            </div>
+            </label>
 
-            <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Amount (₱)</label>
+            <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Amount (₱)</span>
                 <input type="number" step="0.01" min="0" bind:value={amount} required class="pos-input text-lg font-mono font-bold text-status-red" placeholder="0.00" />
-            </div>
+            </label>
 
-            <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Description</label>
+            <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Description</span>
                 <input type="text" bind:value={description} required class="pos-input" placeholder="e.g., Unbox wet wipes" />
-            </div>
+            </label>
 
-            <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Paid By</label>
+            <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Paid By</span>
                 <select bind:value={paidBy} class="pos-input">
                     <option value="Petty Cash">Petty Cash</option>
                     <option value="Cash from Register">Cash from Register</option>
                     <option value="Company Card">Company Card</option>
                     <option value="Owner's Pocket">Owner's Pocket</option>
                 </select>
-            </div>
+            </label>
 
             <button type="submit" class="btn-primary mt-2 flex items-center justify-center gap-2">
                 <span>➕</span> Record Expense

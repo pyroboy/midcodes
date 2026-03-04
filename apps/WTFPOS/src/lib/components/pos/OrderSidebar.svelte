@@ -105,13 +105,13 @@
                             {tStatus.toUpperCase()}
                         </span>
                     </div>
-                    {#if tStatus !== 'picked_up'}
+                    {#if tStatus === 'ready'}
                         <button
                             onclick={() => advanceTakeoutStatus(order.id)}
                             class="text-[10px] font-semibold text-accent hover:underline"
                             style="min-height: unset"
                         >
-                            → {tStatus === 'new' ? 'Start Prep' : tStatus === 'preparing' ? 'Mark Ready' : 'Picked Up'}
+                            → Mark Picked Up
                         </button>
                     {/if}
                 </div>

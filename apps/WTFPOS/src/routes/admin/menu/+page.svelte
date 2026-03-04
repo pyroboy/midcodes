@@ -200,6 +200,7 @@
 					<td class="px-5 py-3 text-center">
 						<button
 							onclick={() => toggleMenuItemAvailability(item.id)}
+							aria-label="Toggle availability"
 							class={cn(
 								'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
 								item.available ? 'bg-status-green' : 'bg-gray-300'
@@ -263,37 +264,37 @@
 
 			<div class="flex flex-col gap-4">
 				<!-- Name -->
-				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Name</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Name</span>
 					<input type="text" bind:value={formName} class="pos-input" placeholder="e.g. Samgyupsal, Soju, etc." />
-				</div>
+				</label>
 
 				<!-- Category -->
-				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</span>
 					<select bind:value={formCategory} class="pos-input">
-						<option value="packages">🎫 Packages</option>
-						<option value="meats">🥩 Meats</option>
-						<option value="sides">🥬 Sides</option>
-						<option value="dishes">🍜 Dishes</option>
-						<option value="drinks">🥤 Drinks</option>
+						<option value="meats">Meats</option>
+						<option value="sides">Sides</option>
+						<option value="drinks">Drinks</option>
+						<option value="packages">Packages</option>
+						<option value="misc">Miscellaneous</option>
 					</select>
-				</div>
+				</label>
 
 				<!-- Price row -->
 				<div class="grid grid-cols-2 gap-4">
-					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+					<label class="flex flex-col gap-1.5">
+						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
 							{formIsWeightBased ? 'Base Price (₱)' : 'Price (₱)'}
-						</label>
+						</span>
 						<input type="number" bind:value={formPrice} class="pos-input font-mono" min="0" step="1" />
-					</div>
+					</label>
 
 					{#if formIsWeightBased}
-						<div class="flex flex-col gap-1.5">
-							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Price Per Gram (₱)</label>
+						<label class="flex flex-col gap-1.5">
+							<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Price Per Gram (₱)</span>
 							<input type="number" bind:value={formPricePerGram} class="pos-input font-mono" min="0" step="0.01" />
-						</div>
+						</label>
 					{/if}
 				</div>
 
@@ -314,10 +315,10 @@
 				</div>
 
 				<!-- Description -->
-				<div class="flex flex-col gap-1.5">
-					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description (optional)</label>
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description (optional)</span>
 					<input type="text" bind:value={formDesc} class="pos-input" placeholder="Short description" />
-				</div>
+				</label>
 
 				<!-- Package-specific fields -->
 				{#if formCategory === 'packages'}
@@ -325,14 +326,14 @@
 						<span class="text-xs font-bold text-accent uppercase tracking-wider">Package Configuration</span>
 
 						<!-- Perks -->
-						<div class="flex flex-col gap-1.5">
-							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Perks Text</label>
+						<label class="flex flex-col gap-1.5">
+							<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Perks Text</span>
 							<input type="text" bind:value={formPerks} class="pos-input" placeholder="e.g. 4 sides, 200g initial meats" />
-						</div>
+						</label>
 
 						<!-- Included Meats -->
 						<div class="flex flex-col gap-1.5">
-							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Included Meats</label>
+							<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Included Meats</span>
 							<div class="flex flex-wrap gap-2">
 								{#each meatItems as meat}
 									<button
@@ -353,7 +354,7 @@
 
 						<!-- Auto Sides -->
 						<div class="flex flex-col gap-1.5">
-							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Auto-included Sides</label>
+							<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Auto-included Sides</span>
 							<div class="flex flex-wrap gap-2">
 								{#each sideItems as side}
 									<button
