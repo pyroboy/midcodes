@@ -232,18 +232,3 @@ Module 4: Administration & System Logs
 
 
 
-## 6. Project Timeline
-
-* 
-**Duration:** Maximum of six (6) weeks from signing.
-
-
-* 
-**Phases:** 1. Foundation & Design 
-2. Prototype (Core POS, table map, KDS, basic payments) 
-3. POS Completion + Inventory & Expenses (Modules 1, 2, 3) 
-4. Analytics Dashboard (Module 4) 
-5. Integration & Hardening (Stress testing sync and networking) 
-6. Final Testing & Handover (Staff training, simulation) 
-
-

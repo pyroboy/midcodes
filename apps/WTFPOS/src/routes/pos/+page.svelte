@@ -202,7 +202,7 @@
                 barcodeBuffer += e.key;
             }
             clearTimeout(barcodeTimeout);
-            barcodeTimeout = setTimeout(() => { barcodeBuffer = ''; }, 100);
+            barcodeTimeout = setTimeout(() => { barcodeBuffer = ''; }, 300);
         }
     }
 </script>

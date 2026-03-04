@@ -32,7 +32,9 @@
     const cashChange = $derived(cashTendered - order.total);
     const hasItems = $derived(order.items.filter(i => i.status !== 'cancelled').length > 0);
     const canConfirmCheckout = $derived(
-        hasItems && (checkoutMethod !== 'cash' || cashTendered >= order.total)
+        hasItems && (checkoutMethod !== 'cash' || cashTendered >= order.total) &&
+        (!(order.discountType === 'senior' || order.discountType === 'pwd') ||
+         (order.discountIds && order.discountIds.length === order.discountPax && order.discountIds.every(id => id.trim() !== '')))
     );
 
     function selectCashPreset(amount: number) {
@@ -44,12 +46,19 @@
     }
 
     function applyScPwdPax(newPax: number) {
+        console.log(`[CHECKOUT-DISCOUNT] Applying SC/PWD pax: ${newPax}, order.pax=${order.pax}`);
+        // BUG: Validation allows discountPax > order.pax in some edge cases
+        if (newPax > order.pax) {
+            console.warn(`[CHECKOUT-DISCOUNT] WARNING: discountPax (${newPax}) > order.pax (${order.pax})`);
+            newPax = order.pax;
+        }
         discountPaxInput = Math.max(1, Math.min(newPax, order.pax));
         discountIdsInput = Array.from({ length: discountPaxInput }, (_, i) => discountIdsInput[i] ?? '');
         order.discountPax = discountPaxInput;
         order.discountIds = [...discountIdsInput];
         recalcOrder(order);
         if (table) table.billTotal = order.total;
+        console.log(`[CHECKOUT-DISCOUNT] New discountAmount: ${order.discountAmount}`);
     }
 
     function syncDiscountIds() {

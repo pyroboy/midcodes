@@ -4,7 +4,7 @@
  */
 import type { Table, Order, MenuItem, KdsTicket, TableZone, TableStatus, TakeoutStatus, SplitType, SubBill, PaymentMethod } from '$lib/types';
 import { nanoid } from 'nanoid';
-import { deductFromStock } from '$lib/stores/stock.svelte';
+import { deductFromStock, restoreStock } from '$lib/stores/stock.svelte';
 import { log } from '$lib/stores/audit.svelte';
 import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 
@@ -36,13 +36,15 @@ function makeTables(): Table[] {
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 
 export const menuItems = $state<MenuItem[]>([
-	{ id: 'pkg-pork',    name: '🐷 Unli Pork',         category: 'packages', price: 499,  isWeightBased: false, available: true, desc: 'All-you-can-eat pork grill',    perks: '4 sides, 200g initial meats', meats: ['meat-samgyup', 'meat-chadol'], autoSides: ['side-kimchi', 'side-rice'] },
-	{ id: 'pkg-beef',    name: '🐄 Unli Beef',         category: 'packages', price: 699,  isWeightBased: false, available: true, desc: 'All-you-can-eat beef grill',    perks: '5 sides, 250g initial meats', meats: ['meat-galbi', 'meat-beef'], autoSides: ['side-kimchi', 'side-rice'] },
-	{ id: 'pkg-combo',   name: '🔥 Unli Pork & Beef',  category: 'packages', price: 899,  isWeightBased: false, available: true, desc: 'Premium pork + beef combo',    perks: '6 sides, 300g initial meats', meats: ['meat-samgyup', 'meat-chadol', 'meat-galbi', 'meat-beef'], autoSides: ['side-kimchi', 'side-rice'] },
-	{ id: 'meat-samgyup',name: 'Samgyupsal',            category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.65 },
-	{ id: 'meat-chadol', name: 'Chadolbaegi',           category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.75 },
-	{ id: 'meat-galbi',  name: 'Galbi',                 category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.90 },
-	{ id: 'meat-beef',   name: 'US Beef Belly',         category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 1.20 },
+	{ id: 'pkg-pork',    name: '🐷 Unli Pork',         category: 'packages', price: 499,  isWeightBased: false, available: true, desc: 'All-you-can-eat pork grill',    perks: '4 sides, 200g initial meats', meats: ['meat-samgyup', 'meat-chadol', 'meat-pork-sliced'], autoSides: ['side-kimchi', 'side-rice'] },
+	{ id: 'pkg-beef',    name: '🐄 Unli Beef',         category: 'packages', price: 699,  isWeightBased: false, available: true, desc: 'All-you-can-eat beef grill',    perks: '5 sides, 250g initial meats', meats: ['meat-galbi', 'meat-beef', 'meat-beef-sliced'], autoSides: ['side-kimchi', 'side-rice'] },
+	{ id: 'pkg-combo',   name: '🔥 Unli Pork & Beef',  category: 'packages', price: 899,  isWeightBased: false, available: true, desc: 'Premium pork + beef combo',    perks: '6 sides, 300g initial meats', meats: ['meat-samgyup', 'meat-chadol', 'meat-pork-sliced', 'meat-galbi', 'meat-beef', 'meat-beef-sliced'], autoSides: ['side-kimchi', 'side-rice'] },
+	{ id: 'meat-samgyup',     name: 'Samgyupsal',          category: 'meats', protein: 'pork', price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.65 },
+	{ id: 'meat-chadol',      name: 'Chadolbaegi',         category: 'meats', protein: 'pork', price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.75 },
+	{ id: 'meat-pork-sliced', name: 'Pork Sliced',         category: 'meats', protein: 'pork', price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.70 },
+	{ id: 'meat-galbi',       name: 'Galbi',               category: 'meats', protein: 'beef', price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.90 },
+	{ id: 'meat-beef',        name: 'US Beef Belly',       category: 'meats', protein: 'beef', price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 1.20 },
+	{ id: 'meat-beef-sliced', name: 'Beef Sliced',         category: 'meats', protein: 'beef', price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 1.10 },
 	{ id: 'side-kimchi', name: 'Kimchi',                category: 'sides',    price: 0,    isWeightBased: false, available: true, isFree: true },
 	{ id: 'side-japchae',name: 'Japchae',               category: 'sides',    price: 120,  isWeightBased: false, available: true },
 	{ id: 'side-rice',   name: 'Steamed Rice',          category: 'sides',    price: 35,   isWeightBased: false, available: true },
@@ -184,9 +186,13 @@ export function tickTimers() {
 		// billing = waiting for payment, should not revert to occupied/warning
 		const lockedStatuses: TableStatus[] = ['billing', 'maintenance'];
 		if (!lockedStatuses.includes(table.status)) {
+			const oldStatus = table.status;
 			if (table.elapsedSeconds >= SESSION_SECONDS - (5 * 60)) table.status = 'critical';
 			else if (table.elapsedSeconds >= SESSION_SECONDS - (15 * 60)) table.status = 'warning';
 			else table.status = 'occupied';
+			if (oldStatus !== table.status) {
+				console.log(`[TIMER] Table ${table.label}: ${oldStatus} -> ${table.status} (${table.elapsedSeconds}s elapsed)`);
+			}
 		}
 	}
 }
@@ -307,8 +313,12 @@ export function recalcOrder(order: Order) {
 		const qualifyingPax = order.discountPax ?? order.pax;
 		const totalPax = order.pax > 0 ? order.pax : 1;
 		disc = Math.round(sub * (qualifyingPax / totalPax) * 0.2);
+		console.log(`[RECALC] SC/PWD discount: qualifyingPax=${qualifyingPax}, totalPax=${totalPax}, disc=${disc}`);
 	}
-	else if (order.discountType === 'comp' || order.discountType === 'service_recovery' || order.discountType === 'promo') disc = sub;
+	else if (order.discountType === 'comp' || order.discountType === 'service_recovery' || order.discountType === 'promo') {
+		disc = sub;
+		console.log(`[RECALC] Full write-off discount: ${disc}`);
+	}
 
 	const net  = sub - disc;
 	// PH law (RA 9994 / RA 7277): SC/PWD discount is applied on the VAT-exclusive price;
@@ -319,20 +329,36 @@ export function recalcOrder(order: Order) {
 		: Math.round(net - net / 1.12);            // Normal/Promos/Comp: VAT already embedded in price
 
 	order.subtotal = sub; order.discountAmount = disc; order.vatAmount = vat; order.total = net;
+	console.log(`[RECALC] subtotal=${sub}, discount=${disc}, vat=${vat}, total=${net}`);
 }
 
 export function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'write_off') {
+	console.log(`[VOID-ORDER] Starting void for order=${orderId.slice(-6)}, reason=${reason}`);
 	const order = orders.find(o => o.id === orderId);
-	if (!order || order.status === 'paid' || order.status === 'cancelled') return;
+	if (!order || order.status === 'paid' || order.status === 'cancelled') {
+		console.warn(`[VOID-ORDER] ABORTED: Order not found or already closed (status=${order?.status})`);
+		return;
+	}
+	
+	// BUG: Stock is NOT being restored here!
+	console.log(`[VOID-ORDER] Order has ${order.items.length} items, checking stock restoration needs...`);
+	for (const item of order.items) {
+		if (item.status !== 'cancelled') {
+			console.log(`[VOID-ORDER] Item ${item.menuItemName} (qty=${item.quantity}, weight=${item.weight}) needs stock restoration`);
+			const restoreQty = item.weight ?? item.quantity;
+			if (restoreQty > 0) {
+				restoreStock(item.menuItemId, restoreQty, order.tableId ?? 'takeout', order.id);
+			}
+			item.status = 'cancelled';
+		}
+	}
+	
 	order.status = 'cancelled';
 	if (reason) order.cancelReason = reason;
 	order.closedAt = new Date().toISOString();
 	// Reset takeout status when voided
 	if (order.orderType === 'takeout') {
 		order.takeoutStatus = 'new';
-	}
-	for (const item of order.items) {
-		if (item.status !== 'cancelled') item.status = 'cancelled';
 	}
 	// Capture elapsed seconds before closeTable() clears it (Fix 3)
 	let capturedElapsed: number | null = null;
@@ -402,6 +428,17 @@ export function rejectOrderItem(orderId: string, itemId: string): boolean {
 	
 	// Mark as cancelled
 	item.status = 'cancelled';
+	
+	// Sync with KDS and restore stock
+	const ticket = kdsTickets.find(t => t.orderId === orderId);
+	if (ticket) {
+		const kdsItem = ticket.items.find(i => i.id === itemId);
+		if (kdsItem) kdsItem.status = 'cancelled';
+	}
+	const restoreQty = item.weight ?? item.quantity;
+	if (restoreQty > 0) {
+		restoreStock(item.menuItemId, restoreQty, order.tableId ?? 'takeout', order.id);
+	}
 	
 	// Recalculate order totals
 	recalcOrder(order);
@@ -742,11 +779,20 @@ export function changePackage(orderId: string, newPackageId: string): {
 // ─── Split Bill ──────────────────────────────────────────────────────────────
 
 export function initEqualSplit(orderId: string, splitCount: number): void {
+	console.log(`[SPLIT-BILL] initEqualSplit called: orderId=${orderId.slice(-6)}, splitCount=${splitCount}`);
 	const order = orders.find(o => o.id === orderId);
-	if (!order || order.total <= 0 || splitCount <= 0) return;
+	if (!order || order.total <= 0 || splitCount <= 0 || splitCount > 100 || order.total < splitCount) {
+		console.warn(`[SPLIT-BILL] ABORTED: order=${!!order}, total=${order?.total}, splitCount=${splitCount}`);
+		return;
+	}
+	// BUG: Division could have remainder issues with certain totals
+	if (order.total < splitCount) {
+		console.warn(`[SPLIT-BILL] WARNING: Total (${order.total}) < splitCount (${splitCount})`);
+	}
 
 	order.splitType = 'equal';
 	const perPerson = Math.floor(order.total / splitCount);
+	console.log(`[SPLIT-BILL] perPerson=${perPerson}, remainder will be on last guest`);
 	const remainder = order.total - perPerson * (splitCount - 1);
 
 	order.subBills = Array.from({ length: splitCount }, (_, i) => ({

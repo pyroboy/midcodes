@@ -1,18 +1,37 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { cn } from '$lib/utils';
-	import { session, LOCATIONS, ELEVATED_ROLES, ROLE_NAV_ACCESS } from '$lib/stores/session.svelte';
+	import { session, LOCATIONS, ELEVATED_ROLES, ROLE_NAV_ACCESS, getCurrentLocation } from '$lib/stores/session.svelte';
+	import type { LocationId } from '$lib/stores/session.svelte';
 	import HardwareStatus from '$lib/components/HardwareStatus.svelte';
 	import NoSaleModal from '$lib/components/NoSaleModal.svelte';
-	import { ScanBarcode } from 'lucide-svelte';
+	import { ScanBarcode, MapPin, ChevronDown } from 'lucide-svelte';
 
 	let isNoSaleOpen = $state(false);
+	let locationDropdownOpen = $state(false);
 
 	const canSeeLocations = $derived(!session.isLocked && ELEVATED_ROLES.includes(session.role));
 	const isWarehouse     = $derived(LOCATIONS.find(l => l.id === session.locationId)?.type === 'warehouse');
+	const currentLoc      = $derived(getCurrentLocation());
 
-	const retailLocations    = $derived(LOCATIONS.filter(l => l.type === 'retail'));
-	const warehouseLocations = $derived(LOCATIONS.filter(l => l.type === 'warehouse'));
+	const switchableLocations = $derived(
+		LOCATIONS.filter(l => l.id !== 'all' || ELEVATED_ROLES.includes(session.role))
+	);
+
+	/** Color scheme per location */
+	const LOCATION_COLORS: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+		'qc':    { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500',    border: 'border-blue-200' },
+		'mkti':  { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  border: 'border-violet-200' },
+		'wh-qc': { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500',   border: 'border-amber-200' },
+		'all':   { bg: 'bg-emerald-50',  text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
+	};
+
+	const locColors = $derived(LOCATION_COLORS[session.locationId] ?? LOCATION_COLORS['qc']);
+
+	function selectLocation(id: LocationId) {
+		session.locationId = id;
+		locationDropdownOpen = false;
+	}
 
 	const allNavLinks = [
 		{ href: '/pos',     label: 'POS',     icon: '💻' },
@@ -77,32 +96,63 @@
 
 	<!-- Right: location select + warehouse badge + role badge + user + logout -->
 	<div class="flex shrink-0 items-center gap-3">
-		{#if canSeeLocations}
-			<select
-				bind:value={session.locationId}
-				class="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-gray-700 outline-none focus:border-accent transition-all"
+		<!-- Location indicator -->
+		<div class="relative">
+			{#if canSeeLocations}
+				<button
+					onclick={() => { locationDropdownOpen = !locationDropdownOpen; }}
+					class={cn(
+						'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+						locColors.bg, locColors.text, locColors.border,
+						'hover:brightness-95'
+					)}
+					style="min-height:unset"
+				>
+					<MapPin class="w-3.5 h-3.5 flex-shrink-0" />
+					<span class="hidden sm:inline">{currentLoc?.name ?? 'Unknown'}</span>
+					<span class="sm:hidden">{session.locationId === 'wh-qc' ? 'WH' : session.locationId.toUpperCase()}</span>
+					<ChevronDown class="w-3 h-3 opacity-60" />
+				</button>
+			{:else}
+				<span class={cn(
+					'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold',
+					locColors.bg, locColors.text, locColors.border
+				)}
 				style="min-height:unset"
-			>
-				<optgroup label="Retail">
-					{#each retailLocations as loc}
-						<option value={loc.id}>{loc.name}</option>
-					{/each}
-				</optgroup>
-				{#if warehouseLocations.length > 0}
-					<optgroup label="Warehouse">
-						{#each warehouseLocations as loc}
-							<option value={loc.id}>{loc.name}</option>
-						{/each}
-					</optgroup>
-				{/if}
-			</select>
-		{/if}
+				>
+					<MapPin class="w-3.5 h-3.5 flex-shrink-0" />
+					<span class="hidden sm:inline">{currentLoc?.name ?? 'Unknown'}</span>
+					<span class="sm:hidden">{session.locationId === 'wh-qc' ? 'WH' : session.locationId.toUpperCase()}</span>
+				</span>
+			{/if}
 
-		{#if isWarehouse}
-			<span class="hidden sm:inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700">
-				📦 Warehouse
-			</span>
-		{/if}
+			{#if locationDropdownOpen}
+				<button
+					class="fixed inset-0 z-40"
+					onclick={() => { locationDropdownOpen = false; }}
+					aria-label="Close location picker"
+				></button>
+				<div class="absolute right-0 top-full z-50 mt-1.5 w-56 rounded-lg border border-border bg-white shadow-lg overflow-hidden">
+					{#each switchableLocations as loc}
+						{@const isActiveLoc = loc.id === session.locationId}
+						{@const lc = LOCATION_COLORS[loc.id] ?? LOCATION_COLORS['qc']}
+						<button
+							onclick={() => selectLocation(loc.id)}
+							class={cn(
+								'flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors',
+								isActiveLoc ? cn(lc.bg, 'font-semibold', lc.text) : 'text-gray-700 hover:bg-gray-50'
+							)}
+						>
+							<span class={cn('flex h-2 w-2 rounded-full flex-shrink-0', isActiveLoc ? lc.dot : 'bg-gray-300')}></span>
+							<span class="flex-1">{loc.name}</span>
+							{#if isActiveLoc}
+								<span class="text-[10px] font-bold uppercase tracking-wider opacity-60">Current</span>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
 
 		<span class={cn('hidden sm:inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase', roleClass)}>
 			{session.role}

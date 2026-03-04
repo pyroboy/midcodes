@@ -182,12 +182,25 @@
                             <button
                                 onclick={() => tapItem(item)}
                                 class={cn(
-                                    'flex flex-col gap-2.5 rounded-xl border p-5 text-left transition-all active:scale-[0.98]',
+                                    'relative flex flex-col gap-2.5 rounded-xl border p-5 text-left transition-all active:scale-[0.98]',
                                     pendingItems.some(p => p.item.id === item.id)
                                         ? 'border-accent bg-accent-light'
-                                        : 'border-border bg-surface-secondary hover:border-gray-300'
+                                        : 'border-border bg-surface-secondary hover:border-gray-300',
+                                    item.protein === 'beef' ? '!border-l-red-500 !border-l-4' : '',
+                                    item.protein === 'pork' ? '!border-l-orange-500 !border-l-4' : '',
+                                    item.protein === 'chicken' ? '!border-l-yellow-500 !border-l-4' : ''
                                 )}
                             >
+                                {#if item.protein}
+                                    <span class={cn(
+                                        "absolute top-3 right-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                                        item.protein === 'beef' ? 'bg-red-100 text-red-700' : '',
+                                        item.protein === 'pork' ? 'bg-orange-100 text-orange-700' : '',
+                                        item.protein === 'chicken' ? 'bg-yellow-100 text-yellow-700' : ''
+                                    )}>
+                                        {item.protein === 'beef' ? '🥩' : item.protein === 'pork' ? '🐷' : '🍗'} {item.protein}
+                                    </span>
+                                {/if}
                                 {#if item.category === 'packages'}
                                     <div class="flex items-center justify-between">
                                         <span class="text-base font-bold text-gray-900">{item.name}</span>

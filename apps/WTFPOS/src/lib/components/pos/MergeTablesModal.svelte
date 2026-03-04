@@ -52,7 +52,7 @@
 	);
 
 	// Check if tables have different packages
-	const packageConflict = $derived(() => {
+	const packageConflict = $derived.by(() => {
 		if (!primaryOrder?.packageId || !targetOrder?.packageId) return false;
 		return primaryOrder.packageId !== targetOrder.packageId;
 	});
@@ -62,8 +62,7 @@
 		mergeError = null;
 		
 		// Check for package conflict
-		const hasConflict = packageConflict();
-		if (hasConflict) {
+		if (packageConflict) {
 			step = 'confirm';
 		} else {
 			step = 'pin';

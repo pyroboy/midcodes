@@ -33,11 +33,13 @@ export interface Location {
 // ─── Menu ─────────────────────────────────────────────────────────────────────
 
 export type MenuCategory = 'packages' | 'meats' | 'sides' | 'dishes' | 'drinks';
+export type MeatProtein = 'beef' | 'pork' | 'chicken' | 'seafood' | 'other';
 
 export interface MenuItem {
 	id: string;
 	name: string;
 	category: MenuCategory;
+	protein?: MeatProtein;
 	price: number;
 	isWeightBased: boolean;
 	pricePerGram?: number;

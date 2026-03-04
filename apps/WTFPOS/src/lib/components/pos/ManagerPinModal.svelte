@@ -24,7 +24,7 @@
 	let pin = $state('');
 	let pinError = $state(false);
 
-	const MANAGER_PIN = '1234';
+	const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || '1234';
 
 	function handleNumber(num: string) {
 		pinError = false;

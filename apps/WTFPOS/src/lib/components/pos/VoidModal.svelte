@@ -13,7 +13,7 @@
 	let voidPinError = $state(false);
 	let voidReason = $state<'mistake' | 'walkout' | 'write_off'>('mistake');
 
-	const MANAGER_PIN = '1234';
+	const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || '1234';
 
 	function handleNumber(num: string) {
 		voidPinError = false;

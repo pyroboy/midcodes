@@ -1,21 +1,20 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
+	import { slide, fade } from 'svelte/transition';
 	import {
 		stockItems, getCurrentStock, getStockStatus,
 		adjustStock, setStock,
-		type StockStatus, type StockCategory, type StockItem,
-		type MeatAnimal, type MeatCutType
+		type StockStatus, type StockCategory, type StockItem
 	} from '$lib/stores/stock.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { LayoutGrid, List, Search, Plus, Minus, X, Pencil, MapPin } from 'lucide-svelte';
-
-	const locationStyle: Record<string, { badge: string; label: string }> = {
-		'qc':    { badge: 'bg-sky-50 text-sky-700 border border-sky-200',      label: 'Alta Cita' },
-		'mkti':  { badge: 'bg-teal-50 text-teal-700 border border-teal-200',   label: 'Alona'     },
-		'wh-qc': { badge: 'bg-amber-50 text-amber-700 border border-amber-200', label: 'Warehouse' },
-	};
-
-	const isAggregated = $derived(session.locationId === 'all');
+	
+	import StockHealthStrip from './StockHealthStrip.svelte';
+	import CategoryIcon from './CategoryIcon.svelte';
+	import StockLevelBar from './StockLevelBar.svelte';
+	import ProteinGroupHeader from './ProteinGroupHeader.svelte';
+	import ProteinDonutChart from './ProteinDonutChart.svelte';
+	import { proteinConfig, getProteinType, type MeatProtein } from '$lib/stores/stock.svelte';
 
 	const statusConfig: Record<StockStatus, { label: string; badgeClass: string; dotClass: string }> = {
 		ok:       { label: 'Well-Stocked', badgeClass: 'bg-status-green-light text-status-green border-status-green/20',    dotClass: 'bg-status-green' },
@@ -23,17 +22,23 @@
 		critical: { label: 'Critical',     badgeClass: 'bg-status-red-light text-status-red border-status-red/20',          dotClass: 'bg-status-red' },
 	};
 
-	const categoryStyle: Record<StockCategory, { badge: string; thumbBg: string; cardBg: string; emoji: string }> = {
-		Meats:  { badge: 'bg-orange-50 text-orange-700',   thumbBg: 'bg-orange-100',  cardBg: 'bg-gradient-to-br from-orange-100 to-orange-200/60', emoji: '🥩' },
-		Sides:  { badge: 'bg-blue-50 text-blue-600',       thumbBg: 'bg-blue-100',    cardBg: 'bg-gradient-to-br from-blue-100 to-blue-200/60',     emoji: '🥗' },
-		Dishes: { badge: 'bg-emerald-50 text-emerald-700', thumbBg: 'bg-emerald-100', cardBg: 'bg-gradient-to-br from-emerald-100 to-emerald-200/60',emoji: '🍲' },
-		Drinks: { badge: 'bg-purple-50 text-purple-600',   thumbBg: 'bg-purple-100',  cardBg: 'bg-gradient-to-br from-purple-100 to-purple-200/60',  emoji: '🍶' },
-	};
+
 
 	// ─── View / Search / Filter ────────────────────────────────────────────────
 	let viewMode     = $state<'grid' | 'list'>('list');
 	let searchQuery  = $state('');
-	let filterStatus = $state<StockStatus | 'all'>('all');
+	let filterStatus = $state<'all' | 'ok' | 'low' | 'critical'>('all');
+	
+	type SortColumn = 'name' | 'stock' | 'status';
+	let sortColumn = $state<SortColumn>('name');
+	let sortDesc   = $state(false);
+
+	// Reset filter when branch changes
+	$effect(() => {
+		session.locationId; // track dependency
+		filterStatus = 'all';
+		searchQuery  = '';
+	});
 
 	interface InventoryItem extends StockItem { currentStock: number; status: StockStatus }
 
@@ -47,39 +52,173 @@
 			} as InventoryItem))
 	);
 
-	const filtered = $derived(
-		items.filter(s => {
+	const filteredAndSorted = $derived(() => {
+		const filtered = items.filter(s => {
 			const matchStatus = filterStatus === 'all' || s.status === filterStatus;
 			const q = searchQuery.trim().toLowerCase();
 			const matchSearch = !q || s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
 			return matchStatus && matchSearch;
-		})
-	);
+		});
 
-	const criticalCount = $derived(items.filter(s => s.status === 'critical').length);
-	const lowCount      = $derived(items.filter(s => s.status === 'low').length);
+		return filtered.sort((a, b) => {
+			let cmp = 0;
+			if (sortColumn === 'name') cmp = a.name.localeCompare(b.name);
+			else if (sortColumn === 'stock') cmp = a.currentStock - b.currentStock;
+			else if (sortColumn === 'status') {
+				const map = { critical: 0, low: 1, ok: 2 };
+				cmp = map[a.status] - map[b.status];
+			}
+			return sortDesc ? -cmp : cmp;
+		});
+	});
+
+	interface ProteinGroup {
+		protein: MeatProtein;
+		items: InventoryItem[];
+		totalStock: number;
+		criticalCount: number;
+		lowCount: number;
+	}
+
+	const expandedGroups = $state<Record<string, boolean>>({
+		beef: true,
+		pork: true,
+		chicken: true,
+		other: true,
+	});
+
+	let hoveredItemId = $state<string | null>(null);
+
+	function toggleGroup(key: string) {
+		expandedGroups[key] = !expandedGroups[key];
+	}
+
+	function handleExpandAll() {
+		for (let key in expandedGroups) expandedGroups[key] = true;
+	}
+
+	function handleCollapseAll() {
+		for (let key in expandedGroups) expandedGroups[key] = false;
+	}
+
+	const gridGroups = $derived(() => {
+		const groups: Record<MeatProtein, ProteinGroup> = {
+			beef: { protein: 'beef', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+			pork: { protein: 'pork', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+			chicken: { protein: 'chicken', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+			other: { protein: 'other', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+		};
+		const nonMeatItems: InventoryItem[] = [];
+		
+		for (const item of filteredAndSorted()) {
+			if (item.category === 'Meats') {
+				const protein = item.proteinType || 'other';
+				groups[protein].items.push(item);
+				groups[protein].totalStock += item.currentStock;
+				if (item.status === 'critical') groups[protein].criticalCount++;
+				if (item.status === 'low') groups[protein].lowCount++;
+			} else {
+				nonMeatItems.push(item);
+			}
+		}
+		
+		return {
+			meatGroups: ['beef', 'pork', 'chicken', 'other']
+				.map(p => groups[p as MeatProtein])
+				.filter(g => g.items.length > 0),
+			nonMeatItems
+		};
+	});
+
+	// For list view, group by category, and subgroup Meats by protein
+	const listGroups = $derived(() => {
+		const categories: {
+			category: string;
+			items: InventoryItem[];
+			isMeat: boolean;
+			proteinGroups: ProteinGroup[];
+		}[] = [];
+		
+		const catMap = new Map<string, InventoryItem[]>();
+		for (const item of filteredAndSorted()) {
+			if (!catMap.has(item.category)) catMap.set(item.category, []);
+			catMap.get(item.category)!.push(item);
+		}
+		
+		for (const [category, items] of catMap) {
+			if (category === 'Meats') {
+				const pGroups: Record<MeatProtein, ProteinGroup> = {
+					beef: { protein: 'beef', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+					pork: { protein: 'pork', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+					chicken: { protein: 'chicken', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+					other: { protein: 'other', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
+				};
+				for (const item of items) {
+					const protein = item.proteinType || 'other';
+					pGroups[protein].items.push(item);
+					pGroups[protein].totalStock += item.currentStock;
+					if (item.status === 'critical') pGroups[protein].criticalCount++;
+					if (item.status === 'low') pGroups[protein].lowCount++;
+				}
+				categories.push({
+					category,
+					items: [],
+					isMeat: true,
+					proteinGroups: ['beef', 'pork', 'chicken', 'other']
+						.map(p => pGroups[p as MeatProtein])
+						.filter(g => g.items.length > 0)
+				});
+			} else {
+				categories.push({ category, items, isMeat: false, proteinGroups: [] });
+			}
+		}
+		
+		// Sort so Meats are always first, followed by other categories alphabetically.
+		return categories.sort((a, b) => {
+			if (a.isMeat) return -1;
+			if (b.isMeat) return 1;
+			return a.category.localeCompare(b.category);
+		});
+	});
+
+	function getProteinBorderClass(protein?: MeatProtein) {
+		if (protein === 'beef') return 'hover:border-red-300';
+		if (protein === 'pork') return 'hover:border-orange-300';
+		if (protein === 'chicken') return 'hover:border-yellow-300';
+		return 'hover:border-accent/30';
+	}
+
+	function getProteinStripeClass(protein?: MeatProtein) {
+		if (protein === 'beef') return 'bg-red-500';
+		if (protein === 'pork') return 'bg-orange-500';
+		if (protein === 'chicken') return 'bg-yellow-500';
+		return 'bg-transparent';
+	}
+
+	function toggleSort(col: SortColumn) {
+		if (sortColumn === col) sortDesc = !sortDesc;
+		else { sortColumn = col; sortDesc = false; }
+	}
+
+	// Constants are no longer needed here since StockLevelBar handles it
 
 	// ─── Modal ────────────────────────────────────────────────────────────────
 	let selectedItem = $state<InventoryItem | null>(null);
 	let modalAction  = $state<'add' | 'deduct' | 'set' | null>(null);
 	let adjustQty    = $state('');
 	let adjustReason = $state('');
-	let meatAnimal   = $state<MeatAnimal>('Pork');
-	let meatCut      = $state<MeatCutType>('Bone-Out');
 
 	function openItemModal(item: InventoryItem) {
 		selectedItem = item;
 		modalAction  = null;
 		adjustQty    = '';
 		adjustReason = '';
-		meatAnimal   = item.name.toLowerCase().includes('beef') ? 'Beef' : 'Pork';
-		meatCut      = 'Bone-Out';
 	}
 
 	function selectAction(action: 'add' | 'deduct' | 'set') {
-		modalAction = action;
-		// Pre-fill "Set" with current value so user edits from it
-		adjustQty   = action === 'set' ? String(selectedItem?.currentStock ?? 0) : '';
+		modalAction  = action;
+		adjustReason = '';
+		adjustQty    = action === 'set' ? String(selectedItem?.currentStock ?? 0) : '';
 	}
 
 	function closeModal() {
@@ -92,45 +231,33 @@
 		const qty = parseFloat(adjustQty);
 		if (isNaN(qty) || qty < 0) return;
 		if (modalAction !== 'set' && qty <= 0) return;
-
-		const isMeat = selectedItem.category === 'Meats';
-		const animal = isMeat ? meatAnimal : undefined;
-		const cut    = isMeat ? meatCut : undefined;
+		// Reason required for deduct and set (audit compliance)
+		if ((modalAction === 'deduct' || modalAction === 'set') && !adjustReason.trim()) return;
 
 		if (modalAction === 'set') {
-			setStock(selectedItem.id, selectedItem.name, qty, selectedItem.unit, adjustReason, animal, cut);
+			setStock(selectedItem.id, selectedItem.name, qty, selectedItem.unit, adjustReason);
 		} else {
-			adjustStock(selectedItem.id, selectedItem.name, modalAction, qty, selectedItem.unit, adjustReason, animal, cut);
+			adjustStock(selectedItem.id, selectedItem.name, modalAction, qty, selectedItem.unit, adjustReason);
 		}
 		closeModal();
 	}
 
+	const reasonRequired = $derived(modalAction === 'deduct' || modalAction === 'set');
 	const confirmDisabled = $derived(
 		!adjustQty ||
 		isNaN(parseFloat(adjustQty)) ||
 		parseFloat(adjustQty) < 0 ||
-		(modalAction !== 'set' && parseFloat(adjustQty) <= 0)
+		(modalAction !== 'set' && parseFloat(adjustQty) <= 0) ||
+		(reasonRequired && !adjustReason.trim())
 	);
 </script>
 
-<!-- ─── Summary Cards ─────────────────────────────────────────────────────── -->
-<div class="mb-5 grid grid-cols-3 gap-4">
-	<div class="rounded-xl border border-border bg-white p-4">
-		<p class="text-xs font-medium uppercase tracking-wide text-gray-400">Total Items</p>
-		<p class="mt-1 text-2xl font-bold text-gray-900">{items.length}</p>
-	</div>
-	<div class="rounded-xl border border-status-red/20 bg-status-red-light p-4">
-		<p class="text-xs font-medium uppercase tracking-wide text-status-red">Critical</p>
-		<p class="mt-1 text-2xl font-bold text-status-red">{criticalCount}</p>
-	</div>
-	<div class="rounded-xl border border-status-yellow/30 bg-status-yellow-light p-4">
-		<p class="text-xs font-medium uppercase tracking-wide text-status-yellow">Low Stock</p>
-		<p class="mt-1 text-2xl font-bold text-status-yellow">{lowCount}</p>
-	</div>
+<div class="mb-5">
+	<StockHealthStrip bind:activeFilter={filterStatus} onFilterClick={(s) => filterStatus = s} />
 </div>
 
 <!-- ─── Toolbar ───────────────────────────────────────────────────────────── -->
-<div class="mb-4 flex items-center gap-3">
+<div class="mb-4 flex flex-col md:flex-row md:items-center gap-3">
 	<!-- Search -->
 	<div class="relative flex-1">
 		<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -138,58 +265,41 @@
 			type="text"
 			bind:value={searchQuery}
 			placeholder="Search items or category…"
-			class="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+			class="w-full pl-9 pr-8 py-2.5 text-sm rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
 		/>
 		{#if searchQuery}
 			<button
 				onclick={() => (searchQuery = '')}
-				class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
-				style="min-height: unset"
+				class="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-700 transition-colors"
 			>
 				<X class="w-3.5 h-3.5" />
 			</button>
 		{/if}
 	</div>
 
-	<!-- Filter chips -->
-	<div class="flex items-center gap-1">
-		{#each (['all', 'ok', 'low', 'critical'] as const) as f}
-			<button
-				onclick={() => (filterStatus = f)}
-				class={cn(
-					'rounded-md px-3 py-1 text-xs font-semibold transition-colors',
-					filterStatus === f
-						? 'bg-accent text-white'
-						: 'border border-border bg-white text-gray-600 hover:bg-gray-50'
-				)}
-				style="min-height: unset"
-			>
-				{f === 'all' ? 'All' : f === 'ok' ? 'OK' : f === 'low' ? 'Low' : 'Critical'}
-			</button>
-		{/each}
+	<!-- Expand/Collapse all -->
+	<div class="flex items-center gap-2">
+		<button onclick={handleExpandAll} class="text-xs font-semibold px-3 py-2 bg-gray-50 border border-border text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+			Expand All
+		</button>
+		<button onclick={handleCollapseAll} class="text-xs font-semibold px-3 py-2 bg-gray-50 border border-border text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+			Collapse All
+		</button>
 	</div>
 
 	<!-- View toggle -->
 	<div class="flex items-center gap-0.5 rounded-lg border border-border bg-white p-1">
 		<button
 			onclick={() => (viewMode = 'list')}
-			class={cn(
-				'rounded p-1.5 transition-colors',
-				viewMode === 'list' ? 'bg-accent text-white' : 'text-gray-500 hover:bg-gray-100'
-			)}
+			class={cn('rounded p-2 transition-colors', viewMode === 'list' ? 'bg-accent text-white' : 'text-gray-500 hover:bg-gray-100')}
 			title="List view"
-			style="min-height: unset"
 		>
 			<List class="w-4 h-4" />
 		</button>
 		<button
 			onclick={() => (viewMode = 'grid')}
-			class={cn(
-				'rounded p-1.5 transition-colors',
-				viewMode === 'grid' ? 'bg-accent text-white' : 'text-gray-500 hover:bg-gray-100'
-			)}
+			class={cn('rounded p-2 transition-colors', viewMode === 'grid' ? 'bg-accent text-white' : 'text-gray-500 hover:bg-gray-100')}
 			title="Grid view"
-			style="min-height: unset"
 		>
 			<LayoutGrid class="w-4 h-4" />
 		</button>
@@ -198,64 +308,139 @@
 
 <!-- ─── Grid View ─────────────────────────────────────────────────────────── -->
 {#if viewMode === 'grid'}
-	{#if filtered.length === 0}
+	{#if filteredAndSorted().length === 0}
 		<div class="flex flex-col items-center justify-center py-20 text-gray-400">
 			<Search class="w-10 h-10 mb-3 opacity-25" />
 			<p class="font-medium text-gray-500">No items match your search</p>
 			<p class="text-sm mt-1">Try a different term or remove the filter</p>
 		</div>
 	{:else}
-		<div class="grid grid-cols-3 gap-4 pb-32">
-			{#each filtered as item (item.id)}
-				<button
-					onclick={() => openItemModal(item)}
-					class={cn(
-						'pos-card flex flex-col overflow-hidden text-left transition-all hover:shadow-md hover:border-accent/30 focus:outline-none focus:ring-2 focus:ring-accent/40',
-						item.status === 'critical' && 'ring-1 ring-status-red/30'
-					)}
-				>
-					<!-- Image placeholder -->
-					<div class={cn('flex h-28 items-center justify-center', categoryStyle[item.category].cardBg)}>
-						<span class="text-5xl select-none">{categoryStyle[item.category].emoji}</span>
-					</div>
-
-					<!-- Info -->
-					<div class="flex flex-col gap-1.5 p-3">
-						<div class="flex flex-wrap items-center gap-1">
-							<span class={cn('rounded-full px-2 py-0.5 text-xs font-medium', categoryStyle[item.category].badge)}>
-								{item.category}
-							</span>
-							{#if isAggregated && locationStyle[item.locationId]}
-								<span class={cn('flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', locationStyle[item.locationId].badge)}>
-									<MapPin class="w-2.5 h-2.5 flex-shrink-0" />
-									{locationStyle[item.locationId].label}
-								</span>
-							{/if}
+		<div class="flex flex-col gap-6">
+			{#each gridGroups().meatGroups as group}
+				<div class="flex flex-col gap-4">
+					<ProteinGroupHeader 
+						protein={group.protein} 
+						itemCount={group.items.length} 
+						criticalCount={group.criticalCount} 
+						lowCount={group.lowCount} 
+						expanded={expandedGroups[group.protein]} 
+						onToggle={() => toggleGroup(group.protein)}
+						chartData={group.items.map(i => ({ id: i.id, label: i.name, value: i.currentStock }))}
+						hoveredItemId={hoveredItemId}
+						onHover={(id: string | null) => hoveredItemId = id}
+					/>
+					
+					{#if expandedGroups[group.protein]}
+						<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" transition:slide={{ duration: 300 }}>
+							{#each group.items as item (item.id)}
+								<button
+									onclick={() => openItemModal(item)}
+									onmouseenter={() => hoveredItemId = item.id}
+									onmouseleave={() => hoveredItemId = null}
+									onfocus={() => hoveredItemId = item.id}
+									onblur={() => hoveredItemId = null}
+									class={cn(
+										'pos-card flex flex-col overflow-hidden text-left transition-all hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-accent/40 active:scale-[0.99]',
+										getProteinBorderClass(item.proteinType),
+										item.status === 'critical' ? 'ring-1 ring-status-red/30' : '',
+										hoveredItemId === item.id ? 'shadow-md -translate-y-0.5 ring-2 ring-accent/30' : ''
+									)}
+								>
+									<div class={cn("h-1 w-full relative overflow-hidden transition-all", getProteinStripeClass(item.proteinType))}>
+										{#if hoveredItemId === item.id}
+											<div class="absolute inset-0 bg-white/30 animate-pulse"></div>
+										{/if}
+									</div>
+									
+									<!-- Info -->
+									<div class="flex flex-col gap-2 p-4 pt-3" in:fade={{ duration: 200, delay: 100 }}>
+										<div class="flex flex-wrap items-center gap-2">
+											<CategoryIcon category={item.category} class="h-8 w-8" iconClass="w-4 h-4" />
+										</div>
+										
+										<p class="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 mt-2">{item.name}</p>
+										
+										<p class="font-mono text-xl font-bold text-gray-900 mt-1">
+											{item.currentStock.toLocaleString()}
+											<span class="text-xs font-normal text-gray-400">{item.unit}</span>
+										</p>
+										<!-- Stock gauge -->
+										<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} class="mt-1" />
+										
+										<div class="flex items-center gap-1.5 mt-1 text-xs">
+											<span class={cn('h-2 w-full flex-shrink-0 rounded-full w-2', statusConfig[item.status].dotClass)}></span>
+											<span class={cn(
+												'font-semibold',
+												item.status === 'ok' ? 'text-status-green' : item.status === 'low' ? 'text-status-yellow' : 'text-status-red'
+											)}>
+												{statusConfig[item.status].label}
+											</span>
+											<span class="text-gray-400 ml-auto">Min: {item.minLevel.toLocaleString()}</span>
+										</div>
+									</div>
+								</button>
+							{/each}
 						</div>
-						<p class="line-clamp-2 text-sm font-semibold leading-snug text-gray-900">{item.name}</p>
-						<p class="font-mono text-base font-bold text-gray-900">
-							{item.currentStock.toLocaleString()}
-							<span class="text-xs font-normal text-gray-400">{item.unit}</span>
-						</p>
-						<div class="flex items-center gap-1.5">
-							<span class={cn('h-2 w-2 flex-shrink-0 rounded-full', statusConfig[item.status].dotClass)}></span>
-							<span class={cn(
-								'text-xs font-semibold',
-								item.status === 'ok' ? 'text-status-green' : item.status === 'low' ? 'text-status-yellow' : 'text-status-red'
-							)}>
-								{statusConfig[item.status].label}
-							</span>
-						</div>
-					</div>
-				</button>
+					{/if}
+				</div>
 			{/each}
+
+			{#if gridGroups().nonMeatItems.length > 0}
+				<div class="flex flex-col gap-4">
+					{#if gridGroups().meatGroups.length > 0}
+						<div class="flex items-center gap-2 mt-2 mb-2">
+							<div class="h-px bg-border flex-1"></div>
+							<span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Other Items</span>
+							<div class="h-px bg-border flex-1"></div>
+						</div>
+					{/if}
+					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+						{#each gridGroups().nonMeatItems as item (item.id)}
+							<button
+								onclick={() => openItemModal(item)}
+								class={cn(
+									'pos-card flex flex-col overflow-hidden text-left transition-all hover:shadow-md hover:border-accent/30 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-accent/40 active:scale-[0.99]',
+									item.status === 'critical' && 'ring-1 ring-status-red/30'
+								)}
+							>
+								<!-- Info -->
+								<div class="flex flex-col gap-2 p-4 pt-4">
+									<div class="flex flex-wrap items-center gap-2">
+										<CategoryIcon category={item.category} class="h-8 w-8" iconClass="w-4 h-4" />
+									</div>
+									
+									<p class="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 mt-2">{item.name}</p>
+									
+									<p class="font-mono text-xl font-bold text-gray-900 mt-1">
+										{item.currentStock.toLocaleString()}
+										<span class="text-xs font-normal text-gray-400">{item.unit}</span>
+									</p>
+									<!-- Stock gauge -->
+									<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} class="mt-1" />
+									
+									<div class="flex items-center gap-1.5 mt-1 text-xs">
+										<span class={cn('h-2 w-full flex-shrink-0 rounded-full w-2', statusConfig[item.status].dotClass)}></span>
+										<span class={cn(
+											'font-semibold',
+											item.status === 'ok' ? 'text-status-green' : item.status === 'low' ? 'text-status-yellow' : 'text-status-red'
+										)}>
+											{statusConfig[item.status].label}
+										</span>
+										<span class="text-gray-400 ml-auto">Min: {item.minLevel.toLocaleString()}</span>
+									</div>
+								</div>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
 <!-- ─── List View ─────────────────────────────────────────────────────────── -->
 {:else}
-	<div class="overflow-hidden rounded-xl border border-border bg-white pb-32">
-		{#if filtered.length === 0}
+	<div class="overflow-hidden rounded-xl border border-border bg-white">
+		{#if filteredAndSorted().length === 0}
 			<div class="flex flex-col items-center justify-center py-20 text-gray-400">
 				<Search class="w-10 h-10 mb-3 opacity-25" />
 				<p class="font-medium text-gray-500">No items match your search</p>
@@ -266,52 +451,126 @@
 				<thead>
 					<tr class="border-b border-border bg-gray-50">
 						<th class="w-12 px-4 py-3"></th>
-						<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Item</th>
+						<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide cursor-pointer hover:bg-gray-100/50 transition-colors group" onclick={() => toggleSort('name')}>
+							Item
+							<span class="ml-1 inline-block w-2 text-gray-400">{sortColumn === 'name' ? (sortDesc ? '↓' : '↑') : ''}</span>
+						</th>
 						<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Category</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Current Stock</th>
-						<th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+						<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Stock Level</th>
+						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide cursor-pointer hover:bg-gray-100/50 transition-colors group" onclick={() => toggleSort('stock')}>
+							Current / Min
+							<span class="ml-1 inline-block w-2 text-gray-400">{sortColumn === 'stock' ? (sortDesc ? '↓' : '↑') : ''}</span>
+						</th>
+						<th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide cursor-pointer hover:bg-gray-100/50 transition-colors group" onclick={() => toggleSort('status')}>
+							Status
+							<span class="ml-1 inline-block w-2 text-gray-400">{sortColumn === 'status' ? (sortDesc ? '↓' : '↑') : ''}</span>
+						</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-border">
-					{#each filtered as item (item.id)}
-						<tr
-							onclick={() => openItemModal(item)}
-							class={cn(
-								'cursor-pointer transition-colors hover:bg-gray-50 group',
-								item.status === 'critical' && 'bg-status-red-light/30'
-							)}
-						>
-							<!-- Thumbnail -->
-							<td class="px-4 py-3">
-								<div class={cn('h-9 w-9 flex-shrink-0 rounded-lg flex items-center justify-center text-xl select-none', categoryStyle[item.category].thumbBg)}>
-									{categoryStyle[item.category].emoji}
-								</div>
-							</td>
-							<td class="px-4 py-3">
-								<p class="font-medium text-gray-900">{item.name}</p>
-								{#if isAggregated && locationStyle[item.locationId]}
-									<span class={cn('mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', locationStyle[item.locationId].badge)}>
-										<MapPin class="w-2.5 h-2.5 flex-shrink-0" />
-										{locationStyle[item.locationId].label}
-									</span>
+					{#each listGroups() as catGroup}
+						{#if catGroup.isMeat}
+							{#each catGroup.proteinGroups as group}
+								{@const config = proteinConfig[group.protein]}
+								<tr class="{config.bgLight} border-l-4 {config.borderColor}">
+									<td colspan="6" class="p-0">
+										<ProteinGroupHeader 
+											protein={group.protein}
+											itemCount={group.items.length}
+											criticalCount={group.criticalCount}
+											lowCount={group.lowCount}
+											expanded={expandedGroups[group.protein]}
+											onToggle={() => toggleGroup(group.protein)}
+											chartData={group.items.map(i => ({ id: i.id, label: i.name, value: i.currentStock }))}
+											hoveredItemId={hoveredItemId}
+											onHover={(id: string | null) => hoveredItemId = id}
+											noBorder={true}
+											noBg={true}
+										/>
+									</td>
+								</tr>
+								{#if expandedGroups[group.protein]}
+									{#each group.items as item (item.id)}
+										<tr
+											onclick={() => openItemModal(item)}
+											onmouseenter={() => hoveredItemId = item.id}
+											onmouseleave={() => hoveredItemId = null}
+											class={cn(
+												'cursor-pointer transition-colors hover:bg-gray-50',
+												item.status === 'critical' ? 'bg-status-red-light/20' : '',
+												hoveredItemId === item.id ? 'bg-accent/5 shadow-[inset_2px_0_0_0_rgba(14,165,233,0.5)]' : ''
+											)}
+											transition:slide={{ duration: 300 }}
+										>
+											<!-- Category icon -->
+											<td class="px-4 py-3" in:fade={{ duration: 200 }}>
+												<div class="flex items-center gap-2 w-max">
+													<CategoryIcon category={item.category} class="h-9 w-9" iconClass="w-4 h-4" />
+												</div>
+											</td>
+											<td class="px-4 py-3">
+												<p class="font-medium text-gray-900">{item.name}</p>
+											</td>
+											<td class="px-4 py-3 text-gray-500 font-medium">
+												{item.category}
+											</td>
+											<td class="px-4 py-3 w-36">
+												<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} />
+											</td>
+											<td class="px-4 py-3 text-right">
+												<span class="font-mono font-semibold text-gray-900">{item.currentStock.toLocaleString()} {item.unit}</span>
+												<br />
+												<span class="text-xs text-gray-400">Min: {item.minLevel.toLocaleString()}</span>
+											</td>
+											<td class="px-4 py-3 text-center">
+												<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', statusConfig[item.status].badgeClass)}>
+													{statusConfig[item.status].label}
+												</span>
+											</td>
+										</tr>
+									{/each}
 								{/if}
-							</td>
-							<td class="px-4 py-3">
-								<span class={cn('rounded-full px-2 py-0.5 text-xs font-medium', categoryStyle[item.category].badge)}>
-									{item.category}
-								</span>
-							</td>
-							<td class="px-4 py-3 text-right">
-								<span class="font-mono font-semibold text-gray-900">{item.currentStock.toLocaleString()} {item.unit}</span>
-								<br />
-								<span class="text-xs text-gray-400">Min: {item.minLevel.toLocaleString()}</span>
-							</td>
-							<td class="px-4 py-3 text-center">
-								<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', statusConfig[item.status].badgeClass)}>
-									{statusConfig[item.status].label}
-								</span>
-							</td>
-						</tr>
+							{/each}
+						{:else}
+							<tr class="bg-gray-50/50">
+								<td colspan="6" class="px-4 py-1.5">
+									<span class="text-xs font-bold uppercase tracking-wide text-gray-400">{catGroup.category}</span>
+								</td>
+							</tr>
+							{#each catGroup.items as item (item.id)}
+								<tr
+									onclick={() => openItemModal(item)}
+									class={cn(
+										'cursor-pointer transition-colors hover:bg-gray-50',
+										item.status === 'critical' && 'bg-status-red-light/20'
+									)}
+								>
+									<!-- Category icon -->
+									<td class="px-4 py-3">
+										<CategoryIcon category={item.category} class="h-9 w-9" iconClass="w-4 h-4" />
+									</td>
+									<td class="px-4 py-3">
+										<p class="font-medium text-gray-900">{item.name}</p>
+									</td>
+									<td class="px-4 py-3 text-gray-500 font-medium">
+										{item.category}
+									</td>
+									<td class="px-4 py-3 w-36">
+										<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} />
+									</td>
+									<td class="px-4 py-3 text-right">
+										<span class="font-mono font-semibold text-gray-900">{item.currentStock.toLocaleString()} {item.unit}</span>
+										<br />
+										<span class="text-xs text-gray-400">Min: {item.minLevel.toLocaleString()}</span>
+									</td>
+									<td class="px-4 py-3 text-center">
+										<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', statusConfig[item.status].badgeClass)}>
+											{statusConfig[item.status].label}
+										</span>
+									</td>
+								</tr>
+							{/each}
+						{/if}
 					{/each}
 				</tbody>
 			</table>
@@ -331,18 +590,18 @@
 			<!-- Modal header -->
 			<div class="flex items-center justify-between border-b border-border px-5 py-4">
 				<div class="flex items-center gap-3">
-					<div class={cn('h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center text-2xl select-none', categoryStyle[selectedItem.category].thumbBg)}>
-						{categoryStyle[selectedItem.category].emoji}
-					</div>
+					<CategoryIcon category={selectedItem.category} class="h-12 w-12" iconClass="w-6 h-6" />
 					<div>
 						<h3 class="font-bold text-gray-900 leading-tight">{selectedItem.name}</h3>
 						<p class="text-xs text-gray-500 mt-0.5">
-							Current stock:
+							Current:
 							<span class="font-mono font-bold text-gray-900">{selectedItem.currentStock.toLocaleString()} {selectedItem.unit}</span>
+							<span class="mx-1 text-gray-300">·</span>
+							Min: <span class="font-mono font-semibold text-gray-600">{selectedItem.minLevel.toLocaleString()}</span>
 						</p>
 					</div>
 				</div>
-				<button onclick={closeModal} class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+				<button onclick={closeModal} class="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
 					<X class="w-5 h-5" />
 				</button>
 			</div>
@@ -351,94 +610,48 @@
 			<div class="px-5 pt-4 pb-3">
 				<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Select Action</p>
 				<div class="grid grid-cols-3 gap-2">
-
-					<!-- Add -->
 					<button
 						onclick={() => selectAction('add')}
 						class={cn(
 							'flex flex-col items-center gap-2 rounded-xl border-2 py-3 px-2 transition-all',
-							modalAction === 'add'
-								? 'border-green-500 bg-green-50'
-								: 'border-border bg-white hover:border-green-300 hover:bg-green-50/50'
+							modalAction === 'add' ? 'border-green-500 bg-green-50' : 'border-border bg-white hover:border-green-300 hover:bg-green-50/50'
 						)}
-						style="min-height: unset"
 					>
 						<div class={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', modalAction === 'add' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500')}>
 							<Plus class="w-4 h-4" />
 						</div>
 						<span class={cn('text-xs font-semibold', modalAction === 'add' ? 'text-green-700' : 'text-gray-600')}>Add</span>
 					</button>
-
-					<!-- Deduct -->
 					<button
 						onclick={() => selectAction('deduct')}
 						class={cn(
 							'flex flex-col items-center gap-2 rounded-xl border-2 py-3 px-2 transition-all',
-							modalAction === 'deduct'
-								? 'border-red-500 bg-red-50'
-								: 'border-border bg-white hover:border-red-300 hover:bg-red-50/50'
+							modalAction === 'deduct' ? 'border-red-500 bg-red-50' : 'border-border bg-white hover:border-red-300 hover:bg-red-50/50'
 						)}
-						style="min-height: unset"
 					>
 						<div class={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', modalAction === 'deduct' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500')}>
 							<Minus class="w-4 h-4" />
 						</div>
 						<span class={cn('text-xs font-semibold', modalAction === 'deduct' ? 'text-red-700' : 'text-gray-600')}>Deduct</span>
 					</button>
-
-					<!-- Set Level -->
 					<button
 						onclick={() => selectAction('set')}
 						class={cn(
 							'flex flex-col items-center gap-2 rounded-xl border-2 py-3 px-2 transition-all',
-							modalAction === 'set'
-								? 'border-blue-500 bg-blue-50'
-								: 'border-border bg-white hover:border-blue-300 hover:bg-blue-50/50'
+							modalAction === 'set' ? 'border-blue-500 bg-blue-50' : 'border-border bg-white hover:border-blue-300 hover:bg-blue-50/50'
 						)}
-						style="min-height: unset"
 					>
 						<div class={cn('flex h-8 w-8 items-center justify-center rounded-full transition-colors', modalAction === 'set' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500')}>
 							<Pencil class="w-4 h-4" />
 						</div>
 						<span class={cn('text-xs font-semibold', modalAction === 'set' ? 'text-blue-700' : 'text-gray-600')}>Set Level</span>
 					</button>
-
 				</div>
 			</div>
 
-			<!-- Form (only shown once action selected) -->
+			<!-- Form -->
 			{#if modalAction}
 				<div class="px-5 pb-2 flex flex-col gap-4">
-
-					<!-- Meat-specific options -->
-					{#if selectedItem.category === 'Meats'}
-						<div class="rounded-lg border border-orange-100 bg-orange-50/50 p-4 flex flex-col gap-4">
-							<div class="flex flex-col gap-1.5">
-								<span class="text-xs font-semibold uppercase tracking-wide text-orange-800">Meat Type</span>
-								<div class="grid grid-cols-2 gap-2">
-									{#each ['Pork', 'Beef'] as animal}
-										<button
-											onclick={() => (meatAnimal = animal as MeatAnimal)}
-											class={cn('rounded border py-1.5 text-sm font-medium transition-colors', meatAnimal === animal ? 'border-orange-500 bg-orange-100 text-orange-900' : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300')}
-											style="min-height: unset"
-										>{animal}</button>
-									{/each}
-								</div>
-							</div>
-							<div class="flex flex-col gap-1.5">
-								<span class="text-xs font-semibold uppercase tracking-wide text-orange-800">Cut Category</span>
-								<div class="grid grid-cols-2 gap-2">
-									{#each ['Bone-In', 'Bone-Out', 'Bones', 'Trimmings'] as cut}
-										<button
-											onclick={() => (meatCut = cut as MeatCutType)}
-											class={cn('rounded border py-1.5 text-sm font-medium transition-colors', meatCut === cut ? 'border-orange-500 bg-orange-100 text-orange-900' : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300')}
-											style="min-height: unset"
-										>{cut}</button>
-									{/each}
-								</div>
-							</div>
-						</div>
-					{/if}
 
 					<!-- Quantity -->
 					<div class="flex flex-col gap-1.5">
@@ -452,6 +665,7 @@
 								bind:value={adjustQty}
 								placeholder={modalAction === 'set' ? String(selectedItem.currentStock) : '0'}
 								min="0"
+								step="any"
 								class={cn(
 									'w-full pl-4 pr-16 py-2.5 text-lg font-mono rounded-lg border focus:ring-2 focus:outline-none transition-shadow',
 									modalAction === 'add'    ? 'border-green-200 focus:border-green-500 focus:ring-green-500/20' :
@@ -467,8 +681,18 @@
 
 					<!-- Reason -->
 					<div class="flex flex-col gap-1.5">
-						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Reason (Optional)</span>
-						<input type="text" bind:value={adjustReason} placeholder="e.g. Audit correction, spoilage…" class="pos-input" />
+						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+							Reason {reasonRequired ? '*' : '(Optional)'}
+						</span>
+						<input
+							type="text"
+							bind:value={adjustReason}
+							placeholder={modalAction === 'deduct' ? 'e.g. Spoilage, manual correction…' : modalAction === 'set' ? 'e.g. Physical count result…' : 'e.g. New delivery received…'}
+							class="pos-input"
+						/>
+						{#if reasonRequired && adjustReason.trim() === '' && adjustQty}
+							<p class="text-xs text-status-red">Reason is required for {modalAction === 'deduct' ? 'deductions' : 'stock level overrides'}.</p>
+						{/if}
 					</div>
 
 				</div>
@@ -488,7 +712,7 @@
 						onclick={handleConfirm}
 						disabled={confirmDisabled}
 						class={cn(
-							'rounded-lg px-5 py-2 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+							'rounded-lg px-5 py-2.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40',
 							modalAction === 'add'    ? 'bg-green-600 hover:bg-green-700' :
 							modalAction === 'deduct' ? 'bg-red-600 hover:bg-red-700' :
 							                          'bg-blue-600 hover:bg-blue-700'

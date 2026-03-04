@@ -13,7 +13,18 @@
 	let notes    = $state('');
 	let saved    = $state(false);
 
-	const canSave = $derived(selectedStockId !== '' && qty.trim() !== '' && supplier.trim() !== '');
+	// Find the last delivery for the selected item to auto-fill supplier
+	$effect(() => {
+		if (selectedStockId) {
+			const lastDelivery = deliveries.find(d => d.stockItemId === selectedStockId);
+			if (lastDelivery && !supplier) {
+				supplier = lastDelivery.supplier;
+			}
+		}
+	});
+
+	const selectedItem = $derived(stockItems.find(s => s.id === selectedStockId));
+	const canSave = $derived(selectedStockId !== '' && parseFloat(qty) > 0 && supplier.trim() !== '');
 
 	function handleReceive() {
 		if (!canSave) return;
@@ -43,6 +54,11 @@
 						<option value={s.id}>{s.name}</option>
 					{/each}
 				</select>
+				{#if selectedItem}
+					<p class="text-[10px] font-medium text-gray-400 mt-1 pl-1">
+						Current Stock: <strong class="text-gray-700">{Math.round(selectedItem.openingStock)} {selectedItem.unit}</strong>
+					</p>
+				{/if}
 			</div>
 
 			<div class="grid grid-cols-2 gap-3">
@@ -60,7 +76,10 @@
 
 			<div class="flex flex-col gap-1.5">
 				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Supplier *</span>
-				<input type="text" bind:value={supplier} placeholder="e.g. Metro Meat Co." class="pos-input" />
+				<input type="text" bind:value={supplier} placeholder="e.g. Metro Meat Co." class={cn('pos-input', !supplier.trim() && selectedStockId && 'border-status-red focus:border-status-red focus:ring-status-red/20')} />
+				{#if !supplier.trim() && selectedStockId}
+					<p class="text-[10px] font-medium text-status-red">Supplier is required</p>
+				{/if}
 			</div>
 
 			<div class="flex flex-col gap-1.5">
