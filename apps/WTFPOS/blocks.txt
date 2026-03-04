@@ -1,0 +1,190 @@
+422 	{#if session.locationId === 'all'}
+440 				{#each [
+464 							{#each bTables as t, idx (t.id)}
+477 									{#if t.status !== 'available'}
+484 										{#if tOrder}<span class="text-[10px] font-mono text-gray-400">{tOrder.pax}p</span>{/if}
+485 										{#if t.billTotal}<span class="text-[10px] font-mono text-accent font-bold">{formatPeso(t.billTotal)}</span>{/if}
+486 									{:else}
+488 									{/if}
+490 							{/each}
+496 							{#if bOrders.length === 0}
+498 							{:else}
+499 								{#each bOrders.slice(0, 4) as order}
+503 											{#if order.orderType === 'takeout'}
+505 											{:else}
+507 											{/if}
+511 								{/each}
+512 								{#if bOrders.length > 4}
+514 								{/if}
+515 							{/if}
+519 				{/each}
+523 	{/if}
+525 	{#if session.locationId !== 'all'}
+558 						🧾 History {#if closedOrders.length > 0}<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">{closedOrders.length}</span>{/if}
+567 					{#each mainTables as table (table.id)}
+576 								{#if table.status !== 'available'}
+580 								{/if}
+583 								{#if table.currentOrderId}
+586 								{:else}
+588 								{/if}
+590 							{#if table.billTotal}
+594 							{/if}
+595 							{#if table.currentOrderId}
+597 								{#if order?.packageId === 'pkg-pork'}
+599 								{:else if order?.packageId === 'pkg-beef'}
+601 								{:else if order?.packageId === 'pkg-combo'}
+603 								{/if}
+604 							{/if}
+606 					{/each}
+616 				{#if takeoutOrders.length > 0}
+623 							{#each takeoutOrders as order (order.id)}
+657 									{#if tStatus !== 'picked_up'}
+665 									{/if}
+667 							{/each}
+670 				{/if}
+676 		{#if !currentActiveOrder}
+697 		{:else}
+709 							{#if currentActiveOrder.orderType === 'takeout'}
+714 							{:else}
+719 							{/if}
+723 					{#if currentActiveOrder.orderType === 'takeout'}
+738 							{#if tStatus !== 'picked_up'}
+746 							{/if}
+748 					{:else if currentActiveOrder.packageName}
+751 							{#if selectedTable?.remainingSeconds !== null}
+755 							{/if}
+757 					{/if}
+762 					{#each currentActiveOrder.items as item (item.id)}
+767 									{#if item.weight}
+769 									{/if}
+774 								{#if item.status === 'cancelled'}
+776 								{/if}
+779 								{#if item.tag === 'PKG'}
+784 								{:else if item.tag === 'FREE'}
+786 								{:else if item.status === 'cancelled'}
+788 								{:else}
+790 								{/if}
+793 					{/each}
+817 							{#if currentActiveOrder.orderType === 'dine-in' && selectedTable}
+819 							{/if}
+820 							{#if currentActiveOrder.packageId && currentActiveOrder.orderType === 'dine-in'}
+822 							{/if}
+823 							{#if currentActiveOrder.items.filter(i => i.status !== 'cancelled').length > 0}
+825 							{/if}
+828 				{/if}
+833 {#if showAddItem && currentActiveOrder}
+840 					{#if currentActiveOrder.orderType === 'takeout'}
+846 					{:else}
+849 					{/if}
+854 					{#each visibleCategories as cat}
+868 					{/each}
+872 				{#if activeCategory === 'sides' || activeCategory === 'packages'}
+876 				{/if}
+880 					{#if weightScreenItem}
+885 								{#each [100, 150, 200, 250, 300, 400] as preset}
+889 								{/each}
+910 					{:else}
+912 							{#each filteredItems as item (item.id)}
+922 									{#if item.category === 'packages'}
+925 											{#if pendingItems.some(p => p.item.id === item.id)}
+927 											{/if}
+929 										{#if item.desc}<p class="text-sm text-gray-500">{item.desc}</p>{/if}
+931 										{#if item.perks}<p class="text-xs text-status-green">✓ {item.perks}</p>{/if}
+932 									{:else if item.isWeightBased}
+936 									{:else}
+938 										{#if item.isFree}
+940 										{:else}
+942 										{/if}
+943 									{/if}
+945 							{/each}
+947 					{/if}
+959 					{#if pendingItems.length === 0}
+963 					{:else}
+964 						{#each pendingItems as p, idx (p.item.id + idx)}
+969 										{#if p.item.category === 'packages'}
+971 										{:else if p.forceFree}
+973 										{/if}
+975 									{#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
+983 						{/each}
+984 					{/if}
+1007 {/if}
+1010 {#if paxModalTable}
+1015 				{#each Array.from({length: 12}, (_, i) => i + 1) as num}
+1019 				{/each}
+1026 {/if}
+1029 {#if showCheckout && checkoutOrder}
+1037 					{#if checkoutOrder.orderType === 'takeout'}
+1039 					{:else}
+1041 					{/if}
+1052 				{#if checkoutOrder.discountType !== 'none'}
+1057 				{/if}
+1071 				{#each [
+1090 				{/each}
+1097 					{#each [
+1114 					{/each}
+1119 			{#if checkoutMethod === 'cash'}
+1138 						{#each [20, 50, 100, 200, 500, 1000, 1500, 2000] as amount}
+1151 						{/each}
+1164 					{#if cashTendered >= checkoutOrder.total}
+1169 					{:else if cashTendered > 0}
+1173 					{/if}
+1175 			{/if}
+1178 			{#if checkoutError}
+1187 			{/if}
+1190 			{#if !checkoutError}
+1206 						{#if checkoutLoading}
+1209 						{:else}
+1211 						{/if}
+1214 			{/if}
+1217 {/if}
+1220 {#if showTakeoutModal}
+1242 {/if}
+1245 {#if showReceipt && receiptOrder}
+1261 				{#each receiptOrder.items.filter(i => i.status !== 'cancelled') as item}
+1265 							{#if item.weight}<span class="text-gray-400"> {item.weight}g</span>{/if}
+1267 						{#if item.tag === 'FREE'}
+1269 						{:else}
+1271 						{/if}
+1273 				{/each}
+1281 				{#if receiptOrder.discountType !== 'none'}
+1286 				{/if}
+1301 					{#if receiptMethod === 'Cash'}
+1310 					{/if}
+1333 {/if}
+1336 {#if showVoidConfirm}
+1348 					{#each [
+1365 					{/each}
+1372 					{#each [0, 1, 2, 3] as idx}
+1379 					{/each}
+1381 				{#if voidPinError}
+1383 				{/if}
+1388 				{#each [1,2,3,4,5,6,7,8,9] as num}
+1394 				{/each}
+1423 {/if}
+1426 {#if showHistory}
+1440 				{#if closedOrders.length === 0}
+1444 				{:else}
+1445 					{#each closedOrders as order (order.id)}
+1451 										{#if order.orderType === 'takeout'}
+1453 										{:else}
+1455 										{/if}
+1457 									{#if order.packageName}
+1459 									{/if}
+1460 									{#if order.status === 'cancelled'}
+1462 									{:else}
+1464 									{/if}
+1472 									{#if order.payments.length > 0}
+1475 									{/if}
+1485 								{#if order.status === 'paid'}
+1499 								{/if}
+1502 					{/each}
+1503 				{/if}
+1507 			{#if closedOrders.length > 0}
+1517 			{/if}
+1520 {/if}
+1523 {#if showTransferModal && selectedTable}
+1529 {/if}
+1532 {#if showPackageChange && currentActiveOrder}
+1538 {/if}
+1541 {#if showSplitBill && currentActiveOrder}
+1547 {/if}

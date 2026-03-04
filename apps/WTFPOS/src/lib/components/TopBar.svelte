@@ -2,6 +2,11 @@
 	import { page } from '$app/stores';
 	import { cn } from '$lib/utils';
 	import { session, LOCATIONS, ELEVATED_ROLES, ROLE_NAV_ACCESS } from '$lib/stores/session.svelte';
+	import HardwareStatus from '$lib/components/HardwareStatus.svelte';
+	import NoSaleModal from '$lib/components/NoSaleModal.svelte';
+	import { ScanBarcode } from 'lucide-svelte';
+
+	let isNoSaleOpen = $state(false);
 
 	const canSeeLocations = $derived(!session.isLocked && ELEVATED_ROLES.includes(session.role));
 	const isWarehouse     = $derived(LOCATIONS.find(l => l.id === session.locationId)?.type === 'warehouse');
@@ -109,9 +114,28 @@
 			</span>
 			<span class="hidden text-sm font-medium text-gray-700 md:inline">{session.userName || 'User'}</span>
 		</div>
+		
+		<div class="flex items-center gap-1.5 border-l border-gray-200 pl-3 ml-1">
+			<!-- Hardware / Device Tools -->
+			<button class="p-2 rounded-full hover:bg-gray-100 transition-colors hidden sm:block" title="Barcode Scanner (Keyboard listener active)">
+				<ScanBarcode class="w-5 h-5 text-gray-400" />
+			</button>
+			
+			<HardwareStatus />
 
-		<a href="/" class="flex items-center rounded-md border border-border px-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors" style="min-height:32px">
+			<!-- No Sale Button -->
+			<button 
+				onclick={() => { isNoSaleOpen = true; }}
+				class="hidden sm:flex h-8 items-center justify-center rounded bg-gray-100 px-3 text-xs font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-200"
+			>
+				No Sale
+			</button>
+		</div>
+
+		<a href="/" class="flex items-center rounded-md border border-border px-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors ml-2" style="min-height:32px">
 			Logout
 		</a>
 	</div>
 </header>
+
+<NoSaleModal isOpen={isNoSaleOpen} onClose={() => { isNoSaleOpen = false; }} />

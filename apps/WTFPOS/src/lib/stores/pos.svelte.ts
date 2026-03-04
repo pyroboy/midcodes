@@ -2,7 +2,7 @@
  * POS Global State — Svelte 5 Runes
  * State is mutated directly (fine in .svelte.ts with $state)
  */
-import type { Table, Order, MenuItem, KdsTicket, TableZone } from '$lib/types';
+import type { Table, Order, MenuItem, KdsTicket, TableZone, TakeoutStatus, SplitType, SubBill, PaymentMethod } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { deductFromStock } from '$lib/stores/stock.svelte';
 import { log } from '$lib/stores/audit.svelte';
@@ -35,14 +35,14 @@ function makeTables(): Table[] {
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 
-export const MENU_ITEMS: MenuItem[] = [
+export const menuItems = $state<MenuItem[]>([
 	{ id: 'pkg-pork',    name: '🐷 Unli Pork',         category: 'packages', price: 499,  isWeightBased: false, available: true, desc: 'All-you-can-eat pork grill',    perks: '4 sides, 200g initial meats', meats: ['meat-samgyup', 'meat-chadol'], autoSides: ['side-kimchi', 'side-rice'] },
 	{ id: 'pkg-beef',    name: '🐄 Unli Beef',         category: 'packages', price: 699,  isWeightBased: false, available: true, desc: 'All-you-can-eat beef grill',    perks: '5 sides, 250g initial meats', meats: ['meat-galbi', 'meat-beef'], autoSides: ['side-kimchi', 'side-rice'] },
 	{ id: 'pkg-combo',   name: '🔥 Unli Pork & Beef',  category: 'packages', price: 899,  isWeightBased: false, available: true, desc: 'Premium pork + beef combo',    perks: '6 sides, 300g initial meats', meats: ['meat-samgyup', 'meat-chadol', 'meat-galbi', 'meat-beef'], autoSides: ['side-kimchi', 'side-rice'] },
-	{ id: 'meat-samgyup',name: 'Samgyupsal',            category: 'meats',    price: 0,    isWeightBased: true,  available: true, pricePerGram: 0.65 },
-	{ id: 'meat-chadol', name: 'Chadolbaegi',           category: 'meats',    price: 0,    isWeightBased: true,  available: true, pricePerGram: 0.75 },
-	{ id: 'meat-galbi',  name: 'Galbi',                 category: 'meats',    price: 0,    isWeightBased: true,  available: true, pricePerGram: 0.90 },
-	{ id: 'meat-beef',   name: 'US Beef Belly',         category: 'meats',    price: 0,    isWeightBased: true,  available: true, pricePerGram: 1.20 },
+	{ id: 'meat-samgyup',name: 'Samgyupsal',            category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.65 },
+	{ id: 'meat-chadol', name: 'Chadolbaegi',           category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.75 },
+	{ id: 'meat-galbi',  name: 'Galbi',                 category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 0.90 },
+	{ id: 'meat-beef',   name: 'US Beef Belly',         category: 'meats',    price: 0,    isWeightBased: true,  available: true, trackInventory: true, pricePerGram: 1.20 },
 	{ id: 'side-kimchi', name: 'Kimchi',                category: 'sides',    price: 0,    isWeightBased: false, available: true, isFree: true },
 	{ id: 'side-japchae',name: 'Japchae',               category: 'sides',    price: 120,  isWeightBased: false, available: true },
 	{ id: 'side-rice',   name: 'Steamed Rice',          category: 'sides',    price: 35,   isWeightBased: false, available: true },
@@ -50,8 +50,41 @@ export const MENU_ITEMS: MenuItem[] = [
 	{ id: 'dish-bibim',  name: 'Bibimbap',              category: 'dishes',   price: 150,  isWeightBased: false, available: true },
 	{ id: 'drink-soju',  name: 'Soju (Original)',       category: 'drinks',   price: 95,   isWeightBased: false, available: true },
 	{ id: 'drink-beer',  name: 'San Miguel Beer',       category: 'drinks',   price: 75,   isWeightBased: false, available: true },
-	{ id: 'drink-tea',   name: 'Iced Tea',              category: 'drinks',   price: 65,   isWeightBased: false, available: true }
-];
+	{ id: 'drink-tea',   name: 'Iced Tea',              category: 'drinks',   price: 65,   isWeightBased: false, available: true },
+	{ id: 'ret-123456',  name: 'Bottled Water',         category: 'drinks',   price: 40,   isWeightBased: false, available: true, isRetail: true }
+]);
+
+// ─── Menu CRUD (owner/admin only) ────────────────────────────────────────────
+
+export function addMenuItem(item: Omit<MenuItem, 'id'>): string {
+	const id = `menu-${nanoid(8)}`;
+	menuItems.push({ ...item, id });
+	log.menuItemCreated(item.name, item.category);
+	return id;
+}
+
+export function updateMenuItem(id: string, updates: Partial<Omit<MenuItem, 'id'>>): void {
+	const item = menuItems.find(m => m.id === id);
+	if (!item) return;
+	const oldName = item.name;
+	Object.assign(item, updates);
+	log.menuItemUpdated(oldName, Object.keys(updates).join(', '));
+}
+
+export function deleteMenuItem(id: string): void {
+	const idx = menuItems.findIndex(m => m.id === id);
+	if (idx === -1) return;
+	const name = menuItems[idx].name;
+	menuItems.splice(idx, 1);
+	log.menuItemDeleted(name);
+}
+
+export function toggleMenuItemAvailability(id: string): void {
+	const item = menuItems.find(m => m.id === id);
+	if (!item) return;
+	item.available = !item.available;
+	log.menuItemToggled(item.name, item.available);
+}
 
 // ─── Reactive State ───────────────────────────────────────────────────────────
 
@@ -97,7 +130,8 @@ export function createTakeoutOrder(customerName: string = 'Walk-in'): string {
 		createdAt: new Date().toISOString(),
 		closedAt: null,
 		billPrinted: false,
-		notes: ''
+		notes: '',
+		takeoutStatus: 'new',
 	});
 	log.tableOpened(`Takeout (${customerName})`, null, 1);
 	return orderId;
@@ -107,18 +141,11 @@ export function closeTable(tableId: string) {
 	const table = tables.find((t) => t.id === tableId);
 	if (!table) return;
 	// Audit logging is handled by the caller (confirmCheckout) which has payment context
-	// After checkout, table is dirty instead of immediately available
-	table.status = 'dirty';
+	table.status = 'available';
 	table.sessionStartedAt = null;
 	table.remainingSeconds = null;
 	table.currentOrderId = null;
 	table.billTotal = null;
-}
-
-export function cleanTable(tableId: string) {
-	const table = tables.find((t) => t.id === tableId);
-	if (!table) return;
-	table.status = 'available';
 }
 
 export function printBill(orderId: string) {
@@ -127,7 +154,7 @@ export function printBill(orderId: string) {
 	order.billPrinted = true;
 	if (order.tableId) {
 		const t = tables.find(t => t.id === order.tableId);
-		if (t && t.status !== 'dirty') {
+		if (t) {
 			t.status = 'billing';
 		}
 	}
@@ -135,7 +162,7 @@ export function printBill(orderId: string) {
 
 export function tickTimers() {
 	for (const table of tables) {
-		if (table.status === 'available' || table.status === 'dirty' || table.remainingSeconds === null) continue;
+		if (table.status === 'available' || table.remainingSeconds === null) continue;
 		table.remainingSeconds = Math.max(0, table.remainingSeconds - 1);
 		
 		// Unli timers: warnings are an overlay visual while color statuses dictates the state.
@@ -203,7 +230,7 @@ export function addItemToOrder(orderId: string, item: MenuItem, qty: number, wei
 
 	// Auto-deduct from stock
 	const deductQty = item.isWeightBased ? (weight ?? 0) : qty;
-	if (deductQty > 0) deductFromStock(item.id, deductQty, order.tableId ?? 'takeout', order.id);
+	if (deductQty > 0) deductFromStock(item.id, deductQty, order.tableId ?? 'takeout', order.id, item.trackInventory ?? false);
 
 	// Audit log
 	const tableLabel = order.tableId ? (tables.find(t => t.id === order.tableId)?.label ?? order.tableId) : 'Takeout';
@@ -216,21 +243,26 @@ export function addItemToOrder(orderId: string, item: MenuItem, qty: number, wei
 
 export function recalcOrder(order: Order) {
 	const sub  = order.items.filter((i) => i.status !== 'cancelled' && i.tag !== 'FREE').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-	const disc = order.discountType !== 'none' ? Math.round(sub * 0.2) : 0;
+	let disc = 0;
+	if (order.discountType === 'senior' || order.discountType === 'pwd') disc = Math.round(sub * 0.2);
+	else if (order.discountType === 'comp' || order.discountType === 'service_recovery' || order.discountType === 'promo') disc = sub;
+
 	const net  = sub - disc;
 	// PH law (RA 9994 / RA 7277): SC/PWD discount is applied on the VAT-exclusive price;
 	// the 12% VAT on the discounted amount is also removed (customer pays zero VAT).
 	// For normal orders, prices are VAT-inclusive — extract VAT from the total.
-	const vat  = order.discountType !== 'none'
+	const vat  = order.discountType !== 'none' && order.discountType !== 'promo' && order.discountType !== 'comp' && order.discountType !== 'service_recovery'
 		? 0                                        // SC/PWD: VAT-exempt
-		: Math.round(net - net / 1.12);            // Normal: VAT already embedded in price
+		: Math.round(net - net / 1.12);            // Normal/Promos/Comp: VAT already embedded in price
+
 	order.subtotal = sub; order.discountAmount = disc; order.vatAmount = vat; order.total = net;
 }
 
-export function voidOrder(orderId: string) {
+export function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'write_off') {
 	const order = orders.find(o => o.id === orderId);
 	if (!order || order.status === 'paid' || order.status === 'cancelled') return;
 	order.status = 'cancelled';
+	if (reason) order.cancelReason = reason;
 	order.closedAt = new Date().toISOString();
 	for (const item of order.items) {
 		if (item.status !== 'cancelled') item.status = 'cancelled';
@@ -238,7 +270,7 @@ export function voidOrder(orderId: string) {
 	if (order.tableId) {
 		const table = tables.find(t => t.id === order.tableId);
 		if (table) {
-			table.status = 'dirty';
+			table.status = 'available';
 			table.sessionStartedAt = null;
 			table.remainingSeconds = null;
 			table.currentOrderId = null;
@@ -248,12 +280,248 @@ export function voidOrder(orderId: string) {
 	const label = order.tableId
 		? (tables.find(t => t.id === order.tableId)?.label ?? order.tableId)
 		: `Takeout (${order.customerName ?? 'Walk-in'})`;
-	log.tableClosed(label, 0, 'VOID');
+	log.tableClosed(label, 0, `VOID (${reason ?? 'unknown'})`);
 }
 
 export function markItemServed(orderId: string, itemId: string) {
 	const t = kdsTickets.find((t) => t.orderId === orderId);
 	if (t) { const i = t.items.find((i) => i.id === itemId); if (i) { i.status = 'served'; log.itemServed(i.menuItemName, t.tableNumber); } }
 	const o = orders.find((o) => o.id === orderId);
-	if (o) { const i = o.items.find((i) => i.id === itemId); if (i) i.status = 'served'; }
+	if (o) {
+		const i = o.items.find((i) => i.id === itemId);
+		if (i) i.status = 'served';
+		// Auto-advance takeout to 'ready' when all items served
+		if (o.orderType === 'takeout' && o.takeoutStatus === 'preparing') {
+			const active = o.items.filter(it => it.status !== 'cancelled');
+			if (active.length > 0 && active.every(it => it.status === 'served')) {
+				o.takeoutStatus = 'ready';
+				log.takeoutAdvanced(o.customerName ?? 'Walk-in', 'ready');
+			}
+		}
+	}
+}
+
+// ─── Takeout Lifecycle ───────────────────────────────────────────────────────
+
+export function advanceTakeoutStatus(orderId: string): void {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.orderType !== 'takeout') return;
+	const progression: Record<TakeoutStatus, TakeoutStatus | null> = {
+		'new': 'preparing',
+		'preparing': 'ready',
+		'ready': 'picked_up',
+		'picked_up': null
+	};
+	const current = order.takeoutStatus ?? 'new';
+	const next = progression[current];
+	if (next) {
+		order.takeoutStatus = next;
+		log.takeoutAdvanced(order.customerName ?? 'Walk-in', next);
+	}
+}
+
+export function setTakeoutStatus(orderId: string, status: TakeoutStatus): void {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.orderType !== 'takeout') return;
+	order.takeoutStatus = status;
+	log.takeoutAdvanced(order.customerName ?? 'Walk-in', status);
+}
+
+// ─── Table Transfer ──────────────────────────────────────────────────────────
+
+export function transferTable(fromTableId: string, toTableId: string): boolean {
+	const fromTable = tables.find(t => t.id === fromTableId);
+	const toTable = tables.find(t => t.id === toTableId);
+	if (!fromTable || !toTable) return false;
+	if (toTable.status !== 'available') return false;
+	if (!fromTable.currentOrderId) return false;
+	if (fromTable.locationId !== toTable.locationId) return false;
+
+	const order = orders.find(o => o.id === fromTable.currentOrderId);
+	if (!order) return false;
+
+	// Transfer table state
+	toTable.status = fromTable.status;
+	toTable.sessionStartedAt = fromTable.sessionStartedAt;
+	toTable.remainingSeconds = fromTable.remainingSeconds;
+	toTable.currentOrderId = fromTable.currentOrderId;
+	toTable.billTotal = fromTable.billTotal;
+
+	// Update order reference
+	order.tableId = toTable.id;
+	order.tableNumber = toTable.number;
+
+	// Update KDS ticket
+	const ticket = kdsTickets.find(t => t.orderId === order.id);
+	if (ticket) ticket.tableNumber = toTable.number;
+
+	// Reset source table
+	fromTable.status = 'available';
+	fromTable.sessionStartedAt = null;
+	fromTable.remainingSeconds = null;
+	fromTable.currentOrderId = null;
+	fromTable.billTotal = null;
+
+	log.tableTransferred(fromTable.label, toTable.label);
+	return true;
+}
+
+// ─── Package Change ──────────────────────────────────────────────────────────
+
+export function changePackage(orderId: string, newPackageId: string): {
+	success: boolean;
+	priceDiff: number;
+	direction: 'upgrade' | 'downgrade' | 'same';
+} {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || !order.packageId) return { success: false, priceDiff: 0, direction: 'same' };
+
+	const oldPkg = menuItems.find(m => m.id === order.packageId);
+	const newPkg = menuItems.find(m => m.id === newPackageId);
+	if (!oldPkg || !newPkg || newPkg.category !== 'packages') return { success: false, priceDiff: 0, direction: 'same' };
+
+	const oldPriceTotal = oldPkg.price * order.pax;
+	const newPriceTotal = newPkg.price * order.pax;
+	const priceDiff = newPriceTotal - oldPriceTotal;
+	const direction = priceDiff > 0 ? 'upgrade' as const : priceDiff < 0 ? 'downgrade' as const : 'same' as const;
+
+	// Update the package line item in the order
+	const pkgItem = order.items.find(i => i.menuItemId === order.packageId && i.tag === 'PKG');
+	if (pkgItem) {
+		pkgItem.menuItemId = newPkg.id;
+		pkgItem.menuItemName = newPkg.name;
+		pkgItem.unitPrice = newPkg.price;
+	}
+
+	// Update order metadata
+	order.packageId = newPkg.id;
+	order.packageName = newPkg.name;
+
+	// Recalculate totals
+	recalcOrder(order);
+	const table = tables.find(t => t.id === order.tableId);
+	if (table) table.billTotal = order.total;
+
+	log.packageChanged(
+		table?.label ?? 'Takeout',
+		oldPkg.name,
+		newPkg.name,
+		direction,
+		Math.abs(priceDiff)
+	);
+
+	return { success: true, priceDiff, direction };
+}
+
+// ─── Split Bill ──────────────────────────────────────────────────────────────
+
+export function initEqualSplit(orderId: string, splitCount: number): void {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || order.total <= 0) return;
+
+	order.splitType = 'equal';
+	const perPerson = Math.floor(order.total / splitCount);
+	const remainder = order.total - perPerson * (splitCount - 1);
+
+	order.subBills = Array.from({ length: splitCount }, (_, i) => ({
+		id: nanoid(),
+		label: `Guest ${i + 1}`,
+		itemIds: [],
+		subtotal: i === splitCount - 1 ? remainder : perPerson,
+		discountAmount: 0,
+		vatAmount: 0,
+		total: i === splitCount - 1 ? remainder : perPerson,
+		payment: null,
+		paidAt: null
+	}));
+
+	const tableLabel = order.tableId ? (tables.find(t => t.id === order.tableId)?.label ?? '') : `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.splitInitiated(tableLabel, 'equal', splitCount);
+}
+
+export function initItemSplit(orderId: string, splitCount: number): void {
+	const order = orders.find(o => o.id === orderId);
+	if (!order) return;
+
+	order.splitType = 'by-item';
+	order.subBills = Array.from({ length: splitCount }, (_, i) => ({
+		id: nanoid(),
+		label: `Guest ${i + 1}`,
+		itemIds: [],
+		subtotal: 0, discountAmount: 0, vatAmount: 0, total: 0,
+		payment: null, paidAt: null
+	}));
+
+	const tableLabel = order.tableId ? (tables.find(t => t.id === order.tableId)?.label ?? '') : `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.splitInitiated(tableLabel, 'by-item', splitCount);
+}
+
+export function assignItemToSubBill(orderId: string, itemId: string, subBillId: string): void {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || !order.subBills) return;
+
+	// Remove from any existing sub-bill
+	for (const sb of order.subBills) {
+		sb.itemIds = sb.itemIds.filter(id => id !== itemId);
+	}
+
+	// Add to target sub-bill
+	const target = order.subBills.find(sb => sb.id === subBillId);
+	if (target) {
+		target.itemIds.push(itemId);
+	}
+
+	recalcSubBills(order);
+}
+
+export function recalcSubBills(order: Order): void {
+	if (!order.subBills || order.splitType !== 'by-item') return;
+	for (const sb of order.subBills) {
+		const items = order.items.filter(i => sb.itemIds.includes(i.id) && i.status !== 'cancelled' && i.tag !== 'FREE');
+		sb.subtotal = items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+		if (order.discountType !== 'none' && order.subtotal > 0) {
+			sb.discountAmount = Math.round(sb.subtotal * 0.2);
+			sb.vatAmount = 0; // SC/PWD: VAT-exempt
+		} else {
+			sb.discountAmount = 0;
+			sb.vatAmount = Math.round(sb.subtotal - sb.subtotal / 1.12);
+		}
+		sb.total = sb.subtotal - sb.discountAmount;
+	}
+}
+
+export function paySubBill(orderId: string, subBillId: string, method: PaymentMethod, amount: number): void {
+	const order = orders.find(o => o.id === orderId);
+	if (!order || !order.subBills) return;
+
+	const sb = order.subBills.find(s => s.id === subBillId);
+	if (!sb) return;
+
+	sb.payment = { method, amount };
+	sb.paidAt = new Date().toISOString();
+
+	const tableLabel = order.tableId ? (tables.find(t => t.id === order.tableId)?.label ?? '') : `Takeout (${order.customerName ?? 'Walk-in'})`;
+	log.subBillPaid(sb.label, tableLabel, sb.total, method);
+
+	// Check if all sub-bills are paid
+	const allPaid = order.subBills.every(s => s.payment !== null);
+	if (allPaid) {
+		for (const sub of order.subBills) {
+			if (sub.payment) order.payments.push(sub.payment);
+		}
+		order.status = 'paid';
+		order.closedAt = new Date().toISOString();
+		if (order.tableId) closeTable(order.tableId);
+		log.tableClosed(tableLabel, order.total, 'Split');
+	}
+}
+
+export function cancelSplit(orderId: string): void {
+	const order = orders.find(o => o.id === orderId);
+	if (!order) return;
+	if (order.subBills?.some(sb => sb.payment !== null)) return;
+	const tableLabel = order.tableId ? (tables.find(t => t.id === order.tableId)?.label ?? '') : `Takeout (${order.customerName ?? 'Walk-in'})`;
+	order.splitType = undefined;
+	order.subBills = undefined;
+	log.splitCancelled(tableLabel);
 }

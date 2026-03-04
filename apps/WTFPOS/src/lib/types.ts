@@ -1,8 +1,7 @@
 // ─── Floor Layout ─────────────────────────────────────────────────────────────
 
 export type TableZone = 'main';
-export type TableStatus = 'available' | 'occupied' | 'warning' | 'critical' | 'billing' | 'dirty';
-
+export type TableStatus = 'available' | 'occupied' | 'warning' | 'critical' | 'billing';
 export interface Table {
 	id: string;
 	locationId: string; // Changed from branchId
@@ -46,9 +45,15 @@ export interface MenuItem {
 	desc?: string;
 	perks?: string;
 	isFree?: boolean;
+	trackInventory?: boolean; // Tier 3: Toggle whether this item deducts from Stock
+	isRetail?: boolean;       // Tier 4: For barcode scanning
 	meats?: string[];      // IDs of meat MenuItems included in this package
 	autoSides?: string[];  // IDs of side MenuItems auto-included with this package
 }
+
+// ─── Takeout ─────────────────────────────────────────────────────────────────
+
+export type TakeoutStatus = 'new' | 'preparing' | 'ready' | 'picked_up';
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
@@ -67,13 +72,29 @@ export interface OrderItem {
 	notes?: string;
 }
 
-export type DiscountType = 'none' | 'senior' | 'pwd' | 'promo';
+export type DiscountType = 'none' | 'senior' | 'pwd' | 'promo' | 'comp' | 'service_recovery';
 export type OrderType = 'dine-in' | 'takeout';
 export type PaymentMethod = 'cash' | 'card' | 'gcash';
 
 export interface Payment {
 	method: PaymentMethod;
 	amount: number;
+}
+
+// ─── Split Bill ──────────────────────────────────────────────────────────────
+
+export type SplitType = 'equal' | 'by-item';
+
+export interface SubBill {
+	id: string;
+	label: string;           // "Guest 1", "Guest 2", etc.
+	itemIds: string[];        // OrderItem IDs assigned to this sub-bill
+	subtotal: number;
+	discountAmount: number;
+	vatAmount: number;
+	total: number;
+	payment: Payment | null;  // null = unpaid
+	paidAt: string | null;
 }
 
 export interface Order {
@@ -98,6 +119,11 @@ export interface Order {
 	closedAt: string | null;
 	billPrinted: boolean;
 	notes?: string;
+	cancelReason?: 'mistake' | 'walkout' | 'write_off';
+	takeoutStatus?: TakeoutStatus;  // only for takeout orders
+	splitType?: SplitType;
+	subBills?: SubBill[];
+	printStatus?: 'pending' | 'printing' | 'success' | 'failed'; // Tier 4
 }
 
 // ─── KDS ──────────────────────────────────────────────────────────────────────
@@ -118,4 +144,5 @@ export interface KdsTicket {
 	customerName?: string;         // for takeout orders
 	items: KdsTicketItem[];
 	createdAt: string;
+	printStatus?: 'pending' | 'success' | 'failed'; // Tier 4
 }

@@ -11,7 +11,8 @@
 
 	const tabs = [
 		{ href: '/stock/inventory', label: 'Current Inventory' },
-		{ href: '/stock/receive', label: 'Receive Delivery' },
+		{ href: '/stock/deliveries', label: 'Deliveries & Batches' },
+		{ href: '/stock/transfers', label: 'Transfers' },
 		{ href: '/stock/counts', label: 'Stock Counts' },
 		{ href: '/stock/waste', label: 'Waste Log' }
 	];

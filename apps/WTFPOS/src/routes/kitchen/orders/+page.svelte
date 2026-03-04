@@ -1,6 +1,26 @@
 <script lang="ts">
-	import { kdsTickets, markItemServed } from '$lib/stores/pos.svelte';
+	import { kdsTickets, markItemServed, toggleMenuItemAvailability, menuItems } from '$lib/stores/pos.svelte';
 	import { formatCountdown, cn } from '$lib/utils';
+	import { printKitchenOrder } from '$lib/stores/hardware.svelte';
+	import { TriangleAlert } from 'lucide-svelte';
+
+	// Auto-print incoming tickets
+	$effect(() => {
+		const toPrint = activeTickets.filter(t => !t.printStatus || t.printStatus === 'pending');
+		for (const ticket of toPrint) {
+			ticket.printStatus = 'success'; // optimistic to prevent loop
+			printKitchenOrder(ticket.orderId).then(res => {
+				if (!res.success) ticket.printStatus = 'failed';
+			});
+		}
+	});
+
+	function retryPrint(ticket: typeof kdsTickets[number]) {
+		ticket.printStatus = 'success'; // optimistic
+		printKitchenOrder(ticket.orderId).then(res => {
+			if (!res.success) ticket.printStatus = 'failed';
+		});
+	}
 
 	const activeTickets = $derived(
 		kdsTickets.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
@@ -43,6 +63,19 @@
 		const extras = items.filter((i) => i.category === 'packages' && i.status !== 'served');
 		return { meats, dishes, extras };
 	}
+
+	// Helper to check if an item is already 86'd
+	function isSoldOut(menuItemId: string): boolean {
+		const mi = menuItems.find(m => m.name === menuItemId);
+		return mi ? !mi.available : false;
+	}
+	
+	function handleSoldOut(menuItemName: string) {
+		const mi = menuItems.find(m => m.name === menuItemName);
+		if (mi) {
+			toggleMenuItemAvailability(mi.id);
+		}
+	}
 </script>
 
 <!-- Queue header -->
@@ -69,17 +102,25 @@
 	<div class="flex gap-4 overflow-x-auto pb-4" style="min-width: max-content">
 		{#each activeTickets as ticket (ticket.orderId)}
 			{@const grouped = groupItems(ticket.items)}
-			<div class={cn('flex w-60 shrink-0 flex-col rounded-xl border-2 overflow-hidden', ticketBorderClass(ticket.createdAt))}>
+			<div class={cn('flex w-60 shrink-0 flex-col rounded-xl border-2 overflow-hidden transition-colors', ticket.printStatus === 'failed' ? 'border-red-500 bg-red-50' : ticketBorderClass(ticket.createdAt))}>
 				<!-- Ticket header -->
 				<div class="flex items-center justify-between px-4 py-3 bg-white/60">
-					{#if ticket.tableNumber !== null}
-											<span class="text-lg font-extrabold text-gray-900">T{ticket.tableNumber}</span>
-										{:else}
-											<span class="flex items-center gap-1">
-												<span class="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-white">📦</span>
-												<span class="text-sm font-extrabold text-gray-900">{ticket.customerName ?? 'Takeout'}</span>
-											</span>
-										{/if}
+					<div class="flex items-center gap-2">
+						{#if ticket.tableNumber !== null}
+							<span class="text-lg font-extrabold text-gray-900">T{ticket.tableNumber}</span>
+						{:else}
+							<span class="flex items-center gap-1">
+								<span class="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-white">📦</span>
+								<span class="text-sm font-extrabold text-gray-900">{ticket.customerName ?? 'Takeout'}</span>
+							</span>
+						{/if}
+
+						{#if ticket.printStatus === 'failed'}
+							<button onclick={() => retryPrint(ticket)} class="flex items-center gap-0.5 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-red-200 transition-colors" title="Printer Error. Click to Retry.">
+								<TriangleAlert class="w-2.5 h-2.5" /> Retry
+							</button>
+						{/if}
+					</div>
 					<span class={cn(
 						'rounded-full px-2 py-0.5 font-mono text-xs font-bold',
 						ageMs(ticket.createdAt) > 10 * 60_000
@@ -100,10 +141,19 @@
 								🥩 MEATS — {grouped.meats.reduce((s, i) => s + (i.weight ?? 0), 0)}g total
 							</p>
 							{#each grouped.meats as item (item.id)}
-								<div class="flex items-center justify-between py-0.5">
-									<div>
+								<div class="flex items-center justify-between py-0.5 group">
+									<div class="flex-1">
 										<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
 										{#if item.weight}<span class="text-[10px] text-gray-400 ml-1">{item.weight}g</span>{/if}
+									</div>
+									<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
+										<button
+											onclick={() => handleSoldOut(item.menuItemName)}
+											class={cn('rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider', isSoldOut(item.menuItemName) ? 'bg-status-red text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
+											title="Toggle availability in POS"
+										>
+											{isSoldOut(item.menuItemName) ? 'Sold Out' : 'Mark Sold Out'}
+										</button>
 									</div>
 									<button
 										onclick={() => markItemServed(ticket.orderId, item.id)}
@@ -124,9 +174,20 @@
 								🍜 DISHES & DRINKS
 							</p>
 							{#each grouped.dishes as item (item.id)}
-								<div class="flex items-center justify-between py-0.5">
-									<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
-									<div class="flex items-center gap-2">
+								<div class="flex items-center justify-between py-0.5 group">
+									<div class="flex-1">
+										<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
+									</div>
+									<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
+										<button
+											onclick={() => handleSoldOut(item.menuItemName)}
+											class={cn('rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider', isSoldOut(item.menuItemName) ? 'bg-status-red text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
+											title="Toggle availability in POS"
+										>
+											{isSoldOut(item.menuItemName) ? 'Sold Out' : 'Mark Sold Out'}
+										</button>
+									</div>
+									<div class="flex items-center gap-2 shrink-0">
 										<span class="text-[10px] text-gray-400">{item.quantity}x</span>
 										<button
 											onclick={() => markItemServed(ticket.orderId, item.id)}

@@ -1,20 +1,22 @@
 <script lang="ts">
-	import { tables as allTables, orders as allOrders, openTable, closeTable, cleanTable, printBill, voidOrder, tickTimers, MENU_ITEMS, addItemToOrder, createTakeoutOrder } from '$lib/stores/pos.svelte';
+	import { tables as allTables, orders as allOrders, openTable, closeTable, cleanTable, printBill, voidOrder, tickTimers, menuItems, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus } from '$lib/stores/pos.svelte';
 	import type { Table, MenuItem, MenuCategory, DiscountType, Order } from '$lib/types';
 	import TopBar from '$lib/components/TopBar.svelte';
+	import TransferTableModal from '$lib/components/pos/TransferTableModal.svelte';
+	import PackageChangeModal from '$lib/components/pos/PackageChangeModal.svelte';
+	import SplitBillModal from '$lib/components/pos/SplitBillModal.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { formatCountdown, formatPeso, cn } from '$lib/utils';
 	import { log } from '$lib/stores/audit.svelte';
 	import { recalcOrder } from '$lib/stores/pos.svelte';
-
-
+	import { printReceipt } from '$lib/stores/hardware.svelte';
 
 	// ─── Branch-filtered tables/orders ───────────────────────────────────────────
 	const tables = $derived(session.locationId === 'all' ? allTables : allTables.filter(t => t.locationId === session.locationId));
 	const orders = $derived(session.locationId === 'all' ? allOrders : allOrders.filter(o => o.locationId === session.locationId));
 
-	// Takeout orders for current branch (open only)
-	const takeoutOrders = $derived(orders.filter(o => o.orderType === 'takeout' && o.status === 'open'));
+	// Takeout orders for current branch (open/active, not picked up)
+	const takeoutOrders = $derived(orders.filter(o => o.orderType === 'takeout' && o.status === 'open' && o.takeoutStatus !== 'picked_up'));
 
 	// ─── Timer ───────────────────────────────────────────────────────────────
 	$effect(() => {
@@ -52,8 +54,6 @@
 		selectedTakeoutId = null;
 		if (table.status === 'available') {
 			paxModalTable = table;
-		} else if (table.status === 'dirty') {
-			cleanTable(table.id);
 		} else {
 			selectedTableId = table.id;
 			showAddItem = false;
@@ -98,6 +98,8 @@
 
 	// ─── Checkout Modal ──────────────────────────────────────────────────────
 	let showCheckout = $state(false);
+	let checkoutLoading = $state(false);
+	let checkoutError = $state('');
 	let checkoutMethod = $state<'cash' | 'gcash' | 'maya'>('cash');
 	let cashTendered = $state<number>(0);
 
@@ -113,13 +115,41 @@
 		if (!currentActiveOrder || currentActiveOrder.items.filter(i => i.status !== 'cancelled').length === 0) return;
 		checkoutMethod = 'cash';
 		cashTendered = 0;
+		checkoutLoading = false;
+		checkoutError = '';
 		showCheckout = true;
 	}
 
-	function confirmCheckout() {
+	async function confirmCheckout() {
 		const order = checkoutOrder;
 		if (!order || !canConfirmCheckout) return;
 
+		checkoutLoading = true;
+		checkoutError = '';
+
+		try {
+			order.printStatus = 'printing';
+			const printResult = await printReceipt(order.id);
+
+			if (!printResult.success) {
+				checkoutError = printResult.error || 'Unknown Printer Error';
+				order.printStatus = 'failed';
+				return; 
+			}
+
+			finalizeCheckout(order, false);
+		} finally {
+			// keep loading true until UI unmounts if success
+			if (checkoutError) checkoutLoading = false;
+		}
+	}
+
+	function skipReceipt() {
+		if (checkoutOrder) finalizeCheckout(checkoutOrder, true);
+	}
+
+	function finalizeCheckout(order: Order, skippedPrint: boolean = false) {
+		order.printStatus = skippedPrint ? 'failed' : 'success';
 		const methodLabel = checkoutMethod === 'cash' ? 'Cash' : checkoutMethod === 'gcash' ? 'GCash' : 'Maya';
 		const label = order.orderType === 'takeout'
 			? `Takeout (${order.customerName ?? 'Walk-in'})`
@@ -146,6 +176,8 @@
 		log.tableClosed(label, order.total, methodLabel);
 		showCheckout = false;
 		showReceipt = true;
+		checkoutError = '';
+		checkoutLoading = false;
 		closeBill();
 	}
 
@@ -167,12 +199,14 @@
 	let showVoidConfirm = $state(false);
 	let voidPin = $state('');
 	let voidPinError = $state(false);
+	let voidReason = $state<'mistake' | 'walkout' | 'write_off'>('mistake');
 	const MANAGER_PIN = '1234';
 
 	function openVoidConfirm() {
 		if (!currentActiveOrder) return;
 		voidPin = '';
 		voidPinError = false;
+		voidReason = 'mistake';
 		showVoidConfirm = true;
 	}
 
@@ -183,8 +217,27 @@
 		}
 		const order = currentActiveOrder;
 		if (!order) return;
-		voidOrder(order.id);
+		voidOrder(order.id, voidReason);
 		showVoidConfirm = false;
+		closeBill();
+	}
+
+	// ─── Transfer / Package Change / Split Bill Modals ───────────────────────
+	let showTransferModal = $state(false);
+	let showPackageChange = $state(false);
+	let showSplitBill = $state(false);
+
+	function handleTransferComplete(newTableId: string) {
+		selectedTableId = newTableId;
+		showTransferModal = false;
+	}
+
+	function handlePackageChanged() {
+		showPackageChange = false;
+	}
+
+	function handleSplitComplete() {
+		showSplitBill = false;
 		closeBill();
 	}
 
@@ -235,7 +288,7 @@
 				: categories)
 	);
 
-	const filteredItems = $derived(MENU_ITEMS.filter((m) => m.category === activeCategory && m.available));
+	const filteredItems = $derived(menuItems.filter((m) => m.category === activeCategory && m.available));
 
 	// Pending items staged before pushing to bill
 	let pendingItems = $state<{ item: MenuItem; qty: number; weight?: number; forceFree?: boolean }[]>([]);
@@ -255,13 +308,13 @@
 			pendingItems = [{ item, qty: 1, forceFree: false }];
 			if (item.meats) {
 				for (const meatId of item.meats) {
-					const meat = MENU_ITEMS.find(m => m.id === meatId);
+					const meat = menuItems.find(m => m.id === meatId);
 					if (meat) pendingItems.push({ item: meat, qty: 1, weight: 150 * activePax, forceFree: true });
 				}
 			}
 			if (item.autoSides) {
 				for (const sideId of item.autoSides) {
-					const side = MENU_ITEMS.find(m => m.id === sideId);
+					const side = menuItems.find(m => m.id === sideId);
 					if (side) pendingItems.push({ item: side, qty: 1, forceFree: true });
 				}
 			}
@@ -309,7 +362,6 @@
 		
 		// Status colors
 		if (t.status === 'available') return base + 'border border-gray-300 bg-white hover:border-accent shadow-sm';
-		if (t.status === 'dirty') return base + 'border border-gray-600 bg-gray-700 text-gray-200';
 		if (t.status === 'billing') return base + 'border border-orange-500 bg-orange-100 shadow-md';
 		
 		// Unli-time critical blinking (if it's not billing/dirty)
@@ -323,7 +375,6 @@
 		if (t.status === 'critical') return 'bg-red-500 text-white font-bold animate-pulse';
 		if (t.status === 'warning')  return 'bg-yellow-400 text-gray-900 font-bold';
 		if (t.status === 'billing') return 'bg-orange-500 text-white font-bold';
-		if (t.status === 'dirty') return 'bg-gray-800 text-white font-bold';
 		return 'bg-emerald-500 text-white';
 	}
 
@@ -332,7 +383,38 @@
 		const idx = takeoutOrders.indexOf(order);
 		return `#TO${String(idx + 1).padStart(2, '0')}`;
 	}
+
+	// ─── Barcode Scanner ──────────────────────────────────────────────────────
+	let barcodeBuffer = $state('');
+	let barcodeTimeout = $state<NodeJS.Timeout>();
+
+	function handleGlobalKeydown(e: KeyboardEvent) {
+		// Only listen if no modals are open (inputs might be active)
+		if (showCheckout || showVoidConfirm || showPackageChange || showSplitBill || showAddItem || showTransferModal) return;
+		if (!currentActiveOrder) return;
+		
+		// If typing in input, ignore
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+		if (e.key === 'Enter') {
+			if (barcodeBuffer.length >= 3) {
+				const matchedItem = menuItems.find(i => i.isRetail && (i.id === barcodeBuffer || i.id === `ret-${barcodeBuffer}`));
+				if (matchedItem) {
+					addItemToOrder(currentActiveOrder.id, matchedItem, 1);
+					// Add to order cleanly
+				}
+				barcodeBuffer = '';
+			}
+		} else if (e.key.length === 1) { 
+			// Only capture single characters (letters, numbers)
+			barcodeBuffer += e.key;
+			clearTimeout(barcodeTimeout);
+			barcodeTimeout = setTimeout(() => { barcodeBuffer = ''; }, 100); // clear if typing slowly
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
 	<TopBar />
@@ -438,7 +520,9 @@
 			</div>
 
 		</div>
-	{:else}
+	{/if}
+
+	{#if session.locationId !== 'all'}
 	<!-- Main: floor + optional bill drawer -->
 	<div class="flex flex-1 overflow-hidden">
 		<!-- Floor content -->
@@ -456,7 +540,6 @@
 						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-white border border-gray-300"></span>Available</span>
 						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-emerald-500"></span>Dining (Green)</span>
 						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Ready / Bill (Orange)</span>
-						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-gray-700"></span>Dirty (Dark Gray)</span>
 					</div>
 					<!-- New Takeout button -->
 					<button
@@ -538,28 +621,49 @@
 						</h2>
 						<div class="flex flex-wrap gap-2">
 							{#each takeoutOrders as order (order.id)}
-								<button
-									onclick={() => handleTakeoutClick(order)}
-									class={cn(
-										'relative flex flex-col gap-1 rounded-xl border-2 border-dashed px-4 py-3 text-left transition-all active:scale-[0.98]',
-										selectedTakeoutId === order.id
-											? 'border-accent bg-accent-light'
-											: order.items.length === 0
-												? 'border-blue-400 bg-blue-50 hover:bg-blue-100 shadow-sm'
-												: 'border-orange-200 bg-orange-50 hover:border-orange-300'
-									)}
-									style="min-width: 120px"
+								{@const tStatus = order.takeoutStatus ?? 'new'}
+								<div class="relative flex flex-col gap-1 rounded-xl border-2 border-dashed px-4 py-3 text-left transition-all"
+									class:border-accent={selectedTakeoutId === order.id}
+									class:bg-accent-light={selectedTakeoutId === order.id}
+									class:border-blue-400={tStatus === 'new' && selectedTakeoutId !== order.id}
+									class:bg-blue-50={tStatus === 'new' && selectedTakeoutId !== order.id}
+									class:border-yellow-400={tStatus === 'preparing' && selectedTakeoutId !== order.id}
+									class:bg-yellow-50={tStatus === 'preparing' && selectedTakeoutId !== order.id}
+									class:border-green-400={tStatus === 'ready' && selectedTakeoutId !== order.id}
+									class:bg-green-50={tStatus === 'ready' && selectedTakeoutId !== order.id}
+									style="min-width: 140px"
 								>
-									<span class="font-mono text-[11px] font-bold text-accent">{takeoutLabel(order)}</span>
-									<span class="text-sm font-semibold text-gray-900">{order.customerName ?? 'Walk-in'}</span>
-									<span class="font-mono text-xs font-bold text-gray-700">{formatPeso(order.total)}</span>
-									<span class="text-[10px] text-gray-400">{order.items.filter(i => i.status !== 'cancelled').length} items</span>
-									{#if selectedTakeoutId === order.id}
-										<span class="absolute top-1.5 right-1.5 rounded bg-accent px-1.5 py-0.5 text-[9px] font-bold text-white">OPEN</span>
-									{:else if order.items.length === 0}
-										<span class="absolute top-1.5 right-1.5 rounded bg-blue-500 px-1.5 py-0.5 text-[9px] font-bold text-white">NEW</span>
+									<button
+										onclick={() => handleTakeoutClick(order)}
+										class="text-left"
+										style="min-height: unset"
+									>
+										<span class="font-mono text-[11px] font-bold text-accent">{takeoutLabel(order)}</span>
+										<div class="text-sm font-semibold text-gray-900">{order.customerName ?? 'Walk-in'}</div>
+										<span class="font-mono text-xs font-bold text-gray-700">{formatPeso(order.total)}</span>
+										<div class="text-[10px] text-gray-400">{order.items.filter(i => i.status !== 'cancelled').length} items</div>
+									</button>
+									<!-- Status badge -->
+									<span class={cn(
+										'absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white',
+										tStatus === 'new' ? 'bg-blue-500' :
+										tStatus === 'preparing' ? 'bg-yellow-500' :
+										tStatus === 'ready' ? 'bg-status-green animate-pulse' :
+										'bg-gray-400'
+									)}>
+										{tStatus === 'new' ? 'NEW' : tStatus === 'preparing' ? 'PREP' : tStatus === 'ready' ? 'READY' : 'DONE'}
+									</span>
+									<!-- Advance button -->
+									{#if tStatus !== 'picked_up'}
+										<button
+											onclick={(e) => { e.stopPropagation(); advanceTakeoutStatus(order.id); }}
+											class="mt-1 flex items-center justify-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+											style="min-height: 24px"
+										>
+											→ {tStatus === 'new' ? 'Start Prep' : tStatus === 'preparing' ? 'Mark Ready' : 'Picked Up'}
+										</button>
 									{/if}
-								</button>
+								</div>
 							{/each}
 						</div>
 					</div>
@@ -617,9 +721,29 @@
 						<button onclick={closeBill} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>
 					</div>
 					{#if currentActiveOrder.orderType === 'takeout'}
-						<div class="flex items-center gap-2 rounded-lg bg-orange-50 border border-dashed border-orange-200 px-3 py-1.5">
-							<span class="font-mono text-xs font-bold text-accent">{takeoutLabel(currentActiveOrder)}</span>
-							<span class="text-xs text-gray-500">· Takeout · no timer</span>
+						{@const tStatus = currentActiveOrder.takeoutStatus ?? 'new'}
+						<div class="flex items-center justify-between rounded-lg bg-orange-50 border border-dashed border-orange-200 px-3 py-1.5">
+							<div class="flex items-center gap-2">
+								<span class="font-mono text-xs font-bold text-accent">{takeoutLabel(currentActiveOrder)}</span>
+								<span class={cn(
+									'rounded px-1.5 py-0.5 text-[10px] font-bold text-white',
+									tStatus === 'new' ? 'bg-blue-500' :
+									tStatus === 'preparing' ? 'bg-yellow-500' :
+									tStatus === 'ready' ? 'bg-status-green' :
+									'bg-gray-400'
+								)}>
+									{tStatus.toUpperCase()}
+								</span>
+							</div>
+							{#if tStatus !== 'picked_up'}
+								<button
+									onclick={() => advanceTakeoutStatus(currentActiveOrder.id)}
+									class="text-[10px] font-semibold text-accent hover:underline"
+									style="min-height: unset"
+								>
+									→ {tStatus === 'new' ? 'Start Prep' : tStatus === 'preparing' ? 'Mark Ready' : 'Picked Up'}
+								</button>
+							{/if}
 						</div>
 					{:else if currentActiveOrder.packageName}
 						<div class="flex items-center justify-between">
@@ -681,29 +805,30 @@
 				</div>
 
 				<!-- Actions -->
-				{#if selectedTable?.status === 'dirty'}
-					<div class="flex flex-col gap-2 px-5 pb-5">
-						<div class="rounded-lg bg-gray-100 p-4 text-center border border-gray-300">
-							<p class="text-xs font-bold text-gray-600 uppercase tracking-widest mb-3">Table Needs Cleaning</p>
-							<button onclick={() => { cleanTable(selectedTable.id); closeBill(); }} class="btn-primary w-full shadow-md">
-								✨ Mark as Clean
-							</button>
+				<div class="flex flex-col gap-2 px-5 pb-5">
+						<!-- Primary actions -->
+						<div class="flex gap-2">
+							<button onclick={openVoidConfirm} class="btn-danger flex-1 text-sm" style="min-height: 44px">🗑 Void</button>
+							<button onclick={openCheckout} class="btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white" style="min-height: 44px">💳 Checkout</button>
+							<button onclick={() => printBill(currentActiveOrder.id)} class="btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800" style="min-height: 44px">🖨</button>
 						</div>
+						<!-- Secondary actions -->
+						<div class="flex gap-2">
+							{#if currentActiveOrder.orderType === 'dine-in' && selectedTable}
+								<button onclick={() => showTransferModal = true} class="btn-secondary flex-1 text-xs" style="min-height: 38px">🔀 Transfer</button>
+							{/if}
+							{#if currentActiveOrder.packageId && currentActiveOrder.orderType === 'dine-in'}
+								<button onclick={() => showPackageChange = true} class="btn-secondary flex-1 text-xs" style="min-height: 38px">🔄 Change Pkg</button>
+							{/if}
+							{#if currentActiveOrder.items.filter(i => i.status !== 'cancelled').length > 0}
+								<button onclick={() => showSplitBill = true} class="btn-secondary flex-1 text-xs" style="min-height: 38px">✂️ Split Bill</button>
+							{/if}
 					</div>
-				{:else}
-					<div class="flex gap-2 px-5 pb-5">
-						<button onclick={openVoidConfirm} class="btn-danger flex-1 text-sm" style="min-height: 44px">🗑 Void</button>
-						<button onclick={openCheckout} class="btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white" style="min-height: 44px">💳 Checkout</button>
-						<button onclick={() => printBill(currentActiveOrder.id)} class="btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800" style="min-height: 44px">🖨 Print Bill</button>
-					</div>
-				{/if}
+				</div>
+			</div>
 		{/if}
-		</div>
-	</div>
-	{/if}
-</div>
 
-<!-- ─── Add to Order Modal ────────────────────────────────────────────────────── -->
+		<!-- ─── Add to Order Modal ────────────────────────────────────────────────────── -->
 {#if showAddItem && currentActiveOrder}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
 		<div class="flex h-[700px] w-full max-w-[1100px] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
@@ -940,32 +1065,28 @@
 			</div>
 
 			<!-- Discount Toggles -->
-			<div class="flex items-center gap-2 border-b border-border px-6 py-3">
-				<span class="text-xs font-semibold text-gray-500 mr-auto">Discount:</span>
-				<button
-					onclick={() => applyDiscount('senior')}
-					class={cn(
-						'rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
-						checkoutOrder.discountType === 'senior'
-							? 'bg-status-green text-white'
-							: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
-					)}
-					style="min-height: 32px"
-				>
-					👴 Senior
-				</button>
-				<button
-					onclick={() => applyDiscount('pwd')}
-					class={cn(
-						'rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
-						checkoutOrder.discountType === 'pwd'
-							? 'bg-status-green text-white'
-							: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
-					)}
-					style="min-height: 32px"
-				>
-					♿ PWD
-				</button>
+			<div class="flex items-center gap-2 border-b border-border px-6 py-3 overflow-x-auto">
+				<span class="text-xs font-semibold text-gray-500 mr-auto shrink-0">Discount:</span>
+				{#each [
+					{ id: 'senior' as const, label: '👴 Senior' },
+					{ id: 'pwd' as const, label: '♿ PWD' },
+					{ id: 'promo' as const, label: '🎟️ Promo' },
+					{ id: 'comp' as const, label: '💯 Comp' },
+					{ id: 'service_recovery' as const, label: '❤️ Service Rec' }
+				] as discount}
+					<button
+						onclick={() => applyDiscount(discount.id)}
+						class={cn(
+							'shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+							checkoutOrder.discountType === discount.id
+								? 'bg-status-green text-white shadow-md'
+								: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
+						)}
+						style="min-height: 32px"
+					>
+						{discount.label}
+					</button>
+				{/each}
 			</div>
 
 			<!-- Payment Method -->
@@ -1052,24 +1173,44 @@
 				</div>
 			{/if}
 
+			<!-- Hardware Error State -->
+			{#if checkoutError}
+				<div class="px-6 py-4 mx-6 mt-4 mb-2 bg-red-50 border border-red-200 rounded-xl flex flex-col items-center text-center gap-2">
+					<p class="text-sm font-bold text-red-700">Hardware Error</p>
+					<p class="text-sm text-red-600">{checkoutError}</p>
+					<div class="flex gap-3 w-full mt-3">
+						<button class="btn-secondary flex-1 border-red-200 hover:bg-red-100 text-red-700 font-semibold" onclick={skipReceipt}>Skip Receipt</button>
+						<button class="btn-primary flex-1 bg-red-600 hover:bg-red-700" onclick={confirmCheckout}>Retry Print</button>
+					</div>
+				</div>
+			{/if}
+
 			<!-- Confirm / Cancel -->
-			<div class="flex gap-3 px-6 py-4">
-				<button
-					onclick={() => showCheckout = false}
-					class="btn-ghost flex-1"
-					style="min-height: 48px"
-				>
-					Cancel
-				</button>
-				<button
-					onclick={confirmCheckout}
-					disabled={!canConfirmCheckout}
-					class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-base font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-					style="min-height: 48px"
-				>
-					✓ Confirm Payment
-				</button>
-			</div>
+			{#if !checkoutError}
+				<div class="flex gap-3 px-6 py-4">
+					<button
+						onclick={() => showCheckout = false}
+						class="btn-ghost flex-1"
+						style="min-height: 48px"
+						disabled={checkoutLoading}
+					>
+						Cancel
+					</button>
+					<button
+						onclick={confirmCheckout}
+						disabled={!canConfirmCheckout || checkoutLoading}
+						class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-base font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+						style="min-height: 48px"
+					>
+						{#if checkoutLoading}
+							<span class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+							Printing...
+						{:else}
+							✓ Confirm Payment
+						{/if}
+					</button>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -1197,6 +1338,31 @@
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-status-red">Void Order</h3>
 				<p class="text-sm text-gray-500">This will cancel the entire order and free the table. Enter Manager PIN to confirm.</p>
+			</div>
+
+			<!-- Reason Selection -->
+			<div class="flex flex-col gap-1.5">
+				<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Reason</span>
+				<div class="grid grid-cols-3 gap-2">
+					{#each [
+						{ id: 'mistake' as const, label: 'Mistake' },
+						{ id: 'walkout' as const, label: 'Walkout' },
+						{ id: 'write_off' as const, label: 'Write-off' }
+					] as reason}
+						<button
+							onclick={() => voidReason = reason.id}
+							class={cn(
+								'rounded-lg py-2 text-sm font-semibold transition-all',
+								voidReason === reason.id
+									? 'bg-status-red text-white'
+									: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
+							)}
+							style="min-height: 40px"
+						>
+							{reason.label}
+						</button>
+					{/each}
+				</div>
 			</div>
 
 			<!-- PIN dots -->
@@ -1350,4 +1516,31 @@
 			{/if}
 		</div>
 	</div>
+{/if}
+
+<!-- ─── Transfer Table Modal ───────────────────────────────────────────────── -->
+{#if showTransferModal && selectedTable}
+	<TransferTableModal
+		fromTable={selectedTable}
+		onclose={() => showTransferModal = false}
+		ontransfer={handleTransferComplete}
+	/>
+{/if}
+
+<!-- ─── Package Change Modal ─────────────────────────────────────────────── -->
+{#if showPackageChange && currentActiveOrder}
+	<PackageChangeModal
+		order={currentActiveOrder}
+		onclose={() => showPackageChange = false}
+		onchange={handlePackageChanged}
+	/>
+{/if}
+
+<!-- ─── Split Bill Modal ─────────────────────────────────────────────────── -->
+{#if showSplitBill && currentActiveOrder}
+	<SplitBillModal
+		order={currentActiveOrder}
+		onclose={() => showSplitBill = false}
+		oncomplete={handleSplitComplete}
+	/>
 {/if}

@@ -34,6 +34,10 @@ export interface Delivery {
 	supplier: string;
 	notes: string;
 	receivedAt: string;
+	batchNo?: string;
+	expiryDate?: string; // YYYY-MM-DD
+	usedQty?: number;
+	depleted?: boolean;
 }
 
 export interface WasteEntry {
@@ -117,9 +121,9 @@ export const stockItems = $state<StockItem[]>(
 );
 
 export const deliveries = $state<Delivery[]>([
-	{ id: 'd1', stockItemId: 'si-0', itemName: 'Samgyupsal (Pork Belly)', qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: '8:15 AM' },
-	{ id: 'd2', stockItemId: 'si-9', itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: '8:30 AM' },
-	{ id: 'd3', stockItemId: 'si-4', itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: '9:00 AM' },
+	{ id: 'd1', stockItemId: 'si-0', itemName: 'Samgyupsal (Pork Belly)', qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: '8:15 AM', usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0] },
+	{ id: 'd2', stockItemId: 'si-9', itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: '8:30 AM', usedQty: 0, depleted: false, batchNo: 'B-242' },
+	{ id: 'd3', stockItemId: 'si-4', itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: '9:00 AM', usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] },
 ]);
 
 export const wasteEntries = $state<WasteEntry[]>([
@@ -188,7 +192,7 @@ export function getDrift(stockItemId: string, period: CountPeriod): number | nul
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-export function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '') {
+export function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '', batchNo?: string, expiryDate?: string) {
 	deliveries.unshift({
 		id: nanoid(),
 		stockItemId,
@@ -198,6 +202,10 @@ export function receiveDelivery(stockItemId: string, itemName: string, qty: numb
 		supplier,
 		notes,
 		receivedAt: new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+		batchNo,
+		expiryDate,
+		usedQty: 0,
+		depleted: false
 	});
 	log.deliveryReceived(itemName, qty, unit, supplier);
 }
@@ -261,9 +269,12 @@ export function setStock(
 }
 
 /** Called by POS when items are charged to a table */
-export function deductFromStock(menuItemId: string, qty: number, tableId: string, orderId: string) {
+export function deductFromStock(menuItemId: string, qty: number, tableId: string, orderId: string, isTracked: boolean = false) {
+	if (!isTracked) return;
 	const item = stockItems.find(s => s.menuItemId === menuItemId);
 	if (!item) return; // item not tracked in stock (e.g. packages themselves)
+
+	// Add the actual deduction logic
 	deductions.push({
 		id: nanoid(),
 		stockItemId: item.id,
@@ -272,6 +283,59 @@ export function deductFromStock(menuItemId: string, qty: number, tableId: string
 		orderId,
 		timestamp: new Date().toISOString(),
 	});
+
+	// Tier 3: Process FIFO queue for batches
+	let remainingToDeduct = qty;
+	// Oldest deliveries first (assuming array is prepended via unshift, so reverse or findLast-ish)
+	// We'll iterate from the end (oldest) to start (newest)
+	for (let i = deliveries.length - 1; i >= 0; i--) {
+		const d = deliveries[i];
+		if (d.stockItemId !== item.id || d.depleted) continue;
+
+		const dUsed = d.usedQty || 0;
+		const availableInBatch = d.qty - dUsed;
+
+		if (availableInBatch > 0) {
+			const deductNow = Math.min(availableInBatch, remainingToDeduct);
+			d.usedQty = dUsed + deductNow;
+			if (d.usedQty >= d.qty) {
+				d.depleted = true;
+			}
+			remainingToDeduct -= deductNow;
+			if (remainingToDeduct <= 0) break;
+		}
+	}
+}
+
+/** Tier 3: Returns active deliveries nearing expiration (within 3 days) */
+export function getSpoilageAlerts() {
+	const todayMs = Date.now();
+	const THRESHOLD = 86400000 * 3; // 3 days
+	
+	return deliveries.filter(d => {
+		if (d.depleted || !d.expiryDate) return false;
+		const expMs = new Date(d.expiryDate).getTime();
+		const diff = expMs - todayMs;
+		return diff > -86400000 && diff <= THRESHOLD; // between 1 day ago (already expired) and 3 days from now
+	}).map(d => {
+		const daysLeft = Math.ceil((new Date(d.expiryDate!).getTime() - todayMs) / 86400000);
+		return { ...d, daysLeft };
+	});
+}
+
+/** Tier 3: Transfer stock between branches/warehouses */
+export function transferStock(stockItemMenuItemId: string, qty: number, fromLocationId: string, toLocationId: string, loggedBy: string = 'Staff') {
+	const fromItem = stockItems.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === fromLocationId);
+	const toItem = stockItems.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === toLocationId);
+	
+	if (!fromItem || !toItem) return false; // Stock link must exist in both locations
+	
+	const currentFrom = getCurrentStock(fromItem.id);
+	if (currentFrom < qty) return false; // Not enough stock to transfer
+
+	adjustStock(fromItem.id, fromItem.name, 'deduct', qty, fromItem.unit, `Transfer to ${toLocationId}`, undefined, undefined, loggedBy);
+	adjustStock(toItem.id, toItem.name, 'add', qty, toItem.unit, `Transfer from ${fromLocationId}`, undefined, undefined, loggedBy);
+	return true;
 }
 
 export function submitCount(stockItemId: string, period: CountPeriod, value: number) {

@@ -9,8 +9,7 @@
 		occupied: 'border-table-occupied/40 bg-table-occupied/10 hover:bg-table-occupied/20',
 		warning: 'border-table-warning/60 bg-table-warning/15 hover:bg-table-warning/25',
 		critical: 'border-table-critical/80 bg-table-critical/20 hover:bg-table-critical/30 animate-pulse',
-		billing: 'border-orange-500 bg-orange-100 hover:bg-orange-200',
-		dirty: 'border-gray-500 bg-gray-700 hover:bg-gray-600'
+		billing: 'border-orange-500 bg-orange-100 hover:bg-orange-200'
 	};
 
 	const statusDot: Record<Table['status'], string> = {
@@ -18,8 +17,7 @@
 		occupied: 'bg-table-occupied',
 		warning: 'bg-table-warning animate-pulse',
 		critical: 'bg-table-critical animate-timer-tick',
-		billing: 'bg-orange-500',
-		dirty: 'bg-gray-400'
+		billing: 'bg-orange-500'
 	};
 
 	const statusLabel: Record<Table['status'], string> = {
@@ -27,8 +25,7 @@
 		occupied: 'Occupied',
 		warning: '⚠ Running low',
 		critical: '🔴 Time up soon',
-		billing: 'Printing Bill',
-		dirty: 'Dirty / Cleaning'
+		billing: 'Printing Bill'
 	};
 </script>
 

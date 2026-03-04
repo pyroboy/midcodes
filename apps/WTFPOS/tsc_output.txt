@@ -1,0 +1,198 @@
+
+> wtfpos@0.0.1 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS
+Getting Svelte diagnostics...
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:205:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-gray-500 uppercase">Label</label>
+						<input type="text" bind:value={editLabel} class="pos-input" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:210:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-gray-500 uppercase">Capacity (Pax)</label>
+						<input type="number" bind:value={editCapacity} class="pos-input" min="1" max="20" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:201:7
+Warn: Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute
+https://svelte.dev/e/a11y_consider_explicit_label (svelte)
+					<td class="px-5 py-3 text-center">
+						<button
+							onclick={() => toggleMenuItemAvailability(item.id)}
+							class={cn(
+								'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
+								item.available ? 'bg-status-green' : 'bg-gray-300'
+							)}
+							style="min-height: unset"
+						>
+							<span class={cn(
+								'inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm',
+								item.available ? 'translate-x-6' : 'translate-x-1'
+							)}></span>
+						</button>
+					</td>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:267:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Name</label>
+					<input type="text" bind:value={formName} class="pos-input" placeholder="e.g. Samgyupsal, Soju, etc." />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:273:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</label>
+					<select bind:value={formCategory} class="pos-input">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:286:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+							{formIsWeightBased ? 'Base Price (₱)' : 'Price (₱)'}
+						</label>
+						<input type="number" bind:value={formPrice} class="pos-input font-mono" min="0" step="1" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:294:8
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+						<div class="flex flex-col gap-1.5">
+							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Price Per Gram (₱)</label>
+							<input type="number" bind:value={formPricePerGram} class="pos-input font-mono" min="0" step="0.01" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:318:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description (optional)</label>
+					<input type="text" bind:value={formDesc} class="pos-input" placeholder="Short description" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:329:8
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+						<div class="flex flex-col gap-1.5">
+							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Perks Text</label>
+							<input type="text" bind:value={formPerks} class="pos-input" placeholder="e.g. 4 sides, 200g initial meats" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:335:8
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+						<div class="flex flex-col gap-1.5">
+							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Included Meats</label>
+							<div class="flex flex-wrap gap-2">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/menu/+page.svelte:356:8
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+						<div class="flex flex-col gap-1.5">
+							<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Auto-included Sides</label>
+							<div class="flex flex-wrap gap-2">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/pos/+page.svelte:828:4
+Error: `</div>` attempted to close an element that was not open
+https://svelte.dev/e/element_invalid_closing_tag (svelte)
+					</div>
+			</div>
+</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/pos/+page.svelte:828:4
+Error: `</div>` attempted to close an element that was not open
+https://svelte.dev/e/element_invalid_closing_tag (ts)
+					</div>
+			</div>
+</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/deliveries/+page.svelte:199:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item</label>
+					<select bind:value={formStockItemId} class="pos-input">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/deliveries/+page.svelte:209:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex-1 flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</label>
+						<input type="number" bind:value={formQty} class="pos-input font-mono" min="0" step="0.1" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/deliveries/+page.svelte:213:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex-1 flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</label>
+						<input type="text" class="pos-input bg-gray-50" value={activeItems.find(s => s.id === formStockItemId)?.unit ?? ''} disabled />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/deliveries/+page.svelte:220:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex-1 flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-accent uppercase tracking-wider">Batch No (Optional)</label>
+						<input type="text" bind:value={formBatchNo} class="pos-input font-mono" placeholder="e.g. B-2024-05" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/deliveries/+page.svelte:224:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex-1 flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-status-red uppercase tracking-wider">Expiry (Optional)</label>
+						<input type="date" bind:value={formExpiryDate} class="pos-input" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/deliveries/+page.svelte:230:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</label>
+					<input type="text" bind:value={formSupplier} class="pos-input" placeholder="e.g. Monterey Meats" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/deliveries/+page.svelte:235:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Notes</label>
+					<input type="text" bind:value={formNotes} class="pos-input" placeholder="Optional notes" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/transfers/+page.svelte:94:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Source Item (From {sourceLocationId.toUpperCase()})</label>
+					<select bind:value={formStockMenuItemId} class="pos-input">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/transfers/+page.svelte:105:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Transfer Quantity</label>
+						<input type="number" bind:value={formQty} class="pos-input font-mono" min="0" step="0.1" placeholder="0.0" />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/transfers/+page.svelte:109:7
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+					<div class="flex flex-col gap-1.5 w-24">
+						<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</label>
+						<input type="text" class="pos-input bg-gray-50 font-mono text-center text-gray-500" value={selectedSourceItem?.unit ?? '-'} disabled />
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/transfers/+page.svelte:123:6
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Destination Branch</label>
+					<div class="flex flex-col gap-2">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/stock/transfers/+page.svelte:144:5
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+			<div class="flex-1 flex flex-col gap-1.5 w-full">
+				<label class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Transfer Reason / Notes</label>
+				<input type="text" bind:value={formNotes} class="pos-input" placeholder="e.g. Weekly replenishment run" />
+
+====================================
+svelte-check found 2 errors and 23 warnings in 5 files

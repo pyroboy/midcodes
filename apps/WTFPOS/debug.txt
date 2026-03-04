@@ -1,0 +1,1547 @@
+1 <script lang="ts">
+2 	import { tables as allTables, orders as allOrders, openTable, closeTable, cleanTable, printBill, voidOrder, tickTimers, menuItems, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus } from '$lib/stores/pos.svelte';
+3 	import type { Table, MenuItem, MenuCategory, DiscountType, Order } from '$lib/types';
+4 	import TopBar from '$lib/components/TopBar.svelte';
+5 	import TransferTableModal from '$lib/components/pos/TransferTableModal.svelte';
+6 	import PackageChangeModal from '$lib/components/pos/PackageChangeModal.svelte';
+7 	import SplitBillModal from '$lib/components/pos/SplitBillModal.svelte';
+8 	import { session } from '$lib/stores/session.svelte';
+9 	import { formatCountdown, formatPeso, cn } from '$lib/utils';
+10 	import { log } from '$lib/stores/audit.svelte';
+11 	import { recalcOrder } from '$lib/stores/pos.svelte';
+12 	import { printReceipt } from '$lib/stores/hardware.svelte';
+13 
+14 	// ─── Branch-filtered tables/orders ───────────────────────────────────────────
+15 	const tables = $derived(session.locationId === 'all' ? allTables : allTables.filter(t => t.locationId === session.locationId));
+16 	const orders = $derived(session.locationId === 'all' ? allOrders : allOrders.filter(o => o.locationId === session.locationId));
+17 
+18 	// Takeout orders for current branch (open/active, not picked up)
+19 	const takeoutOrders = $derived(orders.filter(o => o.orderType === 'takeout' && o.status === 'open' && o.takeoutStatus !== 'picked_up'));
+20 
+21 	// ─── Timer ───────────────────────────────────────────────────────────────
+22 	$effect(() => {
+23 		const id = setInterval(tickTimers, 1000);
+24 		return () => clearInterval(id);
+25 	});
+26 
+27 	// ─── Floor stats ──────────────────────────────────────────────────────────
+28 	const occupied = $derived(tables.filter((t) => t.status !== 'available').length);
+29 	const free     = $derived(tables.filter((t) => t.status === 'available').length);
+30 
+31 	const mainTables = $derived(tables.filter((t) => t.zone === 'main'));
+32 
+33 	// ─── Selected Order (dine-in or takeout) ──────────────────────────────────
+34 	let selectedTableId    = $state<string | null>(null);
+35 	let selectedTakeoutId  = $state<string | null>(null);
+36 
+37 	const selectedTable = $derived(selectedTableId ? tables.find((t) => t.id === selectedTableId) : null);
+38 
+39 	// Active order: either from a table or from a takeout selection
+40 	const activeOrder = $derived((): Order | undefined => {
+41 		if (selectedTakeoutId) return orders.find(o => o.id === selectedTakeoutId);
+42 		if (selectedTable?.currentOrderId) return orders.find(o => o.id === selectedTable.currentOrderId);
+43 		return undefined;
+44 	});
+45 
+46 	// Helper to get the active order regardless of type
+47 	const currentActiveOrder = $derived(activeOrder());
+48 
+49 	const activePax = $derived(currentActiveOrder?.pax ?? 1);
+50 
+51 	let paxModalTable = $state<Table | null>(null);
+52 
+53 	function handleTableClick(table: Table) {
+54 		selectedTakeoutId = null;
+55 		if (table.status === 'available') {
+56 			paxModalTable = table;
+57 		} else {
+58 			selectedTableId = table.id;
+59 			showAddItem = false;
+60 		}
+61 	}
+62 
+63 	function handleTakeoutClick(order: Order) {
+64 		selectedTableId = null;
+65 		selectedTakeoutId = order.id;
+66 		showAddItem = false;
+67 	}
+68 
+69 	function confirmPax(pax: number) {
+70 		if (paxModalTable) {
+71 			openTable(paxModalTable.id, pax);
+72 			selectedTableId = paxModalTable.id;
+73 			showAddItem = true;
+74 			activeCategory = 'packages';
+75 			paxModalTable = null;
+76 		}
+77 	}
+78 
+79 	function closeBill() {
+80 		selectedTableId   = null;
+81 		selectedTakeoutId = null;
+82 		showAddItem = false;
+83 	}
+84 
+85 	function applyDiscount(type: DiscountType) {
+86 		const order = currentActiveOrder;
+87 		if (!order) return;
+88 		const prev = order.discountType;
+89 		order.discountType = (prev === type) ? 'none' : type;
+90 		recalcOrder(order);
+91 		if (selectedTable) selectedTable.billTotal = order.total;
+92 		if (order.discountType === 'none') {
+93 			log.discountRemoved(selectedTable?.label ?? `Takeout`);
+94 		} else {
+95 			log.discountApplied(selectedTable?.label ?? `Takeout`, order.discountType, order.discountAmount);
+96 		}
+97 	}
+98 
+99 	// ─── Checkout Modal ──────────────────────────────────────────────────────
+100 	let showCheckout = $state(false);
+101 	let checkoutLoading = $state(false);
+102 	let checkoutError = $state('');
+103 	let checkoutMethod = $state<'cash' | 'gcash' | 'maya'>('cash');
+104 	let cashTendered = $state<number>(0);
+105 
+106 	const checkoutOrder = $derived(showCheckout ? currentActiveOrder : null);
+107 	const cashChange = $derived(checkoutOrder ? Math.max(0, cashTendered - checkoutOrder.total) : 0);
+108 	const canConfirmCheckout = $derived(
+109 		checkoutOrder
+110 			? (checkoutMethod !== 'cash' || cashTendered >= checkoutOrder.total)
+111 			: false
+112 	);
+113 
+114 	function openCheckout() {
+115 		if (!currentActiveOrder || currentActiveOrder.items.filter(i => i.status !== 'cancelled').length === 0) return;
+116 		checkoutMethod = 'cash';
+117 		cashTendered = 0;
+118 		checkoutLoading = false;
+119 		checkoutError = '';
+120 		showCheckout = true;
+121 	}
+122 
+123 	async function confirmCheckout() {
+124 		const order = checkoutOrder;
+125 		if (!order || !canConfirmCheckout) return;
+126 
+127 		checkoutLoading = true;
+128 		checkoutError = '';
+129 
+130 		try {
+131 			order.printStatus = 'printing';
+132 			const printResult = await printReceipt(order.id);
+133 
+134 			if (!printResult.success) {
+135 				checkoutError = printResult.error || 'Unknown Printer Error';
+136 				order.printStatus = 'failed';
+137 				return; 
+138 			}
+139 
+140 			finalizeCheckout(order, false);
+141 		} finally {
+142 			// keep loading true until UI unmounts if success
+143 			if (checkoutError) checkoutLoading = false;
+144 		}
+145 	}
+146 
+147 	function skipReceipt() {
+148 		if (checkoutOrder) finalizeCheckout(checkoutOrder, true);
+149 	}
+150 
+151 	function finalizeCheckout(order: Order, skippedPrint: boolean = false) {
+152 		order.printStatus = skippedPrint ? 'failed' : 'success';
+153 		const methodLabel = checkoutMethod === 'cash' ? 'Cash' : checkoutMethod === 'gcash' ? 'GCash' : 'Maya';
+154 		const label = order.orderType === 'takeout'
+155 			? `Takeout (${order.customerName ?? 'Walk-in'})`
+156 			: (selectedTable?.label ?? '');
+157 
+158 		// Record payment
+159 		order.payments.push({
+160 			method: checkoutMethod === 'maya' ? 'gcash' : checkoutMethod,
+161 			amount: checkoutMethod === 'cash' ? cashTendered : order.total
+162 		});
+163 		order.status = 'paid';
+164 		order.closedAt = new Date().toISOString();
+165 
+166 		// Snapshot receipt data before closing
+167 		receiptOrder = order;
+168 		receiptChange = checkoutMethod === 'cash' ? cashTendered - order.total : 0;
+169 		receiptMethod = methodLabel;
+170 
+171 		// Free the table for dine-in
+172 		if (order.tableId) {
+173 			closeTable(order.tableId);
+174 		}
+175 
+176 		log.tableClosed(label, order.total, methodLabel);
+177 		showCheckout = false;
+178 		showReceipt = true;
+179 		checkoutError = '';
+180 		checkoutLoading = false;
+181 		closeBill();
+182 	}
+183 
+184 	function selectCashPreset(amount: number) {
+185 		cashTendered = amount;
+186 	}
+187 
+188 	function exactCash() {
+189 		if (checkoutOrder) cashTendered = checkoutOrder.total;
+190 	}
+191 
+192 	// ─── Receipt Modal ───────────────────────────────────────────────────────
+193 	let showReceipt = $state(false);
+194 	let receiptOrder = $state<Order | null>(null);
+195 	let receiptChange = $state(0);
+196 	let receiptMethod = $state('');
+197 
+198 	// ─── Void Flow ───────────────────────────────────────────────────────────
+199 	let showVoidConfirm = $state(false);
+200 	let voidPin = $state('');
+201 	let voidPinError = $state(false);
+202 	let voidReason = $state<'mistake' | 'walkout' | 'write_off'>('mistake');
+203 	const MANAGER_PIN = '1234';
+204 
+205 	function openVoidConfirm() {
+206 		if (!currentActiveOrder) return;
+207 		voidPin = '';
+208 		voidPinError = false;
+209 		voidReason = 'mistake';
+210 		showVoidConfirm = true;
+211 	}
+212 
+213 	function confirmVoid() {
+214 		if (voidPin !== MANAGER_PIN) {
+215 			voidPinError = true;
+216 			return;
+217 		}
+218 		const order = currentActiveOrder;
+219 		if (!order) return;
+220 		voidOrder(order.id, voidReason);
+221 		showVoidConfirm = false;
+222 		closeBill();
+223 	}
+224 
+225 	// ─── Transfer / Package Change / Split Bill Modals ───────────────────────
+226 	let showTransferModal = $state(false);
+227 	let showPackageChange = $state(false);
+228 	let showSplitBill = $state(false);
+229 
+230 	function handleTransferComplete(newTableId: string) {
+231 		selectedTableId = newTableId;
+232 		showTransferModal = false;
+233 	}
+234 
+235 	function handlePackageChanged() {
+236 		showPackageChange = false;
+237 	}
+238 
+239 	function handleSplitComplete() {
+240 		showSplitBill = false;
+241 		closeBill();
+242 	}
+243 
+244 	// ─── Order History ───────────────────────────────────────────────────────
+245 	let showHistory = $state(false);
+246 	const closedOrders = $derived(
+247 		orders.filter(o => o.status === 'paid' || o.status === 'cancelled')
+248 			.sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
+249 	);
+250 
+251 	// ─── New Takeout Modal ────────────────────────────────────────────────────
+252 	let showTakeoutModal = $state(false);
+253 	let takeoutName = $state('');
+254 
+255 	function openTakeoutModal() {
+256 		takeoutName = '';
+257 		showTakeoutModal = true;
+258 	}
+259 
+260 	function confirmTakeout() {
+261 		const name = takeoutName.trim() || 'Walk-in';
+262 		const orderId = createTakeoutOrder(name);
+263 		selectedTakeoutId = orderId;
+264 		selectedTableId = null;
+265 		showAddItem = true;
+266 		activeCategory = 'dishes';
+267 		showTakeoutModal = false;
+268 	}
+269 
+270 	// ─── Add to Order Modal ───────────────────────────────────────────────────
+271 	let showAddItem = $state(false);
+272 	let activeCategory = $state<MenuCategory>('packages');
+273 
+274 	const categories: { id: MenuCategory; label: string }[] = [
+275 		{ id: 'packages', label: '🎫 Package' },
+276 		{ id: 'meats',    label: '🥩 Meats' },
+277 		{ id: 'sides',    label: '🥬 Sides' },
+278 		{ id: 'dishes',   label: '🍜 Dishes' },
+279 		{ id: 'drinks',   label: '🥤 Drinks' }
+280 	];
+281 
+282 	// Takeout hides "packages" + "meats"; dine-in hides packages if already set
+283 	const visibleCategories = $derived(
+284 		currentActiveOrder?.orderType === 'takeout'
+285 			? categories.filter(c => c.id !== 'packages' && c.id !== 'meats')
+286 			: (currentActiveOrder?.packageId
+287 				? categories.filter(c => c.id !== 'packages')
+288 				: categories)
+289 	);
+290 
+291 	const filteredItems = $derived(menuItems.filter((m) => m.category === activeCategory && m.available));
+292 
+293 	// Pending items staged before pushing to bill
+294 	let pendingItems = $state<{ item: MenuItem; qty: number; weight?: number; forceFree?: boolean }[]>([]);
+295 	const pendingTotal = $derived(
+296 		pendingItems.reduce((s, p) => {
+297 			if (p.forceFree) return s;
+298 			if (p.item.category === 'packages') return s + (p.item.price * activePax);
+299 			return s + (p.item.isWeightBased ? Math.round((p.weight ?? 0) * (p.item.pricePerGram ?? 0)) : p.item.price) * p.qty;
+300 		}, 0)
+301 	);
+302 
+303 	let weightScreenItem = $state<MenuItem | null>(null);
+304 	let weightInput = $state('');
+305 
+306 	function tapItem(item: MenuItem) {
+307 		if (item.category === 'packages') {
+308 			pendingItems = [{ item, qty: 1, forceFree: false }];
+309 			if (item.meats) {
+310 				for (const meatId of item.meats) {
+311 					const meat = menuItems.find(m => m.id === meatId);
+312 					if (meat) pendingItems.push({ item: meat, qty: 1, weight: 150 * activePax, forceFree: true });
+313 				}
+314 			}
+315 			if (item.autoSides) {
+316 				for (const sideId of item.autoSides) {
+317 					const side = menuItems.find(m => m.id === sideId);
+318 					if (side) pendingItems.push({ item: side, qty: 1, forceFree: true });
+319 				}
+320 			}
+321 			activeCategory = 'meats';
+322 			return;
+323 		}
+324 		if (item.isWeightBased) { weightScreenItem = item; weightInput = ''; return; }
+325 		const existing = pendingItems.find((p) => p.item.id === item.id);
+326 		if (existing) existing.qty++;
+327 		else pendingItems.push({ item, qty: 1, forceFree: false });
+328 	}
+329 
+330 	function commitMeat(weight: number) {
+331 		if (!weightScreenItem || isNaN(weight) || weight <= 0) return;
+332 		pendingItems.push({ item: weightScreenItem, qty: 1, weight, forceFree: true });
+333 		weightScreenItem = null;
+334 	}
+335 
+336 	function changeQty(idx: number, delta: number) {
+337 		const p = pendingItems[idx];
+338 		if (p.item.isWeightBased) {
+339 			p.weight = Math.max(0, (p.weight || 0) + delta * 50);
+340 			if (p.weight === 0) pendingItems.splice(idx, 1);
+341 		} else {
+342 			p.qty += delta;
+343 			if (p.qty <= 0) pendingItems.splice(idx, 1);
+344 		}
+345 	}
+346 
+347 	function chargeToOrder() {
+348 		const order = currentActiveOrder;
+349 		if (!order) return;
+350 		for (const p of pendingItems) {
+351 			addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree);
+352 		}
+353 		pendingItems = [];
+354 		showAddItem = false;
+355 	}
+356 
+357 	function undoPending() { pendingItems = []; }
+358 
+359 	// ─── Table card style helpers ─────────────────────────────────────────────
+360 	function tableCardClass(t: Table) {
+361 		let base = 'relative overflow-hidden transition-all ';
+362 		
+363 		// Status colors
+364 		if (t.status === 'available') return base + 'border border-gray-300 bg-white hover:border-accent shadow-sm';
+365 		if (t.status === 'billing') return base + 'border border-orange-500 bg-orange-100 shadow-md';
+366 		
+367 		// Unli-time critical blinking (if it's not billing/dirty)
+368 		if (t.status === 'critical') return base + 'border-2 border-red-500 bg-status-green-light animate-border-pulse-red ring-2 ring-red-500 ring-offset-2';
+369 		if (t.status === 'warning') return base + 'border-2 border-yellow-400 bg-status-green-light shadow-md animate-border-pulse-yellow';
+370 		
+371 		return base + 'border-2 border-emerald-500 bg-emerald-50 shadow-md'; 
+372 	}
+373 
+374 	function timerBadgeClass(t: Table) {
+375 		if (t.status === 'critical') return 'bg-red-500 text-white font-bold animate-pulse';
+376 		if (t.status === 'warning')  return 'bg-yellow-400 text-gray-900 font-bold';
+377 		if (t.status === 'billing') return 'bg-orange-500 text-white font-bold';
+378 		return 'bg-emerald-500 text-white';
+379 	}
+380 
+381 	// ─── Takeout ticket number label ──────────────────────────────────────────
+382 	function takeoutLabel(order: Order) {
+383 		const idx = takeoutOrders.indexOf(order);
+384 		return `#TO${String(idx + 1).padStart(2, '0')}`;
+385 	}
+386 
+387 	// ─── Barcode Scanner ──────────────────────────────────────────────────────
+388 	let barcodeBuffer = $state('');
+389 	let barcodeTimeout = $state<NodeJS.Timeout>();
+390 
+391 	function handleGlobalKeydown(e: KeyboardEvent) {
+392 		// Only listen if no modals are open (inputs might be active)
+393 		if (showCheckout || showVoidConfirm || showPackageChange || showSplitBill || showAddItem || showTransferModal) return;
+394 		if (!currentActiveOrder) return;
+395 		
+396 		// If typing in input, ignore
+397 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+398 
+399 		if (e.key === 'Enter') {
+400 			if (barcodeBuffer.length >= 3) {
+401 				const matchedItem = menuItems.find(i => i.isRetail && (i.id === barcodeBuffer || i.id === `ret-${barcodeBuffer}`));
+402 				if (matchedItem) {
+403 					addItemToOrder(currentActiveOrder.id, matchedItem, 1);
+404 					// Add to order cleanly
+405 				}
+406 				barcodeBuffer = '';
+407 			}
+408 		} else if (e.key.length === 1) { 
+409 			// Only capture single characters (letters, numbers)
+410 			barcodeBuffer += e.key;
+411 			clearTimeout(barcodeTimeout);
+412 			barcodeTimeout = setTimeout(() => { barcodeBuffer = ''; }, 100); // clear if typing slowly
+413 		}
+414 	}
+415 </script>
+416 
+417 <svelte:window onkeydown={handleGlobalKeydown} />
+418 
+419 <div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
+420 	<TopBar />
+421 
+422 	{#if session.locationId === 'all'}
+423 		<!-- ─── All Branches Overview ─────────────────────────────────────────── -->
+424 		<div class="flex flex-1 flex-col overflow-hidden bg-surface-secondary">
+425 
+426 			<!-- Top bar -->
+427 			<div class="flex items-center justify-between border-b border-border px-5 py-2.5">
+428 				<div class="flex items-center gap-2.5">
+429 					<span class="relative flex h-2.5 w-2.5">
+430 						<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-green opacity-60"></span>
+431 						<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-green"></span>
+432 					</span>
+433 					<span class="text-xs font-mono font-bold uppercase tracking-widest text-gray-900">ALL BRANCHES — LIVE</span>
+434 				</div>
+435 				<span class="text-[11px] font-mono uppercase tracking-wider text-gray-600">read only · order taking disabled</span>
+436 			</div>
+437 
+438 			<!-- Two-panel split -->
+439 			<div class="flex flex-1 divide-x divide-border overflow-hidden">
+440 				{#each [
+441 					{ id: 'qc',   name: 'Alta Cita' },
+442 					{ id: 'mkti', name: 'Alona'     }
+443 				] as branch (branch.id)}
+444 					{@const bTables = allTables.filter(t => t.locationId === branch.id)}
+445 					{@const bOrders = allOrders.filter(o => o.locationId === branch.id && o.status === 'open')}
+446 					{@const bOcc    = bTables.filter(t => t.status !== 'available').length}
+447 					{@const bFree   = bTables.filter(t => t.status === 'available').length}
+448 					{@const bSales  = bOrders.reduce((s, o) => s + o.total, 0)}
+449 
+450 					<div class="flex flex-1 flex-col overflow-hidden">
+451 
+452 						<!-- Branch header -->
+453 						<div class="flex items-center justify-between border-b border-border bg-surface px-4 py-2.5">
+454 							<span class="text-sm font-bold uppercase tracking-wide text-gray-900">{branch.name}</span>
+455 							<div class="flex items-center gap-3 text-[11px] font-mono font-bold">
+456 								<span class="text-status-red">{bOcc} OCC</span>
+457 								<span class="text-status-green">{bFree} FREE</span>
+458 								<span class="text-accent font-bold">{formatPeso(bSales)}</span>
+459 							</div>
+460 						</div>
+461 
+462 						<!-- Floor snapshot -->
+463 						<div class="relative overflow-hidden" style="min-height: 340px;">
+464 							{#each bTables as t, idx (t.id)}
+465 								{@const tOrder = bOrders.find(o => o.id === t.currentOrderId)}
+466 								<div
+467 									class={cn(
+468 										'absolute flex flex-col rounded-lg px-2.5 py-2',
+469 										t.status === 'available' ? 'border border-status-green bg-status-green-light' :
+470 										t.status === 'critical'  ? 'border border-status-red bg-status-red-light' :
+471 										t.status === 'warning'   ? 'border border-status-yellow bg-status-yellow-light' :
+472 										                           'border border-accent bg-accent-light'
+473 									)}
+474 									style="left: {t.x}px; top: {t.y}px; width: {t.width ?? 82}px;"
+475 								>
+476 									<span class="text-xs font-bold text-gray-900">{t.label}</span>
+477 									{#if t.status !== 'available'}
+478 										<span class={cn('text-[10px] font-mono',
+479 											t.status === 'critical' ? 'text-status-red' :
+480 											t.status === 'warning'  ? 'text-status-yellow' : 'text-accent'
+481 										)}>
+482 											{t.remainingSeconds !== null ? formatCountdown(t.remainingSeconds) : '–'}
+483 										</span>
+484 										{#if tOrder}<span class="text-[10px] font-mono text-gray-400">{tOrder.pax}p</span>{/if}
+485 										{#if t.billTotal}<span class="text-[10px] font-mono text-accent font-bold">{formatPeso(t.billTotal)}</span>{/if}
+486 									{:else}
+487 										<span class="text-[10px] font-mono text-status-green">free</span>
+488 									{/if}
+489 								</div>
+490 							{/each}
+491 						</div>
+492 
+493 						<!-- Active orders strip -->
+494 						<div class="flex flex-col gap-1.5 border-t border-border bg-surface px-4 py-3">
+495 							<span class="text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400">Active Orders</span>
+496 							{#if bOrders.length === 0}
+497 								<span class="text-[11px] font-mono text-gray-400">No active orders</span>
+498 							{:else}
+499 								{#each bOrders.slice(0, 4) as order}
+500 									{@const oTable = allTables.find(t => t.id === order.tableId)}
+501 									<div class="flex items-center justify-between text-[11px] font-mono">
+502 										<span class="truncate text-gray-700">
+503 											{#if order.orderType === 'takeout'}
+504 												📦 {order.customerName ?? 'Walk-in'}
+505 											{:else}
+506 												🪑 {oTable?.label ?? '?'} · {order.packageName ?? '–'} · {order.pax}p
+507 											{/if}
+508 										</span>
+509 										<span class="ml-3 shrink-0 font-bold text-accent">{formatPeso(order.total)}</span>
+510 									</div>
+511 								{/each}
+512 								{#if bOrders.length > 4}
+513 									<span class="text-[10px] font-mono text-gray-400">+{bOrders.length - 4} more orders</span>
+514 								{/if}
+515 							{/if}
+516 						</div>
+517 
+518 					</div>
+519 				{/each}
+520 			</div>
+521 
+522 		</div>
+523 	{/if}
+524 
+525 	{#if session.locationId !== 'all'}
+526 	<!-- Main: floor + optional bill drawer -->
+527 	<div class="flex flex-1 overflow-hidden">
+528 		<!-- Floor content -->
+529 		<div class="flex flex-1 flex-col overflow-y-auto p-6 gap-5">
+530 			<!-- Header row -->
+531 			<div class="flex items-center justify-between">
+532 				<div class="flex items-center gap-3">
+533 					<h1 class="text-lg font-bold text-gray-900">POS</h1>
+534 					<span class="badge-orange">{occupied} occ</span>
+535 					<span class="badge-green">{free} free</span>
+536 				</div>
+537 				<div class="flex items-center gap-4">
+538 					<!-- Legend -->
+539 					<div class="flex items-center gap-3 text-xs font-semibold text-gray-600">
+540 						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-white border border-gray-300"></span>Available</span>
+541 						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-emerald-500"></span>Dining (Green)</span>
+542 						<span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Ready / Bill (Orange)</span>
+543 					</div>
+544 					<!-- New Takeout button -->
+545 					<button
+546 						onclick={openTakeoutModal}
+547 						class="flex items-center gap-2 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-accent hover:bg-orange-100 transition-colors"
+548 						style="min-height: 40px"
+549 					>
+550 						📦 New Takeout
+551 					</button>
+552 					<!-- Order History button -->
+553 					<button
+554 						onclick={() => showHistory = true}
+555 						class="flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+556 						style="min-height: 40px"
+557 					>
+558 						🧾 History {#if closedOrders.length > 0}<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">{closedOrders.length}</span>{/if}
+559 					</button>
+560 				</div>
+561 			</div>
+562 
+563 			<!-- Floor map canvas -->
+564 			<div class="flex-1 rounded-xl border border-border bg-surface p-5 flex flex-col gap-4">
+565 				<h2 class="text-xs font-semibold uppercase tracking-wider text-gray-400">Main Dining</h2>
+566 				<div class="relative" style="min-height: 340px;">
+567 					{#each mainTables as table (table.id)}
+568 						<button
+569 							onclick={() => handleTableClick(table)}
+570 							class={cn(tableCardClass(table), selectedTableId === table.id && 'ring-2 ring-offset-2 ring-accent')}
+571 							style="position: absolute; left: {table.x}px; top: {table.y}px; width: {table.width ?? 92}px; height: {table.height ?? 92}px;"
+572 							aria-label="Table {table.label}"
+573 						>
+574 							<div class="flex w-full items-start justify-between">
+575 								<span class="text-base font-extrabold text-gray-900 z-10">{table.label}</span>
+576 								{#if table.status !== 'available'}
+577 									<span class={cn('rounded-full px-1.5 py-0.5 text-[9px] font-semibold z-10', timerBadgeClass(table))}>
+578 										{table.remainingSeconds !== null ? formatCountdown(table.remainingSeconds) : ''}
+579 									</span>
+580 								{/if}
+581 							</div>
+582 							<div class="mt-1 text-xs text-gray-400 z-10">
+583 								{#if table.currentOrderId}
+584 									{@const o = orders.find(ord => ord.id === table.currentOrderId)}
+585 									{o?.pax ?? table.capacity}p
+586 								{:else}
+587 									{table.capacity}p
+588 								{/if}
+589 							</div>
+590 							{#if table.billTotal}
+591 								<div class="mt-1 font-mono text-xs font-bold text-gray-900 z-10">
+592 									{formatPeso(table.billTotal)}
+593 								</div>
+594 							{/if}
+595 							{#if table.currentOrderId}
+596 								{@const order = orders.find(o => o.id === table.currentOrderId)}
+597 								{#if order?.packageId === 'pkg-pork'}
+598 									<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-pink-400"></div>
+599 								{:else if order?.packageId === 'pkg-beef'}
+600 									<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-purple-500"></div>
+601 								{:else if order?.packageId === 'pkg-combo'}
+602 									<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-pink-400 to-purple-500"></div>
+603 								{/if}
+604 							{/if}
+605 						</button>
+606 					{/each}
+607 
+608 					<!-- Decorative labels -->
+609 					<div class="absolute bottom-2 left-2 flex gap-6 text-xs text-gray-300">
+610 						<span>🍳 KITCHEN</span>
+611 						<span>🚪 ENTRANCE</span>
+612 					</div>
+613 				</div>
+614 
+615 				<!-- Takeout Lane -->
+616 				{#if takeoutOrders.length > 0}
+617 					<div class="border-t border-dashed border-orange-200 pt-4 flex flex-col gap-3">
+618 						<h2 class="text-xs font-semibold uppercase tracking-wider text-accent flex items-center gap-2">
+619 							📦 Takeout Orders
+620 							<span class="rounded-full bg-accent px-2 py-0.5 text-[10px] text-white font-bold">{takeoutOrders.length}</span>
+621 						</h2>
+622 						<div class="flex flex-wrap gap-2">
+623 							{#each takeoutOrders as order (order.id)}
+624 								{@const tStatus = order.takeoutStatus ?? 'new'}
+625 								<div class="relative flex flex-col gap-1 rounded-xl border-2 border-dashed px-4 py-3 text-left transition-all"
+626 									class:border-accent={selectedTakeoutId === order.id}
+627 									class:bg-accent-light={selectedTakeoutId === order.id}
+628 									class:border-blue-400={tStatus === 'new' && selectedTakeoutId !== order.id}
+629 									class:bg-blue-50={tStatus === 'new' && selectedTakeoutId !== order.id}
+630 									class:border-yellow-400={tStatus === 'preparing' && selectedTakeoutId !== order.id}
+631 									class:bg-yellow-50={tStatus === 'preparing' && selectedTakeoutId !== order.id}
+632 									class:border-green-400={tStatus === 'ready' && selectedTakeoutId !== order.id}
+633 									class:bg-green-50={tStatus === 'ready' && selectedTakeoutId !== order.id}
+634 									style="min-width: 140px"
+635 								>
+636 									<button
+637 										onclick={() => handleTakeoutClick(order)}
+638 										class="text-left"
+639 										style="min-height: unset"
+640 									>
+641 										<span class="font-mono text-[11px] font-bold text-accent">{takeoutLabel(order)}</span>
+642 										<div class="text-sm font-semibold text-gray-900">{order.customerName ?? 'Walk-in'}</div>
+643 										<span class="font-mono text-xs font-bold text-gray-700">{formatPeso(order.total)}</span>
+644 										<div class="text-[10px] text-gray-400">{order.items.filter(i => i.status !== 'cancelled').length} items</div>
+645 									</button>
+646 									<!-- Status badge -->
+647 									<span class={cn(
+648 										'absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold text-white',
+649 										tStatus === 'new' ? 'bg-blue-500' :
+650 										tStatus === 'preparing' ? 'bg-yellow-500' :
+651 										tStatus === 'ready' ? 'bg-status-green animate-pulse' :
+652 										'bg-gray-400'
+653 									)}>
+654 										{tStatus === 'new' ? 'NEW' : tStatus === 'preparing' ? 'PREP' : tStatus === 'ready' ? 'READY' : 'DONE'}
+655 									</span>
+656 									<!-- Advance button -->
+657 									{#if tStatus !== 'picked_up'}
+658 										<button
+659 											onclick={(e) => { e.stopPropagation(); advanceTakeoutStatus(order.id); }}
+660 											class="mt-1 flex items-center justify-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+661 											style="min-height: 24px"
+662 										>
+663 											→ {tStatus === 'new' ? 'Start Prep' : tStatus === 'preparing' ? 'Mark Ready' : 'Picked Up'}
+664 										</button>
+665 									{/if}
+666 								</div>
+667 							{/each}
+668 						</div>
+669 					</div>
+670 				{/if}
+671 			</div>
+672 		</div>
+673 
+674 		<!-- Running Bill Drawer (dine-in or takeout) -->
+675 		<div class="flex w-[380px] shrink-0 flex-col border-l border-border bg-surface overflow-y-auto">
+676 		{#if !currentActiveOrder}
+677 			<!-- Empty state: no table or takeout selected -->
+678 			<div class="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center select-none">
+679 				<div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-secondary text-3xl">
+680 					🧾
+681 				</div>
+682 				<div class="flex flex-col gap-1.5">
+683 					<span class="text-sm font-semibold text-gray-700">No Table Selected</span>
+684 					<span class="text-xs text-gray-400 leading-relaxed">Tap an occupied table on the floor plan to view its running bill here.</span>
+685 				</div>
+686 				<div class="mt-2 flex flex-col items-center gap-2 text-xs text-gray-400">
+687 					<span class="flex items-center gap-1.5">
+688 						<span class="h-2 w-2 rounded-full bg-status-green inline-block"></span>
+689 						Green = available — tap to open
+690 					</span>
+691 					<span class="flex items-center gap-1.5">
+692 						<span class="h-2 w-2 rounded-full bg-accent inline-block"></span>
+693 						Orange = occupied — tap to view bill
+694 					</span>
+695 				</div>
+696 			</div>
+697 		{:else}
+698 				<!-- Bill Header -->
+699 				<div class="flex flex-col gap-3 border-b border-border px-5 py-4">
+700 					<div class="flex items-center justify-between">
+701 						<button
+702 							onclick={() => { showAddItem = true; pendingItems = []; }}
+703 							class="btn-primary gap-1.5 px-3 text-sm"
+704 							style="min-height: 36px"
+705 						>
+706 							+ ADD
+707 						</button>
+708 						<div class="flex items-center gap-2.5">
+709 							{#if currentActiveOrder.orderType === 'takeout'}
+710 								<span class="flex items-center gap-1.5">
+711 									<span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">📦 TAKEOUT</span>
+712 									<span class="text-xl font-extrabold text-gray-900">{currentActiveOrder.customerName ?? 'Walk-in'}</span>
+713 								</span>
+714 							{:else}
+715 								<span class="text-xl font-extrabold text-gray-900">{selectedTable?.label}</span>
+716 								<span class="flex items-center gap-1 rounded-full bg-surface-secondary px-2.5 py-1 text-xs font-medium text-gray-600">
+717 									👥 {currentActiveOrder.pax} pax
+718 								</span>
+719 							{/if}
+720 						</div>
+721 						<button onclick={closeBill} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>
+722 					</div>
+723 					{#if currentActiveOrder.orderType === 'takeout'}
+724 						{@const tStatus = currentActiveOrder.takeoutStatus ?? 'new'}
+725 						<div class="flex items-center justify-between rounded-lg bg-orange-50 border border-dashed border-orange-200 px-3 py-1.5">
+726 							<div class="flex items-center gap-2">
+727 								<span class="font-mono text-xs font-bold text-accent">{takeoutLabel(currentActiveOrder)}</span>
+728 								<span class={cn(
+729 									'rounded px-1.5 py-0.5 text-[10px] font-bold text-white',
+730 									tStatus === 'new' ? 'bg-blue-500' :
+731 									tStatus === 'preparing' ? 'bg-yellow-500' :
+732 									tStatus === 'ready' ? 'bg-status-green' :
+733 									'bg-gray-400'
+734 								)}>
+735 									{tStatus.toUpperCase()}
+736 								</span>
+737 							</div>
+738 							{#if tStatus !== 'picked_up'}
+739 								<button
+740 									onclick={() => advanceTakeoutStatus(currentActiveOrder.id)}
+741 									class="text-[10px] font-semibold text-accent hover:underline"
+742 									style="min-height: unset"
+743 								>
+744 									→ {tStatus === 'new' ? 'Start Prep' : tStatus === 'preparing' ? 'Mark Ready' : 'Picked Up'}
+745 								</button>
+746 							{/if}
+747 						</div>
+748 					{:else if currentActiveOrder.packageName}
+749 						<div class="flex items-center justify-between">
+750 							<span class="text-sm font-semibold text-gray-900">🔥 {currentActiveOrder.packageName}</span>
+751 							{#if selectedTable?.remainingSeconds !== null}
+752 								<span class={cn('rounded-full px-2.5 py-1 text-xs font-semibold', timerBadgeClass(selectedTable!))}>
+753 									⏱ {Math.floor((selectedTable?.remainingSeconds ?? 0) / 60)}m
+754 								</span>
+755 							{/if}
+756 						</div>
+757 					{/if}
+758 				</div>
+759 
+760 				<!-- Order items -->
+761 				<div class="flex-1 divide-y divide-border-light px-5">
+762 					{#each currentActiveOrder.items as item (item.id)}
+763 						<div class={cn('flex items-start justify-between py-3', item.status === 'cancelled' && 'opacity-50')}>
+764 							<div class="flex flex-col gap-0.5">
+765 								<div class="flex items-center gap-2">
+766 									<span class="text-sm font-medium text-gray-900">{item.menuItemName}</span>
+767 									{#if item.weight}
+768 										<span class="text-xs text-gray-400">{item.weight}g</span>
+769 									{/if}
+770 								</div>
+771 								<span class="text-xs text-gray-400">
+772 									{new Date(currentActiveOrder.createdAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+773 								</span>
+774 								{#if item.status === 'cancelled'}
+775 									<span class="text-xs italic text-status-red">voided by Manager</span>
+776 								{/if}
+777 							</div>
+778 							<div class="flex items-center gap-2 shrink-0 ml-2">
+779 								{#if item.tag === 'PKG'}
+780 									<div class="flex flex-col items-end">
+781 										<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+782 										<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-accent-light text-accent">PKG</span>
+783 									</div>
+784 								{:else if item.tag === 'FREE'}
+785 									<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">FREE</span>
+786 								{:else if item.status === 'cancelled'}
+787 									<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
+788 								{:else}
+789 									<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+790 								{/if}
+791 							</div>
+792 						</div>
+793 					{/each}
+794 				</div>
+795 
+796 				<!-- Bill Summary -->
+797 				<div class="border-t border-border px-5 py-4 flex flex-col gap-1">
+798 					<div class="flex justify-between text-sm text-gray-500">
+799 						<span>{currentActiveOrder.items.filter(i => i.status !== 'cancelled').length} items</span>
+800 					</div>
+801 					<div class="flex items-center justify-between">
+802 						<span class="text-base font-bold text-gray-900">BILL</span>
+803 						<span class="font-mono text-2xl font-extrabold text-gray-900">{formatPeso(currentActiveOrder.total)}</span>
+804 					</div>
+805 				</div>
+806 
+807 				<!-- Actions -->
+808 				<div class="flex flex-col gap-2 px-5 pb-5">
+809 						<!-- Primary actions -->
+810 						<div class="flex gap-2">
+811 							<button onclick={openVoidConfirm} class="btn-danger flex-1 text-sm" style="min-height: 44px">🗑 Void</button>
+812 							<button onclick={openCheckout} class="btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white" style="min-height: 44px">💳 Checkout</button>
+813 							<button onclick={() => printBill(currentActiveOrder.id)} class="btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800" style="min-height: 44px">🖨</button>
+814 						</div>
+815 						<!-- Secondary actions -->
+816 						<div class="flex gap-2">
+817 							{#if currentActiveOrder.orderType === 'dine-in' && selectedTable}
+818 								<button onclick={() => showTransferModal = true} class="btn-secondary flex-1 text-xs" style="min-height: 38px">🔀 Transfer</button>
+819 							{/if}
+820 							{#if currentActiveOrder.packageId && currentActiveOrder.orderType === 'dine-in'}
+821 								<button onclick={() => showPackageChange = true} class="btn-secondary flex-1 text-xs" style="min-height: 38px">🔄 Change Pkg</button>
+822 							{/if}
+823 							{#if currentActiveOrder.items.filter(i => i.status !== 'cancelled').length > 0}
+824 								<button onclick={() => showSplitBill = true} class="btn-secondary flex-1 text-xs" style="min-height: 38px">✂️ Split Bill</button>
+825 							{/if}
+826 						</div>
+827 					</div>
+828 				{/if}
+829 		</div>
+830 </div>
+831 
+832 <!-- ─── Add to Order Modal ────────────────────────────────────────────────────── -->
+833 {#if showAddItem && currentActiveOrder}
+834 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+835 		<div class="flex h-[700px] w-full max-w-[1100px] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+836 			<!-- Left panel -->
+837 			<div class="flex flex-1 flex-col overflow-hidden">
+838 				<!-- Header -->
+839 				<div class="flex flex-col gap-1.5 border-b border-border px-6 py-4">
+840 					{#if currentActiveOrder.orderType === 'takeout'}
+841 						<div class="flex items-center gap-2">
+842 							<span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">📦 TAKEOUT</span>
+843 							<h2 class="text-xl font-bold text-gray-900">Add to Takeout</h2>
+844 						</div>
+845 						<p class="text-sm text-gray-500">{currentActiveOrder.customerName ?? 'Walk-in'} · {takeoutLabel(currentActiveOrder)}</p>
+846 					{:else}
+847 						<h2 class="text-xl font-bold text-gray-900">➕ Add to Order</h2>
+848 						<p class="text-sm text-gray-500">🔥 {currentActiveOrder.packageName ?? selectedTable?.label} · {currentActiveOrder.pax} pax</p>
+849 					{/if}
+850 				</div>
+851 
+852 				<!-- Category tabs (POS-style big buttons) -->
+853 				<div class="flex gap-2 border-b border-border bg-surface-secondary px-6 py-3">
+854 					{#each visibleCategories as cat}
+855 						<button
+856 							onclick={() => (activeCategory = cat.id)}
+857 							class={cn(
+858 								'flex flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95',
+859 								activeCategory === cat.id
+860 									? 'bg-accent text-white shadow-md'
+861 									: 'border border-border bg-surface text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+862 							)}
+863 							style="min-height: 72px"
+864 						>
+865 							<span class="text-2xl leading-none">{cat.label.split(' ')[0]}</span>
+866 							<span class="text-[11px] font-bold uppercase tracking-wide">{cat.label.split(' ').slice(1).join(' ')}</span>
+867 						</button>
+868 					{/each}
+869 				</div>
+870 
+871 				<!-- FREE banner -->
+872 				{#if activeCategory === 'sides' || activeCategory === 'packages'}
+873 					<div class="flex items-center gap-2 bg-status-green-light px-6 py-2.5">
+874 						<span class="text-xs font-semibold text-status-green">FREE — inventory tracked</span>
+875 					</div>
+876 				{/if}
+877 
+878 				<!-- Items grid -->
+879 				<div class="flex-1 overflow-y-auto p-6">
+880 					{#if weightScreenItem}
+881 						<div class="flex h-full flex-col items-center justify-center gap-6">
+882 							<h3 class="text-3xl font-bold text-gray-900">{weightScreenItem.name}</h3>
+883 							<p class="text-sm text-gray-500">Enter weight from scale (grams)</p>
+884 							<div class="flex flex-wrap items-center justify-center gap-3 w-[400px]">
+885 								{#each [100, 150, 200, 250, 300, 400] as preset}
+886 									<button onclick={() => commitMeat(preset)} class="btn-secondary font-mono w-[30%]">
+887 										{preset}g
+888 									</button>
+889 								{/each}
+890 							</div>
+891 							<div class="mt-4 flex flex-col items-center gap-3">
+892 								<span class="text-xs font-semibold uppercase text-gray-400">Custom Amount</span>
+893 								<div class="flex items-center gap-3">
+894 									<input
+895 										type="number"
+896 										bind:value={weightInput}
+897 										placeholder="e.g. 235"
+898 										class="pos-input text-center font-mono text-xl w-32"
+899 										onkeydown={(e) => e.key === 'Enter' && commitMeat(parseFloat(weightInput))}
+900 									/>
+901 									<button onclick={() => commitMeat(parseFloat(weightInput))} class="btn-primary">Add</button>
+902 								</div>
+903 							</div>
+904 							<div class="mt-8">
+905 								<button onclick={() => weightScreenItem = null} class="btn-ghost flex items-center gap-2">
+906 									← Back to Meats
+907 								</button>
+908 							</div>
+909 						</div>
+910 					{:else}
+911 						<div class="grid grid-cols-3 gap-4">
+912 							{#each filteredItems as item (item.id)}
+913 								<button
+914 									onclick={() => tapItem(item)}
+915 									class={cn(
+916 										'flex flex-col gap-2.5 rounded-xl border p-5 text-left transition-all active:scale-[0.98]',
+917 										pendingItems.some(p => p.item.id === item.id)
+918 											? 'border-accent bg-accent-light'
+919 											: 'border-border bg-surface-secondary hover:border-gray-300'
+920 									)}
+921 								>
+922 									{#if item.category === 'packages'}
+923 										<div class="flex items-center justify-between">
+924 											<span class="text-base font-bold text-gray-900">{item.name}</span>
+925 											{#if pendingItems.some(p => p.item.id === item.id)}
+926 												<span class="rounded bg-accent px-2 py-0.5 text-[10px] font-bold text-white">ACTIVE</span>
+927 											{/if}
+928 										</div>
+929 										{#if item.desc}<p class="text-sm text-gray-500">{item.desc}</p>{/if}
+930 										<p class="font-mono text-sm font-bold text-gray-900">₱{item.price}/pax</p>
+931 										{#if item.perks}<p class="text-xs text-status-green">✓ {item.perks}</p>{/if}
+932 									{:else if item.isWeightBased}
+933 										<span class="text-sm font-semibold text-gray-900">{item.name}</span>
+934 										<span class="text-xs text-gray-400">tap to enter weight</span>
+935 										<span class="font-mono text-xs font-bold text-gray-700">₱{((item.pricePerGram ?? 0) * 100).toFixed(0)}/100g</span>
+936 									{:else}
+937 										<span class="text-sm font-semibold text-gray-900">{item.name}</span>
+938 										{#if item.isFree}
+939 											<span class="text-xs font-semibold text-status-green">FREE</span>
+940 										{:else}
+941 											<span class="font-mono text-sm font-bold text-gray-900">{formatPeso(item.price)}</span>
+942 										{/if}
+943 									{/if}
+944 								</button>
+945 							{/each}
+946 						</div>
+947 					{/if}
+948 				</div>
+949 			</div>
+950 
+951 			<!-- Pending Sidebar -->
+952 			<div class="flex w-[320px] shrink-0 flex-col border-l border-border bg-surface-secondary">
+953 				<div class="flex flex-col gap-1.5 border-b border-border px-5 py-4">
+954 					<h3 class="text-base font-bold text-gray-900">Pending Items</h3>
+955 					<p class="text-xs text-gray-500">Review items before pushing to the bill.</p>
+956 				</div>
+957 
+958 				<div class="flex-1 overflow-y-auto divide-y divide-border px-5">
+959 					{#if pendingItems.length === 0}
+960 						<div class="flex h-full items-center justify-center text-sm text-gray-400 py-12">
+961 							No items yet
+962 						</div>
+963 					{:else}
+964 						{#each pendingItems as p, idx (p.item.id + idx)}
+965 							<div class="flex items-center justify-between py-3">
+966 								<div class="flex flex-col gap-0.5">
+967 									<div class="flex items-center gap-2">
+968 										<span class="text-sm font-medium text-gray-900">{p.item.name}</span>
+969 										{#if p.item.category === 'packages'}
+970 											<span class="rounded bg-accent-light px-1.5 py-0.5 text-[10px] font-bold text-accent">PKG</span>
+971 										{:else if p.forceFree}
+972 											<span class="rounded bg-status-green-light px-1.5 py-0.5 text-[10px] font-bold text-status-green">FREE</span>
+973 										{/if}
+974 									</div>
+975 									{#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
+976 								</div>
+977 								<div class="flex items-center gap-1.5">
+978 									<button onclick={() => changeQty(idx, -1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">−</button>
+979 									<span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
+980 									<button onclick={() => changeQty(idx, +1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">+</button>
+981 								</div>
+982 							</div>
+983 						{/each}
+984 					{/if}
+985 				</div>
+986 
+987 				<div class="border-t border-border px-5 py-4 flex flex-col gap-3">
+988 					<div class="flex items-center justify-between">
+989 						<span class="text-sm font-semibold text-gray-500">PENDING TOTAL</span>
+990 						<span class="font-mono text-lg font-extrabold text-gray-900">{formatPeso(pendingTotal)}</span>
+991 					</div>
+992 					<div class="flex gap-2">
+993 						<button onclick={undoPending} class="btn-secondary flex-1 text-sm" style="min-height: 44px">Undo</button>
+994 						<button
+995 							onclick={chargeToOrder}
+996 							disabled={pendingItems.length === 0}
+997 							class="flex flex-1 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-dark active:scale-95 disabled:opacity-40"
+998 							style="min-height: 44px"
+999 						>
+1000 							⚡ CHARGE ({pendingItems.length})
+1001 						</button>
+1002 					</div>
+1003 				</div>
+1004 			</div>
+1005 		</div>
+1006 	</div>
+1007 {/if}
+1008 
+1009 <!-- Pax counter modal before opening table -->
+1010 {#if paxModalTable}
+1011 	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+1012 		<div class="pos-card w-[320px] flex flex-col gap-4">
+1013 			<h3 class="font-bold text-gray-900">How many guests for {paxModalTable.label}?</h3>
+1014 			<div class="grid grid-cols-4 gap-2">
+1015 				{#each Array.from({length: 12}, (_, i) => i + 1) as num}
+1016 					<button onclick={() => confirmPax(num)} class="btn-secondary h-12 text-lg">
+1017 						{num}
+1018 					</button>
+1019 				{/each}
+1020 			</div>
+1021 			<div class="flex gap-2 mt-2">
+1022 				<button class="btn-ghost flex-1" onclick={() => paxModalTable = null}>Cancel</button>
+1023 			</div>
+1024 		</div>
+1025 	</div>
+1026 {/if}
+1027 
+1028 <!-- ─── Checkout Modal ──────────────────────────────────────────────────────── -->
+1029 {#if showCheckout && checkoutOrder}
+1030 	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+1031 		<div class="pos-card w-[460px] flex flex-col gap-0 overflow-hidden p-0">
+1032 
+1033 			<!-- Header -->
+1034 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
+1035 				<div class="flex items-center gap-3">
+1036 					<span class="text-lg font-bold text-gray-900">Checkout</span>
+1037 					{#if checkoutOrder.orderType === 'takeout'}
+1038 						<span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">TAKEOUT</span>
+1039 					{:else}
+1040 						<span class="text-sm font-semibold text-gray-500">{selectedTable?.label}</span>
+1041 					{/if}
+1042 				</div>
+1043 				<button onclick={() => showCheckout = false} class="text-gray-400 hover:text-gray-600 text-lg" style="min-height: unset">✕</button>
+1044 			</div>
+1045 
+1046 			<!-- Bill Breakdown -->
+1047 			<div class="flex flex-col gap-2 border-b border-border px-6 py-4 bg-surface-secondary">
+1048 				<div class="flex justify-between text-sm text-gray-600">
+1049 					<span>Subtotal ({checkoutOrder.items.filter(i => i.status !== 'cancelled').length} items)</span>
+1050 					<span class="font-mono font-semibold">{formatPeso(checkoutOrder.subtotal)}</span>
+1051 				</div>
+1052 				{#if checkoutOrder.discountType !== 'none'}
+1053 					<div class="flex justify-between text-sm text-status-green">
+1054 						<span>Discount ({checkoutOrder.discountType === 'senior' ? 'Senior 20%' : 'PWD 20%'})</span>
+1055 						<span class="font-mono font-semibold">-{formatPeso(checkoutOrder.discountAmount)}</span>
+1056 					</div>
+1057 				{/if}
+1058 				<div class="flex justify-between text-sm text-gray-500">
+1059 					<span>VAT {checkoutOrder.discountType === 'senior' || checkoutOrder.discountType === 'pwd' ? '(exempt)' : '(inclusive)'}</span>
+1060 					<span class="font-mono">{formatPeso(checkoutOrder.vatAmount)}</span>
+1061 				</div>
+1062 				<div class="flex justify-between border-t border-border pt-2 mt-1">
+1063 					<span class="text-base font-bold text-gray-900">TOTAL</span>
+1064 					<span class="font-mono text-2xl font-extrabold text-gray-900">{formatPeso(checkoutOrder.total)}</span>
+1065 				</div>
+1066 			</div>
+1067 
+1068 			<!-- Discount Toggles -->
+1069 			<div class="flex items-center gap-2 border-b border-border px-6 py-3 overflow-x-auto">
+1070 				<span class="text-xs font-semibold text-gray-500 mr-auto shrink-0">Discount:</span>
+1071 				{#each [
+1072 					{ id: 'senior' as const, label: '👴 Senior' },
+1073 					{ id: 'pwd' as const, label: '♿ PWD' },
+1074 					{ id: 'promo' as const, label: '🎟️ Promo' },
+1075 					{ id: 'comp' as const, label: '💯 Comp' },
+1076 					{ id: 'service_recovery' as const, label: '❤️ Service Rec' }
+1077 				] as discount}
+1078 					<button
+1079 						onclick={() => applyDiscount(discount.id)}
+1080 						class={cn(
+1081 							'shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+1082 							checkoutOrder.discountType === discount.id
+1083 								? 'bg-status-green text-white shadow-md'
+1084 								: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
+1085 						)}
+1086 						style="min-height: 32px"
+1087 					>
+1088 						{discount.label}
+1089 					</button>
+1090 				{/each}
+1091 			</div>
+1092 
+1093 			<!-- Payment Method -->
+1094 			<div class="flex flex-col gap-3 border-b border-border px-6 py-4">
+1095 				<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Payment Method</span>
+1096 				<div class="grid grid-cols-3 gap-2">
+1097 					{#each [
+1098 						{ id: 'cash' as const, label: '💵 Cash' },
+1099 						{ id: 'gcash' as const, label: '📱 GCash' },
+1100 						{ id: 'maya' as const, label: '📱 Maya' }
+1101 					] as method}
+1102 						<button
+1103 							onclick={() => { checkoutMethod = method.id; if (method.id !== 'cash') cashTendered = 0; }}
+1104 							class={cn(
+1105 								'flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all active:scale-95',
+1106 								checkoutMethod === method.id
+1107 									? 'bg-accent text-white shadow-md'
+1108 									: 'border border-border bg-surface text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+1109 							)}
+1110 							style="min-height: 48px"
+1111 						>
+1112 							{method.label}
+1113 						</button>
+1114 					{/each}
+1115 				</div>
+1116 			</div>
+1117 
+1118 			<!-- Cash Tendered (only for cash) -->
+1119 			{#if checkoutMethod === 'cash'}
+1120 				<div class="flex flex-col gap-3 border-b border-border px-6 py-4">
+1121 					<div class="flex items-center justify-between">
+1122 						<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Cash Tendered</span>
+1123 						<button onclick={exactCash} class="text-xs font-semibold text-accent hover:underline" style="min-height: unset">Exact</button>
+1124 					</div>
+1125 
+1126 					<!-- Amount display -->
+1127 					<div class="flex items-center justify-center rounded-xl bg-surface-secondary border border-border py-3">
+1128 						<span class={cn(
+1129 							'font-mono text-3xl font-extrabold',
+1130 							cashTendered > 0 ? 'text-gray-900' : 'text-gray-300'
+1131 						)}>
+1132 							{cashTendered > 0 ? formatPeso(cashTendered) : '₱0.00'}
+1133 						</span>
+1134 					</div>
+1135 
+1136 					<!-- Quick denominations -->
+1137 					<div class="grid grid-cols-4 gap-2">
+1138 						{#each [20, 50, 100, 200, 500, 1000, 1500, 2000] as amount}
+1139 							<button
+1140 								onclick={() => selectCashPreset(amount)}
+1141 								class={cn(
+1142 									'rounded-lg py-2 font-mono text-sm font-bold transition-all active:scale-95',
+1143 									cashTendered === amount
+1144 										? 'bg-accent text-white'
+1145 										: 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
+1146 								)}
+1147 								style="min-height: 40px"
+1148 							>
+1149 								₱{amount.toLocaleString()}
+1150 							</button>
+1151 						{/each}
+1152 					</div>
+1153 
+1154 					<!-- Custom input -->
+1155 					<input
+1156 						type="number"
+1157 						bind:value={cashTendered}
+1158 						placeholder="Enter custom amount"
+1159 						class="pos-input text-center font-mono text-lg"
+1160 						min="0"
+1161 					/>
+1162 
+1163 					<!-- Change -->
+1164 					{#if cashTendered >= checkoutOrder.total}
+1165 						<div class="flex items-center justify-between rounded-xl bg-status-green-light border border-status-green/20 px-4 py-3">
+1166 							<span class="text-sm font-semibold text-status-green">Change</span>
+1167 							<span class="font-mono text-2xl font-extrabold text-status-green">{formatPeso(cashChange)}</span>
+1168 						</div>
+1169 					{:else if cashTendered > 0}
+1170 						<div class="flex items-center justify-between rounded-xl bg-status-red-light border border-status-red/20 px-4 py-2">
+1171 							<span class="text-xs font-semibold text-status-red">Short by {formatPeso(checkoutOrder.total - cashTendered)}</span>
+1172 						</div>
+1173 					{/if}
+1174 				</div>
+1175 			{/if}
+1176 
+1177 			<!-- Hardware Error State -->
+1178 			{#if checkoutError}
+1179 				<div class="px-6 py-4 mx-6 mt-4 mb-2 bg-red-50 border border-red-200 rounded-xl flex flex-col items-center text-center gap-2">
+1180 					<p class="text-sm font-bold text-red-700">Hardware Error</p>
+1181 					<p class="text-sm text-red-600">{checkoutError}</p>
+1182 					<div class="flex gap-3 w-full mt-3">
+1183 						<button class="btn-secondary flex-1 border-red-200 hover:bg-red-100 text-red-700 font-semibold" onclick={skipReceipt}>Skip Receipt</button>
+1184 						<button class="btn-primary flex-1 bg-red-600 hover:bg-red-700" onclick={confirmCheckout}>Retry Print</button>
+1185 					</div>
+1186 				</div>
+1187 			{/if}
+1188 
+1189 			<!-- Confirm / Cancel -->
+1190 			{#if !checkoutError}
+1191 				<div class="flex gap-3 px-6 py-4">
+1192 					<button
+1193 						onclick={() => showCheckout = false}
+1194 						class="btn-ghost flex-1"
+1195 						style="min-height: 48px"
+1196 						disabled={checkoutLoading}
+1197 					>
+1198 						Cancel
+1199 					</button>
+1200 					<button
+1201 						onclick={confirmCheckout}
+1202 						disabled={!canConfirmCheckout || checkoutLoading}
+1203 						class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-base font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+1204 						style="min-height: 48px"
+1205 					>
+1206 						{#if checkoutLoading}
+1207 							<span class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+1208 							Printing...
+1209 						{:else}
+1210 							✓ Confirm Payment
+1211 						{/if}
+1212 					</button>
+1213 				</div>
+1214 			{/if}
+1215 		</div>
+1216 	</div>
+1217 {/if}
+1218 
+1219 <!-- New Takeout Modal -->
+1220 {#if showTakeoutModal}
+1221 	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+1222 		<div class="pos-card w-[340px] flex flex-col gap-5">
+1223 			<div class="flex flex-col gap-1">
+1224 				<h3 class="text-lg font-bold text-gray-900">📦 New Takeout Order</h3>
+1225 				<p class="text-sm text-gray-500">Enter customer name or alias (optional)</p>
+1226 			</div>
+1227 			<input
+1228 				type="text"
+1229 				bind:value={takeoutName}
+1230 				placeholder="e.g. Maria, Table 5 pickup, etc."
+1231 				class="pos-input"
+1232 				onkeydown={(e) => e.key === 'Enter' && confirmTakeout()}
+1233 			/>
+1234 			<div class="flex gap-2">
+1235 				<button class="btn-ghost flex-1" onclick={() => showTakeoutModal = false}>Cancel</button>
+1236 				<button class="btn-primary flex-1" onclick={confirmTakeout}>
+1237 					✓ Create Order
+1238 				</button>
+1239 			</div>
+1240 		</div>
+1241 	</div>
+1242 {/if}
+1243 
+1244 <!-- ─── Receipt Modal ──────────────────────────────────────────────────────── -->
+1245 {#if showReceipt && receiptOrder}
+1246 	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+1247 		<div class="pos-card w-[380px] flex flex-col gap-0 overflow-hidden p-0">
+1248 			<!-- Receipt Header -->
+1249 			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-5 bg-surface">
+1250 				<span class="text-2xl">✓</span>
+1251 				<span class="text-lg font-bold text-gray-900">Payment Successful</span>
+1252 				<span class="text-xs text-gray-500">
+1253 					{receiptOrder.orderType === 'takeout'
+1254 						? `Takeout — ${receiptOrder.customerName ?? 'Walk-in'}`
+1255 						: `Table ${receiptOrder.tableNumber}`}
+1256 				</span>
+1257 			</div>
+1258 
+1259 			<!-- Receipt Body -->
+1260 			<div class="flex flex-col gap-2 border-b border-dashed border-gray-300 px-6 py-4 font-mono text-sm">
+1261 				{#each receiptOrder.items.filter(i => i.status !== 'cancelled') as item}
+1262 					<div class="flex justify-between">
+1263 						<span class="text-gray-700 truncate max-w-[200px]">
+1264 							{item.quantity > 1 ? `${item.quantity}× ` : ''}{item.menuItemName}
+1265 							{#if item.weight}<span class="text-gray-400"> {item.weight}g</span>{/if}
+1266 						</span>
+1267 						{#if item.tag === 'FREE'}
+1268 							<span class="text-status-green text-xs font-bold">FREE</span>
+1269 						{:else}
+1270 							<span class="text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+1271 						{/if}
+1272 					</div>
+1273 				{/each}
+1274 
+1275 				<div class="border-t border-dashed border-gray-200 my-1"></div>
+1276 
+1277 				<div class="flex justify-between text-gray-600">
+1278 					<span>Subtotal</span>
+1279 					<span>{formatPeso(receiptOrder.subtotal)}</span>
+1280 				</div>
+1281 				{#if receiptOrder.discountType !== 'none'}
+1282 					<div class="flex justify-between text-status-green">
+1283 						<span>Discount ({receiptOrder.discountType === 'senior' ? 'SC' : 'PWD'} 20%)</span>
+1284 						<span>-{formatPeso(receiptOrder.discountAmount)}</span>
+1285 					</div>
+1286 				{/if}
+1287 				<div class="flex justify-between text-gray-500 text-xs">
+1288 					<span>VAT {receiptOrder.discountType !== 'none' ? '(exempt)' : '(inclusive)'}</span>
+1289 					<span>{formatPeso(receiptOrder.vatAmount)}</span>
+1290 				</div>
+1291 				<div class="flex justify-between font-bold text-gray-900 text-base border-t border-gray-200 pt-1">
+1292 					<span>TOTAL</span>
+1293 					<span>{formatPeso(receiptOrder.total)}</span>
+1294 				</div>
+1295 
+1296 				<div class="border-t border-dashed border-gray-200 mt-1 pt-2">
+1297 					<div class="flex justify-between">
+1298 						<span class="text-gray-600">Paid via</span>
+1299 						<span class="font-bold text-gray-900">{receiptMethod}</span>
+1300 					</div>
+1301 					{#if receiptMethod === 'Cash'}
+1302 						<div class="flex justify-between">
+1303 							<span class="text-gray-600">Tendered</span>
+1304 							<span>{formatPeso(receiptOrder.total + receiptChange)}</span>
+1305 						</div>
+1306 						<div class="flex justify-between text-status-green font-bold">
+1307 							<span>Change</span>
+1308 							<span>{formatPeso(receiptChange)}</span>
+1309 						</div>
+1310 					{/if}
+1311 				</div>
+1312 			</div>
+1313 
+1314 			<!-- Receipt Footer -->
+1315 			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-3 text-center">
+1316 				<span class="text-[10px] text-gray-400 font-mono">
+1317 					{new Date(receiptOrder.closedAt ?? '').toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
+1318 				</span>
+1319 				<span class="text-[10px] text-gray-400 font-mono">WTF! Samgyupsal — Thank you!</span>
+1320 			</div>
+1321 
+1322 			<div class="flex gap-3 px-6 py-4">
+1323 				<button
+1324 					onclick={() => { showReceipt = false; receiptOrder = null; }}
+1325 					class="btn-primary flex-1"
+1326 					style="min-height: 44px"
+1327 				>
+1328 					Done
+1329 				</button>
+1330 			</div>
+1331 		</div>
+1332 	</div>
+1333 {/if}
+1334 
+1335 <!-- ─── Void Confirmation Modal (Manager PIN) ─────────────────────────────── -->
+1336 {#if showVoidConfirm}
+1337 	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+1338 		<div class="pos-card w-[340px] flex flex-col gap-4">
+1339 			<div class="flex flex-col gap-1">
+1340 				<h3 class="text-lg font-bold text-status-red">Void Order</h3>
+1341 				<p class="text-sm text-gray-500">This will cancel the entire order and free the table. Enter Manager PIN to confirm.</p>
+1342 			</div>
+1343 
+1344 			<!-- Reason Selection -->
+1345 			<div class="flex flex-col gap-1.5">
+1346 				<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Reason</span>
+1347 				<div class="grid grid-cols-3 gap-2">
+1348 					{#each [
+1349 						{ id: 'mistake' as const, label: 'Mistake' },
+1350 						{ id: 'walkout' as const, label: 'Walkout' },
+1351 						{ id: 'write_off' as const, label: 'Write-off' }
+1352 					] as reason}
+1353 						<button
+1354 							onclick={() => voidReason = reason.id}
+1355 							class={cn(
+1356 								'rounded-lg py-2 text-sm font-semibold transition-all',
+1357 								voidReason === reason.id
+1358 									? 'bg-status-red text-white'
+1359 									: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
+1360 							)}
+1361 							style="min-height: 40px"
+1362 						>
+1363 							{reason.label}
+1364 						</button>
+1365 					{/each}
+1366 				</div>
+1367 			</div>
+1368 
+1369 			<!-- PIN dots -->
+1370 			<div class="flex flex-col gap-2">
+1371 				<div class="flex justify-center gap-3">
+1372 					{#each [0, 1, 2, 3] as idx}
+1373 						<div class={cn(
+1374 							'h-4 w-4 rounded-full border-2 transition-all',
+1375 							idx < voidPin.length
+1376 								? (voidPinError ? 'bg-status-red border-status-red' : 'bg-accent border-accent')
+1377 								: 'border-gray-300'
+1378 						)}></div>
+1379 					{/each}
+1380 				</div>
+1381 				{#if voidPinError}
+1382 					<p class="text-center text-xs font-semibold text-status-red">Incorrect PIN. Try again.</p>
+1383 				{/if}
+1384 			</div>
+1385 
+1386 			<!-- Numpad -->
+1387 			<div class="grid grid-cols-3 gap-2">
+1388 				{#each [1,2,3,4,5,6,7,8,9] as num}
+1389 					<button
+1390 						onclick={() => { voidPinError = false; if (voidPin.length < 4) voidPin += String(num); }}
+1391 						class="btn-secondary h-12 text-lg font-bold"
+1392 						style="min-height: 48px"
+1393 					>{num}</button>
+1394 				{/each}
+1395 				<button
+1396 					onclick={() => { voidPin = ''; voidPinError = false; }}
+1397 					class="btn-ghost h-12 text-sm"
+1398 					style="min-height: 48px"
+1399 				>Clear</button>
+1400 				<button
+1401 					onclick={() => { voidPinError = false; if (voidPin.length < 4) voidPin += '0'; }}
+1402 					class="btn-secondary h-12 text-lg font-bold"
+1403 					style="min-height: 48px"
+1404 				>0</button>
+1405 				<button
+1406 					onclick={() => { voidPin = voidPin.slice(0, -1); voidPinError = false; }}
+1407 					class="btn-ghost h-12 text-sm"
+1408 					style="min-height: 48px"
+1409 				>⌫</button>
+1410 			</div>
+1411 
+1412 			<div class="flex gap-2 mt-1">
+1413 				<button class="btn-ghost flex-1" onclick={() => showVoidConfirm = false} style="min-height: 44px">Cancel</button>
+1414 				<button
+1415 					onclick={confirmVoid}
+1416 					disabled={voidPin.length !== 4}
+1417 					class="btn-danger flex-1 disabled:opacity-40"
+1418 					style="min-height: 44px"
+1419 				>Confirm Void</button>
+1420 			</div>
+1421 		</div>
+1422 	</div>
+1423 {/if}
+1424 
+1425 <!-- ─── Order History Modal ────────────────────────────────────────────────── -->
+1426 {#if showHistory}
+1427 	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+1428 		<div class="flex h-[600px] w-full max-w-[700px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+1429 			<!-- Header -->
+1430 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
+1431 				<div class="flex items-center gap-3">
+1432 					<h2 class="text-lg font-bold text-gray-900">Order History</h2>
+1433 					<span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">{closedOrders.length} orders</span>
+1434 				</div>
+1435 				<button onclick={() => showHistory = false} class="text-gray-400 hover:text-gray-600 text-lg" style="min-height: unset">✕</button>
+1436 			</div>
+1437 
+1438 			<!-- Orders list -->
+1439 			<div class="flex-1 overflow-y-auto divide-y divide-border">
+1440 				{#if closedOrders.length === 0}
+1441 					<div class="flex h-full items-center justify-center text-sm text-gray-400">
+1442 						No completed orders yet
+1443 					</div>
+1444 				{:else}
+1445 					{#each closedOrders as order (order.id)}
+1446 						{@const orderTable = order.tableId ? allTables.find(t => t.id === order.tableId) : null}
+1447 						<div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50">
+1448 							<div class="flex flex-col gap-0.5">
+1449 								<div class="flex items-center gap-2">
+1450 									<span class="text-sm font-semibold text-gray-900">
+1451 										{#if order.orderType === 'takeout'}
+1452 											📦 {order.customerName ?? 'Walk-in'}
+1453 										{:else}
+1454 											🪑 {orderTable?.label ?? `T${order.tableNumber}`}
+1455 										{/if}
+1456 									</span>
+1457 									{#if order.packageName}
+1458 										<span class="text-xs text-gray-400">{order.packageName}</span>
+1459 									{/if}
+1460 									{#if order.status === 'cancelled'}
+1461 										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
+1462 									{:else}
+1463 										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">PAID</span>
+1464 									{/if}
+1465 								</div>
+1466 								<div class="flex items-center gap-2 text-xs text-gray-400">
+1467 									<span>{order.pax} pax</span>
+1468 									<span>·</span>
+1469 									<span>{order.items.filter(i => i.status !== 'cancelled').length} items</span>
+1470 									<span>·</span>
+1471 									<span>{order.closedAt ? new Date(order.closedAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+1472 									{#if order.payments.length > 0}
+1473 										<span>·</span>
+1474 										<span class="capitalize">{order.payments[0].method}</span>
+1475 									{/if}
+1476 								</div>
+1477 							</div>
+1478 							<div class="flex items-center gap-3">
+1479 								<span class={cn(
+1480 									'font-mono text-sm font-bold',
+1481 									order.status === 'cancelled' ? 'text-gray-400 line-through' : 'text-gray-900'
+1482 								)}>
+1483 									{formatPeso(order.total)}
+1484 								</span>
+1485 								{#if order.status === 'paid'}
+1486 									<button
+1487 										onclick={() => {
+1488 											receiptOrder = order;
+1489 											const cashPayment = order.payments.find(p => p.method === 'cash');
+1490 											receiptChange = cashPayment ? cashPayment.amount - order.total : 0;
+1491 											receiptMethod = order.payments[0]?.method === 'cash' ? 'Cash' : order.payments[0]?.method === 'gcash' ? 'GCash' : 'Card';
+1492 											showReceipt = true;
+1493 										}}
+1494 										class="text-xs font-semibold text-accent hover:underline"
+1495 										style="min-height: unset"
+1496 									>
+1497 										View
+1498 									</button>
+1499 								{/if}
+1500 							</div>
+1501 						</div>
+1502 					{/each}
+1503 				{/if}
+1504 			</div>
+1505 
+1506 			<!-- Summary footer -->
+1507 			{#if closedOrders.length > 0}
+1508 				{@const paidOrders = closedOrders.filter(o => o.status === 'paid')}
+1509 				{@const totalSales = paidOrders.reduce((s, o) => s + o.total, 0)}
+1510 				<div class="flex items-center justify-between border-t border-border px-6 py-3 bg-surface-secondary">
+1511 					<span class="text-sm font-semibold text-gray-600">{paidOrders.length} paid · {closedOrders.length - paidOrders.length} voided</span>
+1512 					<div class="flex items-center gap-2">
+1513 						<span class="text-xs text-gray-500">Total Sales</span>
+1514 						<span class="font-mono text-lg font-extrabold text-gray-900">{formatPeso(totalSales)}</span>
+1515 					</div>
+1516 				</div>
+1517 			{/if}
+1518 		</div>
+1519 	</div>
+1520 {/if}
+1521 
+1522 <!-- ─── Transfer Table Modal ───────────────────────────────────────────────── -->
+1523 {#if showTransferModal && selectedTable}
+1524 	<TransferTableModal
+1525 		fromTable={selectedTable}
+1526 		onclose={() => showTransferModal = false}
+1527 		ontransfer={handleTransferComplete}
+1528 	/>
+1529 {/if}
+1530 
+1531 <!-- ─── Package Change Modal ─────────────────────────────────────────────── -->
+1532 {#if showPackageChange && currentActiveOrder}
+1533 	<PackageChangeModal
+1534 		order={currentActiveOrder}
+1535 		onclose={() => showPackageChange = false}
+1536 		onchange={handlePackageChanged}
+1537 	/>
+1538 {/if}
+1539 
+1540 <!-- ─── Split Bill Modal ─────────────────────────────────────────────────── -->
+1541 {#if showSplitBill && currentActiveOrder}
+1542 	<SplitBillModal
+1543 		order={currentActiveOrder}
+1544 		onclose={() => showSplitBill = false}
+1545 		oncomplete={handleSplitComplete}
+1546 	/>
+1547 {/if}

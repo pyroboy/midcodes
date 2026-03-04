@@ -3,7 +3,7 @@
  * All report data derived from live POS orders, stock, and audit log state.
  * Import specific derived values here instead of duplicating per page.
  */
-import { orders as allOrders, tables as allTables, MENU_ITEMS } from '$lib/stores/pos.svelte';
+import { orders as allOrders, tables as allTables, menuItems } from '$lib/stores/pos.svelte';
 import { stockItems, deliveries, deductions, getCurrentStock } from '$lib/stores/stock.svelte';
 import { session } from '$lib/stores/session.svelte';
 
@@ -56,13 +56,13 @@ export function bestSellersMeat() {
 	for (const ded of deductions) {
 		const stockItem = stockItems.find(s => s.id === ded.stockItemId);
 		if (!stockItem) continue;
-		const menuItem = MENU_ITEMS.find(m => m.id === stockItem.menuItemId && m.isWeightBased);
+		const menuItem = menuItems.find(m => m.id === stockItem.menuItemId && m.isWeightBased);
 		if (!menuItem) continue;
 		weightByItem[menuItem.id] = (weightByItem[menuItem.id] ?? 0) + ded.qty;
 	}
 	return Object.entries(weightByItem)
 		.map(([id, weight]) => {
-			const item = MENU_ITEMS.find(m => m.id === id)!;
+			const item = menuItems.find(m => m.id === id)!;
 			const revenue = weight * (item.pricePerGram ?? 0);
 			return { name: item.name, weightGrams: weight, revenue };
 		})
@@ -75,7 +75,7 @@ export function bestSellersAddons() {
 	for (const order of getOrders().filter(o => o.status === 'paid')) {
 		for (const item of order.items) {
 			if (item.tag === 'FREE' || item.tag === 'PKG') continue;
-			const menuItem = MENU_ITEMS.find(m => m.id === item.menuItemId);
+			const menuItem = menuItems.find(m => m.id === item.menuItemId);
 			if (!menuItem || menuItem.isWeightBased || menuItem.category === 'packages') continue;
 			if (!qtsByItem[item.menuItemId]) qtsByItem[item.menuItemId] = { name: item.menuItemName, qty: 0, revenue: 0 };
 			qtsByItem[item.menuItemId].qty += item.quantity;
@@ -125,4 +125,41 @@ export function eodSummary() {
 	const gcash  = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'gcash').reduce((t, p) => t + p.amount, 0), 0);
 	const card   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'card').reduce((t, p) => t + p.amount, 0), 0);
 	return { date: today, grossSales: gross, discounts: disc, netSales: net, vatAmount: vat, cash, card, gcash };
+}
+
+export function voidsAndDiscountsSummary() {
+	const allOs = getOrders();
+	
+	// Voids
+	const voided = allOs.filter(o => o.status === 'cancelled');
+	const mistake = voided.filter(o => o.cancelReason === 'mistake' || !o.cancelReason).length;
+	const walkout = voided.filter(o => o.cancelReason === 'walkout').length;
+	const writeOff = voided.filter(o => o.cancelReason === 'write_off').length;
+	const voidTotalValue = voided.reduce((s, o) => s + o.subtotal, 0);
+
+	// Discounts
+	const paidWithDiscounts = allOs.filter(o => o.status === 'paid' && o.discountType !== 'none');
+	const senior = paidWithDiscounts.filter(o => o.discountType === 'senior').reduce((s, o) => s + o.discountAmount, 0);
+	const pwd = paidWithDiscounts.filter(o => o.discountType === 'pwd').reduce((s, o) => s + o.discountAmount, 0);
+	const promo = paidWithDiscounts.filter(o => o.discountType === 'promo').reduce((s, o) => s + o.discountAmount, 0);
+	const comp = paidWithDiscounts.filter(o => o.discountType === 'comp').reduce((s, o) => s + o.discountAmount, 0);
+	const serviceRecovery = paidWithDiscounts.filter(o => o.discountType === 'service_recovery').reduce((s, o) => s + o.discountAmount, 0);
+
+	const discountTotalValue = senior + pwd + promo + comp + serviceRecovery;
+
+	return {
+		voids: { count: voided.length, value: voidTotalValue, mistake, walkout, writeOff, items: voided },
+		discounts: { 
+			count: paidWithDiscounts.length, 
+			value: discountTotalValue, 
+			breakdown: [
+				{ label: 'Senior', amount: senior },
+				{ label: 'PWD', amount: pwd },
+				{ label: 'Promo', amount: promo },
+				{ label: 'Comp', amount: comp },
+				{ label: 'Service Recovery', amount: serviceRecovery },
+			].sort((a, b) => b.amount - a.amount),
+			items: paidWithDiscounts
+		}
+	};
 }

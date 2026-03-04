@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { orders as allOrders, MENU_ITEMS, addItemToOrder } from '$lib/stores/pos.svelte';
+	import { orders as allOrders, menuItems, addItemToOrder } from '$lib/stores/pos.svelte';
 	import { formatCountdown, cn } from '$lib/utils';
 	import type { Order, MenuItem } from '$lib/types';
 
@@ -30,7 +30,7 @@
 	const allowedCategories = ['meats', 'dishes', 'drinks'] as const;
 	
 	const filteredItems = $derived(
-		MENU_ITEMS.filter((m) => m.category === activeCategory && m.available)
+		menuItems.filter((m) => m.category === activeCategory && m.available)
 	);
 
 	// Quick add item state

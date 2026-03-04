@@ -115,6 +115,51 @@ export const log = {
 	/** Expense recorded */
 	expenseLogged: (category: string, amount: number, description: string) =>
 		writeLog('expense', `Expense: ${category} — ₱${amount.toFixed(2)} (${description})`),
+
+	// ─── Menu Editor ─────────────────────────────────────────────────────────
+
+	menuItemCreated: (name: string, category: string) =>
+		writeLog('admin', `Menu item created: ${name} (${category})`),
+
+	menuItemUpdated: (name: string, fields: string) =>
+		writeLog('admin', `Menu item updated: ${name} — ${fields}`),
+
+	menuItemDeleted: (name: string) =>
+		writeLog('admin', `Menu item deleted: ${name}`),
+
+	menuItemToggled: (name: string, available: boolean) =>
+		writeLog('admin', `Menu item ${available ? 'enabled' : "86'd"}: ${name}`),
+
+	// ─── Takeout Lifecycle ───────────────────────────────────────────────────
+
+	takeoutAdvanced: (customerName: string, newStatus: string) =>
+		writeLog('order', `Takeout (${customerName}) → ${newStatus}`),
+
+	// ─── Table Transfer ──────────────────────────────────────────────────────
+
+	tableTransferred: (fromLabel: string, toLabel: string) =>
+		writeLog('order', `Table transferred: ${fromLabel} → ${toLabel}`),
+
+	// ─── Package Change ──────────────────────────────────────────────────────
+
+	packageChanged: (tableLabel: string, oldPkg: string, newPkg: string, direction: string, diff: number) =>
+		writeLog('order', `Package ${direction}: ${tableLabel} — ${oldPkg} → ${newPkg} (${direction === 'upgrade' ? '+' : '-'}₱${diff.toFixed(2)})`),
+
+	// ─── Split Bill ──────────────────────────────────────────────────────────
+
+	splitInitiated: (tableLabel: string, splitType: string, count: number) =>
+		writeLog('order', `Bill split initiated: ${tableLabel} — ${splitType} (${count} ways)`),
+
+	subBillPaid: (guestLabel: string, tableLabel: string, amount: number, method: string) =>
+		writeLog('payment', `Split payment: ${guestLabel} on ${tableLabel} — ₱${amount.toFixed(2)} (${method})`),
+
+	splitCancelled: (tableLabel: string) =>
+		writeLog('order', `Bill split cancelled: ${tableLabel}`),
+
+	// ─── Hardware ────────────────────────────────────────────────────────────
+
+	cashDrawerOpened: (reason: string, requestedBy: string) =>
+		writeLog('admin', `Cash drawer opened manually (${reason}) — by ${requestedBy}`),
 };
 
 // ─── Seed Helpers ─────────────────────────────────────────────────────────────
