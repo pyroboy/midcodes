@@ -21,7 +21,7 @@
     let activeCategory = $state<MenuCategory>('packages');
     
     // Pending items staged before pushing to bill
-    let pendingItems = $state<{ item: MenuItem; qty: number; weight?: number; forceFree?: boolean }[]>([]);
+    let pendingItems = $state<{ item: MenuItem; qty: number; weight?: number; forceFree?: boolean; isTakeout?: boolean }[]>([]);
     
     let weightScreenItem = $state<MenuItem | null>(null);
     let weightInput = $state('');
@@ -91,7 +91,7 @@
     function chargeToOrder() {
         if (!order) return;
         for (const p of pendingItems) {
-            addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree);
+            addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree, p.isTakeout ? '[TAKEOUT]' : undefined);
         }
         pendingItems = [];
         onclose();
@@ -100,20 +100,25 @@
     function undoPending() { pendingItems = []; }
 </script>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') onclose(); }} />
+
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
     <div class="flex h-[700px] w-full max-w-[1100px] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
         <div class="flex flex-1 flex-col overflow-hidden">
-            <div class="flex flex-col gap-1.5 border-b border-border px-6 py-4">
-                {#if order.orderType === 'takeout'}
-                    <div class="flex items-center gap-2">
-                        <span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">📦 TAKEOUT</span>
-                        <h2 class="text-xl font-bold text-gray-900">Add to Takeout</h2>
-                    </div>
-                    <p class="text-sm text-gray-500">{order.customerName ?? 'Walk-in'}</p>
-                {:else}
-                    <h2 class="text-xl font-bold text-gray-900">➕ Add to Order</h2>
-                    <p class="text-sm text-gray-500">🔥 {order.packageName ?? 'Table'} · {order.pax} pax</p>
-                {/if}
+            <div class="flex items-start justify-between border-b border-border px-6 py-4">
+                <div class="flex flex-col gap-1.5">
+                    {#if order.orderType === 'takeout'}
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">📦 TAKEOUT</span>
+                            <h2 class="text-xl font-bold text-gray-900">Add to Takeout</h2>
+                        </div>
+                        <p class="text-sm text-gray-500">{order.customerName ?? 'Walk-in'}</p>
+                    {:else}
+                        <h2 class="text-xl font-bold text-gray-900">➕ Add to Order</h2>
+                        <p class="text-sm text-gray-500">🔥 {order.packageName ?? 'Table'} · {order.pax} pax</p>
+                    {/if}
+                </div>
+                <button onclick={onclose} class="text-gray-400 hover:text-gray-600 p-2" aria-label="Close modal">✕</button>
             </div>
 
             <div class="flex gap-2 border-b border-border bg-surface-secondary px-6 py-3">
@@ -237,10 +242,20 @@
                                 </div>
                                 {#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
                             </div>
-                            <div class="flex items-center gap-1.5">
-                                <button onclick={() => changeQty(idx, -1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">−</button>
-                                <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
-                                <button onclick={() => changeQty(idx, +1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">+</button>
+                            <div class="flex items-center gap-2">
+                                {#if order.orderType === 'dine-in'}
+                                    <button
+                                        onclick={() => p.isTakeout = !p.isTakeout}
+                                        class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
+                                    >
+                                        {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
+                                    </button>
+                                {/if}
+                                <div class="flex items-center gap-1.5 ml-1">
+                                    <button onclick={() => changeQty(idx, -1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">−</button>
+                                    <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
+                                    <button onclick={() => changeQty(idx, +1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">+</button>
+                                </div>
                             </div>
                         </div>
                     {/each}
