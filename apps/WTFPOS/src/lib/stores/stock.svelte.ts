@@ -5,6 +5,9 @@
 import { nanoid } from 'nanoid';
 import { log } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
+import { createRxStore } from '$lib/stores/sync.svelte';
+import { browser } from '$app/environment';
+import { getDb } from '$lib/db';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +42,7 @@ export interface Delivery {
 	expiryDate?: string; // YYYY-MM-DD
 	usedQty?: number;
 	depleted?: boolean;
+	photo?: string;
 }
 
 export interface WasteEntry {
@@ -373,49 +377,56 @@ export function getProteinType(menuItemId: string): MeatProtein | undefined {
   return undefined;
 }
 
-export const stockItems = $state<StockItem[]>(
-	STOCK_ITEMS_LIST.map((s, i) => ({
-		id: `si-${i}`,
-		menuItemId: s.menuItemId,
-		name: s.name,
-		category: s.category,
-		proteinType: s.proteinType || getProteinType(s.menuItemId),
-		locationId: s.locationId,
-		openingStock: getOpeningStock(s.menuItemId, s.locationId),
-		unit: s.unit,
-		minLevel: s.minLevel,
-	}))
-);
+// ─── Initial Mock Data ────────────────────────────────────────────────────────
+export const INITIAL_STOCK_ITEMS: StockItem[] = STOCK_ITEMS_LIST.map((s, i) => ({
+	id: `si-${i}`,
+	menuItemId: s.menuItemId,
+	name: s.name,
+	category: s.category,
+	proteinType: s.proteinType || getProteinType(s.menuItemId),
+	locationId: s.locationId,
+	openingStock: getOpeningStock(s.menuItemId, s.locationId),
+	unit: s.unit,
+	minLevel: s.minLevel,
+}));
 
-const getSiId = (menuItemId: string, locationId: string = 'qc') => {
-	const idx = STOCK_ITEMS_LIST.findIndex(s => s.menuItemId === menuItemId && s.locationId === locationId);
-	return idx >= 0 ? `si-${idx}` : 'si-0'; // fallback
-};
+function getSiId(menuItemId: string, locationId: string) {
+	return `si-${STOCK_ITEMS_LIST.findIndex(s => s.menuItemId === menuItemId && s.locationId === locationId)}`;
+}
 
-export const deliveries = $state<Delivery[]>([
+export const INITIAL_DELIVERIES: Delivery[] = [
 	{ id: 'd1', stockItemId: getSiId('meat-pork-bone-in', 'qc'), itemName: 'Pork Bone-In',            qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: new Date().toISOString(), usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0] },
 	{ id: 'd2', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: new Date(Date.now() - 3600000).toISOString(), usedQty: 0, depleted: false, batchNo: 'B-242' },
 	{ id: 'd3', stockItemId: getSiId('side-kimchi', 'qc'), itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: new Date(Date.now() - 7200000).toISOString(), usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] },
-]);
+];
 
-export const wasteEntries = $state<WasteEntry[]>([
+export const INITIAL_WASTE_ENTRIES: WasteEntry[] = [
 	{ id: 'w1', stockItemId: getSiId('meat-pork-bones', 'qc'),  itemName: 'Pork Bones',            qty: 150, unit: 'g',        reason: 'Trimming (bone/fat)', loggedBy: 'Maria S.', loggedAt: new Date(Date.now() - 14400000).toISOString() },
 	{ id: 'w2', stockItemId: getSiId('side-rice', 'qc'), itemName: 'Steamed Rice',          qty: 2,   unit: 'portions', reason: 'Overcooked',          loggedBy: 'Pedro C.', loggedAt: new Date(Date.now() - 7200000).toISOString() },
 	{ id: 'w3', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',       qty: 1,   unit: 'bottles',  reason: 'Unusable (damaged)',  loggedBy: 'Maria S.', loggedAt: new Date().toISOString() },
-]);
+];
 
-export const deductions = $state<Deduction[]>([]);
+export const INITIAL_DEDUCTIONS: Deduction[] = [];
 
-export const stockCounts = $state<StockCount[]>(
-	stockItems.map(s => ({
-		stockItemId: s.id,
-		counted: {
-			'10am': getMorningCount(s.menuItemId),
-			'4pm': getAfternoonCount(s.menuItemId),
-			'10pm': null,
-		},
-	}))
-);
+export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => ({
+	stockItemId: s.id,
+	counted: {
+		'10am': getMorningCount(s.menuItemId),
+		'4pm': getAfternoonCount(s.menuItemId),
+		'10pm': null,
+	},
+}));
+
+export const INITIAL_ADJUSTMENTS: StockAdjustment[] = [];
+
+// ─── Reactive State (RxDB Stores) ─────────────────────────────────────────────
+
+export const stockItems = createRxStore<StockItem>('stock_items', db => db.stock_items.find());
+export const deliveries = createRxStore<Delivery>('deliveries', db => db.deliveries.find());
+export const wasteEntries = createRxStore<WasteEntry>('waste_entries', db => db.waste_entries.find());
+export const deductions = createRxStore<Deduction>('deductions', db => db.deductions.find());
+export const stockCounts = createRxStore<StockCount>('stock_counts', db => db.stock_counts.find());
+export const adjustments = createRxStore<StockAdjustment>('adjustments', db => db.adjustments.find());
 
 export const countPeriods = $state<{ id: CountPeriod; label: string; time: string; status: 'done' | 'pending' }[]>([
 	{ id: '10am', label: 'Morning',   time: '10:00 AM', status: 'done' },
@@ -423,23 +434,20 @@ export const countPeriods = $state<{ id: CountPeriod; label: string; time: strin
 	{ id: '10pm', label: 'Evening',   time: '10:00 PM', status: 'pending' },
 ]);
 
-export const adjustments = $state<StockAdjustment[]>([]);
-
-
 /** Get the current stock for a stock item, computed reactively */
 export function getCurrentStock(stockItemId: string): number {
-	const item = stockItems.find(s => s.id === stockItemId);
+	const item = stockItems.value.find(s => s.id === stockItemId);
 	if (!item) return 0;
-	const totalDelivered  = deliveries.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
-	const totalWasted     = wasteEntries.filter(w => w.stockItemId === stockItemId).reduce((s, w) => s + w.qty, 0);
-	const totalDeducted   = deductions.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
-	const totalAdjAdded   = adjustments.filter(a => a.stockItemId === stockItemId && a.type === 'add').reduce((s, a) => s + a.qty, 0);
-	const totalAdjDeducted = adjustments.filter(a => a.stockItemId === stockItemId && a.type === 'deduct').reduce((s, a) => s + a.qty, 0);
+	const totalDelivered  = deliveries.value.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
+	const totalWasted     = wasteEntries.value.filter(w => w.stockItemId === stockItemId).reduce((s, w) => s + w.qty, 0);
+	const totalDeducted   = deductions.value.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
+	const totalAdjAdded   = adjustments.value.filter(a => a.stockItemId === stockItemId && a.type === 'add').reduce((s, a) => s + a.qty, 0);
+	const totalAdjDeducted = adjustments.value.filter(a => a.stockItemId === stockItemId && a.type === 'deduct').reduce((s, a) => s + a.qty, 0);
 	return item.openingStock + totalDelivered - totalWasted - totalDeducted + totalAdjAdded - totalAdjDeducted;
 }
 
 export function getStockStatus(stockItemId: string): StockStatus {
-	const item = stockItems.find(s => s.id === stockItemId);
+	const item = stockItems.value.find(s => s.id === stockItemId);
 	if (!item) return 'ok';
 	const current = getCurrentStock(stockItemId);
 	if (current <= item.minLevel * 0.25) return 'critical';
@@ -454,7 +462,7 @@ export function getExpectedStock(stockItemId: string): number {
 
 /** Drift = expected - counted. Positive drift = missing inventory */
 export function getDrift(stockItemId: string, period: CountPeriod): number | null {
-	const count = stockCounts.find(c => c.stockItemId === stockItemId);
+	const count = stockCounts.value.find(c => c.stockItemId === stockItemId);
 	if (!count) return null;
 	const counted = count.counted[period];
 	if (counted === null) return null;
@@ -464,8 +472,10 @@ export function getDrift(stockItemId: string, period: CountPeriod): number | nul
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-export function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '', batchNo?: string, expiryDate?: string) {
-	deliveries.unshift({
+export async function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '', batchNo?: string, expiryDate?: string, photo?: string) {
+	if (!browser) return; // DB operations are client-only
+	const db = await getDb();
+	await db.deliveries.insert({
 		id: nanoid(),
 		stockItemId,
 		itemName,
@@ -477,14 +487,17 @@ export function receiveDelivery(stockItemId: string, itemName: string, qty: numb
 		batchNo,
 		expiryDate,
 		usedQty: 0,
-		depleted: false
+		depleted: false,
+		...(photo && { photo })
 	});
 	log.deliveryReceived(itemName, qty, unit, supplier);
 }
 
-export function logWaste(stockItemId: string, itemName: string, qty: number, unit: string, reason: string, loggedBy?: string) {
+export async function logWaste(stockItemId: string, itemName: string, qty: number, unit: string, reason: string, loggedBy?: string) {
+	if (!browser) return;
 	const logger = loggedBy ?? session.userName ?? 'Staff';
-	wasteEntries.unshift({
+	const db = await getDb();
+	await db.waste.insert({
 		id: nanoid(),
 		stockItemId,
 		itemName,
@@ -497,7 +510,7 @@ export function logWaste(stockItemId: string, itemName: string, qty: number, uni
 	log.wasteLogged(itemName, qty, unit, reason);
 }
 
-export function adjustStock(
+export async function adjustStock(
 	stockItemId: string,
 	itemName: string,
 	type: 'add' | 'deduct',
@@ -506,8 +519,10 @@ export function adjustStock(
 	reason: string,
 	loggedBy?: string
 ) {
+	if (!browser) return;
 	const logger = loggedBy ?? session.userName ?? 'Staff';
-	adjustments.unshift({
+	const db = await getDb();
+	await db.adjustments.insert({
 		id: nanoid(),
 		stockItemId,
 		itemName,
@@ -521,7 +536,7 @@ export function adjustStock(
 }
 
 /** Set stock to an absolute value by computing the delta and calling adjustStock */
-export function setStock(
+export async function setStock(
 	stockItemId: string,
 	itemName: string,
 	targetQty: number,
@@ -533,18 +548,20 @@ export function setStock(
 	const delta = targetQty - current;
 	if (delta === 0) return;
 	const type = delta > 0 ? 'add' : 'deduct';
-	adjustStock(stockItemId, itemName, type, Math.abs(delta), unit, reason || 'Manual stock set', loggedBy);
+	await adjustStock(stockItemId, itemName, type, Math.abs(delta), unit, reason || 'Manual stock set', loggedBy);
 }
 
 /** Called by POS when items are charged to a table */
-export function deductFromStock(menuItemId: string, qty: number, tableId: string, orderId: string, isTracked: boolean = false, locationId?: string) {
+export async function deductFromStock(menuItemId: string, qty: number, tableId: string, orderId: string, isTracked: boolean = false, locationId?: string) {
+	if (!browser) return;
+	const db = await getDb();
 	console.log(`[STOCK-DEDUCT] Attempt: menuItemId=${menuItemId}, qty=${qty}, orderId=${orderId.slice(-6)}, isTracked=${isTracked}`);
 	if (!isTracked) {
 		console.log(`[STOCK-DEDUCT] SKIPPED: Item not tracked`);
 		return;
 	}
 	const locId = locationId ?? session.locationId ?? '';
-	const item = stockItems.find(s => s.menuItemId === menuItemId && s.locationId === locId);
+	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === locId);
 	if (!item) {
 		console.warn(`[STOCK-DEDUCT] FAILED: Stock item not found for menuItemId=${menuItemId} at location=${locId}`);
 		return; // item not tracked in stock (e.g. packages themselves)
@@ -558,7 +575,7 @@ export function deductFromStock(menuItemId: string, qty: number, tableId: string
 	}
 
 	// Add the actual deduction logic
-	deductions.push({
+	await db.deductions.insert({
 		id: nanoid(),
 		stockItemId: item.id,
 		qty,
@@ -571,8 +588,8 @@ export function deductFromStock(menuItemId: string, qty: number, tableId: string
 	let remainingToDeduct = qty;
 	// Oldest deliveries first (assuming array is prepended via unshift, so reverse or findLast-ish)
 	// We'll iterate from the end (oldest) to start (newest)
-	for (let i = deliveries.length - 1; i >= 0; i--) {
-		const d = deliveries[i];
+	for (let i = deliveries.value.length - 1; i >= 0; i--) {
+		const d = deliveries.value[i];
 		if (d.stockItemId !== item.id || d.depleted) continue;
 
 		const dUsed = d.usedQty || 0;
@@ -580,10 +597,11 @@ export function deductFromStock(menuItemId: string, qty: number, tableId: string
 
 		if (availableInBatch > 0) {
 			const deductNow = Math.min(availableInBatch, remainingToDeduct);
-			d.usedQty = dUsed + deductNow;
-			if (d.usedQty >= d.qty) {
-				d.depleted = true;
-			}
+			const newUsedQty = dUsed + deductNow;
+			await db.deliveries.findOne({ selector: { id: d.id } }).patch({ 
+				usedQty: newUsedQty, 
+				depleted: newUsedQty >= d.qty 
+			});
 			remainingToDeduct -= deductNow;
 			if (remainingToDeduct <= 0) break;
 		}
@@ -594,20 +612,22 @@ export function deductFromStock(menuItemId: string, qty: number, tableId: string
  * Restore stock when an item is rejected/cancelled from KDS
  * Creates a stock adjustment to add the quantity back
  */
-export function restoreStock(menuItemId: string, qty: number, tableId: string, orderId: string) {
-	const item = stockItems.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId ?? ''));
+export async function restoreStock(menuItemId: string, qty: number, tableId: string, orderId: string) {
+	if (!browser) return;
+	const db = await getDb();
+	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId ?? ''));
 	if (!item) return; // item not tracked in stock
 
 	// Find and remove the deduction using compound orderId + stockItemId match (not qty-based to avoid ghost deductions)
-	const deductionIndex = deductions.findIndex(d =>
+	const existingDeduction = deductions.value.find(d =>
 		d.stockItemId === item.id && d.orderId === orderId
 	);
-	if (deductionIndex !== -1) {
-		deductions.splice(deductionIndex, 1);
+	if (existingDeduction) {
+		await db.deductions.findOne({ selector: { id: existingDeduction.id } }).remove();
 	}
 
 	// Create a stock adjustment to add the quantity back
-	adjustStock(
+	await adjustStock(
 		item.id,
 		item.name,
 		'add',
@@ -623,7 +643,7 @@ export function getSpoilageAlerts() {
 	const todayMs = Date.now();
 	const THRESHOLD = 86400000 * 3; // 3 days
 	
-	return deliveries.filter(d => {
+	return deliveries.value.filter(d => {
 		if (d.depleted || !d.expiryDate) return false;
 		const expMs = new Date(d.expiryDate).getTime();
 		const diff = expMs - todayMs;
@@ -635,9 +655,9 @@ export function getSpoilageAlerts() {
 }
 
 /** Tier 3: Transfer stock between branches/warehouses */
-export function transferStock(stockItemMenuItemId: string, qty: number, fromLocationId: string, toLocationId: string, loggedBy?: string, notes?: string) {
-	const fromItem = stockItems.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === fromLocationId);
-	const toItem = stockItems.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === toLocationId);
+export async function transferStock(stockItemMenuItemId: string, qty: number, fromLocationId: string, toLocationId: string, loggedBy?: string, notes?: string) {
+	const fromItem = stockItems.value.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === fromLocationId);
+	const toItem = stockItems.value.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === toLocationId);
 
 	if (!fromItem || !toItem) return false; // Stock link must exist in both locations
 
@@ -646,15 +666,18 @@ export function transferStock(stockItemMenuItemId: string, qty: number, fromLoca
 
 	const logger = loggedBy ?? session.userName ?? 'Staff';
 	const noteSuffix = notes ? ` — ${notes}` : '';
-	adjustStock(fromItem.id, fromItem.name, 'deduct', qty, fromItem.unit, `Transfer to ${toLocationId}${noteSuffix}`, logger);
-	adjustStock(toItem.id, toItem.name, 'add', qty, toItem.unit, `Transfer from ${fromLocationId}${noteSuffix}`, logger);
+	await adjustStock(fromItem.id, fromItem.name, 'deduct', qty, fromItem.unit, `Transfer to ${toLocationId}${noteSuffix}`, logger);
+	await adjustStock(toItem.id, toItem.name, 'add', qty, toItem.unit, `Transfer from ${fromLocationId}${noteSuffix}`, logger);
 	return true;
 }
 
-export function submitCount(stockItemId: string, period: CountPeriod, value: number) {
-	const count = stockCounts.find(c => c.stockItemId === stockItemId);
+export async function submitCount(stockItemId: string, period: CountPeriod, value: number) {
+	if (!browser) return;
+	const db = await getDb();
+	const count = stockCounts.value.find(c => c.stockItemId === stockItemId);
 	if (count) {
-		count.counted[period] = value;
+		const newCounted = { ...count.counted, [period]: value };
+		await db.stock_counts.findOne({ selector: { stockItemId } }).patch({ counted: newCounted });
 	}
 }
 
@@ -684,4 +707,13 @@ function getMorningCount(menuItemId: string): number | null {
 function getAfternoonCount(menuItemId: string): number | null {
 	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId || 'qc'));
 	return item ? Math.round(item.minLevel * 0.8) : null;
+}
+
+export async function updateStockItem(id: string, updates: Partial<StockItem>) {
+	if (!browser) return;
+	const db = await getDb();
+	const existing = stockItems.value.find(s => s.id === id);
+	if (existing) {
+		await db.stock_items.findOne({ selector: { id } }).patch(updates);
+	}
 }

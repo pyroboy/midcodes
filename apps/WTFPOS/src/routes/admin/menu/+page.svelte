@@ -17,7 +17,7 @@
 	];
 
 	const filteredItems = $derived(
-		activeFilter === 'all' ? menuItems : menuItems.filter(m => m.category === activeFilter)
+		activeFilter === 'all' ? menuItems.value : menuItems.value.filter(m => m.category === activeFilter)
 	);
 
 	// ─── Add/Edit Modal ──────────────────────────────────────────────────────
@@ -29,6 +29,8 @@
 	let formPrice = $state(0);
 	let formDesc = $state('');
 	let formPerks = $state('');
+	let formImage = $state<File | null>(null);
+	let formImageUrl = $state<string | undefined>(undefined);
 	let formIsWeightBased = $state(false);
 	let formPricePerGram = $state(0);
 	let formIsFree = $state(false);
@@ -36,8 +38,8 @@
 	let formMeats = $state<string[]>([]);
 	let formAutoSides = $state<string[]>([]);
 
-	const meatItems = $derived(menuItems.filter(m => m.category === 'meats'));
-	const sideItems = $derived(menuItems.filter(m => m.category === 'sides'));
+	const meatItems = $derived(menuItems.value.filter(m => m.category === 'meats'));
+	const sideItems = $derived(menuItems.value.filter(m => m.category === 'sides'));
 
 	function openAddModal() {
 		editingId = null;
@@ -46,6 +48,8 @@
 		formPrice = 0;
 		formDesc = '';
 		formPerks = '';
+		formImage = null;
+		formImageUrl = undefined;
 		formIsWeightBased = false;
 		formPricePerGram = 0;
 		formIsFree = false;
@@ -62,6 +66,8 @@
 		formPrice = item.price;
 		formDesc = item.desc ?? '';
 		formPerks = item.perks ?? '';
+		formImage = null;
+		formImageUrl = item.image;
 		formIsWeightBased = item.isWeightBased;
 		formPricePerGram = item.pricePerGram ?? 0;
 		formIsFree = item.isFree ?? false;
@@ -71,7 +77,7 @@
 		showModal = true;
 	}
 
-	function saveItem() {
+	async function saveItem() {
 		if (!formName.trim()) return;
 
 		const data: Omit<MenuItem, 'id'> = {
@@ -82,6 +88,7 @@
 			available: true,
 			...(formDesc && { desc: formDesc }),
 			...(formPerks && { perks: formPerks }),
+			...(formImageUrl && { image: formImageUrl }),
 			...(formIsWeightBased && { pricePerGram: formPricePerGram }),
 			...(formIsFree && { isFree: true }),
 			...(formTrackInventory && { trackInventory: true }),
@@ -90,9 +97,9 @@
 		};
 
 		if (editingId) {
-			updateMenuItem(editingId, data);
+			await updateMenuItem(editingId, data);
 		} else {
-			addMenuItem(data);
+			await addMenuItem(data);
 		}
 		showModal = false;
 	}
@@ -100,9 +107,9 @@
 	// ─── Delete Confirmation ─────────────────────────────────────────────────
 	let deleteTarget = $state<MenuItem | null>(null);
 
-	function confirmDelete() {
+	async function confirmDelete() {
 		if (deleteTarget) {
-			deleteMenuItem(deleteTarget.id);
+			await deleteMenuItem(deleteTarget.id);
 			deleteTarget = null;
 		}
 	}
@@ -158,9 +165,20 @@
 			{#each filteredItems as item (item.id)}
 				<tr class={cn('hover:bg-gray-50 transition-colors', !item.available && 'opacity-50 bg-gray-50')}>
 					<td class="px-5 py-3">
-						<div class="flex flex-col gap-0.5">
-							<span class="font-semibold text-gray-900">{item.name}</span>
-							{#if item.desc}<span class="text-xs text-gray-400">{item.desc}</span>{/if}
+						<div class="flex items-center gap-3">
+							{#if item.image}
+								<div class="w-10 h-10 rounded overflow-hidden bg-gray-100 shrink-0 border border-border">
+									<img src={item.image} alt={item.name} class="w-full h-full object-cover" />
+								</div>
+							{:else}
+								<div class="w-10 h-10 rounded bg-gray-50 shrink-0 border border-border flex items-center justify-center text-gray-300 text-xs">
+									No Img
+								</div>
+							{/if}
+							<div class="flex flex-col gap-0.5">
+								<span class="font-semibold text-gray-900">{item.name}</span>
+								{#if item.desc}<span class="text-xs text-gray-400">{item.desc}</span>{/if}
+							</div>
 						</div>
 					</td>
 					<td class="px-5 py-3">
@@ -246,11 +264,11 @@
 
 <!-- Summary -->
 <div class="mt-4 flex items-center gap-4 text-xs text-gray-500">
-	<span>{menuItems.length} total items</span>
+	<span>{menuItems.value.length} total items</span>
 	<span>·</span>
-	<span>{menuItems.filter(m => m.available).length} active</span>
+	<span>{menuItems.value.filter(m => m.available).length} active</span>
 	<span>·</span>
-	<span>{menuItems.filter(m => !m.available).length} 86'd</span>
+	<span>{menuItems.value.filter(m => !m.available).length} 86'd</span>
 </div>
 
 <!-- ─── Add/Edit Modal ──────────────────────────────────────────────────────── -->
@@ -279,6 +297,36 @@
 						<option value="packages">Packages</option>
 						<option value="misc">Miscellaneous</option>
 					</select>
+				</label>
+
+				<!-- Image Upload -->
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Picture</span>
+					{#if formImageUrl}
+						<div class="mb-2 relative w-32 h-32 rounded-lg overflow-hidden border border-border">
+							<img src={formImageUrl} alt="Preview" class="w-full h-full object-cover bg-gray-50" />
+							<button 
+								onclick={(e) => { e.preventDefault(); formImageUrl = undefined; formImage = null; }}
+								class="absolute top-1 right-1 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-black/70"
+								title="Remove image"
+							>
+								✕
+							</button>
+						</div>
+					{/if}
+					<input 
+						type="file" 
+						accept="image/*" 
+						onchange={(e) => {
+							const target = e.currentTarget;
+							const file = target?.files?.[0];
+							if (file) {
+								formImage = file;
+								formImageUrl = URL.createObjectURL(file);
+							}
+						}}
+						class="pos-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" 
+					/>
 				</label>
 
 				<!-- Price row -->

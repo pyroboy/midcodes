@@ -10,7 +10,7 @@
     }
 
     let { isOpen, onClose }: Props = $props();
-    const meatItems = $derived(stockItems.filter(s => s.category === 'Meats'));
+    const meatItems = $derived(stockItems.value.filter(s => s.category === 'Meats'));
 
     let selectedMeatId = $state('');
     $effect(() => {

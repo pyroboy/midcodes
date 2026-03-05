@@ -37,7 +37,7 @@
                 : categories)
     );
 
-    const filteredItems = $derived(menuItems.filter((m) => m.category === activeCategory && m.available));
+    const filteredItems = $derived(menuItems.value.filter((m) => m.category === activeCategory && m.available));
 
     const pendingTotal = $derived(
         pendingItems.reduce((s, p) => {
@@ -52,13 +52,13 @@
             pendingItems = [{ item, qty: 1, forceFree: false }];
             if (item.meats) {
                 for (const meatId of item.meats) {
-                    const meat = menuItems.find(m => m.id === meatId);
+                    const meat = menuItems.value.find(m => m.id === meatId);
                     if (meat) pendingItems.push({ item: meat, qty: 1, weight: 150 * activePax, forceFree: true });
                 }
             }
             if (item.autoSides) {
                 for (const sideId of item.autoSides) {
-                    const side = menuItems.find(m => m.id === sideId);
+                    const side = menuItems.value.find(m => m.id === sideId);
                     if (side) pendingItems.push({ item: side, qty: 1, forceFree: true });
                 }
             }

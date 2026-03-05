@@ -30,7 +30,7 @@
 
 	function filterExpensesByPeriod(p: Period) {
 		const now = new Date();
-		return allExpenses.filter(e => {
+		return allExpenses.value.filter(e => {
 			const d = new Date(e.createdAt);
 			if (p === 'today') return d.toDateString() === now.toDateString();
 			if (p === 'week') return (now.getTime() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;

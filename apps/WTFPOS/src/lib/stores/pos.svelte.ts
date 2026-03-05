@@ -7,6 +7,9 @@ import { nanoid } from 'nanoid';
 import { deductFromStock, restoreStock } from '$lib/stores/stock.svelte';
 import { log } from '$lib/stores/audit.svelte';
 import { session, isWarehouseSession } from '$lib/stores/session.svelte';
+import { createRxStore } from '$lib/stores/sync.svelte';
+import { getDb } from '$lib/db';
+import { browser } from '$app/environment';
 
 const SESSION_SECONDS = 90 * 60;
 
@@ -35,7 +38,7 @@ function makeTables(): Table[] {
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 
-export const menuItems = $state<MenuItem[]>([
+export const INITIAL_MENU_ITEMS: MenuItem[] = [
 	{ id: 'pkg-pork',    name: '🐷 Unli Pork',         category: 'packages', price: 499,  isWeightBased: false, available: true, desc: 'All-you-can-eat pork grill',    perks: '4 sides, 200g initial meats', meats: ['meat-samgyup', 'meat-chadol', 'meat-pork-sliced'], autoSides: ['side-kimchi', 'side-rice'] },
 	{ id: 'pkg-beef',    name: '🐄 Unli Beef',         category: 'packages', price: 699,  isWeightBased: false, available: true, desc: 'All-you-can-eat beef grill',    perks: '5 sides, 250g initial meats', meats: ['meat-galbi', 'meat-beef', 'meat-beef-sliced'], autoSides: ['side-kimchi', 'side-rice'] },
 	{ id: 'pkg-combo',   name: '🔥 Unli Pork & Beef',  category: 'packages', price: 899,  isWeightBased: false, available: true, desc: 'Premium pork + beef combo',    perks: '6 sides, 300g initial meats', meats: ['meat-samgyup', 'meat-chadol', 'meat-pork-sliced', 'meat-galbi', 'meat-beef', 'meat-beef-sliced'], autoSides: ['side-kimchi', 'side-rice'] },
@@ -54,38 +57,55 @@ export const menuItems = $state<MenuItem[]>([
 	{ id: 'drink-beer',  name: 'San Miguel Beer',       category: 'drinks',   price: 75,   isWeightBased: false, available: true },
 	{ id: 'drink-tea',   name: 'Iced Tea',              category: 'drinks',   price: 65,   isWeightBased: false, available: true },
 	{ id: 'ret-123456',  name: 'Bottled Water',         category: 'drinks',   price: 40,   isWeightBased: false, available: true, isRetail: true }
-]);
+];
+
+const _menuItems = createRxStore<MenuItem>('menu_items', db => db.menu_items.find());
+
+export const menuItems = {
+	get value(): MenuItem[] {
+		return _menuItems.value;
+	}
+};
 
 // ─── Menu CRUD (owner/admin only) ────────────────────────────────────────────
 
-export function addMenuItem(item: Omit<MenuItem, 'id'>): string {
+export async function addMenuItem(item: Omit<MenuItem, 'id'>): Promise<string> {
+	if (!browser) return '';
 	const id = `menu-${nanoid(8)}`;
-	menuItems.push({ ...item, id });
+	const db = await getDb();
+	await db.menu_items.insert({ ...item, id });
 	log.menuItemCreated(item.name, item.category);
 	return id;
 }
 
-export function updateMenuItem(id: string, updates: Partial<Omit<MenuItem, 'id'>>): void {
-	const item = menuItems.find(m => m.id === id);
-	if (!item) return;
-	const oldName = item.name;
-	Object.assign(item, updates);
+export async function updateMenuItem(id: string, updates: Partial<Omit<MenuItem, 'id'>>): Promise<void> {
+	if (!browser) return;
+	const db = await getDb();
+	const doc = await db.menu_items.findOne(id).exec();
+	if (!doc) return;
+	const oldName = doc.name;
+	await doc.patch(updates);
 	log.menuItemUpdated(oldName, Object.keys(updates).join(', '));
 }
 
-export function deleteMenuItem(id: string): void {
-	const idx = menuItems.findIndex(m => m.id === id);
-	if (idx === -1) return;
-	const name = menuItems[idx].name;
-	menuItems.splice(idx, 1);
+export async function deleteMenuItem(id: string): Promise<void> {
+	if (!browser) return;
+	const db = await getDb();
+	const doc = await db.menu_items.findOne(id).exec();
+	if (!doc) return;
+	const name = doc.name;
+	await doc.remove();
 	log.menuItemDeleted(name);
 }
 
-export function toggleMenuItemAvailability(id: string): void {
-	const item = menuItems.find(m => m.id === id);
-	if (!item) return;
-	item.available = !item.available;
-	log.menuItemToggled(item.name, item.available);
+export async function toggleMenuItemAvailability(id: string): Promise<void> {
+	if (!browser) return;
+	const db = await getDb();
+	const doc = await db.menu_items.findOne(id).exec();
+	if (!doc) return;
+	const newAvailable = !doc.available;
+	await doc.patch({ available: newAvailable });
+	log.menuItemToggled(doc.name, newAvailable);
 }
 
 // ─── Reactive State ───────────────────────────────────────────────────────────
@@ -647,11 +667,11 @@ export function mergeTables(primaryTableId: string, secondaryTableId: string): {
 		// They will be marked as 'FREE' if they were meats
 		const secondaryPkgItems = secondaryOrder.items.filter(i => 
 			i.tag === 'PKG' || (i.tag === 'FREE' && secondaryOrder.packageId && 
-			menuItems.find(m => m.id === secondaryOrder.packageId)?.meats?.includes(i.menuItemId))
+			menuItems.value.find(m => m.id === secondaryOrder.packageId)?.meats?.includes(i.menuItemId))
 		);
 		
 		for (const item of secondaryPkgItems) {
-			const menuItem = menuItems.find(m => m.id === item.menuItemId);
+			const menuItem = menuItems.value.find(m => m.id === item.menuItemId);
 			if (menuItem) {
 				// Add as individual item (not part of primary package)
 				primaryOrder.items.push({
@@ -739,8 +759,8 @@ export function changePackage(orderId: string, newPackageId: string): {
 	const order = orders.find(o => o.id === orderId);
 	if (!order || !order.packageId) return { success: false, priceDiff: 0, direction: 'same' };
 
-	const oldPkg = menuItems.find(m => m.id === order.packageId);
-	const newPkg = menuItems.find(m => m.id === newPackageId);
+	const oldPkg = menuItems.value.find(m => m.id === order.packageId);
+	const newPkg = menuItems.value.find(m => m.id === newPackageId);
 	if (!oldPkg || !newPkg || newPkg.category !== 'packages') return { success: false, priceDiff: 0, direction: 'same' };
 
 	const oldPriceTotal = oldPkg.price * order.pax;

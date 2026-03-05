@@ -18,7 +18,8 @@
 		{ href: '/admin/users', label: '👤 Users' },
 		{ href: '/admin/menu',  label: '📋 Menu Editor' },
 		{ href: '/admin/logs',  label: '📋 Activity Logs' },
-		{ href: '/admin/floor-editor', label: '🪑 Floor Editor' }
+		{ href: '/admin/floor-editor', label: '🪑 Floor Editor' },
+		{ href: '/admin/devices', label: '💻 Devices' }
 	];
 </script>
 

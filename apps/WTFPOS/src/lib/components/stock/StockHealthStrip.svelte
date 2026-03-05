@@ -11,7 +11,7 @@
 	let { activeFilter = $bindable('all'), onFilterClick }: Props = $props();
 
 	const items = $derived(
-		stockItems.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
+		stockItems.value.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
 	);
 
 	const itemsWithStatus = $derived(items.map(s => getStockStatus(s.id)));

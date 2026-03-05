@@ -70,14 +70,14 @@
 
 	// Helper to check if an item is already 86'd
 	function isSoldOut(menuItemId: string): boolean {
-		const mi = menuItems.find(m => m.name === menuItemId);
+		const mi = menuItems.value.find(m => m.name === menuItemId);
 		return mi ? !mi.available : false;
 	}
 	
-	function handleSoldOut(menuItemName: string) {
-		const mi = menuItems.find(m => m.name === menuItemName);
+	async function handleSoldOut(menuItemName: string) {
+		const mi = menuItems.value.find(m => m.name === menuItemName);
 		if (mi) {
-			toggleMenuItemAvailability(mi.id);
+			await toggleMenuItemAvailability(mi.id);
 		}
 	}
 </script>

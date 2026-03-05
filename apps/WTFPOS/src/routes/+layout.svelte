@@ -2,6 +2,7 @@
 	import '../app.css';
 	import ConnectionStatus from '$lib/components/ConnectionStatus.svelte';
 	import { initConnectionMonitor } from '$lib/stores/connection.svelte';
+	import { initDeviceHeartbeat } from '$lib/stores/device.svelte';
 	import { onMount } from 'svelte';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
@@ -13,6 +14,7 @@
 
 	onMount(() => {
 		initConnectionMonitor();
+		initDeviceHeartbeat();
 
 		if (!import.meta.env.DEV) return;
 

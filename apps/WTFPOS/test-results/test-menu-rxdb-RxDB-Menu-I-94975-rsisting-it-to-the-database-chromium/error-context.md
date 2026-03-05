@@ -1,0 +1,84 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: WTF! SAMGYUP
+        - generic [ref=e7]: POS
+      - navigation [ref=e8]:
+        - link "💻 POS" [ref=e9] [cursor=pointer]:
+          - /url: /pos
+          - generic [ref=e10]: 💻
+          - text: POS
+      - generic [ref=e11]:
+        - generic [ref=e13]:
+          - img [ref=e14]
+          - generic [ref=e15]: Alta Cita (QC)
+        - generic [ref=e16]: staff
+        - generic [ref=e17]:
+          - generic [ref=e18]: U
+          - generic [ref=e19]: User
+        - generic [ref=e20]:
+          - button "Barcode Scanner (Keyboard listener active)" [ref=e21] [cursor=pointer]:
+            - img [ref=e22]
+          - button "Hardware Status Simulation" [ref=e24] [cursor=pointer]:
+            - img [ref=e25]
+          - button "No Sale" [ref=e26] [cursor=pointer]
+        - link "Logout" [ref=e27] [cursor=pointer]:
+          - /url: /
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - heading "POS" [level=1] [ref=e32]
+            - generic [ref=e33]: 0 occ
+            - generic [ref=e34]: 8 free
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - generic [ref=e37]: Available
+              - generic [ref=e39]: Dining (Green)
+              - generic [ref=e41]: Ready / Bill (Orange)
+            - button "📦 New Takeout" [ref=e43] [cursor=pointer]
+            - button "🧾 History" [ref=e44] [cursor=pointer]
+        - generic [ref=e45]:
+          - heading "Main Dining" [level=2] [ref=e46]
+          - generic [ref=e47]:
+            - button "Table T1" [ref=e48] [cursor=pointer]:
+              - generic [ref=e50]: T1
+              - generic [ref=e51]: 4p
+            - button "Table T2" [ref=e52] [cursor=pointer]:
+              - generic [ref=e54]: T2
+              - generic [ref=e55]: 4p
+            - button "Table T3" [ref=e56] [cursor=pointer]:
+              - generic [ref=e58]: T3
+              - generic [ref=e59]: 4p
+            - button "Table T4" [ref=e60] [cursor=pointer]:
+              - generic [ref=e62]: T4
+              - generic [ref=e63]: 4p
+            - button "Table T5" [ref=e64] [cursor=pointer]:
+              - generic [ref=e66]: T5
+              - generic [ref=e67]: 4p
+            - button "Table T6" [ref=e68] [cursor=pointer]:
+              - generic [ref=e70]: T6
+              - generic [ref=e71]: 4p
+            - button "Table T7" [ref=e72] [cursor=pointer]:
+              - generic [ref=e74]: T7
+              - generic [ref=e75]: 2p
+            - button "Table T8" [ref=e76] [cursor=pointer]:
+              - generic [ref=e78]: T8
+              - generic [ref=e79]: 2p
+            - generic [ref=e80]:
+              - generic [ref=e81]: 🍳 KITCHEN
+              - generic [ref=e82]: 🚪 ENTRANCE
+      - generic [ref=e84]:
+        - generic [ref=e85]: 🧾
+        - generic [ref=e86]:
+          - generic [ref=e87]: No Table Selected
+          - generic [ref=e88]: Tap an occupied table on the floor plan to view its running bill here.
+        - generic [ref=e89]:
+          - generic [ref=e90]: Green = available — tap to open
+          - generic [ref=e92]: Orange = occupied — tap to view bill
+  - generic [ref=e94]: WTF! Samgyup POS
+```

@@ -189,7 +189,7 @@
 
         if (e.key === 'Enter') {
             if (barcodeBuffer.length >= 3) {
-                const matchedItem = menuItems.find(i => i.isRetail && (i.id === barcodeBuffer || i.id === `ret-${barcodeBuffer}`));
+                const matchedItem = menuItems.value.find(i => i.isRetail && (i.id === barcodeBuffer || i.id === `ret-${barcodeBuffer}`));
                 if (matchedItem) {
                     addItemToOrder(currentActiveOrder.id, matchedItem, 1);
                 }

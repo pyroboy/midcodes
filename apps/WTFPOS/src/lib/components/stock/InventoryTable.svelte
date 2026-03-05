@@ -7,7 +7,7 @@
 		type StockStatus, type StockCategory, type StockItem
 	} from '$lib/stores/stock.svelte';
 	import { session } from '$lib/stores/session.svelte';
-	import { LayoutGrid, List, Search, Plus, Minus, X, Pencil, MapPin } from 'lucide-svelte';
+	import { LayoutGrid, List, Search, Plus, Minus, X, Pencil, MapPin, Edit3 } from 'lucide-svelte';
 	
 	import StockHealthStrip from './StockHealthStrip.svelte';
 	import CategoryIcon from './CategoryIcon.svelte';
@@ -40,10 +40,10 @@
 		searchQuery  = '';
 	});
 
-	interface InventoryItem extends StockItem { currentStock: number; status: StockStatus }
+	interface InventoryItem extends StockItem { currentStock: number; status: StockStatus; description?: string; image?: string; }
 
 	const items = $derived(
-		stockItems
+		stockItems.value
 			.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
 			.map(s => ({
 				...s,
@@ -226,7 +226,7 @@
 		modalAction  = null;
 	}
 
-	function handleConfirm() {
+	async function handleConfirm() {
 		if (!selectedItem || !modalAction) return;
 		const qty = parseFloat(adjustQty);
 		if (isNaN(qty) || qty < 0) return;
@@ -235,9 +235,9 @@
 		if ((modalAction === 'deduct' || modalAction === 'set') && !adjustReason.trim()) return;
 
 		if (modalAction === 'set') {
-			setStock(selectedItem.id, selectedItem.name, qty, selectedItem.unit, adjustReason);
+			await setStock(selectedItem.id, selectedItem.name, qty, selectedItem.unit, adjustReason);
 		} else {
-			adjustStock(selectedItem.id, selectedItem.name, modalAction, qty, selectedItem.unit, adjustReason);
+			await adjustStock(selectedItem.id, selectedItem.name, modalAction, qty, selectedItem.unit, adjustReason);
 		}
 		closeModal();
 	}
@@ -250,6 +250,44 @@
 		(modalAction !== 'set' && parseFloat(adjustQty) <= 0) ||
 		(reasonRequired && !adjustReason.trim())
 	);
+
+	// ─── Edit Modal ────────────────────────────────────────────────────────────
+	let showEditModal = $state(false);
+	let editItem = $state<InventoryItem | null>(null);
+	let editName = $state('');
+	let editDesc = $state('');
+	let editImage = $state<File | null>(null);
+	let editImageUrl = $state<string | undefined>(undefined);
+
+	function openEditModalClick(item: InventoryItem, e: MouseEvent) {
+		e.stopPropagation();
+		editItem = item;
+		editName = item.name;
+		editDesc = item.description || '';
+		editImage = null;
+		editImageUrl = item.image;
+		showEditModal = true;
+	}
+
+	function closeEditModal() {
+		showEditModal = false;
+		editItem = null;
+	}
+
+	async function handleEditConfirm() {
+		if (!editItem || !editName.trim()) return;
+		
+		const updates = {
+			name: editName.trim(),
+			description: editDesc,
+			...(editImageUrl !== undefined && { image: editImageUrl })
+		};
+
+		import('$lib/stores/stock.svelte').then(async m => {
+			await m.updateStockItem(editItem!.id, updates as any);
+			closeEditModal();
+		});
+	}
 </script>
 
 <div class="mb-5">
@@ -377,6 +415,18 @@
 											</span>
 											<span class="text-gray-400 ml-auto">Min: {item.minLevel.toLocaleString()}</span>
 										</div>
+
+										<div class="mt-2 flex justify-end">
+											<div 
+												role="button"
+												tabindex="0"
+												onclick={(e) => openEditModalClick(item, e)}
+												onkeydown={(e) => e.key === 'Enter' && openEditModalClick(item, e as any)}
+												class="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+											>
+												<Edit3 class="w-3 h-3" /> Edit Info
+											</div>
+										</div>
 									</div>
 								</button>
 							{/each}
@@ -428,6 +478,18 @@
 										</span>
 										<span class="text-gray-400 ml-auto">Min: {item.minLevel.toLocaleString()}</span>
 									</div>
+
+									<div class="mt-2 flex justify-end">
+										<div 
+											role="button"
+											tabindex="0"
+											onclick={(e) => openEditModalClick(item, e)}
+											onkeydown={(e) => e.key === 'Enter' && openEditModalClick(item, e as any)}
+											class="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+										>
+											<Edit3 class="w-3 h-3" /> Edit Info
+										</div>
+									</div>
 								</div>
 							</button>
 						{/each}
@@ -465,6 +527,7 @@
 							Status
 							<span class="ml-1 inline-block w-2 text-gray-400">{sortColumn === 'status' ? (sortDesc ? '↓' : '↑') : ''}</span>
 						</th>
+						<th class="w-16 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"></th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-border">
@@ -527,6 +590,15 @@
 													{statusConfig[item.status].label}
 												</span>
 											</td>
+											<td class="px-4 py-3 text-right">
+												<button 
+													class="text-gray-400 hover:text-accent transition-colors"
+													onclick={(e) => openEditModalClick(item, e)}
+													aria-label="Edit Info"
+												>
+													<Edit3 class="w-4 h-4" />
+												</button>
+											</td>
 										</tr>
 									{/each}
 								{/if}
@@ -567,6 +639,15 @@
 										<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', statusConfig[item.status].badgeClass)}>
 											{statusConfig[item.status].label}
 										</span>
+									</td>
+									<td class="px-4 py-3 text-right">
+										<button 
+											class="text-gray-400 hover:text-accent transition-colors"
+											onclick={(e) => openEditModalClick(item, e)}
+											aria-label="Edit Info"
+										>
+											<Edit3 class="w-4 h-4" />
+										</button>
 									</td>
 								</tr>
 							{/each}
@@ -723,6 +804,75 @@
 				{/if}
 			</div>
 
+		</div>
+	</div>
+{/if}
+
+<!-- ─── Edit Details Modal ──────────────────────────────────────────────────── -->
+{#if showEditModal && editItem}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+		<div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl flex flex-col">
+			<div class="flex items-center justify-between border-b border-border px-5 py-4">
+				<h3 class="font-bold text-gray-900 leading-tight">Edit Item Info</h3>
+				<button onclick={closeEditModal} class="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+					<X class="w-5 h-5" />
+				</button>
+			</div>
+
+			<div class="px-5 py-4 flex flex-col gap-4">
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Name *</span>
+					<input type="text" bind:value={editName} class="pos-input" />
+				</label>
+				
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description (Optional)</span>
+					<textarea bind:value={editDesc} class="pos-input resize-none h-20" placeholder="e.g. For cooking use"></textarea>
+				</label>
+
+				<!-- Image Upload -->
+				<label class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item Picture</span>
+					{#if editImageUrl}
+						<div class="mb-2 relative w-32 h-32 rounded-lg overflow-hidden border border-border">
+							<img src={editImageUrl} alt="Preview" class="w-full h-full object-cover bg-gray-50" />
+							<button 
+								onclick={(e) => { e.preventDefault(); editImageUrl = undefined; editImage = null; }}
+								class="absolute top-1 right-1 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-black/70"
+								title="Remove image"
+							>
+								✕
+							</button>
+						</div>
+					{/if}
+					<input 
+						type="file" 
+						accept="image/*" 
+						onchange={(e) => {
+							const target = e.currentTarget;
+							const file = target?.files?.[0];
+							if (file) {
+								editImage = file;
+								editImageUrl = URL.createObjectURL(file);
+							}
+						}}
+						class="pos-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" 
+					/>
+				</label>
+			</div>
+
+			<div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-border bg-gray-50 p-4">
+				<button onclick={closeEditModal} class="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">
+					Cancel
+				</button>
+				<button 
+					onclick={handleEditConfirm}
+					disabled={!editName.trim()}
+					class="rounded-lg px-5 py-2.5 text-sm font-bold text-white bg-accent hover:bg-accent-light hover:text-accent transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					Save Changes
+				</button>
+			</div>
 		</div>
 	</div>
 {/if}

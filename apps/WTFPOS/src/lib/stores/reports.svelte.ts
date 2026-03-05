@@ -55,16 +55,16 @@ export function tableSalesToday() {
 
 export function bestSellersMeat() {
 	const weightByItem: Record<string, number> = {};
-	for (const ded of deductions) {
-		const stockItem = stockItems.find(s => s.id === ded.stockItemId);
+	for (const ded of deductions.value) {
+		const stockItem = stockItems.value.find(s => s.id === ded.stockItemId);
 		if (!stockItem) continue;
-		const menuItem = menuItems.find(m => m.id === stockItem.menuItemId && m.isWeightBased);
+		const menuItem = menuItems.value.find(m => m.id === stockItem.menuItemId && m.isWeightBased);
 		if (!menuItem) continue;
 		weightByItem[menuItem.id] = (weightByItem[menuItem.id] ?? 0) + ded.qty;
 	}
 	return Object.entries(weightByItem)
 		.map(([id, weight]) => {
-			const item = menuItems.find(m => m.id === id)!;
+			const item = menuItems.value.find(m => m.id === id)!;
 			const revenue = weight * (item.pricePerGram ?? 0);
 			return { name: item.name, weightGrams: weight, revenue };
 		})
@@ -77,7 +77,7 @@ export function bestSellersAddons() {
 	for (const order of getOrders().filter(o => o.status === 'paid')) {
 		for (const item of order.items) {
 			if (item.tag === 'FREE' || item.tag === 'PKG') continue;
-			const menuItem = menuItems.find(m => m.id === item.menuItemId);
+			const menuItem = menuItems.value.find(m => m.id === item.menuItemId);
 			if (!menuItem || menuItem.isWeightBased || menuItem.category === 'packages') continue;
 			if (!qtsByItem[item.menuItemId]) qtsByItem[item.menuItemId] = { name: item.menuItemName, qty: 0, revenue: 0 };
 			qtsByItem[item.menuItemId].qty += item.quantity;
@@ -90,13 +90,13 @@ export function bestSellersAddons() {
 }
 
 export function meatVarianceToday() {
-	const meatStockItems = stockItems.filter(s =>
+	const meatStockItems = stockItems.value.filter(s =>
 		s.category === 'Meats' &&
 		(session.locationId === 'all' || s.locationId === session.locationId)
 	);
 	return meatStockItems.map(s => {
-		const totalDelivered = deliveries.filter(d => d.stockItemId === s.id).reduce((t, d) => t + d.qty, 0);
-		const totalConsumed  = deductions.filter(d => d.stockItemId === s.id).reduce((t, d) => t + d.qty, 0);
+		const totalDelivered = deliveries.value.filter(d => d.stockItemId === s.id).reduce((t, d) => t + d.qty, 0);
+		const totalConsumed  = deductions.value.filter(d => d.stockItemId === s.id).reduce((t, d) => t + d.qty, 0);
 		const closing        = getCurrentStock(s.id);
 		const available      = s.openingStock + totalDelivered;
 		const expectedConsumed = available - closing;
@@ -249,4 +249,39 @@ export function voidsAndDiscountsSummary() {
 			items: paidWithDiscounts
 		}
 	};
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+export const utilitySettings = $state({
+	electricityPerKwh: 12,
+	gasPerKg: 85
+});
+
+export interface UtilityReading {
+	id: string;
+	date: string;
+	electricity: number;
+	gas: number;
+	recordedBy: string;
+}
+
+export const utilityReadings = $state<UtilityReading[]>([
+	{ id: 'util-1', date: new Date(Date.now() - 86400000).toDateString(), electricity: 1450, gas: 42, recordedBy: 'System' }
+]);
+
+export function getPreviousUtilityReading(): UtilityReading | null {
+	if (utilityReadings.length === 0) return null;
+	// Return the most recent reading
+	return [...utilityReadings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+}
+
+export function saveUtilityReading(electricity: number, gas: number) {
+	utilityReadings.push({
+		id: nanoid(),
+		date: new Date().toDateString(),
+		electricity,
+		gas,
+		recordedBy: session.userName || 'Staff'
+	});
 }

@@ -14,9 +14,9 @@
 
 	const preFilteredDeliveries = $derived(
 		isWarehouseSession()
-			? deliveries
-			: deliveries.filter(d => {
-				const item = stockItems.find(s => s.id === d.stockItemId);
+			? deliveries.value
+			: deliveries.value.filter(d => {
+				const item = stockItems.value.find(s => s.id === d.stockItemId);
 				return item?.locationId === session.locationId;
 			})
 	);
@@ -43,7 +43,7 @@
 	const allAlerts = $derived(
 		getSpoilageAlerts().filter(d => {
 			if (isWarehouseSession()) return true;
-			const item = stockItems.find(s => s.id === d.stockItemId);
+			const item = stockItems.value.find(s => s.id === d.stockItemId);
 			return item?.locationId === session.locationId;
 		}).sort((a, b) => a.daysLeft - b.daysLeft)
 	);
@@ -53,7 +53,7 @@
 	const expiringAlerts = $derived(allAlerts.filter(a => a.daysLeft >= 0));
 
 	const activeItems = $derived(
-		stockItems.filter(s => isWarehouseSession() || s.locationId === session.locationId)
+		stockItems.value.filter(s => isWarehouseSession() || s.locationId === session.locationId)
 	);
 
 	// ─── Receive Form ────────────────────────────────────────────────────────────
@@ -81,16 +81,16 @@
 		showModal = true;
 	}
 
-	function saveDelivery() {
+	async function saveDelivery() {
 		formError = '';
 		if (!formStockItemId) { formError = 'Please select an item.'; return; }
 		if (parsedQty <= 0)   { formError = 'Quantity must be greater than zero.'; return; }
 		if (!formSupplier.trim()) { formError = 'Supplier is required.'; return; }
 
-		const item = stockItems.find(s => s.id === formStockItemId);
+		const item = stockItems.value.find(s => s.id === formStockItemId);
 		if (!item) return;
 
-		receiveDelivery(
+		await receiveDelivery(
 			item.id,
 			item.name,
 			parsedQty,

@@ -20,14 +20,14 @@
 	let pin = $state('');
 	let pinError = $state(false);
 
-	const packages = $derived(menuItems.filter(m => m.category === 'packages' && m.available));
-	const currentPkg = $derived(menuItems.find(m => m.id === order.packageId));
+	const packages = $derived(menuItems.value.filter(m => m.category === 'packages' && m.available));
+	const currentPkg = $derived(menuItems.value.find(m => m.id === order.packageId));
 
 	function selectPackage(pkgId: string) {
 		if (pkgId === order.packageId) return;
 		selectedPackageId = pkgId;
 
-		const newPkg = menuItems.find(m => m.id === pkgId);
+		const newPkg = menuItems.value.find(m => m.id === pkgId);
 		if (!newPkg || !currentPkg) return;
 
 		const diff = newPkg.price - currentPkg.price;

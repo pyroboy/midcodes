@@ -31,7 +31,7 @@
 	};
 
 	const currentMonthExpenses = $derived(
-		allExpenses.filter(e => {
+		allExpenses.value.filter(e => {
 			const d = new Date(e.createdAt);
 			const now = new Date();
 			return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();

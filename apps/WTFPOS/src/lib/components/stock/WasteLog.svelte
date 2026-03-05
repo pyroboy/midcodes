@@ -33,14 +33,14 @@
 	let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Auto-fill unit from selected item
-	const selectedItem = $derived(stockItems.find(s => s.id === selectedStockId));
+	const selectedItem = $derived(stockItems.value.find(s => s.id === selectedStockId));
 	const unit = $derived(selectedItem?.unit ?? '');
 
 	const canSave = $derived(selectedStockId !== '' && qty.trim() !== '' && parseFloat(qty) > 0 && reason !== '');
 
 	// Filter to today's entries only
 	const todayEntries = $derived(
-		wasteEntries.filter(e => {
+		wasteEntries.value.filter(e => {
 			try {
 				return isToday(new Date(e.loggedAt));
 			} catch {
@@ -71,11 +71,11 @@
 		return entries.reduce((best, x) => x.qty > best.qty ? x : best, { name: '—', qty: 0 });
 	})());
 
-	function handleLog() {
+	async function handleLog() {
 		if (!canSave || !selectedItem) return;
 		if (!confirm(`Are you sure you want to log ${qty} ${unit} of ${selectedItem.name} as waste?`)) return;
 		
-		logWaste(selectedStockId, selectedItem.name, parseFloat(qty) || 0, unit, reason, session.userName);
+		await logWaste(selectedStockId, selectedItem.name, parseFloat(qty) || 0, unit, reason, session.userName);
 		selectedStockId = '';
 		qty = '';
 		reason = '';
@@ -149,7 +149,7 @@
 			<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Item *</span>
 			<select bind:value={selectedStockId} class="pos-input">
 				<option value="">Select item…</option>
-				{#each stockItems as s}
+				{#each stockItems.value as s}
 					<option value={s.id}>{s.name}</option>
 				{/each}
 			</select>

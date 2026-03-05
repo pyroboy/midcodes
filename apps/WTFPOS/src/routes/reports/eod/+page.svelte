@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
-	import { eodSummary } from '$lib/stores/reports.svelte';
+	import { eodSummary, utilitySettings, getPreviousUtilityReading, saveUtilityReading, type UtilityReading } from '$lib/stores/reports.svelte';
 	import { allExpenses } from '$lib/stores/expenses.svelte';
 
 	const summary = $derived(eodSummary());
@@ -8,7 +8,7 @@
 	let closingActual = $state(0);
 	const openingCash    = 5000;
 	const cashExpenses   = $derived(
-		allExpenses
+		allExpenses.value
 			.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString() && e.paidBy === 'Cash from Register')
 			.reduce((s, e) => s + e.amount, 0)
 	);
@@ -36,6 +36,35 @@
 		{ label: 'Less: Cash Expenses',value: -cashExpenses,          style: 'text-status-red' },
 		{ label: 'Expected Closing',   value: closingExpected,        style: 'font-semibold border-t border-border pt-1' },
 	]);
+
+	// ─── Utilities ─────────────────────────────────────────────────────────────
+	const previousReading = $derived(getPreviousUtilityReading());
+	let currentElec = $state<number | ''>('');
+	let currentGas = $state<number | ''>('');
+
+	const elecUsed = $derived(
+		typeof currentElec === 'number' && previousReading 
+			? Math.max(0, currentElec - previousReading.electricity) 
+			: 0
+	);
+	const gasUsed = $derived(
+		typeof currentGas === 'number' && previousReading 
+			? Math.max(0, currentGas - previousReading.gas) 
+			: 0
+	);
+
+	const elecCost = $derived(elecUsed * utilitySettings.electricityPerKwh);
+	const gasCost = $derived(gasUsed * utilitySettings.gasPerKg);
+	const totalUtilCost = $derived(elecCost + gasCost);
+
+	let eodSubmitted = $state(false);
+
+	function submitEOD() {
+		if (typeof currentElec === 'number' && typeof currentGas === 'number') {
+			saveUtilityReading(currentElec, currentGas);
+		}
+		eodSubmitted = true;
+	}
 </script>
 
 <!-- Live indicator -->
@@ -142,6 +171,44 @@
 			{/if}
 		</div>
 
+		<!-- Utilities Input -->
+		<div class="rounded-xl border border-border bg-white p-5 fadeIn" style={isBlindCloseSubmitted ? '' : 'opacity: 0.5; pointer-events: none;'}>
+			<h2 class="mb-3 font-bold text-gray-900">Utility Readings</h2>
+			<p class="mb-4 text-xs text-gray-500">Record today's meter readings to estimate daily utility usage.</p>
+			
+			<div class="flex flex-col gap-4">
+				<div class="grid grid-cols-2 gap-4">
+					<div class="flex flex-col gap-1.5">
+						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Electricity (kWh)</span>
+						<input type="number" bind:value={currentElec} class="pos-input font-mono" min="0" disabled={eodSubmitted} placeholder={previousReading ? String(previousReading.electricity) : '0'} />
+						<span class="text-[10px] text-gray-400">Prev: {previousReading ? previousReading.electricity : '0'}</span>
+					</div>
+					<div class="flex flex-col gap-1.5">
+						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Gas (kg)</span>
+						<input type="number" bind:value={currentGas} class="pos-input font-mono" min="0" disabled={eodSubmitted} placeholder={previousReading ? String(previousReading.gas) : '0'} />
+						<span class="text-[10px] text-gray-400">Prev: {previousReading ? previousReading.gas : '0'}</span>
+					</div>
+				</div>
+
+				{#if (typeof currentElec === 'number' || typeof currentGas === 'number') && previousReading}
+					<div class="rounded-lg bg-gray-50 p-3 mt-2 border border-gray-100 fadeIn">
+						<div class="flex justify-between text-sm mb-1">
+							<span class="text-gray-500">Electricity Used ({elecUsed} kWh)</span>
+							<span class="font-mono text-gray-700">{formatPeso(elecCost)}</span>
+						</div>
+						<div class="flex justify-between text-sm mb-1">
+							<span class="text-gray-500">Gas Used ({gasUsed} kg)</span>
+							<span class="font-mono text-gray-700">{formatPeso(gasCost)}</span>
+						</div>
+						<div class="flex justify-between text-sm font-bold border-t border-gray-200 pt-1 mt-1">
+							<span class="text-gray-900">Total Est. Cost</span>
+							<span class="font-mono text-status-red">{formatPeso(totalUtilCost)}</span>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</div>
+
 		<div class="rounded-xl border border-border bg-white p-5">
 			<h2 class="mb-3 font-bold text-gray-900">Finalize EOD</h2>
 			{#if !isBlindCloseSubmitted}
@@ -153,16 +220,11 @@
 				>Declare Drawer Count</button>
 			{:else}
 				<p class="mb-4 text-xs text-gray-400">Submitting will lock today's records and generate the EOD report.</p>
-				<button class="btn-primary w-full">Submit EOD Report</button>
+				<button class="btn-primary w-full" disabled={eodSubmitted} onclick={submitEOD}>
+					{eodSubmitted ? 'EOD Submitted ✓' : 'Submit EOD Report'}
+				</button>
 				<button class="btn-secondary mt-2 w-full">Export to PDF</button>
 			{/if}
-		</div>
-
-		<div class="rounded-xl border border-border bg-white p-5">
-			<h2 class="mb-3 font-bold text-gray-900">Finalize EOD</h2>
-			<p class="mb-4 text-xs text-gray-400">Submitting will lock today's records and generate the EOD report.</p>
-			<button class="btn-primary w-full">Submit EOD Report</button>
-			<button class="btn-secondary mt-2 w-full">Export to PDF</button>
 		</div>
 	</div>
 </div>

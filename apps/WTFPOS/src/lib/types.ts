@@ -51,6 +51,7 @@ export interface MenuItem {
 	isRetail?: boolean;       // Tier 4: For barcode scanning
 	meats?: string[];      // IDs of meat MenuItems included in this package
 	autoSides?: string[];  // IDs of side MenuItems auto-included with this package
+	image?: string;
 }
 
 // ─── Takeout ─────────────────────────────────────────────────────────────────

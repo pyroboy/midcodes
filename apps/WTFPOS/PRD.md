@@ -221,7 +221,58 @@ Module 4: Administration & System Logs
 
 
 
-## 5. Exclusions & Future Expansions
+## 5. Production Update & Deployment Protocol
+
+### 5.1 Version Tracking
+
+Every build carries a version number (`APP_VERSION` in `src/lib/version.ts`) and a build timestamp injected at compile time. The version is displayed in the TopBar for quick identification across all devices.
+
+### 5.2 Update Safety Matrix
+
+| Change Type | Safe Window | Risk |
+|---|---|---|
+| UI tweaks, labels, colors, typo fixes | Anytime | None — no data impact |
+| Bug fixes (no schema change) | Anytime | Low — test first |
+| New features reading existing data | Slow hours (2–4 PM) | Low |
+| New store logic changing write paths | Between shifts | Medium — verify data integrity |
+| New RxDB collection | Between shifts | Medium — restart needed |
+| Schema version bump (field add/rename) | After close (10 PM+) | High — migration runs on every document |
+| Breaking schema (remove field, change PK) | After close + backup | Critical — test on copy of production data |
+| Force-clear IndexedDB remotely | NEVER | Data loss |
+
+### 5.3 Rollout Order
+
+All updates follow this sequence:
+
+1. Deploy new build to server/hosting
+2. Update **one tablet** at one branch (canary) — verify 15 minutes
+3. Update remaining tablets at that branch (Main POS first, then Kitchen KDS)
+4. Move to next branch, repeat
+5. Owner phones last
+
+### 5.4 Update Delivery (Option B — Manual Prompt)
+
+Updates must **never** auto-refresh mid-transaction. The service worker (PWA) detects new versions and shows a non-intrusive banner. Staff taps "Update Now" when between customers. The app reloads with new code; local data (IndexedDB) remains intact.
+
+### 5.5 Offline Branch Updates
+
+If a branch has been offline when an update is deployed, the migration runs automatically when the tablet reconnects and loads the new app code. RxDB migrations are per-device, automatic, and sequential — no coordination between devices is required.
+
+### 5.6 Schema Migration Checklist
+
+Before deploying any schema change:
+
+- [ ] Bumped schema version in `schemas.ts`
+- [ ] Added `migrationStrategies` in `db/index.ts`
+- [ ] Tested upgrade path (old data → new code)
+- [ ] Tested fresh install (cleared IndexedDB, re-seeded)
+- [ ] Bumped `APP_VERSION` in `version.ts`
+- [ ] Deployed after service hours (10 PM+)
+- [ ] Canary tablet verified first
+
+---
+
+## 6. Exclusions & Future Expansions
 
 * 
 **Exclusions:** All hardware (computers, tablets, printers, scales, routers), internet service costs, and BIR filing/registration fees are the sole responsibility of the Client.

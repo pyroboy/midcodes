@@ -11,9 +11,13 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"clean": "rimraf .svelte-kit build node_modules/.cache/turbo node_modules/.vite"
+		"clean": "rimraf .svelte-kit build node_modules/.cache/turbo node_modules/.vite",
+		"test:routes": "node scripts/check-routes.js",
+		"test": "node scripts/check-routes.js && playwright test",
+		"test:ui": "playwright test --ui"
 	},
 	"devDependencies": {
+		"@playwright/test": "^1.49.1",
 		"@sveltejs/adapter-node": "^5.2.13",
 		"@sveltejs/kit": "^2.27.3",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -40,7 +44,10 @@
 	},
 	"dependencies": {
 		"date-fns": "^4.1.0",
-		"nanoid": "^5.1.5"
+		"dexie": "^4.3.0",
+		"nanoid": "^5.1.5",
+		"rxdb": "^16.21.1",
+		"rxjs": "^7.8.2"
 	},
 	"engines": {
 		"node": ">=20.0.0"

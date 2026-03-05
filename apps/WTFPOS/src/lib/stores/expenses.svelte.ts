@@ -3,6 +3,9 @@
  */
 import { nanoid } from 'nanoid';
 import { session } from '$lib/stores/session.svelte';
+import { getDb } from '$lib/db';
+import { createRxStore } from '$lib/stores/sync.svelte';
+import { browser } from '$app/environment';
 
 export interface Expense {
     id: string;
@@ -13,9 +16,12 @@ export interface Expense {
     locationId: string;
     createdBy: string;
     createdAt: string;
+    receiptPhoto?: string;
 }
 
 export const expenseCategories = [
+    'Labor Budget',
+    'Petty Cash',
     'Meat Procurement', 
     'Produce & Sides', 
     'Utilities', 
@@ -24,41 +30,34 @@ export const expenseCategories = [
     'Miscellaneous'
 ];
 
-export const allExpenses = $state<Expense[]>([
-    {
-        id: nanoid(),
-        category: 'Meat Procurement',
-        amount: 8500,
-        description: 'Pork belly delivery',
-        paidBy: 'Petty Cash',
-        locationId: 'loc-ayala',
-        createdBy: 'Manager',
-        createdAt: new Date().toISOString()
-    },
-    {
-        id: nanoid(),
-        category: 'Produce & Sides',
-        amount: 1250,
-        description: 'Morning market run for lettuce',
-        paidBy: 'Petty Cash',
-        locationId: 'loc-bgc',
-        createdBy: 'Manager',
-        createdAt: new Date().toISOString()
-    }
-]);
+// Replaces the static array with a reactive RxDB query wrapped in a $derived
+const dbQuery = createRxStore<Expense>('expenses', db => db.expenses.find({ sort: [{ createdAt: 'desc' }] }));
 
-export function addExpense(category: string, amount: number, description: string, paidBy: string) {
+// We export the getter so UI components still read it identically to before without modifying components
+export const allExpenses = {
+    get value(): Expense[] {
+        return dbQuery.value;
+    }
+};
+
+export async function addExpense(category: string, amount: number, description: string, paidBy: string, receiptPhoto?: string) {
+    if (!browser) return;
     const expense: Expense = {
         id: nanoid(),
         category,
         amount,
         description,
         paidBy,
-        locationId: session.locationId === 'all' ? 'loc-ayala' : session.locationId,
+        locationId: session.locationId === 'all' ? 'qc' : session.locationId,
         createdBy: session.userName || 'Staff',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        ...(receiptPhoto && { receiptPhoto })
     };
-    allExpenses.unshift(expense);
+    
+    // Write directly to the local RxDB database instead of a memory array
+    const db = await getDb();
+    await db.expenses.insert(expense);
+
     // Try to call audit if it exists
     import('$lib/stores/audit.svelte').then(({ log }) => {
         if (typeof (log as any).expenseAdded === 'function') {
@@ -69,9 +68,10 @@ export function addExpense(category: string, amount: number, description: string
     }).catch(() => {});
 }
 
-export function deleteExpense(id: string) {
-    const idx = allExpenses.findIndex(e => e.id === id);
-    if (idx !== -1) {
-        allExpenses.splice(idx, 1);
-    }
+export async function deleteExpense(id: string) {
+    if (!browser) return;
+    const db = await getDb();
+    const query = db.expenses.findOne(id);
+    await query.remove();
 }
+

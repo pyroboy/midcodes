@@ -4,21 +4,34 @@
     import { formatPeso } from '$lib/utils';
 
     const branchExpenses = $derived(
-        session.locationId === 'all' ? allExpenses : allExpenses.filter(e => e.locationId === session.locationId)
+        session.locationId === 'all' ? allExpenses.value : allExpenses.value.filter(e => e.locationId === session.locationId)
     );
 
     let category = $state(expenseCategories[0]);
     let amount = $state('');
     let description = $state('');
     let paidBy = $state('Petty Cash');
+    let receiptPhoto = $state<File | null>(null);
 
     function handleSubmit(e: Event) {
         e.preventDefault();
         const numAmount = parseFloat(amount);
         if (!numAmount || numAmount <= 0) return;
-        addExpense(category, numAmount, description, paidBy);
+
+        let photoUrl: string | undefined = undefined;
+        if (receiptPhoto) {
+            photoUrl = URL.createObjectURL(receiptPhoto);
+        }
+
+        addExpense(category, numAmount, description, paidBy, photoUrl);
+        
+        // Reset form
         amount = '';
         description = '';
+        receiptPhoto = null;
+        
+        const fileInput = document.getElementById('receipt-upload') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
     }
 </script>
 
@@ -65,6 +78,21 @@
                 </select>
             </label>
 
+            <label class="flex flex-col gap-1.5">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Receipt Photo (Optional)</span>
+                <input 
+                    id="receipt-upload"
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment"
+                    onchange={(e) => {
+                        const target = e.target as HTMLInputElement;
+                        receiptPhoto = target.files?.[0] || null;
+                    }}
+                    class="pos-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" 
+                />
+            </label>
+
             <button type="submit" class="btn-primary mt-2 flex items-center justify-center gap-2">
                 <span>➕</span> Record Expense
             </button>
@@ -89,6 +117,7 @@
                                 <th>Category</th>
                                 <th>Description</th>
                                 <th>Source</th>
+                                <th>Photo</th>
                                 <th class="text-right">Amount</th>
                                 <th></th>
                             </tr>
@@ -102,6 +131,15 @@
                                     <td class="font-medium text-gray-900">{exp.category}</td>
                                     <td class="text-gray-600">{exp.description}</td>
                                     <td class="text-gray-500">{exp.paidBy}</td>
+                                    <td class="text-center">
+                                        {#if exp.receiptPhoto}
+                                            <a href={exp.receiptPhoto} target="_blank" rel="noopener noreferrer" class="text-accent hover:underline text-lg" title="View Receipt">
+                                                📸
+                                            </a>
+                                        {:else}
+                                            <span class="text-gray-300">-</span>
+                                        {/if}
+                                    </td>
                                     <td class="text-right font-mono font-bold text-status-red">
                                         {formatPeso(exp.amount)}
                                     </td>

@@ -23,6 +23,8 @@
 		'noel':   { password: 'noel',   role: 'staff',   displayName: 'Noel Garcia',   dest: '/stock',   locationId: 'wh-qc' },
 		// ── Management (all-locations) ───────────────────────────────────────
 		'chris':  { password: 'chris',  role: 'owner',   displayName: 'Christopher S', dest: '/pos',     locationId: 'all'   },
+		// ── System Admin ─────────────────────────────────────────────────────────
+		'sysadmin': { password: 'sysadmin', role: 'admin', displayName: 'System Admin', dest: '/admin/devices', locationId: 'all' },
 	};
 
 	const roleBadge: Record<Role, { label: string; cls: string }> = {
@@ -176,9 +178,19 @@
 			LOGIN →
 		</button>
 
-		<p class="text-center text-xs text-gray-400">
-			WTF! Samgyupsal POS · v0.1-alpha
-		</p>
+		<div class="flex flex-col items-center gap-1.5 mt-1">
+			<p class="text-xs text-gray-400">
+				WTF! Samgyupsal POS · v0.1-alpha
+			</p>
+			<button
+				onclick={() => quickLogin('sysadmin')}
+				class="text-[10px] font-semibold tracking-wide text-gray-300 hover:text-gray-500 uppercase transition-colors"
+				style="min-height: unset"
+				tabindex={-1}
+			>
+				System Admin
+			</button>
+		</div>
 	</div>
 
 	<!-- ─── Test Credentials Panel ───────────────────────────────────────── -->

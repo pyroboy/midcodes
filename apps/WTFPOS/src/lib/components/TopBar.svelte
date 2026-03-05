@@ -6,6 +6,8 @@
 	import HardwareStatus from '$lib/components/HardwareStatus.svelte';
 	import NoSaleModal from '$lib/components/NoSaleModal.svelte';
 	import { ScanBarcode, MapPin, ChevronDown } from 'lucide-svelte';
+	import { APP_VERSION, BUILD_DATE } from '$lib/version';
+	import { format } from 'date-fns';
 
 	let isNoSaleOpen = $state(false);
 	let locationDropdownOpen = $state(false);
@@ -71,6 +73,12 @@
 		<span class="text-base font-extrabold tracking-tight text-gray-900">WTF! SAMGYUP</span>
 		<span class="inline-flex h-5 items-center rounded-full bg-accent px-2 text-[10px] font-bold uppercase tracking-wide text-white">
 			POS
+		</span>
+		<span
+			class="hidden sm:inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-mono text-gray-400 cursor-default"
+			title="v{APP_VERSION} — Built {format(new Date(BUILD_DATE), 'MMM d, yyyy h:mm a')}"
+		>
+			v{APP_VERSION}
 		</span>
 	</div>
 

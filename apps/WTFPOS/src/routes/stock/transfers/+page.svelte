@@ -10,7 +10,7 @@
 
 	// ─── Source (derived from session) ───────────────────────────────────────────
 	const sourceLocationId = $derived(isWarehouseSession() ? 'wh-qc' : session.locationId);
-	const sourceItems = $derived(stockItems.filter(s => s.locationId === sourceLocationId));
+	const sourceItems = $derived(stockItems.value.filter(s => s.locationId === sourceLocationId));
 
 	const locationLabels: Record<string, string> = {
 		'qc':    'QC Branch (Alta Cita)',
@@ -45,7 +45,7 @@
 	// ─── Destination awareness ──────────────────────────────────────────────────
 	const destinationItem = $derived(
 		formToLocationId && formStockMenuItemId
-			? stockItems.find(s => s.menuItemId === formStockMenuItemId && s.locationId === formToLocationId)
+			? stockItems.value.find(s => s.menuItemId === formStockMenuItemId && s.locationId === formToLocationId)
 			: undefined
 	);
 	const destinationCurrentStock = $derived(
@@ -99,8 +99,8 @@
 		formNotes = '';
 	}
 
-	function confirmTransfer() {
-		const success = transferStock(
+	async function confirmTransfer() {
+		const success = await transferStock(
 			formStockMenuItemId,
 			parsedQty,
 			sourceLocationId,
@@ -122,7 +122,7 @@
 
 	// ─── Recent transfers ───────────────────────────────────────────────────────
 	const recentTransfers = $derived(
-		adjustments.filter(a => a.reason.startsWith('Transfer')).slice(0, 20)
+		adjustments.value.filter(a => a.reason.startsWith('Transfer')).slice(0, 20)
 	);
 
 	// ─── Step indicator data ────────────────────────────────────────────────────
@@ -307,7 +307,7 @@
 
 					{#each allLocations as loc}
 						{@const isSource = loc.id === sourceLocationId}
-						{@const destItem = stockItems.find(s => s.menuItemId === formStockMenuItemId && s.locationId === loc.id)}
+						{@const destItem = stockItems.value.find(s => s.menuItemId === formStockMenuItemId && s.locationId === loc.id)}
 						{@const destStock = destItem ? getCurrentStock(destItem.id) : null}
 						{@const canSelect = !isSource && !!destItem}
 

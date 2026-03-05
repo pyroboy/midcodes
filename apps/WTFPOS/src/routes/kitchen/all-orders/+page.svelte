@@ -30,7 +30,7 @@
 	const allowedCategories = ['meats', 'dishes', 'drinks'] as const;
 	
 	const filteredItems = $derived(
-		menuItems.filter((m) => m.category === activeCategory && m.available)
+		menuItems.value.filter((m) => m.category === activeCategory && m.available)
 	);
 
 	// Quick add item state

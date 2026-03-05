@@ -83,6 +83,8 @@
         } else if (order.discountType === 'senior' || order.discountType === 'pwd') {
             discountPaxInput = order.discountPax ?? 1;
             discountIdsInput = Array.from({ length: discountPaxInput }, (_, i) => order.discountIds?.[i] ?? '');
+            order.discountPax = discountPaxInput;
+            order.discountIds = [...discountIdsInput];
         }
         recalcOrder(order);
         if (table) table.billTotal = order.total;
@@ -170,7 +172,7 @@
 </script>
 
 <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="pos-card w-[460px] flex flex-col gap-0 overflow-hidden p-0">
+    <div class="pos-card w-[460px] flex flex-col gap-0 overflow-y-auto p-0 max-h-[95vh]">
         <div class="flex items-center justify-between border-b border-border px-6 py-4">
             <div class="flex items-center gap-3">
                 <span class="text-lg font-bold text-gray-900">Checkout</span>

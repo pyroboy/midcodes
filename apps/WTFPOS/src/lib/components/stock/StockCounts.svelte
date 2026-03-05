@@ -14,7 +14,7 @@
 
 	// Only show items for the current branch (no cross-branch editing)
 	const branchItems = $derived(
-		stockItems.filter(s =>
+		stockItems.value.filter(s =>
 			session.locationId === 'all' || s.locationId === session.locationId
 		)
 	);
@@ -40,8 +40,8 @@
 		return 'text-status-green font-semibold';
 	}
 
-	function handleSubmitCount() {
-		markPeriodDone(activePeriod);
+	async function handleSubmitCount() {
+		await markPeriodDone(activePeriod);
 	}
 </script>
 
@@ -110,7 +110,7 @@
 		</thead>
 		<tbody class="divide-y divide-border">
 			{#each branchItems as item (item.id)}
-				{@const count = stockCounts.find(c => c.stockItemId === item.id)}
+				{@const count = stockCounts.value.find(c => c.stockItemId === item.id)}
 				{@const counted = count?.counted[activePeriod] ?? null}
 				{@const expected = getCurrentStock(item.id)}
 				{@const drift = getDrift(item.id, activePeriod)}
