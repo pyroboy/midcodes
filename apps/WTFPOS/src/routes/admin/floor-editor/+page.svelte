@@ -10,7 +10,7 @@
 	);
 
 	const retailLocations = LOCATIONS.filter(l => l.type === 'retail');
-	const tables = $derived(allTables.filter(t => t.locationId === selectedLocationId));
+	const tables = $derived(allTables.value.filter(t => t.locationId === selectedLocationId));
 
 	// ─── Dragging State ──────────────────────────────────────────────────────────
 	let draggingTableId = $state<string | null>(null);
@@ -98,7 +98,7 @@
 
 	function saveProperties() {
 		if (activeTableId) {
-			const t = allTables.find(t => t.id === activeTableId);
+			const t = allTables.value.find(t => t.id === activeTableId);
 			if (t) {
 				t.label = editLabel;
 				t.capacity = editCapacity;

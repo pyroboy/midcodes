@@ -1,0 +1,295 @@
+
+> wtfpos@0.0.1 check /Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS
+Getting Svelte diagnostics...
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:27:107
+Error: Property 'length' does not exist on type '{ readonly value: KdsHistoryEntry[]; readonly initialized: boolean; }'. (ts)
+					<h3 class="text-lg font-bold text-gray-900">Bumped Ticket History</h3>
+					<span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-600">{kdsTicketHistory.length}</span>
+				</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:33:27
+Error: Property 'length' does not exist on type '{ readonly value: KdsHistoryEntry[]; readonly initialized: boolean; }'. (ts)
+			<div class="flex-1 overflow-y-auto px-6 py-4">
+				{#if kdsTicketHistory.length === 0}
+					<div class="text-center py-8">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:40:14
+Error: Argument of type '{ readonly value: KdsHistoryEntry[]; readonly initialized: boolean; }' is not assignable to parameter of type 'Iterable<unknown> | ArrayLike<unknown> | null | undefined'. (ts)
+					<div class="flex flex-col gap-3">
+						{#each kdsTicketHistory as entry (entry.orderId + entry.bumpedAt)}
+							<div class="rounded-lg border border-border bg-gray-50 p-4">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:40:41
+Error: 'entry' is of type 'unknown'. (ts)
+					<div class="flex flex-col gap-3">
+						{#each kdsTicketHistory as entry (entry.orderId + entry.bumpedAt)}
+							<div class="rounded-lg border border-border bg-gray-50 p-4">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:40:57
+Error: 'entry' is of type 'unknown'. (ts)
+					<div class="flex flex-col gap-3">
+						{#each kdsTicketHistory as entry (entry.orderId + entry.bumpedAt)}
+							<div class="rounded-lg border border-border bg-gray-50 p-4">
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:45:13
+Error: 'entry' is of type 'unknown'. (ts)
+										<span class="text-sm font-bold text-gray-900">
+											{entry.tableNumber !== null ? `T${entry.tableNumber}` : entry.customerName ?? 'Takeout'}
+										</span>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:45:46
+Error: 'entry' is of type 'unknown'. (ts)
+										<span class="text-sm font-bold text-gray-900">
+											{entry.tableNumber !== null ? `T${entry.tableNumber}` : entry.customerName ?? 'Takeout'}
+										</span>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:45:68
+Error: 'entry' is of type 'unknown'. (ts)
+										<span class="text-sm font-bold text-gray-900">
+											{entry.tableNumber !== null ? `T${entry.tableNumber}` : entry.customerName ?? 'Takeout'}
+										</span>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:47:66
+Error: 'entry' is of type 'unknown'. (ts)
+										</span>
+										<span class="text-xs text-gray-400">Bumped {formatTime(entry.bumpedAt)}</span>
+									</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:50:39
+Error: 'entry' is of type 'unknown'. (ts)
+									<button
+										onclick={() => handleRecall(entry.orderId)}
+										class="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white hover:bg-accent-dark transition-colors"
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:58:17
+Error: 'entry' is of type 'unknown'. (ts)
+								<div class="flex flex-wrap gap-1.5">
+									{#each entry.items as item}
+										<span class={cn(
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/kitchen/KdsHistoryModal.svelte:69:57
+Error: 'entry' is of type 'unknown'. (ts)
+								</div>
+								<div class="mt-1 text-[10px] text-gray-300">by {entry.bumpedBy}</div>
+							</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:22:53
+Error: Property 'value' does not exist on type 'Order[]'. Did you mean 'values'? (ts)
+        if (t.status === 'billing') {
+            const order = t.currentOrderId ? orders.value.find(o => o.id === t.currentOrderId) : null;
+            if (order?.status === 'pending_payment') return base + 'border-2 border-cyan-500 bg-cyan-50 shadow-md';
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:22:64
+Error: Parameter 'o' implicitly has an 'any' type. (ts)
+        if (t.status === 'billing') {
+            const order = t.currentOrderId ? orders.value.find(o => o.id === t.currentOrderId) : null;
+            if (order?.status === 'pending_payment') return base + 'border-2 border-cyan-500 bg-cyan-50 shadow-md';
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:38:53
+Error: Property 'value' does not exist on type 'Order[]'. Did you mean 'values'? (ts)
+        if (t.status === 'billing') {
+            const order = t.currentOrderId ? orders.value.find(o => o.id === t.currentOrderId) : null;
+            if (order?.status === 'pending_payment') return 'bg-cyan-500 text-white font-bold';
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:38:64
+Error: Parameter 'o' implicitly has an 'any' type. (ts)
+        if (t.status === 'billing') {
+            const order = t.currentOrderId ? orders.value.find(o => o.id === t.currentOrderId) : null;
+            if (order?.status === 'pending_payment') return 'bg-cyan-500 text-white font-bold';
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:71:44
+Error: Property 'value' does not exist on type 'Order[]'. Did you mean 'values'? (ts)
+                    {#if table.currentOrderId}
+                        {@const o = orders.value.find(ord => ord.id === table.currentOrderId)}
+                        {o?.pax ?? table.capacity}p
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:71:55
+Error: Parameter 'ord' implicitly has an 'any' type. (ts)
+                    {#if table.currentOrderId}
+                        {@const o = orders.value.find(ord => ord.id === table.currentOrderId)}
+                        {o?.pax ?? table.capacity}p
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:84:44
+Error: Property 'value' does not exist on type 'Order[]'. Did you mean 'values'? (ts)
+                {#if table.currentOrderId}
+                    {@const order = orders.value.find(o => o.id === table.currentOrderId)}
+                    {#if order?.packageId === 'pkg-pork'}
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/lib/components/pos/FloorPlan.svelte:84:55
+Error: Parameter 'o' implicitly has an 'any' type. (ts)
+                {#if table.currentOrderId}
+                    {@const order = orders.value.find(o => o.id === table.currentOrderId)}
+                    {#if order?.packageId === 'pkg-pork'}
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:13:36
+Error: Property 'filter' does not exist on type '{ readonly value: Table[]; readonly initialized: boolean; }'. (ts)
+	const retailLocations = LOCATIONS.filter(l => l.type === 'retail');
+	const tables = $derived(allTables.filter(t => t.locationId === selectedLocationId));
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:13:43
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+	const retailLocations = LOCATIONS.filter(l => l.type === 'retail');
+	const tables = $derived(allTables.filter(t => t.locationId === selectedLocationId));
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:71:43
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+
+	const activeTable = $derived(tables.find(t => t.id === activeTableId));
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:81:33
+Error: Parameter 'max' implicitly has an 'any' type. (ts)
+		// Find the highest existing table number to avoid duplicates after deletion
+		const maxNum = tables.reduce((max, t) => {
+			const match = t.label.match(/^T(\d+)$/);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:81:38
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+		// Find the highest existing table number to avoid duplicates after deletion
+		const maxNum = tables.reduce((max, t) => {
+			const match = t.label.match(/^T(\d+)$/);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:101:24
+Error: Property 'find' does not exist on type '{ readonly value: Table[]; readonly initialized: boolean; }'. (ts)
+		if (activeTableId) {
+			const t = allTables.find(t => t.id === activeTableId);
+			if (t) {
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/admin/floor-editor/+page.svelte:101:29
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+		if (activeTableId) {
+			const t = allTables.find(t => t.id === activeTableId);
+			if (t) {
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/all-orders/+page.svelte:7:13
+Error: Property 'filter' does not exist on type '{ readonly value: Order[]; readonly initialized: boolean; }'. (ts)
+	const activeOrders = $derived(
+		allOrders.filter((o) => o.status === 'open' || o.status === 'pending_payment')
+	);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/all-orders/+page.svelte:7:21
+Error: Parameter 'o' implicitly has an 'any' type. (ts)
+	const activeOrders = $derived(
+		allOrders.filter((o) => o.status === 'open' || o.status === 'pending_payment')
+	);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:13:40
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+	$effect(() => {
+		const toPrint = activeTickets.filter(t => !t.printStatus || t.printStatus === 'pending');
+		for (const ticket of toPrint) {
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:22:48
+Error: Type '{ readonly value: KdsTicket[]; readonly initialized: boolean; }' has no matching index signature for type 'number'. (ts)
+
+	function retryPrint(ticket: typeof kdsTickets[number]) {
+		ticket.printStatus = 'success'; // optimistic
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:30:14
+Error: Property 'filter' does not exist on type '{ readonly value: KdsTicket[]; readonly initialized: boolean; }'. (ts)
+	const activeTickets = $derived(
+		kdsTickets.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
+	);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:30:22
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+	const activeTickets = $derived(
+		kdsTickets.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
+	);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:30:42
+Error: Parameter 'i' implicitly has an 'any' type. (ts)
+	const activeTickets = $derived(
+		kdsTickets.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
+	);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:34:59
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+	// Stat counts
+	const activeTables = $derived(new Set(activeTickets.map((t) => t.tableNumber)).size);
+	const menuOrders   = $derived(activeTickets.filter((t) => t.items.some((i) => i.category !== 'meats')).length);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:35:54
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+	const activeTables = $derived(new Set(activeTickets.map((t) => t.tableNumber)).size);
+	const menuOrders   = $derived(activeTickets.filter((t) => t.items.some((i) => i.category !== 'meats')).length);
+	const queueOrders  = $derived(activeTickets.length);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:35:74
+Error: Parameter 'i' implicitly has an 'any' type. (ts)
+	const activeTables = $derived(new Set(activeTickets.map((t) => t.tableNumber)).size);
+	const menuOrders   = $derived(activeTickets.filter((t) => t.items.some((i) => i.category !== 'meats')).length);
+	const queueOrders  = $derived(activeTickets.length);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:54:29
+Error: Property 'find' does not exist on type '{ readonly value: KdsTicket[]; readonly initialized: boolean; }'. (ts)
+	function bumpAll(orderId: string) {
+		const ticket = kdsTickets.find(t => t.orderId === orderId);
+		if (!ticket) return;
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:54:34
+Error: Parameter 't' implicitly has an 'any' type. (ts)
+	function bumpAll(orderId: string) {
+		const ticket = kdsTickets.find(t => t.orderId === orderId);
+		if (!ticket) return;
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:64:47
+Error: Type '{ readonly value: KdsTicket[]; readonly initialized: boolean; }' has no matching index signature for type 'number'. (ts)
+	// Group items by category for kitchen display
+	function groupItems(items: typeof kdsTickets[number]['items']) {
+		const meats  = items.filter((i) => i.category === 'meats'   && i.status !== 'served');
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:65:32
+Error: Parameter 'i' implicitly has an 'any' type. (ts)
+	function groupItems(items: typeof kdsTickets[number]['items']) {
+		const meats  = items.filter((i) => i.category === 'meats'   && i.status !== 'served');
+		const dishes = items.filter((i) => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && i.status !== 'served');
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:66:32
+Error: Parameter 'i' implicitly has an 'any' type. (ts)
+		const meats  = items.filter((i) => i.category === 'meats'   && i.status !== 'served');
+		const dishes = items.filter((i) => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && i.status !== 'served');
+		const extras = items.filter((i) => i.category === 'packages' && i.status !== 'served');
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:67:32
+Error: Parameter 'i' implicitly has an 'any' type. (ts)
+		const dishes = items.filter((i) => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && i.status !== 'served');
+		const extras = items.filter((i) => i.category === 'packages' && i.status !== 'served');
+		return { meats, dishes, extras };
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:96:31
+Error: Property 'length' does not exist on type '{ readonly value: KdsHistoryEntry[]; readonly initialized: boolean; }'. (ts)
+			onclick={() => recallLastTicket()}
+			disabled={kdsTicketHistory.length === 0}
+			class="rounded-lg border border-accent bg-accent-light px-3 py-1.5 text-xs font-bold text-accent hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:107:37
+Error: Property 'length' does not exist on type '{ readonly value: KdsHistoryEntry[]; readonly initialized: boolean; }'. (ts)
+		>
+			📋 History {#if kdsTicketHistory.length > 0}<span class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold">{kdsTicketHistory.length}</span>{/if}
+		</button>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:107:146
+Error: Property 'length' does not exist on type '{ readonly value: KdsHistoryEntry[]; readonly initialized: boolean; }'. (ts)
+		>
+			📋 History {#if kdsTicketHistory.length > 0}<span class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold">{kdsTicketHistory.length}</span>{/if}
+		</button>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:160:43
+Error: Parameter 's' implicitly has an 'any' type. (ts)
+							<p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-status-red">
+								🥩 MEATS — {grouped.meats.reduce((s, i) => s + (i.weight ?? 0), 0)}g total
+							</p>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS/src/routes/kitchen/orders/+page.svelte:160:46
+Error: Parameter 'i' implicitly has an 'any' type. (ts)
+							<p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-status-red">
+								🥩 MEATS — {grouped.meats.reduce((s, i) => s + (i.weight ?? 0), 0)}g total
+							</p>
+
+====================================
+svelte-check found 48 errors and 0 warnings in 5 files
+ ELIFECYCLE  Command failed with exit code 1.

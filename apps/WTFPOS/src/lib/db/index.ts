@@ -2,6 +2,7 @@ import { createRxDatabase, addRxPlugin, removeRxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
+import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import {
 	tableSchema,
 	orderSchema,
@@ -26,6 +27,7 @@ import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
 // Register necessary plugins
 addRxPlugin(RxDBUpdatePlugin);
 addRxPlugin(RxDBQueryBuilderPlugin);
+addRxPlugin(RxDBMigrationSchemaPlugin);
 
 // Add dev mode plugin only in development to catch errors and allow ignoreDuplicate for HMR
 if (dev) {
@@ -41,9 +43,17 @@ const globalForRxDB = globalThis as unknown as {
 let dbPromise: Promise<any> | null = globalForRxDB.__wtfposDbPromise || null;
 
 export async function getDb() {
-	if (dbPromise) return dbPromise;
+	if (globalForRxDB.__wtfposDbPromise) {
+		try {
+			return await globalForRxDB.__wtfposDbPromise;
+		} catch (err) {
+			console.error('[RxDB] Existing database promise failed, clearing and retrying...', err);
+			globalForRxDB.__wtfposDbPromise = null;
+		}
+	}
 
 	dbPromise = globalForRxDB.__wtfposDbPromise = (async () => {
+		try {
 		// Initialize the database with Dexie (IndexedDB) as the storage engine
 		const db = await createRxDatabase({
 			name: 'wtfpos_db',
@@ -51,8 +61,16 @@ export async function getDb() {
 				? wrappedValidateIsMyJsonValidStorage({ storage: getRxStorageDexie() })
 				: getRxStorageDexie(),
             multiInstance: true,          // Allow multiple instances per tab (good for SvelteKit HMR)
-            eventReduce: true             // Query optimization
+            eventReduce: true,             // Query optimization
+            ignoreDuplicate: true,         // Vital for HMR/Development
+            closeDuplicates: true          // Recommended for HMR
 		});
+
+		// Check if collections already exist (prevents COL23)
+		if (Object.keys(db.collections).length > 0) {
+			console.log('[RxDB] Collections already exist, skipping addCollections');
+			return db;
+		}
 
 		// Add our collections using the defined schemas
 		await db.addCollections({
@@ -65,7 +83,29 @@ export async function getDb() {
 			deductions: { schema: deductionSchema },
 			expenses: { schema: expenseSchema },
 			adjustments: { schema: adjustmentSchema },
-			stock_counts: { schema: stockCountSchema },
+			stock_counts: { 
+				schema: stockCountSchema,
+				migrationStrategies: {
+						1: (oldDoc: any) => {
+							const newDoc = JSON.parse(JSON.stringify(oldDoc));
+							// Set current state of these mandatory fields
+							newDoc._deleted = typeof oldDoc._deleted !== 'undefined' ? oldDoc._deleted : false;
+							newDoc._attachments = oldDoc._attachments || {};
+							newDoc._meta = oldDoc._meta || { lwt: Date.now() };
+							// Map the counted fields
+							newDoc.counted = {
+								am10: oldDoc.counted?.['10am'] || oldDoc.counted?.am10 || null,
+								pm4: oldDoc.counted?.['4pm'] || oldDoc.counted?.pm4 || null,
+								pm10: oldDoc.counted?.['10pm'] || oldDoc.counted?.pm10 || null
+							};
+							// Remove old properties at top level if they existed
+							delete newDoc['10am'];
+							delete newDoc['4pm'];
+							delete newDoc['10pm'];
+							return newDoc;
+						}
+				}
+			},
 			devices: { schema: deviceSchema },
 			kds_tickets: { schema: kdsTicketSchema },
 			kds_history: { schema: kdsHistorySchema },
@@ -77,10 +117,14 @@ export async function getDb() {
         const seedModule = await import('./seed');
         await seedModule.seedDatabaseIfNeeded(db as any);
 
-		return db;
+			return db;
+		} catch (err) {
+			globalForRxDB.__wtfposDbPromise = null;
+			throw err;
+		}
 	})();
 
-	return dbPromise;
+	return globalForRxDB.__wtfposDbPromise;
 }
 
 /**

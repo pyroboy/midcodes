@@ -1,0 +1,8 @@
+
+> wtfpos@0.0.1 check /Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/WTFPOS
+Getting Svelte diagnostics...
+
+svelte-check found 0 errors and 0 warnings

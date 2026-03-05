@@ -226,7 +226,7 @@ export const adjustmentSchema: RxJsonSchema<any> = {
 // ─── Stock Count ─────────────────────────────────────────────────────────────
 export const stockCountSchema: RxJsonSchema<any> = {
 	title: 'stock count schema',
-	version: 0,
+	version: 1,
 	primaryKey: 'stockItemId',
 	type: 'object',
 	properties: {
@@ -238,9 +238,13 @@ export const stockCountSchema: RxJsonSchema<any> = {
 				pm4: { type: ['number', 'null'] },
 				pm10: { type: ['number', 'null'] }
 			}
-		}
+		},
+		// Internal RxDB fields added to satisfy strict validator during migration
+		_deleted: { type: 'boolean' },
+		_attachments: { type: 'object' },
+		_meta: { type: 'object' }
 	},
-	required: ['stockItemId', 'counted']
+	required: ['stockItemId', 'counted', '_deleted']
 };
 
 // ─── Device ─────────────────────────────────────────────────────────────────

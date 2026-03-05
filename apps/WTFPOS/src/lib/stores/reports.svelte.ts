@@ -15,7 +15,9 @@ import { nanoid } from 'nanoid';
 function getOrders() { return session.locationId === 'all' ? allOrders.value : allOrders.value.filter(o => o.locationId === session.locationId); }
 function getTables() { return session.locationId === 'all' ? allTables.value : allTables.value.filter(t => t.locationId === session.locationId); }
 
-const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+function getToday() {
+	return new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+}
 
 export function liveOrders() { return getOrders(); }
 
@@ -29,7 +31,7 @@ export function salesSummary() {
 	const vatAmount    = os.reduce((s, o) => s + o.vatAmount, 0);
 	const totalPax     = os.reduce((s, o) => s + (o.pax ?? 0), 0);
 	const avgTicket    = totalPax > 0 ? Math.round(netSales / totalPax) : 0;
-	return { grossSales, discounts, netSales, vatAmount, totalPax, avgTicket, date: today };
+	return { grossSales, discounts, netSales, vatAmount, totalPax, avgTicket, date: getToday() };
 }
 
 export function tableSalesToday() {
@@ -127,7 +129,7 @@ export function eodSummary() {
 	const cash   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'cash').reduce((t, p) => t + Math.min(p.amount, o.total), 0), 0);
 	const gcash  = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'gcash').reduce((t, p) => t + p.amount, 0), 0);
 	const card   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'card').reduce((t, p) => t + p.amount, 0), 0);
-	return { date: today, grossSales: gross, discounts: disc, netSales: net, vatAmount: vat, cash, card, gcash };
+	return { date: getToday(), grossSales: gross, discounts: disc, netSales: net, vatAmount: vat, cash, card, gcash };
 }
 
 // ─── X-Read Mid-Shift Audit ──────────────────────────────────────────────────

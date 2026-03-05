@@ -47,14 +47,16 @@
 
     function applyScPwdPax(newPax: number) {
         console.log(`[CHECKOUT-DISCOUNT] Applying SC/PWD pax: ${newPax}, order.pax=${order.pax}`);
-        // BUG: Validation allows discountPax > order.pax in some edge cases
+        
+        // Enforce discountPax cannot exceed order.pax
+        const validatedPax = Math.max(1, Math.min(newPax, order.pax));
         if (newPax > order.pax) {
-            console.warn(`[CHECKOUT-DISCOUNT] WARNING: discountPax (${newPax}) > order.pax (${order.pax})`);
-            newPax = order.pax;
+            console.warn(`[CHECKOUT-DISCOUNT] Clamped discountPax from ${newPax} to ${validatedPax} (max: order.pax)`);
         }
-        discountPaxInput = Math.max(1, Math.min(newPax, order.pax));
-        discountIdsInput = Array.from({ length: discountPaxInput }, (_, i) => discountIdsInput[i] ?? '');
-        order.discountPax = discountPaxInput;
+        
+        discountPaxInput = validatedPax;
+        discountIdsInput = Array.from({ length: validatedPax }, (_, i) => discountIdsInput[i] ?? '');
+        order.discountPax = validatedPax;
         order.discountIds = [...discountIdsInput];
         recalcOrder(order);
         if (table) table.billTotal = order.total;
@@ -162,8 +164,8 @@
 
         // Record payment
         currentOrder.payments.push({
-            method: checkoutMethod === 'maya' ? 'gcash' : checkoutMethod,
-            amount: checkoutMethod === 'cash' ? cashTendered : currentOrder.total
+            method: checkoutMethod,
+            amount: currentOrder.total
         });
         currentOrder.status = 'paid';
         currentOrder.closedAt = new Date().toISOString();

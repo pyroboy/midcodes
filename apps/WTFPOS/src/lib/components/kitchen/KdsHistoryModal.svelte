@@ -24,20 +24,20 @@
 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
 				<div class="flex items-center gap-2">
 					<h3 class="text-lg font-bold text-gray-900">Bumped Ticket History</h3>
-					<span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-600">{kdsTicketHistory.length}</span>
+					<span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-600">{kdsTicketHistory.value.length}</span>
 				</div>
 				<button onclick={onClose} class="text-gray-400 hover:text-gray-600 text-lg" style="min-height: unset">✕</button>
 			</div>
 
 			<div class="flex-1 overflow-y-auto px-6 py-4">
-				{#if kdsTicketHistory.length === 0}
+				{#if kdsTicketHistory.value.length === 0}
 					<div class="text-center py-8">
 						<div class="text-3xl mb-2">✅</div>
 						<p class="text-sm text-gray-400">No bumped tickets this shift.</p>
 					</div>
 				{:else}
 					<div class="flex flex-col gap-3">
-						{#each kdsTicketHistory as entry (entry.orderId + entry.bumpedAt)}
+						{#each kdsTicketHistory.value as entry (entry.orderId + entry.bumpedAt)}
 							<div class="rounded-lg border border-border bg-gray-50 p-4">
 								<div class="flex items-center justify-between mb-2">
 									<div class="flex items-center gap-2">

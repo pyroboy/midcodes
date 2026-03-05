@@ -29,7 +29,7 @@ export function getUnacknowledgedAlerts() {
 
 export function getPendingRejectionsForTable(tableId: string | null): KitchenAlert[] {
 	if (!tableId) return [];
-	const order = orders.find(o => o.tableId === tableId && o.status === 'open');
+	const order = orders.value.find((o: any) => o.tableId === tableId && o.status === 'open');
 	if (!order) return [];
 	return alerts.filter(a => a.orderId === order.id && !a.acknowledgedBy);
 }
@@ -43,7 +43,7 @@ export function getPendingRejectionsForTable(tableId: string | null): KitchenAle
  */
 export function refuseItem(orderId: string, tableNumber: number | null, itemName: string, reason: string) {
 	// Find the order and item
-	const order = orders.find(o => o.id === orderId);
+	const order = orders.value.find(o => o.id === orderId);
 	if (!order) return;
 	
 	const orderItem = order.items.find(i => i.menuItemName === itemName && i.status !== 'cancelled');
@@ -66,7 +66,7 @@ export function refuseItem(orderId: string, tableNumber: number | null, itemName
 	rejectOrderItem(orderId, orderItem.id);
 	
 	// Update KDS ticket item status
-	const ticket = kdsTickets.find(t => t.orderId === orderId);
+	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 	if (ticket) {
 		const kdsItem = ticket.items.find(i => i.id === orderItem.id);
 		if (kdsItem) {
@@ -96,7 +96,7 @@ export function acknowledgeAlert(alertId: string) {
  */
 export function acknowledgeAllForTable(tableId: string | null) {
 	if (!tableId) return;
-	const order = orders.find(o => o.tableId === tableId && o.status === 'open');
+	const order = orders.value.find(o => o.tableId === tableId && o.status === 'open');
 	if (!order) return;
 	
 	const pendingAlerts = alerts.filter(a => a.orderId === order.id && !a.acknowledgedBy);

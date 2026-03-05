@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket } from '$lib/stores/pos.svelte';
+	import type { KdsTicket } from '$lib/types';
 	import { refuseItem } from '$lib/stores/alert.svelte';
 	import { formatCountdown, cn } from '$lib/utils';
 	import { printKitchenOrder } from '$lib/stores/hardware.svelte';
@@ -19,7 +20,7 @@
 		}
 	});
 
-	function retryPrint(ticket: typeof kdsTickets[number]) {
+	function retryPrint(ticket: KdsTicket) {
 		ticket.printStatus = 'success'; // optimistic
 		printKitchenOrder(ticket.orderId).then(res => {
 			if (!res.success) ticket.printStatus = 'failed';
@@ -27,7 +28,7 @@
 	}
 
 	const activeTickets = $derived(
-		kdsTickets.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
+		kdsTickets.value.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
 	);
 
 	// Stat counts
@@ -51,7 +52,7 @@
 
 	// Bump entire ticket
 	function bumpAll(orderId: string) {
-		const ticket = kdsTickets.find(t => t.orderId === orderId);
+		const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 		if (!ticket) return;
 		for (const item of ticket.items) {
 			if (item.status !== 'served' && item.status !== 'cancelled') {
@@ -61,7 +62,7 @@
 	}
 
 	// Group items by category for kitchen display
-	function groupItems(items: typeof kdsTickets[number]['items']) {
+	function groupItems(items: KdsTicket['items']) {
 		const meats  = items.filter((i) => i.category === 'meats'   && i.status !== 'served');
 		const dishes = items.filter((i) => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && i.status !== 'served');
 		const extras = items.filter((i) => i.category === 'packages' && i.status !== 'served');
@@ -93,7 +94,7 @@
 		<span class="badge-orange">{queueOrders} In Queue</span>
 		<button
 			onclick={() => recallLastTicket()}
-			disabled={kdsTicketHistory.length === 0}
+			disabled={kdsTicketHistory.value.length === 0}
 			class="rounded-lg border border-accent bg-accent-light px-3 py-1.5 text-xs font-bold text-accent hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
 			style="min-height: 32px"
 		>
@@ -104,7 +105,7 @@
 			class="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"
 			style="min-height: 32px"
 		>
-			📋 History {#if kdsTicketHistory.length > 0}<span class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold">{kdsTicketHistory.length}</span>{/if}
+			📋 History {#if kdsTicketHistory.value.length > 0}<span class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold">{kdsTicketHistory.value.length}</span>{/if}
 		</button>
 	</div>
 </div>
@@ -157,7 +158,7 @@
 					{#if grouped.meats.length > 0}
 						<div class="py-3">
 							<p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-status-red">
-								🥩 MEATS — {grouped.meats.reduce((s, i) => s + (i.weight ?? 0), 0)}g total
+								🥩 MEATS — {grouped.meats.reduce((s: number, i: any) => s + (i.weight ?? 0), 0)}g total
 							</p>
 							{#each grouped.meats as item (item.id)}
 								<div class="flex items-center justify-between py-0.5 group">

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { tables as allTables, orders as allOrders, openTable, tickTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance } from '$lib/stores/pos.svelte';
+    import { tables as allTables, orders as allOrders, openTable, updateTableTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance } from '$lib/stores/pos.svelte';
     import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
     import { getPendingRejectionsForTable, acknowledgeAlert, type KitchenAlert } from '$lib/stores/alert.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
@@ -34,7 +34,7 @@
 
     // ─── Timer ───────────────────────────────────────────────────────────────
     $effect(() => {
-        const id = setInterval(tickTimers, 1000);
+        const id = setInterval(updateTableTimers, 1000);
         return () => clearInterval(id);
     });
 
@@ -163,10 +163,21 @@
     }
 
     function handleCheckoutSuccess() {
-        receiptOrder = currentActiveOrder ?? null;
-        const cashPayment = currentActiveOrder?.payments.find(p => p.method === 'cash');
-        receiptChange = cashPayment ? cashPayment.amount - (currentActiveOrder?.total ?? 0) : 0;
-        receiptMethod = 'Cash'; // Simplified - the actual logic is in CheckoutModal
+        const order = currentActiveOrder;
+        if (!order) return;
+        
+        receiptOrder = order;
+        const cashPayment = order.payments.find(p => p.method === 'cash');
+        receiptChange = cashPayment ? cashPayment.amount - order.total : 0;
+        
+        // Determine payment method from actual payments
+        const primaryPayment = order.payments[order.payments.length - 1];
+        receiptMethod = primaryPayment ? 
+            primaryPayment.method === 'gcash' ? 'GCash' :
+            primaryPayment.method === 'maya' ? 'Maya' :
+            primaryPayment.method === 'card' ? 'Card' : 'Cash' 
+            : 'Cash';
+            
         showReceipt = true;
         showCheckout = false;
         closeBill();
@@ -209,8 +220,14 @@
             if (barcodeBuffer.length < 20) {
                 barcodeBuffer += e.key;
             }
-            clearTimeout(barcodeTimeout);
-            barcodeTimeout = setTimeout(() => { barcodeBuffer = ''; }, 300);
+            if (barcodeTimeout) {
+                clearTimeout(barcodeTimeout);
+                barcodeTimeout = undefined;
+            }
+            barcodeTimeout = setTimeout(() => { 
+                barcodeBuffer = ''; 
+                barcodeTimeout = undefined;
+            }, 300);
         }
     }
 </script>

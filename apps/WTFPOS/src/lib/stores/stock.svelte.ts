@@ -429,7 +429,7 @@ export const INITIAL_ADJUSTMENTS: StockAdjustment[] = [];
 
 export const stockItems = createRxStore<StockItem>('stock_items', db => db.stock_items.find());
 export const deliveries = createRxStore<Delivery>('deliveries', db => db.deliveries.find());
-export const wasteEntries = createRxStore<WasteEntry>('waste_entries', db => db.waste_entries.find());
+export const wasteEntries = createRxStore<WasteEntry>('waste', db => db.waste.find());
 export const deductions = createRxStore<Deduction>('deductions', db => db.deductions.find());
 export const stockCounts = createRxStore<StockCount>('stock_counts', db => db.stock_counts.find());
 export const adjustments = createRxStore<StockAdjustment>('adjustments', db => db.adjustments.find());
@@ -702,16 +702,16 @@ export async function restoreStock(menuItemId: string, qty: number, orderId: str
 	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === locId);
 	if (!item) return;
 
-	// 1. Find the deduction record
-	const existingDeduction = deductions.value.find(d => 
+	// 1. Find all deduction records for this order
+	const matchingDeductions = deductions.value.filter(d => 
 		d.stockItemId === item.id && d.orderId === orderId
 	);
-	if (!existingDeduction) return;
+	if (matchingDeductions.length === 0) return;
 
-	const restoreQty = existingDeduction.qty;
+	const totalRestoreQty = matchingDeductions.reduce((sum, d) => sum + d.qty, 0);
 
 	// 2. Roll back FIFO usedQty in deliveries (Newest First)
-	let remainingToRestore = restoreQty;
+	let remainingToRestore = totalRestoreQty;
 	const itemDeliveries = [...deliveries.value]
 		.filter(d => d.stockItemId === item.id && (d.usedQty || 0) > 0)
 		.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
@@ -730,9 +730,11 @@ export async function restoreStock(menuItemId: string, qty: number, orderId: str
 		if (remainingToRestore <= 0) break;
 	}
 
-	// 3. Remove the deduction record
-	await db.deductions.findOne(existingDeduction.id).remove();
-	log.stockRestored(item.name, restoreQty, item.unit, orderId);
+	// 3. Remove the deduction records
+	for (const d of matchingDeductions) {
+		await db.deductions.findOne(d.id).remove();
+	}
+	log.stockRestored(item.name, totalRestoreQty, item.unit, orderId);
 }
 
 /** Tier 3: Transfer stock between branches/warehouses */

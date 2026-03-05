@@ -4,7 +4,7 @@
 	import type { Order, MenuItem } from '$lib/types';
 
 	const activeOrders = $derived(
-		allOrders.filter((o) => o.status === 'open' || o.status === 'pending_payment')
+		allOrders.value.filter((o) => o.status === 'open' || o.status === 'pending_payment')
 	);
 
 	function ageMs(createdAt: string) { return Date.now() - new Date(createdAt).getTime(); }

@@ -36,6 +36,8 @@ function makeTables(): Table[] {
 	return [...gen('qc', 'QC'), ...gen('mkti', 'MK')];
 }
 
+export const INITIAL_TABLES = makeTables();
+
 // ─── Menu Items ───────────────────────────────────────────────────────────────
 
 export const INITIAL_MENU_ITEMS: MenuItem[] = [
@@ -116,20 +118,23 @@ const _kdsHistory = createRxStore<KdsHistoryEntry>('kds_history', db => db.kds_h
     sort: [{ bumpedAt: 'desc' }]
 }));
 
-// Create proxy objects that work both as arrays and have .value property
-function createStoreProxy<T>(store: { value: T[] }): T[] & { value: T[] } {
-	return new Proxy(store.value, {
-		get(target, prop) {
-			if (prop === 'value') return target;
-			return (target as any)[prop];
-		}
-	}) as T[] & { value: T[] };
-}
+export const tables = {
+	get value() { return _tables.value; },
+	get initialized() { return _tables.initialized; }
+};
+export const orders = {
+	get value() { return _orders.value; },
+	get initialized() { return _orders.initialized; }
+};
+export const kdsTickets = {
+	get value() { return _kdsTickets.value; },
+	get initialized() { return _kdsTickets.initialized; }
+};
+export const kdsTicketHistory = {
+	get value() { return _kdsHistory.value; },
+	get initialized() { return _kdsHistory.initialized; }
+};
 
-export const tables = createStoreProxy(_tables);
-export const orders = createStoreProxy(_orders);
-export const kdsTickets = createStoreProxy(_kdsTickets);
-export const kdsTicketHistory = createStoreProxy(_kdsHistory);
 
 // ─── Table Actions ────────────────────────────────────────────────────────────
 
@@ -143,13 +148,16 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 	const orderId = nanoid();
 
 	// Persist table state
-	await db.tables.findOne(tableId).patch({
-		status: 'occupied',
-		sessionStartedAt: new Date().toISOString(),
-		elapsedSeconds: 0,
-		currentOrderId: orderId,
-		billTotal: 0
-	});
+	const tableDoc = await db.tables.findOne(tableId).exec();
+	if (tableDoc) {
+		await tableDoc.patch({
+			status: 'occupied',
+			sessionStartedAt: new Date().toISOString(),
+			elapsedSeconds: 0,
+			currentOrderId: orderId,
+			billTotal: 0
+		});
+	}
 
 	// Persist new order
 	await db.orders.insert({ 
@@ -213,17 +221,22 @@ export async function createTakeoutOrder(customerName: string = 'Walk-in'): Prom
 }
 
 export async function closeTable(tableId: string) {
+	const table = tables.value.find(t => t.id === tableId);
+	if (!table) return;
+
 	const db = await getDb();
 	const doc = await db.tables.findOne(tableId).exec();
-	if (doc) {
-		await doc.patch({
-			status: 'available',
-			sessionStartedAt: null,
-			elapsedSeconds: null,
-			currentOrderId: null,
-			billTotal: null
-		});
+	if (!doc) {
+		console.warn(`[closeTable] Table ${tableId} not found`);
+		return;
 	}
+	await doc.patch({
+		status: 'available',
+		sessionStartedAt: null,
+		elapsedSeconds: null,
+		currentOrderId: null,
+		billTotal: null
+	});
 }
 
 export async function printBill(orderId: string) {
@@ -231,10 +244,12 @@ export async function printBill(orderId: string) {
 	if (!order) return;
 	
 	const db = await getDb();
-	await db.orders.findOne(orderId).patch({ billPrinted: true });
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) await orderDoc.patch({ billPrinted: true });
 	
 	if (order.tableId) {
-		await db.tables.findOne(order.tableId).patch({ status: 'billing' });
+		const tableDoc = await db.tables.findOne(order.tableId).exec();
+		if (tableDoc) await tableDoc.patch({ status: 'billing' });
 	}
 }
 
@@ -244,42 +259,49 @@ export async function setTableMaintenance(tableId: string, isMaintenance: boolea
 	if (isMaintenance && table.status !== 'available') return; // Can only mark empty tables
 	
 	const db = await getDb();
-	await db.tables.findOne(tableId).patch({
-		status: isMaintenance ? 'maintenance' : 'available'
-	});
-}
-
-export async function syncElapsedSeconds() {
-	if (!browser || session.locationId === 'wh-qc') return;
-	const db = await getDb();
-	for (const table of tables.value) {
-		if (table.status === 'occupied' && table.sessionStartedAt) {
-			const start = new Date(table.sessionStartedAt).getTime();
-			const now = Date.now();
-			const seconds = Math.floor((now - start) / 1000);
-			if (seconds !== table.elapsedSeconds) {
-				await db.tables.findOne(table.id).patch({ elapsedSeconds: seconds });
-			}
-		}
+	const doc = await db.tables.findOne(tableId).exec();
+	if (doc) {
+		await doc.patch({
+			status: isMaintenance ? 'maintenance' : 'available'
+		});
 	}
 }
 
-export function tickTimers() {
-	for (const table of tables.value) {
-		if (table.status === 'available' || table.status === 'maintenance' || table.elapsedSeconds === null) continue;
-		table.elapsedSeconds += 1;
+export async function updateTableTimers() {
+	if (!browser || session.locationId === 'wh-qc') return;
+	const db = await getDb();
+	const SESSION_SECONDS = 2 * 60 * 60; // 2 hours
 
-		// Only update status based on timer if not in billing or critical locked states
-		// billing = waiting for payment, should not revert to occupied/warning
+	for (const table of tables.value) {
+		if (table.status === 'available' || table.status === 'maintenance' || !table.sessionStartedAt) continue;
+
+		const start = new Date(table.sessionStartedAt).getTime();
+		const now = Date.now();
+		const seconds = Math.floor((now - start) / 1000);
+		
+		const updates: Partial<Table> = {};
+		
+		// Update elapsed seconds if changed
+		if (seconds !== table.elapsedSeconds) {
+			updates.elapsedSeconds = seconds;
+		}
+
+		// Update status based on timer if not in billing or critical locked states
 		const lockedStatuses: TableStatus[] = ['billing', 'maintenance'];
 		if (!lockedStatuses.includes(table.status)) {
-			const oldStatus = table.status;
-			if (table.elapsedSeconds >= SESSION_SECONDS - (5 * 60)) table.status = 'critical';
-			else if (table.elapsedSeconds >= SESSION_SECONDS - (15 * 60)) table.status = 'warning';
-			else table.status = 'occupied';
-			if (oldStatus !== table.status) {
-				console.log(`[TIMER] Table ${table.label}: ${oldStatus} -> ${table.status} (${table.elapsedSeconds}s elapsed)`);
+			let nextStatus: TableStatus = 'occupied';
+			if (seconds >= SESSION_SECONDS - (5 * 60)) nextStatus = 'critical';
+			else if (seconds >= SESSION_SECONDS - (15 * 60)) nextStatus = 'warning';
+			
+			if (nextStatus !== table.status) {
+				updates.status = nextStatus;
+				console.log(`[TIMER] Table ${table.label}: ${table.status} -> ${nextStatus} (${seconds}s elapsed)`);
 			}
+		}
+
+		if (Object.keys(updates).length > 0) {
+			const doc = await db.tables.findOne(table.id).exec();
+			if (doc) await doc.patch(updates);
 		}
 	}
 }
@@ -288,12 +310,15 @@ export async function updateTableLayout(tableUpdates: Pick<Table, 'id' | 'x' | '
 	if (!browser) return;
 	const db = await getDb();
 	for (const update of tableUpdates) {
-		await db.tables.findOne(update.id).patch({
-			x: update.x,
-			y: update.y,
-			width: update.width,
-			height: update.height
-		});
+		const doc = await db.tables.findOne(update.id).exec();
+		if (doc) {
+			await doc.patch({
+				x: update.x,
+				y: update.y,
+				width: update.width,
+				height: update.height
+			});
+		}
 	}
 }
 
@@ -319,6 +344,17 @@ export async function deleteTable(tableId: string) {
 	}
 }
 
+export async function updateTableOrder(tableId: string, orderId: string | null) {
+	const table = tables.value.find(t => t.id === tableId);
+	if (!table) return;
+
+	const db = await getDb();
+	const doc = await db.tables.findOne(tableId).exec();
+	if (doc) {
+		await doc.patch({ currentOrderId: orderId });
+	}
+}
+
 // ─── Pending Payment Hold ────────────────────────────────────────────────────
 
 export async function holdPayment(orderId: string, method: 'gcash' | 'maya') {
@@ -326,10 +362,13 @@ export async function holdPayment(orderId: string, method: 'gcash' | 'maya') {
 	if (!order || order.status !== 'open') return;
 
 	const db = await getDb();
-	await db.orders.findOne(orderId).patch({
-		status: 'pending_payment',
-		pendingPaymentMethod: method
-	});
+	const doc = await db.orders.findOne(orderId).exec();
+	if (doc) {
+		await doc.patch({
+			status: 'pending_payment',
+			pendingPaymentMethod: method
+		});
+	}
 
 	const label = order.tableId
 		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
@@ -352,12 +391,15 @@ export async function confirmHeldPayment(orderId: string) {
 		? (tables.value.find(t => t.id === order.tableId)?.elapsedSeconds ?? null)
 		: null;
 
-	await db.orders.findOne(orderId).patch({
-		payments: [...order.payments, { method, amount: order.total }],
-		status: 'paid',
-		closedAt: new Date().toISOString(),
-		closedBy: session.userName || 'Staff'
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			payments: [...order.payments, { method, amount: order.total }],
+			status: 'paid',
+			closedAt: new Date().toISOString(),
+			closedBy: session.userName || 'Staff'
+		});
+	}
 
 	if (order.tableId) await closeTable(order.tableId);
 	
@@ -370,10 +412,13 @@ export async function cancelHeldPayment(orderId: string) {
 	if (!order || order.status !== 'pending_payment') return;
 
 	const db = await getDb();
-	await db.orders.findOne(orderId).patch({
-		status: 'open',
-		pendingPaymentMethod: undefined
-	});
+	const doc = await db.orders.findOne(orderId).exec();
+	if (doc) {
+		await doc.patch({
+			status: 'open',
+			pendingPaymentMethod: undefined
+		});
+	}
 
 	const label = order.tableId
 		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
@@ -391,23 +436,29 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 
 	const db = await getDb();
 	const isFree = item.category === 'meats' || item.isFree || forceFree;
-	const unitPrice = isFree ? 0 : (item.category === 'packages' ? item.price * order.pax : (item.isWeightBased ? Math.round((weight ?? 0) * (item.pricePerGram ?? 0)) : item.price));
-	const tag: 'PKG' | 'FREE' | null = isFree ? 'FREE' : (item.category === 'packages' ? 'PKG' : null);
+	const isPackage = item.category === 'packages';
+	const unitPrice = isFree ? 0 : (isPackage ? item.price : (item.isWeightBased ? Math.round((weight ?? 0) * (item.pricePerGram ?? 0)) : item.price));
+	const quantity = isPackage ? order.pax : qty;
+	const tag: 'PKG' | 'FREE' | null = isFree ? 'FREE' : (isPackage ? 'PKG' : null);
 
-	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity: qty, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes };
+	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes };
 	
 	const updatedItems = [...order.items, newItem];
 	const totals = calculateOrderTotals({ ...order, items: updatedItems });
 
-	await db.orders.findOne(orderId).patch({
-		packageId: item.category === 'packages' ? item.id : order.packageId,
-		packageName: item.category === 'packages' ? item.name : order.packageName,
-		items: updatedItems,
-		...totals
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			packageId: item.category === 'packages' ? item.id : order.packageId,
+			packageName: item.category === 'packages' ? item.name : order.packageName,
+			items: updatedItems,
+			...totals
+		});
+	}
 
 	if (order.tableId) {
-		await db.tables.findOne(order.tableId).patch({ billTotal: totals.total });
+		const tableDoc = await db.tables.findOne(order.tableId).exec();
+		if (tableDoc) await tableDoc.patch({ billTotal: totals.total });
 	}
 
 	// Auto-deduct from stock
@@ -421,9 +472,12 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 	const kdsItem = { id: newItem.id, menuItemName: item.name, quantity: qty, status: 'pending' as const, weight, category: item.category, notes };
 	
 	if (ticket) {
-		await db.kds_tickets.findOne(ticket.id).patch({
-			items: [...ticket.items, kdsItem]
-		});
+		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+		if (tDoc) {
+			await tDoc.patch({
+				items: [...ticket.items, kdsItem]
+			});
+		}
 	} else {
 		await db.kds_tickets.insert({
 			id: nanoid(),
@@ -442,21 +496,31 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 export function calculateOrderTotals(order: Pick<Order, 'items' | 'discountType' | 'discountPax' | 'pax'>): { subtotal: number, discountAmount: number, vatAmount: number, total: number } {
 	const sub = order.items.filter((i) => i.status !== 'cancelled' && i.tag !== 'FREE').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 	let disc = 0;
+	let vat = 0;
+
 	if (order.discountType === 'senior' || order.discountType === 'pwd') {
-		const qualifyingPax = Math.max(0, order.discountPax ?? order.pax);
 		const totalPax = Math.max(1, order.pax);
-		const validQualifyingPax = Math.min(qualifyingPax, totalPax);
-		disc = Math.round(sub * (validQualifyingPax / totalPax) * 0.2);
+		const qualifyingPax = Math.max(0, Math.min(order.discountPax ?? 1, totalPax));
+		const nonQualifyingPax = totalPax - qualifyingPax;
+
+		const qualifyingShare = sub * (qualifyingPax / totalPax);
+		const taxableShare = sub * (nonQualifyingPax / totalPax);
+
+		// BIR Rule: 20% discount on net-of-vat price
+		disc = Math.round((qualifyingShare / 1.12) * 0.20);
+		
+		// Only non-qualifying share is taxable
+		vat = Math.round(taxableShare - taxableShare / 1.12);
 	}
 	else if (order.discountType === 'comp' || order.discountType === 'service_recovery' || order.discountType === 'promo') {
 		disc = sub;
+		vat = 0;
+	} else {
+		// Standard 12% inclusive VAT
+		vat = Math.round(sub - sub / 1.12);
 	}
 
 	const net = Math.max(0, sub - disc);
-	const vat = order.discountType !== 'none' && order.discountType !== 'promo' && order.discountType !== 'comp' && order.discountType !== 'service_recovery'
-		? 0
-		: Math.round(net - net / 1.12);
-
 	return { subtotal: sub, discountAmount: disc, vatAmount: vat, total: net };
 }
 
@@ -485,25 +549,29 @@ export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' 
 		if (item.status !== 'cancelled') {
 			const restoreQty = item.weight ?? item.quantity;
 			if (restoreQty > 0) {
-				restoreStock(item.menuItemId, restoreQty, order.tableId ?? 'takeout', order.id);
+				restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
 			}
 			return { ...item, status: 'cancelled' as const };
 		}
 		return item;
 	});
 
-	await db.orders.findOne(orderId).patch({
-		status: 'cancelled' as const,
-		items: updatedItems,
-		cancelReason: reason,
-		closedAt: new Date().toISOString(),
-		takeoutStatus: order.orderType === 'takeout' ? 'new' : order.takeoutStatus
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			status: 'cancelled' as const,
+			items: updatedItems,
+			cancelReason: reason,
+			closedAt: new Date().toISOString(),
+			takeoutStatus: order.orderType === 'takeout' ? 'new' : order.takeoutStatus
+		});
+	}
 
 	// Remove or cancel KDS ticket
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 	if (ticket) {
-		await db.kds_tickets.findOne(ticket.id).remove();
+		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+		if (tDoc) await tDoc.remove();
 	}
 
 	let capturedElapsed: number | null = null;
@@ -531,9 +599,15 @@ export async function markItemServed(orderId: string, itemId: string) {
 	if (!order) return;
 
 	const db = await getDb();
-	const updatedItems = order.items.map(i => i.id === itemId ? { ...i, status: 'served' } : i);
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (!orderDoc) {
+		console.warn(`[markItemServed] Order ${orderId} not found`);
+		return;
+	}
 	
-	await db.orders.findOne(orderId).patch({ items: updatedItems } as any);
+	const updatedItems = order.items.map(i => i.id === itemId ? { ...i, status: 'served' as const } : i);
+	
+	await orderDoc.patch({ items: updatedItems });
 
 	// Update KDS Ticket
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
@@ -550,15 +624,18 @@ export async function markItemServed(orderId: string, itemId: string) {
 				bumpedBy: session.userName || 'Kitchen'
 			});
 			// Remove from active tickets
-			await db.kds_tickets.findOne(ticket.id).remove();
+			const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+			if (tDoc) await tDoc.remove();
 			
 			// If takeout, advance to ready
 			if (order.orderType === 'takeout' && order.status === 'open') {
-				await db.orders.findOne(orderId).patch({ takeoutStatus: 'ready' });
+				const oDoc = await db.orders.findOne(orderId).exec();
+				if (oDoc) await oDoc.patch({ takeoutStatus: 'ready' });
 				log.takeoutAdvanced(order.customerName ?? 'Walk-in', 'ready');
 			}
 		} else {
-			await db.kds_tickets.findOne(ticket.id).patch({ items: updatedKdsItems });
+			const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+			if (tDoc) await tDoc.patch({ items: updatedKdsItems });
 		}
 	}
 	log.itemServed(updatedItems.find(i => i.id === itemId)?.menuItemName ?? 'Item', order.tableNumber);
@@ -579,19 +656,23 @@ export async function rejectOrderItem(orderId: string, itemId: string, reason: s
 	const updatedItems = order.items.map(i => i.id === itemId ? { ...i, status: 'cancelled' as const } : i);
 	const totals = calculateOrderTotals({ ...order, items: updatedItems });
 
-	await db.orders.findOne(orderId).patch({
-		items: updatedItems,
-		...totals
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			items: updatedItems,
+			...totals
+		});
+	}
 
 	if (order.tableId) {
-		await db.tables.findOne(order.tableId).patch({ billTotal: totals.total });
+		const tableDoc = await db.tables.findOne(order.tableId).exec();
+		if (tableDoc) await tableDoc.patch({ billTotal: totals.total });
 	}
 
 	// Restore stock
 	const restoreQty = item.weight ?? item.quantity;
 	if (restoreQty > 0) {
-		restoreStock(item.menuItemId, restoreQty, order.tableId ?? 'takeout', order.id);
+		restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
 	}
 	log.kitchenRefusal(item.menuItemName, order.tableNumber, reason);
 }
@@ -604,8 +685,15 @@ export async function recallTicket(orderId: string) {
 	const entry = historyDoc.toJSON();
 	const restoredItems = entry.items.map((i: any) => i.status === 'served' ? { ...i, status: 'pending' } : i);
 	
+	// Check if ticket already exists to avoid duplicate ID error
+	const existingTicket = await db.kds_tickets.findOne({ selector: { orderId } }).exec();
+	if (existingTicket) {
+		console.warn(`[RECALL] Ticket for order ${orderId} already exists in active tickets`);
+		return;
+	}
+	
 	await db.kds_tickets.insert({
-		id: entry.id,
+		id: nanoid(), // Generate new ID instead of reusing history ID
 		orderId: entry.orderId,
 		tableNumber: entry.tableNumber,
 		customerName: entry.customerName,
@@ -654,15 +742,19 @@ export async function changePax(orderId: string, newPax: number) {
 
 	const totals = calculateOrderTotals({ ...order, pax: newPax, items: updatedItems });
 
-	await db.orders.findOne(orderId).patch({
-		pax: newPax,
-		originalPax: order.originalPax || oldPax,
-		items: updatedItems,
-		...totals
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			pax: newPax,
+			originalPax: order.originalPax || oldPax,
+			items: updatedItems,
+			...totals
+		});
+	}
 
 	if (order.tableId) {
-		await db.tables.findOne(order.tableId).patch({ billTotal: totals.total });
+		const tableDoc = await db.tables.findOne(order.tableId).exec();
+		if (tableDoc) await tableDoc.patch({ billTotal: totals.total });
 	}
 
 	const tableLabel = order.tableId
@@ -682,21 +774,25 @@ export async function applyLeftoverPenalty(orderId: string, weightGrams: number,
 	
 	const penaltyItem = {
 		id: nanoid(), menuItemId: 'penalty-leftover', menuItemName: 'Leftover Penalty',
-		quantity: 1, unitPrice: penalty, weight: weightGrams, status: 'served' as const, sentAt: null, tag: null as any,
+		quantity: 1, unitPrice: penalty, weight: weightGrams, status: 'served' as const, sentAt: null, tag: null as 'PKG' | 'FREE' | null,
 		notes: `${weightGrams}g leftover @ ₱${ratePerHundredGrams}/100g`
 	};
 
 	const updatedItems = [...order.items, penaltyItem];
 	const totals = calculateOrderTotals({ ...order, items: updatedItems });
 
-	await db.orders.findOne(orderId).patch({
-		leftoverPenaltyAmount: penalty,
-		items: updatedItems,
-		...totals
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			leftoverPenaltyAmount: penalty,
+			items: updatedItems,
+			...totals
+		});
+	}
 
 	if (order.tableId) {
-		await db.tables.findOne(order.tableId).patch({ billTotal: totals.total });
+		const tableDoc = await db.tables.findOne(order.tableId).exec();
+		if (tableDoc) await tableDoc.patch({ billTotal: totals.total });
 	}
 
 	const label = order.tableId
@@ -713,14 +809,18 @@ export async function waiveLeftoverPenalty(orderId: string) {
 	const updatedItems = order.items.filter(i => i.menuItemId !== 'penalty-leftover');
 	const totals = calculateOrderTotals({ ...order, items: updatedItems });
 
-	await db.orders.findOne(orderId).patch({
-		leftoverPenaltyAmount: 0,
-		items: updatedItems,
-		...totals
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			leftoverPenaltyAmount: 0,
+			items: updatedItems,
+			...totals
+		});
+	}
 
 	if (order.tableId) {
-		await db.tables.findOne(order.tableId).patch({ billTotal: totals.total });
+		const tableDoc = await db.tables.findOne(order.tableId).exec();
+		if (tableDoc) await tableDoc.patch({ billTotal: totals.total });
 	}
 
 	const label = order.tableId
@@ -746,16 +846,22 @@ export async function advanceTakeoutStatus(orderId: string): Promise<void> {
 	
 	if (next) {
 		const db = await getDb();
-		await db.orders.findOne(orderId).patch({ takeoutStatus: next });
+		const doc = await db.orders.findOne(orderId).exec();
+		if (doc) await doc.patch({ takeoutStatus: next });
 		log.takeoutAdvanced(order.customerName ?? 'Walk-in', next);
 	}
 }
 
-export function setTakeoutStatus(orderId: string, status: TakeoutStatus): void {
-	const order = orders.find(o => o.id === orderId);
+export async function setTakeoutStatus(orderId: string, status: TakeoutStatus): Promise<void> {
+	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.orderType !== 'takeout') return;
-	order.takeoutStatus = status;
-	log.takeoutAdvanced(order.customerName ?? 'Walk-in', status);
+	
+	const db = await getDb();
+	const doc = await db.orders.findOne(orderId).exec();
+	if (doc) {
+		await doc.patch({ takeoutStatus: status });
+		log.takeoutAdvanced(order.customerName ?? 'Walk-in', status);
+	}
 }
 
 // ─── Table Transfer ──────────────────────────────────────────────────────────
@@ -769,8 +875,17 @@ export async function transferTable(fromTableId: string, toTableId: string): Pro
 	const db = await getDb();
 	const orderId = fromTable.currentOrderId;
 
+	// Validate documents exist before patching
+	const toTableDoc = await db.tables.findOne(toTableId).exec();
+	const fromTableDoc = await db.tables.findOne(fromTableId).exec();
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	
+	if (!toTableDoc || !fromTableDoc || !orderDoc) {
+		return { success: false, error: 'Table or order not found in database' };
+	}
+
 	// Update table state
-	await db.tables.findOne(toTableId).patch({
+	await toTableDoc.patch({
 		status: fromTable.status,
 		sessionStartedAt: fromTable.sessionStartedAt,
 		elapsedSeconds: fromTable.elapsedSeconds,
@@ -778,7 +893,7 @@ export async function transferTable(fromTableId: string, toTableId: string): Pro
 		billTotal: fromTable.billTotal
 	});
 
-	await db.tables.findOne(fromTableId).patch({
+	await fromTableDoc.patch({
 		status: 'available',
 		sessionStartedAt: null,
 		elapsedSeconds: null,
@@ -787,7 +902,7 @@ export async function transferTable(fromTableId: string, toTableId: string): Pro
 	});
 
 	// Update order reference
-	await db.orders.findOne(orderId).patch({
+	await orderDoc.patch({
 		tableId: toTableId,
 		tableNumber: toTable.number
 	});
@@ -795,7 +910,8 @@ export async function transferTable(fromTableId: string, toTableId: string): Pro
 	// Update KDS ticket
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 	if (ticket) {
-		await db.kds_tickets.findOne(ticket.id).patch({ tableNumber: toTable.number });
+		const ticketDoc = await db.kds_tickets.findOne(ticket.id).exec();
+		if (ticketDoc) await ticketDoc.patch({ tableNumber: toTable.number });
 	}
 
 	log.tableTransferred(fromTable.label, toTable.label);
@@ -835,30 +951,43 @@ export async function mergeTables(primaryTableId: string, secondaryTableId: stri
 
 	const totals = calculateOrderTotals({ ...primaryOrder, items: mergedItems, pax: combinedPax });
 
-	await db.orders.findOne(primaryOrder.id).patch({
-		items: mergedItems,
-		pax: combinedPax,
-		...totals
-	});
+	const primaryOrderDoc = await db.orders.findOne(primaryOrder.id).exec();
+	if (primaryOrderDoc) {
+		await primaryOrderDoc.patch({
+			items: mergedItems,
+			pax: combinedPax,
+			packageId: primaryOrder.packageId || secondaryOrder.packageId,
+			packageName: primaryOrder.packageName || secondaryOrder.packageName,
+			...totals
+		});
+	}
 
-	await db.tables.findOne(primaryTableId).patch({ billTotal: totals.total });
+	const primaryTableDoc = await db.tables.findOne(primaryTableId).exec();
+	if (primaryTableDoc) await primaryTableDoc.patch({ billTotal: totals.total });
 
 	// Merge KDS
 	const primaryTicket = kdsTickets.value.find(t => t.orderId === primaryOrder.id);
 	const secondaryTicket = kdsTickets.value.find(t => t.orderId === secondaryOrder.id);
 	if (primaryTicket && secondaryTicket) {
-		await db.kds_tickets.findOne(primaryTicket.id).patch({
-			items: [...primaryTicket.items, ...secondaryTicket.items.filter(i => i.status !== 'cancelled').map(i => ({ ...i, id: nanoid() }))]
-		});
-		await db.kds_tickets.findOne(secondaryTicket.id).remove();
+		const pDoc = await db.kds_tickets.findOne(primaryTicket.id).exec();
+		if (pDoc) {
+			await pDoc.patch({
+				items: [...primaryTicket.items, ...secondaryTicket.items.filter(i => i.status !== 'cancelled').map(i => ({ ...i, id: nanoid() }))]
+			});
+		}
+		const sDoc = await db.kds_tickets.findOne(secondaryTicket.id).exec();
+		if (sDoc) await sDoc.remove();
 	}
 
 	// Void secondary
-	await db.orders.findOne(secondaryOrder.id).patch({
-		status: 'cancelled',
-		notes: `Merged into ${primaryTable.label}`,
-		closedAt: new Date().toISOString()
-	});
+	const sOrderDoc = await db.orders.findOne(secondaryOrder.id).exec();
+	if (sOrderDoc) {
+		await sOrderDoc.patch({
+			status: 'cancelled',
+			notes: `Merged into ${primaryTable.label}`,
+			closedAt: new Date().toISOString()
+		});
+	}
 
 	await closeTable(secondaryTableId);
 	log.tableClosed(secondaryTable.label, 0, `MERGED into ${primaryTable.label}`);
@@ -876,15 +1005,19 @@ export async function changePackage(orderId: string, newPackageId: string) {
 	const updatedItems = order.items.map(i => (i.menuItemId === order.packageId && i.tag === 'PKG') ? { ...i, menuItemId: newPkg.id, menuItemName: newPkg.name, unitPrice: newPkg.price } : i);
 	const totals = calculateOrderTotals({ ...order, items: updatedItems });
 
-	await db.orders.findOne(orderId).patch({
-		packageId: newPkg.id,
-		packageName: newPkg.name,
-		items: updatedItems,
-		...totals
-	});
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.patch({
+			packageId: newPkg.id,
+			packageName: newPkg.name,
+			items: updatedItems,
+			...totals
+		});
+	}
 
 	if (order.tableId) {
-		await db.tables.findOne(order.tableId).patch({ billTotal: totals.total });
+		const tableDoc = await db.tables.findOne(order.tableId).exec();
+		if (tableDoc) await tableDoc.patch({ billTotal: totals.total });
 	}
 }
 
@@ -895,6 +1028,12 @@ export async function initEqualSplit(orderId: string, splitCount: number) {
 	if (!order || order.total <= 0 || splitCount <= 0) return;
 
 	const db = await getDb();
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (!orderDoc) {
+		console.warn(`[initEqualSplit] Order ${orderId} not found`);
+		return;
+	}
+	
 	const baseAmount = Math.floor(order.total / splitCount);
 	const remainder = order.total % splitCount;
 
@@ -912,8 +1051,18 @@ export async function initEqualSplit(orderId: string, splitCount: number) {
 			paidAt: null
 		};
 	});
+	
+	// Verify sum equals original total
+	const sum = subBills.reduce((s, sb) => s + sb.total, 0);
+	if (sum !== order.total) {
+		console.error(`[initEqualSplit] Sum mismatch: ${sum} !== ${order.total}`);
+		// Adjust last bill to ensure total matches
+		const diff = order.total - sum;
+		subBills[subBills.length - 1].total += diff;
+		subBills[subBills.length - 1].subtotal += diff;
+	}
 
-	await db.orders.findOne(orderId).patch({ splitType: 'equal', subBills });
+	await orderDoc.patch({ splitType: 'equal', subBills });
 }
 
 export async function initItemSplit(orderId: string, splitCount: number) {
@@ -929,7 +1078,8 @@ export async function initItemSplit(orderId: string, splitCount: number) {
 		payment: null, paidAt: null
 	}));
 
-	await db.orders.findOne(orderId).patch({ splitType: 'by-item', subBills });
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) await orderDoc.patch({ splitType: 'by-item', subBills });
 }
 
 export async function assignItemToSubBill(orderId: string, itemId: string, subBillId: string) {
@@ -948,13 +1098,22 @@ export async function assignItemToSubBill(orderId: string, itemId: string, subBi
 		const items = order.items.filter(i => sb.itemIds.includes(i.id) && i.status !== 'cancelled' && i.tag !== 'FREE');
 		sb.subtotal = items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 		
-		const totals = calculateOrderTotals({ items, discountType: order.discountType, discountPax: order.discountPax, pax: order.pax });
-		sb.discountAmount = totals.discountAmount;
-		sb.vatAmount = totals.vatAmount;
-		sb.total = totals.total;
+		// For split bills, discounts apply proportionally based on sub-bill's share of total
+		// VAT is recalculated for each sub-bill independently
+		const subtotalRatio = order.subtotal > 0 ? sb.subtotal / order.subtotal : 0;
+		const proportionalDiscount = Math.round(order.discountAmount * subtotalRatio);
+		const net = Math.max(0, sb.subtotal - proportionalDiscount);
+		const vat = order.discountType !== 'none' && order.discountType !== 'promo' && order.discountType !== 'comp' && order.discountType !== 'service_recovery'
+			? 0
+			: Math.round(net - net / 1.12);
+		
+		sb.discountAmount = proportionalDiscount;
+		sb.vatAmount = vat;
+		sb.total = net;
 	}
 
-	await db.orders.findOne(orderId).patch({ subBills: updatedSubBills });
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) await orderDoc.patch({ subBills: updatedSubBills });
 }
 
 export async function paySubBill(orderId: string, subBillId: string, method: PaymentMethod, amount: number) {
@@ -967,16 +1126,20 @@ export async function paySubBill(orderId: string, subBillId: string, method: Pay
 	const allPaid = updatedSubBills.every(s => s.payment !== null);
 	if (allPaid) {
 		const payments = [...order.payments, ...updatedSubBills.map(s => s.payment!)];
-		await db.orders.findOne(orderId).patch({
-			subBills: updatedSubBills,
-			payments,
-			status: 'paid',
-			closedAt: new Date().toISOString(),
-			closedBy: session.userName || 'Staff'
-		});
+		const orderDoc = await db.orders.findOne(orderId).exec();
+		if (orderDoc) {
+			await orderDoc.patch({
+				subBills: updatedSubBills,
+				payments,
+				status: 'paid',
+				closedAt: new Date().toISOString(),
+				closedBy: session.userName || 'Staff'
+			});
+		}
 		if (order.tableId) await closeTable(order.tableId);
 	} else {
-		await db.orders.findOne(orderId).patch({ subBills: updatedSubBills });
+		const orderDoc = await db.orders.findOne(orderId).exec();
+		if (orderDoc) await orderDoc.patch({ subBills: updatedSubBills });
 	}
 }
 
@@ -985,5 +1148,15 @@ export async function cancelSplit(orderId: string) {
 	if (!order || order.subBills?.some(sb => sb.payment !== null)) return;
 	
 	const db = await getDb();
-	await db.orders.findOne(orderId).patch({ splitType: null as any, subBills: null as any });
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (!orderDoc) {
+		console.warn(`[cancelSplit] Order ${orderId} not found`);
+		return;
+	}
+	
+	// Use undefined to clear split fields instead of null with type casting
+	await orderDoc.patch({ 
+		splitType: undefined as unknown as 'equal' | 'by-item' | null, 
+		subBills: undefined as unknown as SubBill[] | null 
+	});
 }

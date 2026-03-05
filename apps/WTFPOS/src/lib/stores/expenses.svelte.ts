@@ -54,13 +54,30 @@ function validateExpense(category: string, amount: number, description: string, 
 }
 
 export async function addExpense(category: string, amount: number, description: string, paidBy: string, receiptPhoto?: string): Promise<{ success: boolean; error?: string; id?: string }> {
-    if (!browser) return { success: false, error: 'Not in browser environment' };
+    console.log('[EXPENSE_DEBUG] addExpense called:', { category, amount, description, paidBy, receiptPhoto });
+    
+    if (!browser) {
+        console.error('[EXPENSE_DEBUG] Not in browser environment');
+        return { success: false, error: 'Not in browser environment' };
+    }
     
     // Validate inputs
     const validationError = validateExpense(category, amount, description, paidBy);
     if (validationError) {
+        console.error('[EXPENSE_DEBUG] Validation failed:', validationError);
         return { success: false, error: validationError };
     }
+    
+    // DEBUG: Check if receiptPhoto is a blob URL that won't persist
+    if (receiptPhoto) {
+        console.warn('[EXPENSE_DEBUG] Receipt photo provided:', receiptPhoto.substring(0, 100) + '...');
+        if (receiptPhoto.startsWith('blob:')) {
+            console.error('[EXPENSE_DEBUG] CRITICAL: Blob URL will not persist after page reload!');
+        }
+    }
+    
+    const locationId = session.locationId === 'all' ? 'qc' : session.locationId;
+    console.log('[EXPENSE_DEBUG] Using locationId:', locationId, '(session.locationId:', session.locationId + ')');
     
     const expense: Expense = {
         id: nanoid(),
@@ -68,7 +85,7 @@ export async function addExpense(category: string, amount: number, description: 
         amount,
         description: description.trim(),
         paidBy: paidBy.trim(),
-        locationId: session.locationId === 'all' ? 'qc' : session.locationId,
+        locationId: locationId,
         createdBy: session.userName || 'Staff',
         createdAt: new Date().toISOString(),
         ...(receiptPhoto && { receiptPhoto })
@@ -78,12 +95,14 @@ export async function addExpense(category: string, amount: number, description: 
         const db = await getDb();
         await db.expenses.insert(expense);
         
+        console.log('[EXPENSE_DEBUG] Expense saved successfully:', expense.id);
+        
         // Log to audit
         log.expenseLogged(category, amount, description);
         
         return { success: true, id: expense.id };
     } catch (err) {
-        console.error('[EXPENSE] Failed to add expense:', err);
+        console.error('[EXPENSE_DEBUG] Failed to add expense:', err);
         return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
     }
 }

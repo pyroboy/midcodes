@@ -12,26 +12,58 @@
     let description = $state('');
     let paidBy = $state('Petty Cash');
     let receiptPhoto = $state<File | null>(null);
+    let errorMessage = $state('');
+    let isSubmitting = $state(false);
 
-    function handleSubmit(e: Event) {
+    // Convert File to Base64 data URL for persistent storage
+    async function fileToBase64(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function handleSubmit(e: Event) {
         e.preventDefault();
+        errorMessage = '';
+        
         const numAmount = parseFloat(amount);
-        if (!numAmount || numAmount <= 0) return;
-
-        let photoUrl: string | undefined = undefined;
-        if (receiptPhoto) {
-            photoUrl = URL.createObjectURL(receiptPhoto);
+        if (!numAmount || numAmount <= 0) {
+            errorMessage = 'Please enter a valid amount greater than 0';
+            return;
         }
 
-        addExpense(category, numAmount, description, paidBy, photoUrl);
+        isSubmitting = true;
         
-        // Reset form
-        amount = '';
-        description = '';
-        receiptPhoto = null;
-        
-        const fileInput = document.getElementById('receipt-upload') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
+        try {
+            let photoUrl: string | undefined = undefined;
+            if (receiptPhoto) {
+                // Convert to Base64 for persistent storage (blob URLs don't persist)
+                photoUrl = await fileToBase64(receiptPhoto);
+            }
+
+            const result = await addExpense(category, numAmount, description, paidBy, photoUrl);
+            
+            if (!result.success) {
+                errorMessage = result.error || 'Failed to save expense';
+                isSubmitting = false;
+                return;
+            }
+            
+            // Reset form on success
+            amount = '';
+            description = '';
+            receiptPhoto = null;
+            
+            const fileInput = document.getElementById('receipt-upload') as HTMLInputElement;
+            if (fileInput) fileInput.value = '';
+        } catch (err) {
+            errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+        } finally {
+            isSubmitting = false;
+        }
     }
 </script>
 
@@ -93,8 +125,18 @@
                 />
             </label>
 
-            <button type="submit" class="btn-primary mt-2 flex items-center justify-center gap-2">
-                <span>➕</span> Record Expense
+            {#if errorMessage}
+                <div class="text-sm text-status-red bg-status-red-light px-3 py-2 rounded-lg">
+                    {errorMessage}
+                </div>
+            {/if}
+
+            <button type="submit" disabled={isSubmitting} class="btn-primary mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                {#if isSubmitting}
+                    <span class="animate-spin">⏳</span> Saving...
+                {:else}
+                    <span>➕</span> Record Expense
+                {/if}
             </button>
         </form>
 
@@ -110,6 +152,9 @@
                         <p>No expenses recorded yet.</p>
                     </div>
                 {:else}
+                    {#if branchExpenses.some(e => e.receiptPhoto?.startsWith('blob:'))}
+                        {console.warn('[EXPENSE_DEBUG] Found blob URLs in expenses that may be invalid:', branchExpenses.filter(e => e.receiptPhoto?.startsWith('blob:')).map(e => ({ id: e.id, url: e.receiptPhoto?.substring(0, 50) + '...' })))}
+                    {/if}
                     <table class="w-full text-sm">
                         <thead class="sticky top-0 bg-white shadow-sm z-10">
                             <tr class="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-gray-400 [&>th]:px-4 [&>th]:py-3">
