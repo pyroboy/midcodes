@@ -238,13 +238,10 @@ export const stockCountSchema: RxJsonSchema<any> = {
 				pm4: { type: ['number', 'null'] },
 				pm10: { type: ['number', 'null'] }
 			}
-		},
-		// Internal RxDB fields added to satisfy strict validator during migration
-		_deleted: { type: 'boolean' },
-		_attachments: { type: 'object' },
-		_meta: { type: 'object' }
+			}
+		}
 	},
-	required: ['stockItemId', 'counted', '_deleted']
+	required: ['stockItemId', 'counted']
 };
 
 // ─── Device ─────────────────────────────────────────────────────────────────
