@@ -95,6 +95,31 @@
 		}
 	}
 
+	let isExporting = $state(false);
+	async function handleExport() {
+		try {
+			isExporting = true;
+			const { getDb } = await import('$lib/db');
+			const db = await getDb();
+			const jsonExport = await db.exportJSON();
+			
+			const blob = new Blob([JSON.stringify(jsonExport, null, 2)], { type: "application/json" });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = `wtfpos-backup-${new Date().toISOString().split('T')[0]}.json`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			console.error('[Backup] Failed to export database', err);
+			alert('Failed to export database backup. Check console.');
+		} finally {
+			isExporting = false;
+		}
+	}
+
 	$effect(() => {
 		// Just referencing to track reactivity 
 		now;
@@ -231,13 +256,23 @@
 	<div class="mt-8 mb-4 border-t border-border pt-6 flex flex-col gap-3">
 		<div class="flex items-center justify-between items-start">
 			<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Database Infrastructure</h3>
-			<button 
-				onclick={handleReset} 
-				disabled={isResetting}
-				class="rounded-lg border border-status-red/30 bg-status-red-light/50 hover:bg-status-red-light px-3 py-1.5 text-xs font-bold text-status-red transition-colors disabled:opacity-50"
-			>
-				{isResetting ? 'Resetting...' : '⚠️ Reset Database (Seed)'}
-			</button>
+			<div class="flex items-center gap-2">
+				<button 
+					onclick={handleExport} 
+					disabled={isExporting}
+					class="rounded-lg border border-border bg-white hover:bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-700 transition-colors disabled:opacity-50 flex gap-2 items-center"
+				>
+					{@html `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`}
+					{isExporting ? 'Exporting...' : 'Export Backup'}
+				</button>
+				<button 
+					onclick={handleReset} 
+					disabled={isResetting}
+					class="rounded-lg border border-status-red/30 bg-status-red-light/50 hover:bg-status-red-light px-3 py-1.5 text-xs font-bold text-status-red transition-colors disabled:opacity-50"
+				>
+					{isResetting ? 'Resetting...' : '⚠️ Reset Database (Seed)'}
+				</button>
+			</div>
 		</div>
 		<div class="inline-flex w-fit items-center gap-6 rounded-xl border border-border bg-white px-5 py-3 shadow-sm">
 			<div class="flex flex-col">

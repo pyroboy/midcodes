@@ -82,7 +82,7 @@ async function upsertDevice() {
 
 	const existing = await db.devices.findOne(deviceId).exec();
 	if (existing) {
-		await existing.patch({
+		await existing.incrementalPatch({
 			lastSeenAt: record.lastSeenAt,
 			isOnline: record.isOnline,
 			locationId: record.locationId,
@@ -129,7 +129,7 @@ export async function renameDevice(deviceId: string, newName: string) {
 	const db = await getDb();
 	const doc = await db.devices.findOne(deviceId).exec();
 	if (doc) {
-		await doc.patch({ name: newName });
+		await doc.incrementalPatch({ name: newName });
 		// Persist locally if it's this device
 		if (deviceId === getDeviceId()) {
 			localStorage.setItem(DEVICE_NAME_KEY, newName);

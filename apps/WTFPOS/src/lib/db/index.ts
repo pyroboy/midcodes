@@ -54,72 +54,77 @@ export async function getDb() {
 
 	dbPromise = globalForRxDB.__wtfposDbPromise = (async () => {
 		try {
-		// Initialize the database with Dexie (IndexedDB) as the storage engine
-		const db = await createRxDatabase({
-			name: 'wtfpos_db',
-			storage: dev 
-				? wrappedValidateIsMyJsonValidStorage({ storage: getRxStorageDexie() })
-				: getRxStorageDexie(),
-            multiInstance: true,          // Allow multiple instances per tab (good for SvelteKit HMR)
-            eventReduce: true,             // Query optimization
-            ignoreDuplicate: true,         // Vital for HMR/Development
-            closeDuplicates: true          // Recommended for HMR
-		});
+			// Initialize the database with Dexie (IndexedDB) as the storage engine
+			const db = await createRxDatabase({
+				name: 'wtfpos_db',
+				storage: dev 
+					? wrappedValidateIsMyJsonValidStorage({ storage: getRxStorageDexie() })
+					: getRxStorageDexie(),
+				multiInstance: true,          // Allow multiple instances per tab (good for SvelteKit HMR)
+				eventReduce: true,             // Query optimization
+				ignoreDuplicate: true,         // Vital for HMR/Development
+				closeDuplicates: true          // Recommended for HMR
+			});
 
-		// Check if collections already exist (prevents COL23)
-		if (Object.keys(db.collections).length > 0) {
-			console.log('[RxDB] Collections already exist, skipping addCollections');
-			return db;
-		}
+			// Check if collections already exist (prevents COL23)
+			if (Object.keys(db.collections).length > 0) {
+				console.log('[RxDB] Collections already exist, skipping addCollections');
+				return db;
+			}
 
-		// Add our collections using the defined schemas
-		await db.addCollections({
-			tables: { schema: tableSchema },
-			orders: { schema: orderSchema },
-			menu_items: { schema: menuItemSchema },
-			stock_items: { schema: stockItemSchema },
-			deliveries: { schema: deliverySchema },
-			waste: { schema: wasteSchema },
-			deductions: { schema: deductionSchema },
-			expenses: { schema: expenseSchema },
-			adjustments: { schema: adjustmentSchema },
-			stock_counts: { 
-				schema: stockCountSchema,
-				migrationStrategies: {
-						1: (oldDoc: any) => {
-							const newDoc = JSON.parse(JSON.stringify(oldDoc));
-							// Set current state of these mandatory fields
-							newDoc._deleted = typeof oldDoc._deleted !== 'undefined' ? oldDoc._deleted : false;
-							newDoc._attachments = oldDoc._attachments || {};
-							newDoc._meta = oldDoc._meta || { lwt: Date.now() };
-							// Map the counted fields
-							newDoc.counted = {
-								am10: oldDoc.counted?.['10am'] || oldDoc.counted?.am10 || null,
-								pm4: oldDoc.counted?.['4pm'] || oldDoc.counted?.pm4 || null,
-								pm10: oldDoc.counted?.['10pm'] || oldDoc.counted?.pm10 || null
-							};
-							// Remove old properties at top level if they existed
-							delete newDoc['10am'];
-							delete newDoc['4pm'];
-							delete newDoc['10pm'];
-							return newDoc;
-						}
-				}
-			},
-			devices: { schema: deviceSchema },
-			kds_tickets: { schema: kdsTicketSchema },
-			kds_history: { schema: kdsHistorySchema },
-			x_reads: { schema: xReadSchema },
-			utility_readings: { schema: utilityReadingSchema }
-		});
+			// Add our collections using the defined schemas
+			await db.addCollections({
+				tables: { schema: tableSchema },
+				orders: { schema: orderSchema },
+				menu_items: { schema: menuItemSchema },
+				stock_items: { schema: stockItemSchema },
+				deliveries: { schema: deliverySchema },
+				waste: { schema: wasteSchema },
+				deductions: { schema: deductionSchema },
+				expenses: { schema: expenseSchema },
+				adjustments: { schema: adjustmentSchema },
+				stock_counts: { 
+					schema: stockCountSchema,
+					migrationStrategies: {
+							1: (oldDoc: any) => {
+								return {
+									stockItemId: oldDoc.stockItemId,
+									counted: {
+										am10: oldDoc.counted?.['10am'] || oldDoc.counted?.am10 || null,
+										pm4: oldDoc.counted?.['4pm'] || oldDoc.counted?.pm4 || null,
+										pm10: oldDoc.counted?.['10pm'] || oldDoc.counted?.pm10 || null
+									}
+								};
+							}
+					}
+				},
+				devices: { schema: deviceSchema },
+				kds_tickets: { schema: kdsTicketSchema },
+				kds_history: { schema: kdsHistorySchema },
+				x_reads: { schema: xReadSchema },
+				utility_readings: { schema: utilityReadingSchema }
+			});
 
-        // Try to dynamically import the seeder and run it only in uninitialized environments
-        const seedModule = await import('./seed');
-        await seedModule.seedDatabaseIfNeeded(db as any);
+			// Try to dynamically import the seeder and run it only in uninitialized environments
+			const seedModule = await import('./seed');
+			await seedModule.seedDatabaseIfNeeded(db as any);
 
 			return db;
-		} catch (err) {
+		} catch (err: any) {
+			console.error('[RxDB] Fatal initialization error:', err);
 			globalForRxDB.__wtfposDbPromise = null;
+			
+			// Auto-recovery for critical schema mismatch or corrupted storage
+			// DM4: Migration error, DB9: Database creation failed, SC1: Schema validation failed on load
+			if (err?.code === 'DM4' || err?.code === 'DB9' || err?.code === 'SC1' || 
+			    err?.message?.includes('closed') || err?.message?.includes('NotFound')) {
+				console.warn('[RxDB] Unrecoverable database state detected. Initiating emergency reset...');
+				if (typeof window !== 'undefined') {
+					// Fallback to native IndexedDB clear if RxDB is too broken to gracefully drop
+					window.indexedDB.deleteDatabase('wtfpos_db');
+					window.location.reload();
+				}
+			}
 			throw err;
 		}
 	})();

@@ -774,7 +774,7 @@ export async function submitCount(stockItemId: string, period: CountPeriod, valu
 	const db = await getDb();
 	const doc = await db.stock_counts.findOne({ selector: { stockItemId } }).exec();
 	if (doc) {
-		await doc.atomicPatch({
+		await doc.incrementalPatch({
 			counted: { ...doc.counted, [period]: value }
 		});
 	}

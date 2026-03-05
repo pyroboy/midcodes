@@ -238,7 +238,6 @@ export const stockCountSchema: RxJsonSchema<any> = {
 				pm4: { type: ['number', 'null'] },
 				pm10: { type: ['number', 'null'] }
 			}
-			}
 		}
 	},
 	required: ['stockItemId', 'counted']
