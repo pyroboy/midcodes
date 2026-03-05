@@ -10,7 +10,7 @@
 	import QuickNumberInput from './QuickNumberInput.svelte';
 	import VarianceBar from './VarianceBar.svelte';
 
-	let activePeriod = $state<CountPeriod>('10pm');
+	let activePeriod = $state<CountPeriod>('pm10');
 
 	// Only show items for the current branch (no cross-branch editing)
 	const branchItems = $derived(

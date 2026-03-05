@@ -5,7 +5,9 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	define: {
 		__BUILD_DATE__: JSON.stringify(new Date().toISOString()),
-		__BUILD_MODE__: JSON.stringify(process.env.NODE_ENV ?? 'development')
+		__BUILD_MODE__: JSON.stringify(process.env.NODE_ENV ?? 'development'),
+		'process.env': {},
+		'process': { env: {} }
 	},
 	server: {
 		host: '0.0.0.0', // expose on LAN for tablet access

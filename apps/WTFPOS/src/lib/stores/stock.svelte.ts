@@ -13,7 +13,7 @@ import { getDb } from '$lib/db';
 
 export type StockStatus   = 'ok' | 'low' | 'critical';
 export type StockCategory = 'Meats' | 'Sides' | 'Dishes' | 'Drinks';
-export type CountPeriod   = '10am' | '4pm' | '10pm';
+export type CountPeriod   = 'am10' | 'pm4' | 'pm10';
 export type MeatProtein = 'beef' | 'pork' | 'chicken' | 'other';
 
 export interface StockItem {
@@ -411,9 +411,9 @@ export const INITIAL_DEDUCTIONS: Deduction[] = [];
 export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => ({
 	stockItemId: s.id,
 	counted: {
-		'10am': getMorningCount(s.menuItemId),
-		'4pm': getAfternoonCount(s.menuItemId),
-		'10pm': null,
+		am10: getMorningCount(s.menuItemId),
+		pm4: getAfternoonCount(s.menuItemId),
+		pm10: null,
 	},
 }));
 
@@ -429,9 +429,9 @@ export const stockCounts = createRxStore<StockCount>('stock_counts', db => db.st
 export const adjustments = createRxStore<StockAdjustment>('adjustments', db => db.adjustments.find());
 
 export const countPeriods = $state<{ id: CountPeriod; label: string; time: string; status: 'done' | 'pending' }[]>([
-	{ id: '10am', label: 'Morning',   time: '10:00 AM', status: 'done' },
-	{ id: '4pm',  label: 'Afternoon', time: '4:00 PM',  status: 'done' },
-	{ id: '10pm', label: 'Evening',   time: '10:00 PM', status: 'pending' },
+	{ id: 'am10', label: 'Morning',   time: '10:00 AM', status: 'done' },
+	{ id: 'pm4',  label: 'Afternoon', time: '4:00 PM',  status: 'done' },
+	{ id: 'pm10', label: 'Evening',   time: '10:00 PM', status: 'pending' },
 ]);
 
 /** Get the current stock for a stock item, computed reactively */
@@ -686,7 +686,7 @@ export function markPeriodDone(period: CountPeriod) {
 	const p = countPeriods.find(cp => cp.id === period);
 	if (p) {
 		p.status = 'done';
-		const periodLabels: Record<CountPeriod, string> = { '10am': 'Morning', '4pm': 'Afternoon', '10pm': 'Evening' };
+		const periodLabels: Record<CountPeriod, string> = { am10: 'Morning', pm4: 'Afternoon', pm10: 'Evening' };
 		log.countSubmitted(periodLabels[period]);
 	}
 }

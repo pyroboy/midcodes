@@ -5,11 +5,13 @@
 	import type { LocationId } from '$lib/stores/session.svelte';
 	import HardwareStatus from '$lib/components/HardwareStatus.svelte';
 	import NoSaleModal from '$lib/components/NoSaleModal.svelte';
+	import ExpensesModal from '$lib/components/ExpensesModal.svelte';
 	import { ScanBarcode, MapPin, ChevronDown } from 'lucide-svelte';
 	import { APP_VERSION, BUILD_DATE } from '$lib/version';
 	import { format } from 'date-fns';
 
 	let isNoSaleOpen = $state(false);
+	let isExpensesOpen = $state(false);
 	let locationDropdownOpen = $state(false);
 
 	const canSeeLocations = $derived(!session.isLocked && ELEVATED_ROLES.includes(session.role));
@@ -36,21 +38,25 @@
 	}
 
 	const allNavLinks = [
-		{ href: '/pos',     label: 'POS',     icon: '💻' },
-		{ href: '/kitchen', label: 'Kitchen', icon: '🍳' },
-		{ href: '/stock',   label: 'Stock',   icon: '📦' },
-		{ href: '/reports', label: 'Reports', icon: '📊' },
-		{ href: '/admin',   label: 'Admin',   icon: '⚙️' }
+		{ href: '/pos',      label: 'POS',      icon: '💻' },
+		{ href: '/kitchen',  label: 'Kitchen',  icon: '🍳' },
+		{ href: '/stock',    label: 'Stock',    icon: '📦' },
+		{ href: '/reports',  label: 'Reports',  icon: '📊' },
+		{ href: '/admin',    label: 'Admin',    icon: '⚙️' }
 	];
-
+	
 	/** Floor and Kitchen are retail-only — hidden when in a warehouse location */
 	const RETAIL_ONLY = new Set(['/pos', '/kitchen']);
-
+	
 	const navLinks = $derived(
 		allNavLinks
 			.filter(l => ROLE_NAV_ACCESS[session.role]?.includes(l.href))
 			.filter(l => !isWarehouse || !RETAIL_ONLY.has(l.href))
 	);
+	
+	/** Roles that can access the Expenses modal */
+	const EXPENSES_ROLES = new Set(['manager', 'owner', 'admin']);
+	const canAccessExpenses = $derived(EXPENSES_ROLES.has(session.role));
 
 	function isActive(href: string) {
 		return $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
@@ -100,6 +106,22 @@
 				{link.label}
 			</a>
 		{/each}
+		<!-- Expenses Modal Button -->
+		{#if canAccessExpenses}
+			<button
+				onclick={() => { isExpensesOpen = true; }}
+				class={cn(
+					'flex items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors no-select',
+					isExpensesOpen
+						? 'bg-accent-light text-accent'
+						: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+				)}
+				style="min-height:36px"
+			>
+				<span class="text-sm leading-none">💸</span>
+				Expenses
+			</button>
+		{/if}
 	</nav>
 
 	<!-- Right: location select + warehouse badge + role badge + user + logout -->
@@ -197,3 +219,4 @@
 </header>
 
 <NoSaleModal isOpen={isNoSaleOpen} onClose={() => { isNoSaleOpen = false; }} />
+<ExpensesModal isOpen={isExpensesOpen} onClose={() => { isExpensesOpen = false; }} />

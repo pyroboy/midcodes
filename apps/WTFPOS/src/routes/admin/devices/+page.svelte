@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { devices, renameDevice, getCurrentDeviceId } from '$lib/stores/device.svelte';
 	import { LOCATIONS } from '$lib/stores/session.svelte';
+	import { resetDatabase } from '$lib/db';
 	import { cn } from '$lib/utils';
 	import { formatDistanceToNow, differenceInSeconds, parseISO } from 'date-fns';
 	import { APP_VERSION, BUILD_DATE } from '$lib/version';
@@ -83,6 +84,14 @@
 		if (editingId === id) {
 			await renameDevice(id, editingName.trim() || 'Unnamed Device');
 			editingId = null;
+		}
+	}
+
+	let isResetting = $state(false);
+	async function handleReset() {
+		if (confirm('⚠️ WARNING: This will completely wipe all data on this device and re-seed with mock data. Are you sure?')) {
+			isResetting = true;
+			await resetDatabase();
 		}
 	}
 
@@ -220,7 +229,16 @@
 
 	<!-- Database Info Footer -->
 	<div class="mt-8 mb-4 border-t border-border pt-6 flex flex-col gap-3">
-		<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Database Infrastructure</h3>
+		<div class="flex items-center justify-between items-start">
+			<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Database Infrastructure</h3>
+			<button 
+				onclick={handleReset} 
+				disabled={isResetting}
+				class="rounded-lg border border-status-red/30 bg-status-red-light/50 hover:bg-status-red-light px-3 py-1.5 text-xs font-bold text-status-red transition-colors disabled:opacity-50"
+			>
+				{isResetting ? 'Resetting...' : '⚠️ Reset Database (Seed)'}
+			</button>
+		</div>
 		<div class="inline-flex w-fit items-center gap-6 rounded-xl border border-border bg-white px-5 py-3 shadow-sm">
 			<div class="flex flex-col">
 				<span class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Storage Engine</span>

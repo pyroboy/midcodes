@@ -234,9 +234,9 @@ export const stockCountSchema: RxJsonSchema<any> = {
 		counted: {
 			type: 'object',
 			properties: {
-				'10am': { type: ['number', 'null'] },
-				'4pm': { type: ['number', 'null'] },
-				'10pm': { type: ['number', 'null'] }
+				am10: { type: ['number', 'null'] },
+				pm4: { type: ['number', 'null'] },
+				pm10: { type: ['number', 'null'] }
 			}
 		}
 	},
