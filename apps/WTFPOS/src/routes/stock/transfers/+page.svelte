@@ -77,8 +77,20 @@
 	function setStatus(type: 'success' | 'error', msg: string) {
 		status = { type, msg };
 		if (statusTimer) clearTimeout(statusTimer);
-		if (type === 'success') statusTimer = setTimeout(() => (status = null), 4000);
+		if (type === 'success') {
+			statusTimer = setTimeout(() => {
+				status = null;
+				statusTimer = null;
+			}, 4000);
+		}
 	}
+
+	// Cleanup timer on component destroy
+	$effect(() => {
+		return () => {
+			if (statusTimer) clearTimeout(statusTimer);
+		};
+	});
 
 	// ─── Navigation ─────────────────────────────────────────────────────────────
 	function nextStep() {
@@ -122,7 +134,7 @@
 
 	// ─── Recent transfers ───────────────────────────────────────────────────────
 	const recentTransfers = $derived(
-		adjustments.value.filter(a => a.reason.startsWith('Transfer')).slice(0, 20)
+		adjustments.value.filter(a => a.reason?.startsWith('Transfer')).slice(0, 20)
 	);
 
 	// ─── Step indicator data ────────────────────────────────────────────────────

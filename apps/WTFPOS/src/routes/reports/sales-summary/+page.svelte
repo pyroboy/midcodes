@@ -7,9 +7,11 @@
 
 	// Today's live row — derived from the store
 	const todayRow = $derived(salesSummary());
-	const vatSales    = $derived(Math.round(todayRow.netSales * 0.8929));
+	// VAT rate is 12% - calculate VAT-exclusive amount properly
+	const VAT_RATE = 0.12;
+	const vatSales = $derived(Math.round(todayRow.netSales / (1 + VAT_RATE)));
 	const nonVatSales = $derived(todayRow.netSales - vatSales);
-	const taxCollected = $derived(Math.round(vatSales * 0.12));
+	const taxCollected = $derived(Math.round(vatSales * VAT_RATE));
 
 	// Historical seed rows (past days) augmented with today's live data
 	const historicalDaily = [

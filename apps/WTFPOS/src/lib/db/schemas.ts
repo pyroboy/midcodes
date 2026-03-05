@@ -286,3 +286,106 @@ export const expenseSchema: RxJsonSchema<any> = {
 	},
 	required: ['id', 'category', 'amount', 'description', 'paidBy', 'locationId', 'createdBy', 'createdAt']
 };
+
+// ─── KDS History ─────────────────────────────────────────────────────────────
+export const kdsTicketSchema: RxJsonSchema<any> = {
+	title: 'kds ticket schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		orderId: { type: 'string' },
+		tableNumber: { type: ['number', 'null'] },
+		customerName: { type: ['string', 'null'] },
+		items: {
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					id: { type: 'string' },
+					menuItemName: { type: 'string' },
+					quantity: { type: 'number' },
+					status: { type: 'string' },
+					weight: { type: ['number', 'null'] },
+					category: { type: 'string' },
+					notes: { type: 'string' }
+				}
+			}
+		},
+		createdAt: { type: 'string' }
+	},
+	required: ['id', 'orderId', 'items', 'createdAt']
+};
+
+export const kdsHistorySchema: RxJsonSchema<any> = {
+	title: 'kds history schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		orderId: { type: 'string' },
+		tableNumber: { type: ['number', 'null'] },
+		customerName: { type: ['string', 'null'] },
+		items: {
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					id: { type: 'string' },
+					menuItemName: { type: 'string' },
+					quantity: { type: 'number' },
+					status: { type: 'string' },
+					weight: { type: ['number', 'null'] },
+					category: { type: 'string' },
+					notes: { type: 'string' }
+				}
+			}
+		},
+		createdAt: { type: 'string' },
+		bumpedAt: { type: 'string' },
+		bumpedBy: { type: 'string' }
+	},
+	required: ['id', 'orderId', 'items', 'createdAt', 'bumpedAt', 'bumpedBy']
+};
+
+// ─── X-Read ──────────────────────────────────────────────────────────────────
+export const xReadSchema: RxJsonSchema<any> = {
+	title: 'x-read schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		timestamp: { type: 'string' },
+		grossSales: { type: 'number' },
+		discounts: { type: 'number' },
+		netSales: { type: 'number' },
+		vatAmount: { type: 'number' },
+		totalPax: { type: 'number' },
+		cash: { type: 'number' },
+		gcash: { type: 'number' },
+		card: { type: 'number' },
+		voidCount: { type: 'number' },
+		discountCount: { type: 'number' },
+		generatedBy: { type: 'string' }
+	},
+	required: ['id', 'timestamp', 'grossSales', 'discounts', 'netSales', 'generatedBy']
+};
+
+// ─── Utility Reading ─────────────────────────────────────────────────────────
+export const utilityReadingSchema: RxJsonSchema<any> = {
+	title: 'utility reading schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		date: { type: 'string' },
+		electricity: { type: 'number' },
+		gas: { type: 'number' },
+		recordedBy: { type: 'string' }
+	},
+	required: ['id', 'date', 'electricity', 'gas', 'recordedBy']
+};

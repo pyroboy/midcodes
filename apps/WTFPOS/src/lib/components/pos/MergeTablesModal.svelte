@@ -24,19 +24,19 @@
 
 	// Target table derived state (for use in template)
 	const targetTable = $derived(
-		selectedTargetId ? allTables.find(t => t.id === selectedTargetId) : null
+		selectedTargetId ? allTables.value.find(t => t.id === selectedTargetId) : null
 	);
 
 	// Get primary table's order
 	const primaryOrder = $derived(
 		primaryTable.currentOrderId 
-			? orders.find(o => o.id === primaryTable.currentOrderId)
+			? orders.value.find(o => o.id === primaryTable.currentOrderId)
 			: null
 	);
 
 	// Get other occupied tables at the same location
 	const mergeableTables = $derived(
-		allTables.filter(t => 
+		allTables.value.filter(t => 
 			t.status === 'occupied' &&
 			t.locationId === primaryTable.locationId &&
 			t.id !== primaryTable.id &&
@@ -47,7 +47,7 @@
 	// Get target table's order
 	const targetOrder = $derived(
 		selectedTargetId 
-			? orders.find(o => o.id === allTables.find(t => t.id === selectedTargetId)?.currentOrderId)
+			? orders.value.find(o => o.id === allTables.value.find(t => t.id === selectedTargetId)?.currentOrderId)
 			: null
 	);
 
@@ -77,14 +77,14 @@
 		pinError = false;
 	}
 
-	function confirmMerge() {
+	async function confirmMerge() {
 		if (pin !== MANAGER_PIN) {
 			pinError = true;
 			return;
 		}
 		if (!selectedTargetId) return;
 		
-		const result = mergeTables(primaryTable.id, selectedTargetId);
+		const result = await mergeTables(primaryTable.id, selectedTargetId);
 		if (result.success) {
 			onmerge(selectedTargetId);
 		} else {
@@ -95,12 +95,12 @@
 	}
 
 	function getPackageName(table: Table): string {
-		const order = table.currentOrderId ? orders.find(o => o.id === table.currentOrderId) : null;
+		const order = table.currentOrderId ? orders.value.find(o => o.id === table.currentOrderId) : null;
 		return order?.packageName ?? 'No Package';
 	}
 
 	function getPax(table: Table): number {
-		const order = table.currentOrderId ? orders.find(o => o.id === table.currentOrderId) : null;
+		const order = table.currentOrderId ? orders.value.find(o => o.id === table.currentOrderId) : null;
 		return order?.pax ?? table.capacity;
 	}
 </script>
@@ -188,7 +188,7 @@
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-gray-900">Manager PIN Required</h3>
 				<p class="text-sm text-gray-500">
-					Merge {primaryTable.label} → {allTables.find(t => t.id === selectedTargetId)?.label ?? '?'}
+					Merge {primaryTable.label} → {allTables.value.find(t => t.id === selectedTargetId)?.label ?? '?'}
 				</p>
 			</div>
 

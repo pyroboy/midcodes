@@ -60,7 +60,8 @@
 	let pin         = $state('');
 	let pinError    = $state(false);
 	let pendingDest = $state('');
-	const MANAGER_PIN = '1234';
+	// TODO: Move to environment variable or secure config
+	const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || '1234';
 
 	// ─── Login logic ──────────────────────────────────────────────────────────
 	function login() {

@@ -5,7 +5,7 @@
 
 	// Pending meat orders across all tickets
 	const pendingMeatOrders = $derived(
-		kdsTickets.flatMap(t =>
+		kdsTickets.value.flatMap(t =>
 			t.items
 				.filter(i => i.category === 'meats' && i.status !== 'served' && i.status !== 'cancelled')
 				.map(i => ({

@@ -148,6 +148,7 @@ export interface KdsTicketItem {
 }
 
 export interface KdsTicket {
+	id: string;
 	orderId: string;
 	tableNumber: number | null;    // null for takeout orders
 	customerName?: string;         // for takeout orders
@@ -155,3 +156,9 @@ export interface KdsTicket {
 	createdAt: string;
 	printStatus?: 'pending' | 'success' | 'failed'; // Tier 4
 }
+
+export interface KdsHistoryEntry extends KdsTicket {
+	bumpedAt: string;
+	bumpedBy: string;
+}
+

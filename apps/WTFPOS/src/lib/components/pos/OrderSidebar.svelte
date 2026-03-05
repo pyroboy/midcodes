@@ -1,8 +1,7 @@
 <script lang="ts">
     import type { Table, Order } from '$lib/types';
     import { formatPeso, cn } from '$lib/utils';
-    import { printBill, confirmHeldPayment, cancelHeldPayment } from '$lib/stores/pos.svelte';
-    import { advanceTakeoutStatus } from '$lib/stores/pos.svelte';
+    import { printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus } from '$lib/stores/pos.svelte';
     import type { KitchenAlert } from '$lib/stores/alert.svelte';
 
     interface Props {
@@ -38,7 +37,17 @@
     }: Props = $props();
 
     function takeoutLabel(takeoutOrders: Order[], order: Order) {
+        if (!takeoutOrders || takeoutOrders.length === 0) {
+            // Fallback: use order creation time to generate consistent label
+            const timeCode = new Date(order.createdAt).getTime() % 1000;
+            return `#TO${String(timeCode).padStart(3, '0')}`;
+        }
         const idx = takeoutOrders.indexOf(order);
+        if (idx === -1) {
+            // Order not found in array - use fallback
+            const timeCode = new Date(order.createdAt).getTime() % 1000;
+            return `#TO${String(timeCode).padStart(3, '0')}`;
+        }
         return `#TO${String(idx + 1).padStart(2, '0')}`;
     }
 

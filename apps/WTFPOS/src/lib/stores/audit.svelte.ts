@@ -96,6 +96,22 @@ export const log = {
 		writeLog('payment', `Zero-value cancellation: ${tableLabel}${reason ? ` — ${reason}` : ''}${dur}`);
 	},
 
+	/** POS: order voided with value */
+	orderVoided: (tableLabel: string, total: number, reason?: string, durationSeconds?: number) => {
+		const dur = durationSeconds != null
+			? ` [seated ${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s]`
+			: '';
+		writeLog('payment', `VOIDED: ${tableLabel} — ₱${total.toFixed(2)}${reason ? ` (${reason})` : ''}${dur}`);
+	},
+
+	/** Stock: transfer logged */
+	stockTransferred: (itemName: string, qty: number, unit: string, fromBranch: string, toBranch: string) =>
+		writeLog('stock', `Transfer: ${qty}${unit} ${itemName} — ${fromBranch.toUpperCase()} → ${toBranch.toUpperCase()}`),
+
+	/** Stock: item restored from void/cancel */
+	stockRestored: (itemName: string, qty: number, unit: string, orderId: string) =>
+		writeLog('stock', `Restored ${qty}${unit} ${itemName} (void order ${orderId})`),
+
 	/** KDS: item marked as served */
 	itemServed: (itemName: string, tableNumber: number | null) =>
 		writeLog('order', `Served: ${itemName} → ${tableNumber !== null ? `T${tableNumber}` : 'Takeout'}`),

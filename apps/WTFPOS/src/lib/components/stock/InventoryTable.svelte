@@ -52,7 +52,7 @@
 			} as InventoryItem))
 	);
 
-	const filteredAndSorted = $derived(() => {
+	const filteredAndSorted = $derived.by(() => {
 		const filtered = items.filter(s => {
 			const matchStatus = filterStatus === 'all' || s.status === filterStatus;
 			const q = searchQuery.trim().toLowerCase();
@@ -101,7 +101,7 @@
 		for (let key in expandedGroups) expandedGroups[key] = false;
 	}
 
-	const gridGroups = $derived(() => {
+	const gridGroups = $derived.by(() => {
 		const groups: Record<MeatProtein, ProteinGroup> = {
 			beef: { protein: 'beef', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
 			pork: { protein: 'pork', items: [], totalStock: 0, criticalCount: 0, lowCount: 0 },
@@ -110,7 +110,7 @@
 		};
 		const nonMeatItems: InventoryItem[] = [];
 		
-		for (const item of filteredAndSorted()) {
+		for (const item of filteredAndSorted) {
 			if (item.category === 'Meats') {
 				const protein = item.proteinType || 'other';
 				groups[protein].items.push(item);
@@ -131,7 +131,7 @@
 	});
 
 	// For list view, group by category, and subgroup Meats by protein
-	const listGroups = $derived(() => {
+	const listGroups = $derived.by(() => {
 		const categories: {
 			category: string;
 			items: InventoryItem[];
@@ -140,7 +140,7 @@
 		}[] = [];
 		
 		const catMap = new Map<string, InventoryItem[]>();
-		for (const item of filteredAndSorted()) {
+		for (const item of filteredAndSorted) {
 			if (!catMap.has(item.category)) catMap.set(item.category, []);
 			catMap.get(item.category)!.push(item);
 		}
@@ -346,7 +346,7 @@
 
 <!-- ─── Grid View ─────────────────────────────────────────────────────────── -->
 {#if viewMode === 'grid'}
-	{#if filteredAndSorted().length === 0}
+	{#if filteredAndSorted.length === 0}
 		<div class="flex flex-col items-center justify-center py-20 text-gray-400">
 			<Search class="w-10 h-10 mb-3 opacity-25" />
 			<p class="font-medium text-gray-500">No items match your search</p>
@@ -354,7 +354,7 @@
 		</div>
 	{:else}
 		<div class="flex flex-col gap-6">
-			{#each gridGroups().meatGroups as group}
+			{#each gridGroups.meatGroups as group}
 				<div class="flex flex-col gap-4">
 					<ProteinGroupHeader 
 						protein={group.protein} 
@@ -435,9 +435,9 @@
 				</div>
 			{/each}
 
-			{#if gridGroups().nonMeatItems.length > 0}
-				<div class="flex flex-col gap-4">
-					{#if gridGroups().meatGroups.length > 0}
+			{#if gridGroups.nonMeatItems.length > 0}
+					<div class="flex flex-col gap-4">
+						{#if gridGroups.meatGroups.length > 0}
 						<div class="flex items-center gap-2 mt-2 mb-2">
 							<div class="h-px bg-border flex-1"></div>
 							<span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Other Items</span>
@@ -445,7 +445,7 @@
 						</div>
 					{/if}
 					<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-						{#each gridGroups().nonMeatItems as item (item.id)}
+						{#each gridGroups.nonMeatItems as item (item.id)}
 							<button
 								onclick={() => openItemModal(item)}
 								class={cn(
@@ -502,7 +502,7 @@
 <!-- ─── List View ─────────────────────────────────────────────────────────── -->
 {:else}
 	<div class="overflow-hidden rounded-xl border border-border bg-white">
-		{#if filteredAndSorted().length === 0}
+		{#if filteredAndSorted.length === 0}
 			<div class="flex flex-col items-center justify-center py-20 text-gray-400">
 				<Search class="w-10 h-10 mb-3 opacity-25" />
 				<p class="font-medium text-gray-500">No items match your search</p>
@@ -531,7 +531,7 @@
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-border">
-					{#each listGroups() as catGroup}
+					{#each listGroups as catGroup}
 						{#if catGroup.isMeat}
 							{#each catGroup.proteinGroups as group}
 								{@const config = proteinConfig[group.protein]}

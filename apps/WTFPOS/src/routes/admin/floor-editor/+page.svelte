@@ -77,7 +77,12 @@
 	}
 
 	function createTable() {
-		addTable(selectedLocationId, `T${tables.length + 1}`, 2, 50, 50);
+		// Find the highest existing table number to avoid duplicates after deletion
+		const maxNum = tables.reduce((max, t) => {
+			const match = t.label.match(/^T(\d+)$/);
+			return match ? Math.max(max, parseInt(match[1])) : max;
+		}, 0);
+		addTable(selectedLocationId, `T${maxNum + 1}`, 2, 50, 50);
 		writeLog('admin', `Added table to ${selectedLocationId}`);
 	}
 

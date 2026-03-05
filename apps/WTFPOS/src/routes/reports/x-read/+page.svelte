@@ -7,7 +7,7 @@
 	const summary = $derived(salesSummary());
 	const eod = $derived(eodSummary());
 	const liveOrders = $derived(
-		(session.locationId === 'all' ? orders : orders.filter(o => o.locationId === session.locationId))
+		(session.locationId === 'all' ? orders.value : orders.value.filter(o => o.locationId === session.locationId))
 	);
 	const openOrders = $derived(liveOrders.filter(o => o.status === 'open' || o.status === 'pending_payment').length);
 	const paidOrders = $derived(liveOrders.filter(o => o.status === 'paid').length);
@@ -106,7 +106,7 @@
 	<div class="flex flex-col gap-4">
 		<div class="rounded-xl border border-border bg-white p-5">
 			<h3 class="mb-3 font-bold text-gray-900">X-Read History</h3>
-			{#if xReadHistory.length === 0}
+			{#if xReadHistory.value.length === 0}
 				<div class="text-center py-6">
 					<div class="text-3xl mb-2">📋</div>
 					<p class="text-sm text-gray-400">No X-Reads generated yet this shift.</p>
@@ -114,10 +114,10 @@
 				</div>
 			{:else}
 				<div class="flex flex-col gap-3 max-h-[400px] overflow-y-auto">
-					{#each xReadHistory as xr, idx (xr.id)}
+					{#each xReadHistory.value as xr, idx (xr.id)}
 						<div class="rounded-lg border border-border bg-gray-50 p-3">
 							<div class="flex items-center justify-between mb-2">
-								<span class="text-xs font-bold text-gray-700">X-Read #{xReadHistory.length - idx}</span>
+								<span class="text-xs font-bold text-gray-700">X-Read #{xReadHistory.value.length - idx}</span>
 								<span class="text-xs text-gray-400">{formatTime(xr.timestamp)} · {xr.generatedBy}</span>
 							</div>
 							<div class="grid grid-cols-2 gap-1.5 text-xs">

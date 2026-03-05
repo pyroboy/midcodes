@@ -7,12 +7,13 @@ import { orders as allOrders, tables as allTables, menuItems } from '$lib/stores
 import { stockItems, deliveries, deductions, getCurrentStock } from '$lib/stores/stock.svelte';
 import { session } from '$lib/stores/session.svelte';
 import { log } from '$lib/stores/audit.svelte';
+import { createRxStore } from '$lib/stores/sync.svelte';
+import { getDb } from '$lib/db';
 import { nanoid } from 'nanoid';
 
-// Branch-filtered getters — $derived can't be exported from modules, so we
-// filter inside each exported function call (which runs in a reactive context).
-function getOrders() { return session.locationId === 'all' ? allOrders : allOrders.filter(o => o.locationId === session.locationId); }
-function getTables() { return session.locationId === 'all' ? allTables : allTables.filter(t => t.locationId === session.locationId); }
+// Branch-filtered getters
+function getOrders() { return session.locationId === 'all' ? allOrders.value : allOrders.value.filter(o => o.locationId === session.locationId); }
+function getTables() { return session.locationId === 'all' ? allTables.value : allTables.value.filter(t => t.locationId === session.locationId); }
 
 const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -147,9 +148,9 @@ export interface XReadSnapshot {
 	generatedBy: string;
 }
 
-export const xReadHistory = $state<XReadSnapshot[]>([]);
+export const xReadHistory = createRxStore<XReadSnapshot>('x_reads', db => db.x_reads.find().sort({ timestamp: 'desc' }));
 
-export function generateXRead(): XReadSnapshot {
+export async function generateXRead(): Promise<XReadSnapshot> {
 	const summary = eodSummary();
 	const voids = getOrders().filter(o => o.status === 'cancelled');
 	const discounted = getOrders().filter(o => o.status === 'paid' && o.discountType !== 'none');
@@ -171,7 +172,9 @@ export function generateXRead(): XReadSnapshot {
 		discountCount: discounted.length,
 		generatedBy: session.userName || 'Staff',
 	};
-	xReadHistory.unshift(snapshot);
+
+	const db = await getDb();
+	await db.x_reads.insert(snapshot);
 	log.xReadGenerated();
 	return snapshot;
 }
@@ -266,20 +269,18 @@ export interface UtilityReading {
 	recordedBy: string;
 }
 
-export const utilityReadings = $state<UtilityReading[]>([
-	{ id: 'util-1', date: new Date(Date.now() - 86400000).toDateString(), electricity: 1450, gas: 42, recordedBy: 'System' }
-]);
+export const utilityReadings = createRxStore<UtilityReading>('utility_readings', db => db.utility_readings.find().sort({ date: 'desc' }));
 
 export function getPreviousUtilityReading(): UtilityReading | null {
-	if (utilityReadings.length === 0) return null;
-	// Return the most recent reading
-	return [...utilityReadings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+	if (utilityReadings.value.length === 0) return null;
+	return utilityReadings.value[0];
 }
 
-export function saveUtilityReading(electricity: number, gas: number) {
-	utilityReadings.push({
+export async function saveUtilityReading(electricity: number, gas: number) {
+	const db = await getDb();
+	await db.utility_readings.insert({
 		id: nanoid(),
-		date: new Date().toDateString(),
+		date: new Date().toISOString(),
 		electricity,
 		gas,
 		recordedBy: session.userName || 'Staff'

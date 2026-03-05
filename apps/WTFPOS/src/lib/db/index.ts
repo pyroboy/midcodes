@@ -13,7 +13,11 @@ import {
 	expenseSchema,
 	adjustmentSchema,
 	stockCountSchema,
-	deviceSchema
+	deviceSchema,
+	kdsTicketSchema,
+	kdsHistorySchema,
+	xReadSchema,
+	utilityReadingSchema
 } from './schemas';
 
 import { dev } from '$app/environment';
@@ -62,7 +66,11 @@ export async function getDb() {
 			expenses: { schema: expenseSchema },
 			adjustments: { schema: adjustmentSchema },
 			stock_counts: { schema: stockCountSchema },
-			devices: { schema: deviceSchema }
+			devices: { schema: deviceSchema },
+			kds_tickets: { schema: kdsTicketSchema },
+			kds_history: { schema: kdsHistorySchema },
+			x_reads: { schema: xReadSchema },
+			utility_readings: { schema: utilityReadingSchema }
 		});
 
         // Try to dynamically import the seeder and run it only in uninitialized environments

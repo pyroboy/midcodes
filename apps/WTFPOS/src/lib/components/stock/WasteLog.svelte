@@ -32,6 +32,13 @@
 	let saved  = $state(false);
 	let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+	// Cleanup timer on component destroy
+	$effect(() => {
+		return () => {
+			if (saveTimer) clearTimeout(saveTimer);
+		};
+	});
+
 	// Auto-fill unit from selected item
 	const selectedItem = $derived(stockItems.value.find(s => s.id === selectedStockId));
 	const unit = $derived(selectedItem?.unit ?? '');

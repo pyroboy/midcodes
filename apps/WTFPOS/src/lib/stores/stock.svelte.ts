@@ -390,8 +390,14 @@ export const INITIAL_STOCK_ITEMS: StockItem[] = STOCK_ITEMS_LIST.map((s, i) => (
 	minLevel: s.minLevel,
 }));
 
-function getSiId(menuItemId: string, locationId: string) {
-	return `si-${STOCK_ITEMS_LIST.findIndex(s => s.menuItemId === menuItemId && s.locationId === locationId)}`;
+function getSiId(menuItemId: string, locationId: string): string {
+	const index = STOCK_ITEMS_LIST.findIndex(s => s.menuItemId === menuItemId && s.locationId === locationId);
+	if (index === -1) {
+		console.warn(`[STOCK] Stock item not found for menuItemId=${menuItemId}, locationId=${locationId}`);
+		// Return a unique fallback ID to prevent collisions
+		return `si-missing-${menuItemId}-${locationId}`;
+	}
+	return `si-${index}`;
 }
 
 export const INITIAL_DELIVERIES: Delivery[] = [
@@ -470,44 +476,98 @@ export function getDrift(stockItemId: string, period: CountPeriod): number | nul
 	return expected - counted; // positive = missing
 }
 
-// ─── Actions ──────────────────────────────────────────────────────────────────
-
-export async function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '', batchNo?: string, expiryDate?: string, photo?: string) {
-	if (!browser) return; // DB operations are client-only
-	const db = await getDb();
-	await db.deliveries.insert({
-		id: nanoid(),
-		stockItemId,
-		itemName,
-		qty,
-		unit,
-		supplier,
-		notes,
-		receivedAt: new Date().toISOString(),
-		batchNo,
-		expiryDate,
-		usedQty: 0,
-		depleted: false,
-		...(photo && { photo })
-	});
-	log.deliveryReceived(itemName, qty, unit, supplier);
+export function getSpoilageAlerts() {
+	const now = new Date();
+	const alerts = [];
+	
+	for (const delivery of deliveries.value) {
+		if (delivery.depleted || !delivery.expiryDate) continue;
+		
+		const expiry = new Date(delivery.expiryDate);
+		const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+		
+		// Alert if expired (daysLeft < 0) or expiring in next 3 days
+		if (daysLeft <= 3) {
+			alerts.push({
+				...delivery,
+				daysLeft
+			});
+		}
+	}
+	
+	return alerts;
 }
 
-export async function logWaste(stockItemId: string, itemName: string, qty: number, unit: string, reason: string, loggedBy?: string) {
-	if (!browser) return;
+// ─── Actions ──────────────────────────────────────────────────────────────────
+
+export async function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '', batchNo?: string, expiryDate?: string, photo?: string): Promise<{ success: boolean; error?: string; id?: string }> {
+	if (!browser) return { success: false, error: 'Not in browser environment' };
+	
+	// Validate inputs
+	if (!stockItemId || typeof stockItemId !== 'string') return { success: false, error: 'Invalid stock item ID' };
+	if (!itemName || itemName.trim() === '') return { success: false, error: 'Item name is required' };
+	if (typeof qty !== 'number' || isNaN(qty) || qty <= 0) return { success: false, error: 'Quantity must be a positive number' };
+	if (qty > 999999999) return { success: false, error: 'Quantity exceeds maximum allowed' };
+	if (!unit || unit.trim() === '') return { success: false, error: 'Unit is required' };
+	if (!supplier || supplier.trim() === '') return { success: false, error: 'Supplier is required' };
+	
+	try {
+		const db = await getDb();
+		const id = nanoid();
+		await db.deliveries.insert({
+			id,
+			stockItemId,
+			itemName: itemName.trim(),
+			qty,
+			unit: unit.trim(),
+			supplier: supplier.trim(),
+			notes: notes.trim(),
+			receivedAt: new Date().toISOString(),
+			batchNo,
+			expiryDate,
+			usedQty: 0,
+			depleted: false,
+			...(photo && { photo })
+		});
+		log.deliveryReceived(itemName, qty, unit, supplier);
+		return { success: true, id };
+	} catch (err) {
+		console.error('[STOCK] Failed to receive delivery:', err);
+		return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
+	}
+}
+
+export async function logWaste(stockItemId: string, itemName: string, qty: number, unit: string, reason: string, loggedBy?: string): Promise<{ success: boolean; error?: string; id?: string }> {
+	if (!browser) return { success: false, error: 'Not in browser environment' };
+	
+	// Validate inputs
+	if (!stockItemId || typeof stockItemId !== 'string') return { success: false, error: 'Invalid stock item ID' };
+	if (!itemName || itemName.trim() === '') return { success: false, error: 'Item name is required' };
+	if (typeof qty !== 'number' || isNaN(qty) || qty <= 0) return { success: false, error: 'Quantity must be a positive number' };
+	if (!unit || unit.trim() === '') return { success: false, error: 'Unit is required' };
+	if (!reason || reason.trim() === '') return { success: false, error: 'Reason is required' };
+	
 	const logger = loggedBy ?? session.userName ?? 'Staff';
-	const db = await getDb();
-	await db.waste.insert({
-		id: nanoid(),
-		stockItemId,
-		itemName,
-		qty,
-		unit,
-		reason,
-		loggedBy: logger,
-		loggedAt: new Date().toISOString(),
-	});
-	log.wasteLogged(itemName, qty, unit, reason);
+	
+	try {
+		const db = await getDb();
+		const id = nanoid();
+		await db.waste.insert({
+			id,
+			stockItemId,
+			itemName: itemName.trim(),
+			qty,
+			unit: unit.trim(),
+			reason: reason.trim(),
+			loggedBy: logger,
+			loggedAt: new Date().toISOString(),
+		});
+		log.wasteLogged(itemName, qty, unit, reason);
+		return { success: true, id };
+	} catch (err) {
+		console.error('[STOCK] Failed to log waste:', err);
+		return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
+	}
 }
 
 export async function adjustStock(
@@ -518,21 +578,38 @@ export async function adjustStock(
 	unit: string,
 	reason: string,
 	loggedBy?: string
-) {
-	if (!browser) return;
+): Promise<{ success: boolean; error?: string; id?: string }> {
+	if (!browser) return { success: false, error: 'Not in browser environment' };
+	
+	// Validate inputs
+	if (!stockItemId || typeof stockItemId !== 'string') return { success: false, error: 'Invalid stock item ID' };
+	if (!itemName || itemName.trim() === '') return { success: false, error: 'Item name is required' };
+	if (type !== 'add' && type !== 'deduct') return { success: false, error: 'Type must be add or deduct' };
+	if (typeof qty !== 'number' || isNaN(qty) || qty <= 0) return { success: false, error: 'Quantity must be a positive number' };
+	if (!unit || unit.trim() === '') return { success: false, error: 'Unit is required' };
+	if (!reason || reason.trim() === '') return { success: false, error: 'Reason is required' };
+	
 	const logger = loggedBy ?? session.userName ?? 'Staff';
-	const db = await getDb();
-	await db.adjustments.insert({
-		id: nanoid(),
-		stockItemId,
-		itemName,
-		type,
-		qty,
-		unit,
-		reason,
-		loggedBy: logger,
-		loggedAt: new Date().toISOString(),
-	});
+	
+	try {
+		const db = await getDb();
+		const id = nanoid();
+		await db.adjustments.insert({
+			id,
+			stockItemId,
+			itemName: itemName.trim(),
+			type,
+			qty,
+			unit: unit.trim(),
+			reason: reason.trim(),
+			loggedBy: logger,
+			loggedAt: new Date().toISOString(),
+		});
+		return { success: true, id };
+	} catch (err) {
+		console.error('[STOCK] Failed to adjust stock:', err);
+		return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
+	}
 }
 
 /** Set stock to an absolute value by computing the delta and calling adjustStock */
@@ -554,104 +631,108 @@ export async function setStock(
 /** Called by POS when items are charged to a table */
 export async function deductFromStock(menuItemId: string, qty: number, tableId: string, orderId: string, isTracked: boolean = false, locationId?: string) {
 	if (!browser) return;
-	const db = await getDb();
-	console.log(`[STOCK-DEDUCT] Attempt: menuItemId=${menuItemId}, qty=${qty}, orderId=${orderId.slice(-6)}, isTracked=${isTracked}`);
-	if (!isTracked) {
-		console.log(`[STOCK-DEDUCT] SKIPPED: Item not tracked`);
-		return;
-	}
+	if (!isTracked) return;
+	if (qty <= 0) return;
+	
 	const locId = locationId ?? session.locationId ?? '';
 	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === locId);
-	if (!item) {
-		console.warn(`[STOCK-DEDUCT] FAILED: Stock item not found for menuItemId=${menuItemId} at location=${locId}`);
-		return; // item not tracked in stock (e.g. packages themselves)
-	}
-	const currentStock = getCurrentStock(item.id);
-	console.log(`[STOCK-DEDUCT] Current stock for ${item.name}: ${currentStock}${item.unit}, deducting: ${qty}`);
-	if (currentStock < qty) {
-		console.error(`[STOCK-DEDUCT] WARNING: Insufficient stock! Have ${currentStock}, need ${qty}`);
-		qty = Math.max(0, currentStock); // Limit deduction to what is available to prevent negative stock
-		if (qty <= 0) return; // Do not create a deduction instance if we cannot deduct anything
-	}
-
-	// Add the actual deduction logic
-	await db.deductions.insert({
-		id: nanoid(),
-		stockItemId: item.id,
-		qty,
-		tableId,
-		orderId,
-		timestamp: new Date().toISOString(),
-	});
-
-	// Tier 3: Process FIFO queue for batches
-	let remainingToDeduct = qty;
-	// Oldest deliveries first (assuming array is prepended via unshift, so reverse or findLast-ish)
-	// We'll iterate from the end (oldest) to start (newest)
-	for (let i = deliveries.value.length - 1; i >= 0; i--) {
-		const d = deliveries.value[i];
-		if (d.stockItemId !== item.id || d.depleted) continue;
-
-		const dUsed = d.usedQty || 0;
-		const availableInBatch = d.qty - dUsed;
-
-		if (availableInBatch > 0) {
-			const deductNow = Math.min(availableInBatch, remainingToDeduct);
-			const newUsedQty = dUsed + deductNow;
-			await db.deliveries.findOne({ selector: { id: d.id } }).patch({ 
-				usedQty: newUsedQty, 
-				depleted: newUsedQty >= d.qty 
-			});
-			remainingToDeduct -= deductNow;
-			if (remainingToDeduct <= 0) break;
+	if (!item) return; // item not tracked in stock (e.g. packages themselves)
+	
+	const db = await getDb();
+	
+	try {
+		// Re-check stock inside transaction to prevent race conditions
+		const currentStock = getCurrentStock(item.id);
+		const deductQty = Math.min(qty, currentStock); // Never deduct more than available
+		
+		if (deductQty <= 0) {
+			console.warn(`[STOCK-DEDUCT] Insufficient stock for ${item.name}: have ${currentStock}, need ${qty}`);
+			return;
 		}
+		
+		// Insert deduction record
+		await db.deductions.insert({
+			id: nanoid(),
+			stockItemId: item.id,
+			qty: deductQty,
+			tableId,
+			orderId,
+			timestamp: new Date().toISOString(),
+		});
+
+		// Process FIFO queue for batches
+		let remainingToDeduct = deductQty;
+		// Oldest deliveries first (assuming array is prepended via unshift, so reverse or findLast-ish)
+		// We'll iterate from the end (oldest) to start (newest)
+		for (let i = deliveries.value.length - 1; i >= 0; i--) {
+			const d = deliveries.value[i];
+			if (d.stockItemId !== item.id || d.depleted) continue;
+
+			const dUsed = d.usedQty || 0;
+			const availableInBatch = d.qty - dUsed;
+
+			if (availableInBatch > 0) {
+				const deductNow = Math.min(availableInBatch, remainingToDeduct);
+				const newUsedQty = dUsed + deductNow;
+				const doc = await db.deliveries.findOne(d.id).exec();
+				if (doc) {
+					await doc.patch({
+						usedQty: newUsedQty,
+						depleted: newUsedQty >= d.qty
+					});
+				}
+				remainingToDeduct -= deductNow;
+				if (remainingToDeduct <= 0) break;
+			}
+		}
+	} catch (err) {
+		console.error(`[STOCK-DEDUCT] Error deducting stock for ${menuItemId}:`, err);
+		throw err; // Re-throw so caller can handle
 	}
 }
 
 /**
  * Restore stock when an item is rejected/cancelled from KDS
- * Creates a stock adjustment to add the quantity back
+ * Rolls back FIFO usage in deliveries and removes the deduction record.
  */
-export async function restoreStock(menuItemId: string, qty: number, tableId: string, orderId: string) {
+export async function restoreStock(menuItemId: string, qty: number, orderId: string, locationId?: string) {
 	if (!browser) return;
 	const db = await getDb();
-	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId ?? ''));
-	if (!item) return; // item not tracked in stock
+	const locId = locationId ?? session.locationId ?? 'qc';
+	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === locId);
+	if (!item) return;
 
-	// Find and remove the deduction using compound orderId + stockItemId match (not qty-based to avoid ghost deductions)
-	const existingDeduction = deductions.value.find(d =>
+	// 1. Find the deduction record
+	const existingDeduction = deductions.value.find(d => 
 		d.stockItemId === item.id && d.orderId === orderId
 	);
-	if (existingDeduction) {
-		await db.deductions.findOne({ selector: { id: existingDeduction.id } }).remove();
+	if (!existingDeduction) return;
+
+	const restoreQty = existingDeduction.qty;
+
+	// 2. Roll back FIFO usedQty in deliveries (Newest First)
+	let remainingToRestore = restoreQty;
+	const itemDeliveries = [...deliveries.value]
+		.filter(d => d.stockItemId === item.id && (d.usedQty || 0) > 0)
+		.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+
+	for (const d of itemDeliveries) {
+		const used = d.usedQty || 0;
+		const restoreNow = Math.min(used, remainingToRestore);
+		const newUsedQty = used - restoreNow;
+		
+		await db.deliveries.findOne(d.id).patch({
+			usedQty: newUsedQty,
+			depleted: false
+		});
+
+		remainingToRestore -= restoreNow;
+		if (remainingToRestore <= 0) break;
 	}
 
-	// Create a stock adjustment to add the quantity back
-	await adjustStock(
-		item.id,
-		item.name,
-		'add',
-		qty,
-		item.unit,
-		`Restored from KDS rejection — Order ${orderId.slice(-6)}`,
-		'Kitchen'
-	);
-}
-
-/** Tier 3: Returns active deliveries nearing expiration (within 3 days) */
-export function getSpoilageAlerts() {
-	const todayMs = Date.now();
-	const THRESHOLD = 86400000 * 3; // 3 days
-	
-	return deliveries.value.filter(d => {
-		if (d.depleted || !d.expiryDate) return false;
-		const expMs = new Date(d.expiryDate).getTime();
-		const diff = expMs - todayMs;
-		return diff > -86400000 && diff <= THRESHOLD; // between 1 day ago (already expired) and 3 days from now
-	}).map(d => {
-		const daysLeft = Math.ceil((new Date(d.expiryDate!).getTime() - todayMs) / 86400000);
-		return { ...d, daysLeft };
-	});
+	// 3. Remove the deduction record
+	await db.deductions.findOne(existingDeduction.id).remove();
+	log.stockRestored(item.name, restoreQty, item.unit, orderId);
 }
 
 /** Tier 3: Transfer stock between branches/warehouses */
@@ -659,25 +740,41 @@ export async function transferStock(stockItemMenuItemId: string, qty: number, fr
 	const fromItem = stockItems.value.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === fromLocationId);
 	const toItem = stockItems.value.find(s => s.menuItemId === stockItemMenuItemId && s.locationId === toLocationId);
 
-	if (!fromItem || !toItem) return false; // Stock link must exist in both locations
+	if (!fromItem || !toItem) return false;
 
 	const currentFrom = getCurrentStock(fromItem.id);
-	if (currentFrom < qty) return false; // Not enough stock to transfer
+	if (currentFrom < qty) return false;
 
 	const logger = loggedBy ?? session.userName ?? 'Staff';
 	const noteSuffix = notes ? ` — ${notes}` : '';
+	
+	// Create a deduction record in the source (this will also trigger FIFO batch usage if we use deductFromStock)
+	// But deductFromStock is tied to orders. Let's just use adjustStock for simplicity but with a special reason.
 	await adjustStock(fromItem.id, fromItem.name, 'deduct', qty, fromItem.unit, `Transfer to ${toLocationId}${noteSuffix}`, logger);
-	await adjustStock(toItem.id, toItem.name, 'add', qty, toItem.unit, `Transfer from ${fromLocationId}${noteSuffix}`, logger);
+
+	// Create a NEW delivery in the destination to represent the incoming transfer as a fresh batch
+	await receiveDelivery(
+		toItem.id, 
+		toItem.name, 
+		qty, 
+		toItem.unit, 
+		`Transfer from ${fromLocationId}`, 
+		notes, 
+		`TRF-${nanoid(4).toUpperCase()}`
+	);
+
+	log.stockTransferred(fromItem.name, qty, fromItem.unit, fromLocationId, toLocationId);
 	return true;
 }
 
 export async function submitCount(stockItemId: string, period: CountPeriod, value: number) {
 	if (!browser) return;
 	const db = await getDb();
-	const count = stockCounts.value.find(c => c.stockItemId === stockItemId);
-	if (count) {
-		const newCounted = { ...count.counted, [period]: value };
-		await db.stock_counts.findOne({ selector: { stockItemId } }).patch({ counted: newCounted });
+	const doc = await db.stock_counts.findOne({ selector: { stockItemId } }).exec();
+	if (doc) {
+		await doc.atomicPatch({
+			counted: { ...doc.counted, [period]: value }
+		});
 	}
 }
 

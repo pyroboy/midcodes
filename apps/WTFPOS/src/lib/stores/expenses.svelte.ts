@@ -6,6 +6,7 @@ import { session } from '$lib/stores/session.svelte';
 import { getDb } from '$lib/db';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { browser } from '$app/environment';
+import { log } from '$lib/stores/audit.svelte';
 
 export interface Expense {
     id: string;
@@ -22,11 +23,11 @@ export interface Expense {
 export const expenseCategories = [
     'Labor Budget',
     'Petty Cash',
-    'Meat Procurement', 
-    'Produce & Sides', 
-    'Utilities', 
-    'Wages', 
-    'Rent', 
+    'Meat Procurement',
+    'Produce & Sides',
+    'Utilities',
+    'Wages',
+    'Rent',
     'Miscellaneous'
 ];
 
@@ -40,38 +41,68 @@ export const allExpenses = {
     }
 };
 
-export async function addExpense(category: string, amount: number, description: string, paidBy: string, receiptPhoto?: string) {
-    if (!browser) return;
+function validateExpense(category: string, amount: number, description: string, paidBy: string): string | null {
+    if (!category || category.trim() === '') return 'Category is required';
+    if (!expenseCategories.includes(category)) return 'Invalid category';
+    if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) return 'Amount must be a positive number';
+    if (amount > 999999999) return 'Amount exceeds maximum allowed';
+    if (!description || description.trim() === '') return 'Description is required';
+    if (description.length > 500) return 'Description is too long (max 500 characters)';
+    if (!paidBy || paidBy.trim() === '') return 'Paid by is required';
+    if (paidBy.length > 100) return 'Paid by name is too long (max 100 characters)';
+    return null;
+}
+
+export async function addExpense(category: string, amount: number, description: string, paidBy: string, receiptPhoto?: string): Promise<{ success: boolean; error?: string; id?: string }> {
+    if (!browser) return { success: false, error: 'Not in browser environment' };
+    
+    // Validate inputs
+    const validationError = validateExpense(category, amount, description, paidBy);
+    if (validationError) {
+        return { success: false, error: validationError };
+    }
+    
     const expense: Expense = {
         id: nanoid(),
-        category,
+        category: category.trim(),
         amount,
-        description,
-        paidBy,
+        description: description.trim(),
+        paidBy: paidBy.trim(),
         locationId: session.locationId === 'all' ? 'qc' : session.locationId,
         createdBy: session.userName || 'Staff',
         createdAt: new Date().toISOString(),
         ...(receiptPhoto && { receiptPhoto })
     };
     
-    // Write directly to the local RxDB database instead of a memory array
-    const db = await getDb();
-    await db.expenses.insert(expense);
-
-    // Try to call audit if it exists
-    import('$lib/stores/audit.svelte').then(({ log }) => {
-        if (typeof (log as any).expenseAdded === 'function') {
-            (log as any).expenseAdded(category, amount);
-        } else if (typeof (log as any).writeLog === 'function') {
-             (log as any).writeLog(`Expense added: ${category} - ₱${amount}`);
-        }
-    }).catch(() => {});
+    try {
+        const db = await getDb();
+        await db.expenses.insert(expense);
+        
+        // Log to audit
+        log.expenseLogged(category, amount, description);
+        
+        return { success: true, id: expense.id };
+    } catch (err) {
+        console.error('[EXPENSE] Failed to add expense:', err);
+        return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
+    }
 }
 
-export async function deleteExpense(id: string) {
-    if (!browser) return;
-    const db = await getDb();
-    const query = db.expenses.findOne(id);
-    await query.remove();
+export async function deleteExpense(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!browser) return { success: false, error: 'Not in browser environment' };
+    if (!id || typeof id !== 'string') return { success: false, error: 'Invalid expense ID' };
+    
+    try {
+        const db = await getDb();
+        const doc = await db.expenses.findOne(id).exec();
+        if (!doc) {
+            return { success: false, error: 'Expense not found' };
+        }
+        await doc.remove();
+        return { success: true };
+    } catch (err) {
+        console.error('[EXPENSE] Failed to delete expense:', err);
+        return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
+    }
 }
 

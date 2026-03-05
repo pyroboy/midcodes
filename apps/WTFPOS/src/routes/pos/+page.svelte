@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { tables as allTables, orders as allOrders, openTable, tickTimers, menuItems, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance } from '$lib/stores/pos.svelte';
+    import { tables as allTables, orders as allOrders, openTable, tickTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance } from '$lib/stores/pos.svelte';
     import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
     import { getPendingRejectionsForTable, acknowledgeAlert, type KitchenAlert } from '$lib/stores/alert.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
@@ -25,8 +25,9 @@
     import { session } from '$lib/stores/session.svelte';
 
     // ─── Branch-filtered tables/orders ───────────────────────────────────────────
-    const tables = $derived(session.locationId === 'all' ? allTables : allTables.filter(t => t.locationId === session.locationId));
-    const orders = $derived(session.locationId === 'all' ? allOrders : allOrders.filter(o => o.locationId === session.locationId));
+    const tables = $derived(session.locationId === 'all' ? allTables.value : allTables.value.filter(t => t.locationId === session.locationId));
+    const orders = $derived(session.locationId === 'all' ? allOrders.value : allOrders.value.filter(o => o.locationId === session.locationId));
+    const menuItems = $derived(menuItemsStore.value);
 
     // Takeout orders for current branch (open/active, not picked up)
     const takeoutOrders = $derived(orders.filter(o => o.orderType === 'takeout' && o.status === 'open' && o.takeoutStatus !== 'picked_up'));
@@ -179,6 +180,13 @@
     let barcodeBuffer = $state('');
     let barcodeTimeout = $state<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+    // Cleanup barcode timeout on component destroy
+    $effect(() => {
+        return () => {
+            if (barcodeTimeout) clearTimeout(barcodeTimeout);
+        };
+    });
+
     function handleGlobalKeydown(e: KeyboardEvent) {
         // Only listen if no modals are open (inputs might be active)
         if (showCheckout || showVoidConfirm || showPackageChange || showSplitBill || showAddItem || showTransferModal) return;
@@ -189,7 +197,7 @@
 
         if (e.key === 'Enter') {
             if (barcodeBuffer.length >= 3) {
-                const matchedItem = menuItems.value.find(i => i.isRetail && (i.id === barcodeBuffer || i.id === `ret-${barcodeBuffer}`));
+                const matchedItem = menuItems.find((i: MenuItem) => i.isRetail && (i.id === barcodeBuffer || i.id === `ret-${barcodeBuffer}`));
                 if (matchedItem) {
                     addItemToOrder(currentActiveOrder.id, matchedItem, 1);
                 }
@@ -214,7 +222,7 @@
     <TopBar />
 
     {#if session.locationId === 'all'}
-        <AllBranchesDashboard {allTables} {allOrders} />
+        <AllBranchesDashboard allTables={allTables.value} allOrders={allOrders.value} />
     {:else}
         <div class="flex flex-1 overflow-hidden">
             <div class="flex flex-1 flex-col overflow-y-auto p-6 gap-5">
@@ -316,8 +324,8 @@
 <NewTakeoutModal
     isOpen={showTakeoutModal}
     onClose={() => showTakeoutModal = false}
-    onConfirm={(name) => {
-        const orderId = createTakeoutOrder(name);
+    onConfirm={async (name) => {
+        const orderId = await createTakeoutOrder(name);
         selectedTakeoutId = orderId;
         selectedTableId = null;
         showAddItem = true;
@@ -342,7 +350,7 @@
 <OrderHistoryModal
     isOpen={showHistory}
     orders={closedOrders}
-    tables={allTables}
+    tables={allTables.value}
     onClose={() => showHistory = false}
     onViewOrder={(order) => {
         if (order.status === 'paid') {

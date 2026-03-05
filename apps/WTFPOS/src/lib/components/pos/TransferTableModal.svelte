@@ -22,7 +22,7 @@
 	let pinError = $state(false);
 
 	const availableTables = $derived(
-		allTables.filter(t =>
+		allTables.value.filter(t =>
 			t.status === 'available' &&
 			t.locationId === fromTable.locationId &&
 			t.id !== fromTable.id
@@ -36,14 +36,14 @@
 		pinError = false;
 	}
 
-	function confirmTransfer() {
+	async function confirmTransfer() {
 		if (pin !== MANAGER_PIN) {
 			pinError = true;
 			return;
 		}
 		if (!selectedTargetId) return;
-		const success = transferTable(fromTable.id, selectedTargetId);
-		if (success) {
+		const result = await transferTable(fromTable.id, selectedTargetId);
+		if (result.success) {
 			ontransfer(selectedTargetId);
 		}
 	}
@@ -86,7 +86,7 @@
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-gray-900">Manager PIN Required</h3>
 				<p class="text-sm text-gray-500">
-					Transfer {fromTable.label} → {allTables.find(t => t.id === selectedTargetId)?.label ?? '?'}
+					Transfer {fromTable.label} → {allTables.value.find(t => t.id === selectedTargetId)?.label ?? '?'}
 				</p>
 			</div>
 

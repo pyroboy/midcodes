@@ -102,6 +102,7 @@
     <div class="hidden lg:flex flex-col gap-1 min-w-[120px]">
       {#each sortedData.slice(0, 3) as item, index}
         <div 
+          role="presentation"
           class="flex items-center gap-2 transition-all"
           class:opacity-100={hoveredItemId === item.id || !hoveredItemId}
           class:opacity-40={hoveredItemId && hoveredItemId !== item.id}

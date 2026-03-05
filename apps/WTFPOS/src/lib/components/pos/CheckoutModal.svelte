@@ -112,26 +112,32 @@
     }
 
     async function confirmCheckout() {
-        if (!canConfirmCheckout) return;
+        // Capture stable reference to avoid undefined during async closure
+        const currentOrder = order;
+        if (!currentOrder || !canConfirmCheckout) {
+            console.error('[CHECKOUT] Cannot confirm checkout: order is undefined or invalid');
+            return;
+        }
 
         checkoutLoading = true;
         checkoutError = '';
 
         try {
-            order.printStatus = 'printing';
-            const printResult = await printReceipt(order.id);
+            currentOrder.printStatus = 'printing';
+            const printResult = await printReceipt(currentOrder.id);
 
             if (!printResult.success) {
                 checkoutError = printResult.error || 'Unknown Printer Error';
-                order.printStatus = 'failed';
+                currentOrder.printStatus = 'failed';
                 checkoutLoading = false;
                 return;
             }
 
             finalizeCheckout(false);
         } catch (err) {
+            console.error('[CHECKOUT] Error during confirmCheckout:', err);
             checkoutError = err instanceof Error ? err.message : 'Unknown error during checkout';
-            order.printStatus = 'failed';
+            if (currentOrder) currentOrder.printStatus = 'failed';
             checkoutLoading = false;
         }
     }
@@ -141,30 +147,37 @@
     }
 
     function finalizeCheckout(skippedPrint: boolean = false) {
-        order.printStatus = skippedPrint ? 'failed' : 'success';
+        const currentOrder = order;
+        if (!currentOrder) {
+            console.error('[CHECKOUT] Cannot finalize: order is undefined');
+            checkoutLoading = false;
+            return;
+        }
+
+        currentOrder.printStatus = skippedPrint ? 'failed' : 'success';
         const methodLabel = checkoutMethod === 'cash' ? 'Cash' : checkoutMethod === 'gcash' ? 'GCash' : 'Maya';
-        const label = order.orderType === 'takeout'
-            ? `Takeout (${order.customerName ?? 'Walk-in'})`
+        const label = currentOrder.orderType === 'takeout'
+            ? `Takeout (${currentOrder.customerName ?? 'Walk-in'})`
             : (table?.label ?? '');
 
         // Record payment
-        order.payments.push({
+        currentOrder.payments.push({
             method: checkoutMethod === 'maya' ? 'gcash' : checkoutMethod,
-            amount: checkoutMethod === 'cash' ? cashTendered : order.total
+            amount: checkoutMethod === 'cash' ? cashTendered : currentOrder.total
         });
-        order.status = 'paid';
-        order.closedAt = new Date().toISOString();
-        order.closedBy = session.userName || 'Staff';
+        currentOrder.status = 'paid';
+        currentOrder.closedAt = new Date().toISOString();
+        currentOrder.closedBy = session.userName || 'Staff';
 
         // Capture duration before closeTable() clears elapsedSeconds (Fix 3)
         const capturedElapsed = table?.elapsedSeconds ?? null;
 
         // Free the table for dine-in
-        if (order.tableId) {
-            closeTable(order.tableId);
+        if (currentOrder.tableId) {
+            closeTable(currentOrder.tableId);
         }
 
-        log.tableClosed(label, order.total, methodLabel, capturedElapsed ?? undefined);
+        log.tableClosed(label, currentOrder.total, methodLabel, capturedElapsed ?? undefined);
         checkoutError = '';
         checkoutLoading = false;
         onsuccess();

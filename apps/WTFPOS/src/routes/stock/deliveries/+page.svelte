@@ -15,14 +15,14 @@
 	const preFilteredDeliveries = $derived(
 		isWarehouseSession()
 			? deliveries.value
-			: deliveries.value.filter(d => {
+			: deliveries.value.filter((d: any) => {
 				const item = stockItems.value.find(s => s.id === d.stockItemId);
 				return item?.locationId === session.locationId;
 			})
 	);
 
 	const filteredDeliveries = $derived(
-		preFilteredDeliveries.filter(d => {
+		preFilteredDeliveries.filter((d: any) => {
 			if (!showDepleted && d.depleted) return false;
 			
 			const matchSearch = !searchQuery.trim() || 
@@ -41,16 +41,16 @@
 	);
 
 	const allAlerts = $derived(
-		getSpoilageAlerts().filter(d => {
+		getSpoilageAlerts().filter((d: any) => {
 			if (isWarehouseSession()) return true;
 			const item = stockItems.value.find(s => s.id === d.stockItemId);
 			return item?.locationId === session.locationId;
-		}).sort((a, b) => a.daysLeft - b.daysLeft)
+		}).sort((a: any, b: any) => a.daysLeft - b.daysLeft)
 	);
 
 	// Split into expired (daysLeft < 0) and expiring soon (daysLeft >= 0)
-	const expiredAlerts  = $derived(allAlerts.filter(a => a.daysLeft < 0));
-	const expiringAlerts = $derived(allAlerts.filter(a => a.daysLeft >= 0));
+	const expiredAlerts  = $derived(allAlerts.filter((a: any) => a.daysLeft < 0));
+	const expiringAlerts = $derived(allAlerts.filter((a: any) => a.daysLeft >= 0));
 
 	const activeItems = $derived(
 		stockItems.value.filter(s => isWarehouseSession() || s.locationId === session.locationId)
