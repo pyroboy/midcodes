@@ -18,7 +18,8 @@ import {
 	kdsTicketSchema,
 	kdsHistorySchema,
 	xReadSchema,
-	utilityReadingSchema
+	auditLogSchema,
+	kitchenAlertSchema
 } from './schemas';
 
 import { dev } from '$app/environment';
@@ -42,6 +43,19 @@ const globalForRxDB = globalThis as unknown as {
 
 let dbPromise: Promise<any> | null = globalForRxDB.__wtfposDbPromise || null;
 
+// ─── Migration helpers ──────────────────────────────────────────────────────
+
+/** Backfills updatedAt from the best available timestamp on the document */
+function addUpdatedAt(oldDoc: any, ...fallbackFields: string[]) {
+	if (!oldDoc.updatedAt) {
+		for (const field of fallbackFields) {
+			if (oldDoc[field]) { oldDoc.updatedAt = oldDoc[field]; return oldDoc; }
+		}
+		oldDoc.updatedAt = new Date().toISOString();
+	}
+	return oldDoc;
+}
+
 export async function getDb() {
 	if (globalForRxDB.__wtfposDbPromise) {
 		try {
@@ -57,7 +71,7 @@ export async function getDb() {
 			// Initialize the database with Dexie (IndexedDB) as the storage engine
 			const db = await createRxDatabase({
 				name: 'wtfpos_db',
-				storage: dev 
+				storage: dev
 					? wrappedValidateIsMyJsonValidStorage({ storage: getRxStorageDexie() })
 					: getRxStorageDexie(),
 				multiInstance: true,          // Allow multiple instances per tab (good for SvelteKit HMR)
@@ -74,35 +88,123 @@ export async function getDb() {
 
 			// Add our collections using the defined schemas
 			await db.addCollections({
-				tables: { schema: tableSchema },
-				orders: { schema: orderSchema },
-				menu_items: { schema: menuItemSchema },
-				stock_items: { schema: stockItemSchema },
-				deliveries: { schema: deliverySchema },
-				waste: { schema: wasteSchema },
-				deductions: { schema: deductionSchema },
-				expenses: { schema: expenseSchema },
-				adjustments: { schema: adjustmentSchema },
-				stock_counts: { 
-					schema: stockCountSchema,
+				tables: {
+					schema: tableSchema,
 					migrationStrategies: {
-							1: (oldDoc: any) => {
-								return {
-									stockItemId: oldDoc.stockItemId,
-									counted: {
-										am10: oldDoc.counted?.['10am'] || oldDoc.counted?.am10 || null,
-										pm4: oldDoc.counted?.['4pm'] || oldDoc.counted?.pm4 || null,
-										pm10: oldDoc.counted?.['10pm'] || oldDoc.counted?.pm10 || null
-									}
-								};
-							}
+						1: (d: any) => d, // v0→v1: indexes
+						2: (d: any) => addUpdatedAt(d, 'sessionStartedAt') // v1→v2: +updatedAt
 					}
 				},
-				devices: { schema: deviceSchema },
-				kds_tickets: { schema: kdsTicketSchema },
-				kds_history: { schema: kdsHistorySchema },
-				x_reads: { schema: xReadSchema },
-				utility_readings: { schema: utilityReadingSchema }
+				orders: {
+					schema: orderSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => d,
+						3: (d: any) => d, // v2→v3: nested required
+						4: (d: any) => addUpdatedAt(d, 'createdAt') // v3→v4: +updatedAt
+					}
+				},
+				menu_items: {
+					schema: menuItemSchema,
+					migrationStrategies: {
+						1: (d: any) => addUpdatedAt(d) // v0→v1: +updatedAt (no existing timestamp)
+					}
+				},
+				stock_items: {
+					schema: stockItemSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => addUpdatedAt(d) // v1→v2: +updatedAt
+					}
+				},
+				deliveries: {
+					schema: deliverySchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => { d.depleted = d.depleted ?? false; return d; },
+						3: (d: any) => addUpdatedAt(d, 'receivedAt') // v2→v3: +updatedAt
+					}
+				},
+				waste: {
+					schema: wasteSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => d,
+						3: (d: any) => addUpdatedAt(d, 'loggedAt') // v2→v3: +updatedAt
+					}
+				},
+				deductions: {
+					schema: deductionSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => addUpdatedAt(d, 'timestamp') // v1→v2: +updatedAt
+					}
+				},
+				expenses: {
+					schema: expenseSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => d,
+						3: (d: any) => addUpdatedAt(d, 'createdAt') // v2→v3: +updatedAt
+					}
+				},
+				adjustments: {
+					schema: adjustmentSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => d,
+						3: (d: any) => addUpdatedAt(d, 'loggedAt') // v2→v3: +updatedAt
+					}
+				},
+				stock_counts: {
+					schema: stockCountSchema,
+					migrationStrategies: {
+						1: (d: any) => {
+							return {
+								stockItemId: d.stockItemId,
+								counted: {
+									am10: d.counted?.['10am'] || d.counted?.am10 || null,
+									pm4: d.counted?.['4pm'] || d.counted?.pm4 || null,
+									pm10: d.counted?.['10pm'] || d.counted?.pm10 || null
+								}
+							};
+						},
+						2: (d: any) => addUpdatedAt(d) // v1→v2: +updatedAt
+					}
+				},
+				devices: {
+					schema: deviceSchema,
+					migrationStrategies: {
+						1: (d: any) => addUpdatedAt(d, 'lastSeenAt') // v0→v1: +updatedAt
+					}
+				},
+				kds_tickets: {
+					schema: kdsTicketSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => d, // v1→v2: nested required
+						3: (d: any) => addUpdatedAt(d, 'createdAt') // v2→v3: +updatedAt
+					}
+				},
+				kds_history: {
+					schema: kdsHistorySchema,
+					migrationStrategies: {
+						1: (d: any) => d, // v0→v1: nested required
+						2: (d: any) => addUpdatedAt(d, 'bumpedAt') // v1→v2: +updatedAt
+					}
+				},
+				x_reads: {
+					schema: xReadSchema,
+					migrationStrategies: {
+						1: (d: any) => addUpdatedAt(d, 'timestamp') // v0→v1: +updatedAt
+					}
+				},
+				audit_logs: {
+					schema: auditLogSchema
+				},
+				kitchen_alerts: {
+					schema: kitchenAlertSchema
+				}
 			});
 
 			// Try to dynamically import the seeder and run it only in uninitialized environments
@@ -113,10 +215,10 @@ export async function getDb() {
 		} catch (err: any) {
 			console.error('[RxDB] Fatal initialization error:', err);
 			globalForRxDB.__wtfposDbPromise = null;
-			
+
 			// Auto-recovery for critical schema mismatch or corrupted storage
-			// DM4: Migration error, DB9: Database creation failed, SC1: Schema validation failed on load
-			if (err?.code === 'DM4' || err?.code === 'DB9' || err?.code === 'SC1' || 
+			// DM4: Migration error, DB9: Database creation failed, SC1/SC34: Schema validation failed
+			if (err?.code === 'DM4' || err?.code === 'DB9' || err?.code === 'SC1' || err?.code === 'SC34' ||
 			    err?.message?.includes('closed') || err?.message?.includes('NotFound')) {
 				console.warn('[RxDB] Unrecoverable database state detected. Initiating emergency reset...');
 				if (typeof window !== 'undefined') {

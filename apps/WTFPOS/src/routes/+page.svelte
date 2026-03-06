@@ -3,6 +3,7 @@
 	import { cn } from '$lib/utils';
 	import { setSession } from '$lib/stores/session.svelte';
 	import type { Role } from '$lib/stores/session.svelte';
+	import { writeLog } from '$lib/stores/audit.svelte';
 
 	// ─── Accounts ─────────────────────────────────────────────────────────────
 	import type { LocationId } from '$lib/stores/session.svelte';
@@ -80,6 +81,7 @@
 			pinError = false;
 			showPin = true;
 		} else {
+			writeLog('auth', `Login: ${account.displayName} (${account.role})`);
 			goto(account.dest);
 		}
 	}
@@ -89,8 +91,12 @@
 	}
 
 	function verifyPin() {
-		if (pin === MANAGER_PIN) { showPin = false; goto(pendingDest); }
-		else { pin = ''; pinError = true; }
+		if (pin === MANAGER_PIN) {
+			const acct = ACCOUNTS[username.trim().toLowerCase()];
+			if (acct) writeLog('auth', `Login: ${acct.displayName} (${acct.role}) — PIN verified`);
+			showPin = false;
+			goto(pendingDest);
+		} else { pin = ''; pinError = true; }
 	}
 
 	// Auto-fill from test card click

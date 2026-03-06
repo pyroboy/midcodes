@@ -86,6 +86,7 @@
 			price: formPrice,
 			isWeightBased: formIsWeightBased,
 			available: true,
+			updatedAt: new Date().toISOString(),
 			...(formDesc && { desc: formDesc }),
 			...(formPerks && { perks: formPerks }),
 			...(formImageUrl && { image: formImageUrl }),

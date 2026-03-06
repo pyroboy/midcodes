@@ -1,8 +1,17 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
+	import { orders as allOrders } from '$lib/stores/pos.svelte';
+	import { allExpenses } from '$lib/stores/expenses.svelte';
+	import { inPeriod } from '$lib/stores/reports.svelte';
 
 	type Period = 'today' | 'week' | 'month';
 	let period = $state<Period>('month');
+
+	const BRANCHES = [
+		{ id: 'qc',   name: 'QC Branch' },
+		{ id: 'mkti', name: 'Makati Branch' },
+	];
+	const FOOD_COGS = new Set(['Meat Procurement', 'Produce & Sides']);
 
 	interface BranchData {
 		name: string;
@@ -17,40 +26,54 @@
 		avgTicket: number;
 	}
 
-	const data: Record<Period, BranchData[]> = {
-		today: [
-			{ name: 'Alta Cita', grossRevenue: 34696, netRevenue: 33748, totalExpenses: 8767, grossProfit: 19168, netProfit: 10401, grossMarginPct: 56.8, netMarginPct: 30.8, pax: 46, avgTicket: 734 },
-			{ name: 'Alona',     grossRevenue: 28400, netRevenue: 27200, totalExpenses: 7200, grossProfit: 15600, netProfit: 8400,  grossMarginPct: 57.4, netMarginPct: 30.9, pax: 38, avgTicket: 716 }
-		],
-		week: [
-			{ name: 'Alta Cita', grossRevenue: 198400, netRevenue: 175020, totalExpenses: 60817, grossProfit: 102620, netProfit: 41803, grossMarginPct: 58.6, netMarginPct: 23.9, pax: 232, avgTicket: 754 },
-			{ name: 'Alona',     grossRevenue: 172600, netRevenue: 158400, totalExpenses: 55200, grossProfit: 92400,  netProfit: 37200, grossMarginPct: 58.3, netMarginPct: 23.5, pax: 210, avgTicket: 754 }
-		],
-		month: [
-			{ name: 'Alta Cita', grossRevenue: 824000, netRevenue: 722000, totalExpenses: 261600, grossProfit: 424000, netProfit: 162400, grossMarginPct: 58.7, netMarginPct: 22.5, pax: 960, avgTicket: 752 },
-			{ name: 'Alona',     grossRevenue: 716000, netRevenue: 648000, totalExpenses: 238400, grossProfit: 380000, netProfit: 141600, grossMarginPct: 58.6, netMarginPct: 21.9, pax: 880, avgTicket: 736 }
-		]
-	};
+	function computeBranches(p: Period): BranchData[] {
+		return BRANCHES.map(({ id, name }) => {
+			const os = allOrders.value.filter(o => o.status === 'paid' && o.locationId === id && inPeriod(o.createdAt, p));
+			const ex = allExpenses.value.filter(e => e.locationId === id && inPeriod(e.createdAt, p));
 
-	const branches = $derived(data[period]);
+			const grossRevenue  = os.reduce((s, o) => s + o.subtotal, 0);
+			const netRevenue    = os.reduce((s, o) => s + o.total, 0);
+			const totalExpenses = ex.reduce((s, e) => s + e.amount, 0);
+			const cogs          = ex.filter(e => FOOD_COGS.has(e.category)).reduce((s, e) => s + e.amount, 0);
+			const grossProfit   = netRevenue - cogs;
+			const netProfit     = netRevenue - totalExpenses;
+			const pax           = os.reduce((s, o) => s + (o.pax ?? 0), 0);
+
+			return {
+				name,
+				grossRevenue,
+				netRevenue,
+				totalExpenses,
+				grossProfit,
+				netProfit,
+				grossMarginPct: grossRevenue > 0 ? grossProfit / grossRevenue * 100 : 0,
+				netMarginPct:   grossRevenue > 0 ? netProfit   / grossRevenue * 100 : 0,
+				pax,
+				avgTicket: pax > 0 ? Math.round(netRevenue / pax) : 0,
+			};
+		});
+	}
+
+	const branches = $derived(computeBranches(period));
 
 	interface CompareRow {
 		label: string;
 		key: keyof BranchData;
 		format: 'peso' | 'pct' | 'number';
 		highlight?: boolean;
+		lowerIsBetter?: boolean;
 	}
 
 	const compareRows: CompareRow[] = [
-		{ label: 'Gross Revenue',    key: 'grossRevenue',    format: 'peso' },
-		{ label: 'Net Revenue',      key: 'netRevenue',      format: 'peso' },
-		{ label: 'Total Expenses',   key: 'totalExpenses',   format: 'peso' },
-		{ label: 'Gross Profit',     key: 'grossProfit',     format: 'peso', highlight: true },
-		{ label: 'Net Profit',       key: 'netProfit',       format: 'peso', highlight: true },
-		{ label: 'Gross Margin',     key: 'grossMarginPct',  format: 'pct' },
-		{ label: 'Net Margin',       key: 'netMarginPct',    format: 'pct' },
-		{ label: 'Total Pax',        key: 'pax',             format: 'number' },
-		{ label: 'Avg Ticket',       key: 'avgTicket',       format: 'peso' }
+		{ label: 'Gross Revenue',  key: 'grossRevenue',  format: 'peso' },
+		{ label: 'Net Revenue',    key: 'netRevenue',    format: 'peso' },
+		{ label: 'Total Expenses', key: 'totalExpenses', format: 'peso', lowerIsBetter: true },
+		{ label: 'Gross Profit',   key: 'grossProfit',   format: 'peso', highlight: true },
+		{ label: 'Net Profit',     key: 'netProfit',     format: 'peso', highlight: true },
+		{ label: 'Gross Margin',   key: 'grossMarginPct',format: 'pct' },
+		{ label: 'Net Margin',     key: 'netMarginPct',  format: 'pct' },
+		{ label: 'Total Pax',      key: 'pax',           format: 'number' },
+		{ label: 'Avg Ticket',     key: 'avgTicket',     format: 'peso' },
 	];
 
 	function fmt(value: number, format: string) {
@@ -63,8 +86,8 @@
 		if (branches.length < 2) return null;
 		const a = branches[0][row.key] as number;
 		const b = branches[1][row.key] as number;
-		if (row.key === 'totalExpenses') return a < b ? 0 : a > b ? 1 : null;
-		return a > b ? 0 : a < b ? 1 : null;
+		if (a === b) return null;
+		return row.lowerIsBetter ? (a < b ? 0 : 1) : (a > b ? 0 : 1);
 	}
 </script>
 

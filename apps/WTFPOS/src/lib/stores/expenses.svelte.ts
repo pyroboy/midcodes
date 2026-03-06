@@ -7,6 +7,8 @@ import { getDb } from '$lib/db';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { browser } from '$app/environment';
 import { log } from '$lib/stores/audit.svelte';
+export { expenseCategories, validateExpense } from '$lib/stores/expenses.utils';
+import { expenseCategories } from '$lib/stores/expenses.utils';
 
 export interface Expense {
     id: string;
@@ -18,18 +20,8 @@ export interface Expense {
     createdBy: string;
     createdAt: string;
     receiptPhoto?: string;
+    updatedAt: string;
 }
-
-export const expenseCategories = [
-    'Labor Budget',
-    'Petty Cash',
-    'Meat Procurement',
-    'Produce & Sides',
-    'Utilities',
-    'Wages',
-    'Rent',
-    'Miscellaneous'
-];
 
 // Replaces the static array with a reactive RxDB query wrapped in a $derived
 const dbQuery = createRxStore<Expense>('expenses', db => db.expenses.find({ sort: [{ createdAt: 'desc' }] }));
@@ -88,6 +80,7 @@ export async function addExpense(category: string, amount: number, description: 
         locationId: locationId,
         createdBy: session.userName || 'Staff',
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         ...(receiptPhoto && { receiptPhoto })
     };
     

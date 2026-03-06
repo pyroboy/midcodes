@@ -19,6 +19,7 @@ export interface Table {
 	elapsedSeconds: number | null;
 	currentOrderId: string | null;
 	billTotal: number | null;
+	updatedAt: string;
 }
 
 // ─── Locations ──────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ export interface MenuItem {
 	meats?: string[];      // IDs of meat MenuItems included in this package
 	autoSides?: string[];  // IDs of side MenuItems auto-included with this package
 	image?: string;
+	updatedAt: string;
 }
 
 // ─── Takeout ─────────────────────────────────────────────────────────────────
@@ -133,6 +135,7 @@ export interface Order {
 	splitType?: SplitType;
 	subBills?: SubBill[];
 	printStatus?: 'pending' | 'printing' | 'success' | 'failed'; // Tier 4
+	updatedAt: string;
 }
 
 // ─── KDS ──────────────────────────────────────────────────────────────────────
@@ -155,6 +158,7 @@ export interface KdsTicket {
 	items: KdsTicketItem[];
 	createdAt: string;
 	printStatus?: 'pending' | 'success' | 'failed'; // Tier 4
+	updatedAt: string;
 }
 
 export interface KdsHistoryEntry extends KdsTicket {

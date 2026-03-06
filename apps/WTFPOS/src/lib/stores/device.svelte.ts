@@ -53,6 +53,7 @@ export interface DeviceRecord {
 	deviceType: string;
 	screenWidth: number;
 	userAgent: string;
+	updatedAt: string;
 }
 
 // ─── Heartbeat ──────────────────────────────────────────────────────────────
@@ -77,7 +78,8 @@ async function upsertDevice() {
 		syncStatus: 'local-only',
 		deviceType: detectDeviceType(),
 		screenWidth: window.innerWidth,
-		userAgent: navigator.userAgent
+		userAgent: navigator.userAgent,
+		updatedAt: new Date().toISOString()
 	};
 
 	const existing = await db.devices.findOne(deviceId).exec();
@@ -90,7 +92,8 @@ async function upsertDevice() {
 			userName: record.userName,
 			appVersion: record.appVersion,
 			buildDate: record.buildDate,
-			screenWidth: record.screenWidth
+			screenWidth: record.screenWidth,
+			updatedAt: new Date().toISOString()
 		});
 	} else {
 		await db.devices.insert(record);
@@ -129,7 +132,7 @@ export async function renameDevice(deviceId: string, newName: string) {
 	const db = await getDb();
 	const doc = await db.devices.findOne(deviceId).exec();
 	if (doc) {
-		await doc.incrementalPatch({ name: newName });
+		await doc.incrementalPatch({ name: newName, updatedAt: new Date().toISOString() });
 		// Persist locally if it's this device
 		if (deviceId === getDeviceId()) {
 			localStorage.setItem(DEVICE_NAME_KEY, newName);

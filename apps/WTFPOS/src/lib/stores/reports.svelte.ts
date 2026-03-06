@@ -6,7 +6,7 @@
 import { orders as allOrders, tables as allTables, menuItems } from '$lib/stores/pos.svelte';
 import { stockItems, deliveries, deductions, getCurrentStock } from '$lib/stores/stock.svelte';
 import { session } from '$lib/stores/session.svelte';
-import { log } from '$lib/stores/audit.svelte';
+import { log, auditLog, writeLog } from '$lib/stores/audit.svelte';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { getDb } from '$lib/db';
 import { nanoid } from 'nanoid';
@@ -256,6 +256,133 @@ export function voidsAndDiscountsSummary() {
 	};
 }
 
+// ─── Sales by Day / Week ─────────────────────────────────────────────────────
+
+export interface DailySalesRow {
+	dateKey: string;   // YYYY-MM-DD for sorting
+	date: string;      // Formatted label e.g. "Mar 6"
+	grossSales: number;
+	discounts: number;
+	netSales: number;
+	vatAmount: number;
+	totalPax: number;
+	isToday: boolean;
+}
+
+export interface WeeklySalesRow {
+	weekKey: string;   // YYYY-MM-DD of that Monday
+	weekLabel: string; // "Mar 3–Mar 9"
+	grossSales: number;
+	discounts: number;
+	netSales: number;
+	vatAmount: number;
+	totalPax: number;
+}
+
+function toDateKey(iso: string): string {
+	return iso.slice(0, 10);
+}
+
+function toWeekKey(iso: string): string {
+	const d = new Date(iso);
+	const day = d.getUTCDay();
+	const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1); // ISO Monday
+	return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff)).toISOString().slice(0, 10);
+}
+
+export function salesByDay(days = 14): DailySalesRow[] {
+	const todayKey = new Date().toISOString().slice(0, 10);
+	const byDay: Record<string, { gross: number; disc: number; vat: number; pax: number }> = {};
+
+	for (const o of getOrders().filter(o => o.status === 'paid')) {
+		const key = toDateKey(o.createdAt);
+		if (!byDay[key]) byDay[key] = { gross: 0, disc: 0, vat: 0, pax: 0 };
+		byDay[key].gross += o.subtotal;
+		byDay[key].disc  += o.discountAmount;
+		byDay[key].vat   += o.vatAmount;
+		byDay[key].pax   += o.pax ?? 0;
+	}
+
+	return Object.entries(byDay)
+		.map(([dateKey, d]) => ({
+			dateKey,
+			date: new Date(dateKey + 'T12:00:00Z').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
+			grossSales: d.gross,
+			discounts: d.disc,
+			netSales: d.gross - d.disc,
+			vatAmount: d.vat,
+			totalPax: d.pax,
+			isToday: dateKey === todayKey,
+		}))
+		.sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+		.slice(0, days);
+}
+
+export function salesByWeek(weeks = 8): WeeklySalesRow[] {
+	const byWeek: Record<string, { gross: number; disc: number; vat: number; pax: number }> = {};
+
+	for (const o of getOrders().filter(o => o.status === 'paid')) {
+		const key = toWeekKey(o.createdAt);
+		if (!byWeek[key]) byWeek[key] = { gross: 0, disc: 0, vat: 0, pax: 0 };
+		byWeek[key].gross += o.subtotal;
+		byWeek[key].disc  += o.discountAmount;
+		byWeek[key].vat   += o.vatAmount;
+		byWeek[key].pax   += o.pax ?? 0;
+	}
+
+	return Object.entries(byWeek)
+		.map(([weekKey, d]) => {
+			const monday = new Date(weekKey + 'T12:00:00Z');
+			const sunday = new Date(monday);
+			sunday.setUTCDate(sunday.getUTCDate() + 6);
+			const fmt = (dt: Date) => dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+			return {
+				weekKey,
+				weekLabel: `${fmt(monday)}–${fmt(sunday)}`,
+				grossSales: d.gross,
+				discounts: d.disc,
+				netSales: d.gross - d.disc,
+				vatAmount: d.vat,
+				totalPax: d.pax,
+			};
+		})
+		.sort((a, b) => b.weekKey.localeCompare(a.weekKey))
+		.slice(0, weeks);
+}
+
+/**
+ * Returns true if an ISO date string falls within the given period.
+ * Used by report pages to filter orders and expenses consistently.
+ */
+export function inPeriod(isoDate: string, period: 'today' | 'week' | 'month'): boolean {
+	const now = new Date();
+	const d = new Date(isoDate);
+	if (period === 'today') return isoDate.slice(0, 10) === now.toISOString().slice(0, 10);
+	if (period === 'week') {
+		const day = now.getDay();
+		const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+		const weekStart = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+		return d >= weekStart;
+	}
+	return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+/** Net sales (total after discounts) for a given period — used by expense reports */
+export function netSalesByPeriod(period: 'today' | 'week' | 'month'): number {
+	const now = new Date();
+	const todayKey = now.toISOString().slice(0, 10);
+	const thisWeekKey = toWeekKey(now.toISOString());
+	return getOrders()
+		.filter(o => {
+			if (o.status !== 'paid') return false;
+			if (period === 'today') return toDateKey(o.createdAt) === todayKey;
+			if (period === 'week')  return toWeekKey(o.createdAt) === thisWeekKey;
+			const d = new Date(o.createdAt);
+			return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+		})
+		.reduce((s, o) => s + o.total, 0);
+}
+
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
 export const utilitySettings = $state({
@@ -271,20 +398,28 @@ export interface UtilityReading {
 	recordedBy: string;
 }
 
-export const utilityReadings = createRxStore<UtilityReading>('utility_readings', db => db.utility_readings.find().sort({ date: 'desc' }));
+// Utility readings are stored as audit log entries (action='admin', description='EOD Utility Reading')
+// This avoids a dedicated collection and keeps us under the RxDB OSS 16-collection limit.
+export const utilityReadings = {
+	get value(): UtilityReading[] {
+		return auditLog.value
+			.filter(e => e.description === 'EOD Utility Reading' && e.meta)
+			.map(e => {
+				try {
+					const meta = JSON.parse(e.meta!);
+					return { id: e.id, date: e.isoTimestamp, electricity: Number(meta.electricity) || 0, gas: Number(meta.gas) || 0, recordedBy: e.user };
+				} catch { return null; }
+			})
+			.filter((r): r is UtilityReading => r !== null);
+	}
+};
 
 export function getPreviousUtilityReading(): UtilityReading | null {
-	if (utilityReadings.value.length === 0) return null;
-	return utilityReadings.value[0];
+	const readings = utilityReadings.value;
+	if (readings.length === 0) return null;
+	return readings[0]; // auditLog is sorted desc, so first match is most recent
 }
 
 export async function saveUtilityReading(electricity: number, gas: number) {
-	const db = await getDb();
-	await db.utility_readings.insert({
-		id: nanoid(),
-		date: new Date().toISOString(),
-		electricity,
-		gas,
-		recordedBy: session.userName || 'Staff'
-	});
+	writeLog('admin', 'EOD Utility Reading', { meta: { electricity, gas } });
 }

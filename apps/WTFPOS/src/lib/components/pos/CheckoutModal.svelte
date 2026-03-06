@@ -1,7 +1,7 @@
 <script lang="ts">
     import { untrack } from 'svelte';
     import type { Order, Table, DiscountType } from '$lib/types';
-    import { closeTable, recalcOrder, holdPayment } from '$lib/stores/pos.svelte';
+    import { recalcOrder, holdPayment, checkoutOrder } from '$lib/stores/pos.svelte';
     import { printReceipt } from '$lib/stores/hardware.svelte';
     import { log } from '$lib/stores/audit.svelte';
     import { session } from '$lib/stores/session.svelte';
@@ -12,7 +12,7 @@
         order: Order;
         table: Table | null;
         onclose: () => void;
-        onsuccess: () => void;
+        onsuccess: (paidOrder: Order) => void;
     }
 
     let { order, table, onclose, onsuccess }: Props = $props();
@@ -24,17 +24,21 @@
     let showPinForDiscount = $state(false);
     let pendingDiscountType = $state<DiscountType>('none');
 
-    // SC/PWD per-person inputs (Fix 1 + Fix 2)
-    let discountPaxInput = $state<number>(untrack(() => order.discountPax ?? 1));
-    let discountIdsInput = $state<string[]>([]);
-    const showScPwdSection = $derived(order.discountType === 'senior' || order.discountType === 'pwd');
+    // Local discount state — never mutate the RxDB proxy directly.
+    // The actual DB value is updated via recalcOrder(); the reactive order prop
+    // will reflect the new totals once RxDB propagates the change.
+    let localDiscountType = $state<DiscountType>(untrack(() => order.discountType));
+    let discountPaxInput  = $state<number>(untrack(() => order.discountPax ?? 1));
+    let discountIdsInput  = $state<string[]>([]);
+
+    const showScPwdSection = $derived(localDiscountType === 'senior' || localDiscountType === 'pwd');
 
     const cashChange = $derived(cashTendered - order.total);
     const hasItems = $derived(order.items.filter(i => i.status !== 'cancelled').length > 0);
     const canConfirmCheckout = $derived(
         hasItems && (checkoutMethod !== 'cash' || cashTendered >= order.total) &&
-        (!(order.discountType === 'senior' || order.discountType === 'pwd') ||
-         (order.discountIds && order.discountIds.length === order.discountPax && order.discountIds.every(id => id.trim() !== '')))
+        (!(localDiscountType === 'senior' || localDiscountType === 'pwd') ||
+         (discountIdsInput.length === discountPaxInput && discountIdsInput.every(id => id.trim() !== '')))
     );
 
     function selectCashPreset(amount: number) {
@@ -46,55 +50,42 @@
     }
 
     function applyScPwdPax(newPax: number) {
-        console.log(`[CHECKOUT-DISCOUNT] Applying SC/PWD pax: ${newPax}, order.pax=${order.pax}`);
-        
-        // Enforce discountPax cannot exceed order.pax
         const validatedPax = Math.max(1, Math.min(newPax, order.pax));
-        if (newPax > order.pax) {
-            console.warn(`[CHECKOUT-DISCOUNT] Clamped discountPax from ${newPax} to ${validatedPax} (max: order.pax)`);
-        }
-        
         discountPaxInput = validatedPax;
         discountIdsInput = Array.from({ length: validatedPax }, (_, i) => discountIdsInput[i] ?? '');
-        order.discountPax = validatedPax;
-        order.discountIds = [...discountIdsInput];
-        recalcOrder(order);
-        if (table) table.billTotal = order.total;
-        console.log(`[CHECKOUT-DISCOUNT] New discountAmount: ${order.discountAmount}`);
+        recalcOrder(order, { discountType: localDiscountType, discountPax: validatedPax, discountIds: [...discountIdsInput] });
     }
 
     function syncDiscountIds() {
-        order.discountIds = [...discountIdsInput];
+        // discountIdsInput is already updated by Svelte bind — just persist to DB
+        recalcOrder(order, { discountType: localDiscountType, discountPax: discountPaxInput, discountIds: [...discountIdsInput] });
     }
 
     function applyDiscount(type: DiscountType) {
         // Comp and Service Recovery require manager PIN (100% write-offs)
-        if ((type === 'comp' || type === 'service_recovery') && order.discountType !== type) {
+        if ((type === 'comp' || type === 'service_recovery') && localDiscountType !== type) {
             pendingDiscountType = type;
             showPinForDiscount = true;
             return;
         }
-        const prev = order.discountType;
-        order.discountType = (prev === type) ? 'none' : type;
-        // Reset or initialize SC/PWD pax + IDs when toggling
-        if (order.discountType === 'none') {
+        const newType: DiscountType = (localDiscountType === type) ? 'none' : type;
+        localDiscountType = newType;
+
+        if (newType === 'none') {
             discountPaxInput = order.pax;
             discountIdsInput = [];
-            order.discountPax = undefined;
-            order.discountIds = undefined;
-        } else if (order.discountType === 'senior' || order.discountType === 'pwd') {
+        } else if (newType === 'senior' || newType === 'pwd') {
             discountPaxInput = order.discountPax ?? 1;
             discountIdsInput = Array.from({ length: discountPaxInput }, (_, i) => order.discountIds?.[i] ?? '');
-            order.discountPax = discountPaxInput;
-            order.discountIds = [...discountIdsInput];
         }
-        recalcOrder(order);
-        if (table) table.billTotal = order.total;
+
+        recalcOrder(order, { discountType: newType, discountPax: discountPaxInput, discountIds: [...discountIdsInput] });
+
         const tableLabel = order.orderType === 'takeout'
             ? `Takeout (${order.customerName ?? 'Walk-in'})`
             : (table?.label ?? '');
-        if (order.discountType !== 'none') {
-            log.discountApplied(tableLabel, order.discountType, order.discountAmount);
+        if (newType !== 'none') {
+            log.discountApplied(tableLabel, newType, order.discountAmount);
         } else {
             log.discountRemoved(tableLabel);
         }
@@ -102,87 +93,62 @@
 
     function handlePinConfirmed() {
         showPinForDiscount = false;
-        order.discountType = pendingDiscountType;
-        recalcOrder(order);
-        if (table) table.billTotal = order.total;
+        localDiscountType = pendingDiscountType;
+        recalcOrder(order, { discountType: pendingDiscountType, discountPax: discountPaxInput, discountIds: [...discountIdsInput] });
         const tableLabel = order.orderType === 'takeout'
             ? `Takeout (${order.customerName ?? 'Walk-in'})`
             : (table?.label ?? '');
-        log.discountApplied(tableLabel, order.discountType, order.discountAmount);
+        log.discountApplied(tableLabel, pendingDiscountType, order.discountAmount);
         log.managerPinVerified(`${pendingDiscountType} discount on ${tableLabel}`);
         pendingDiscountType = 'none';
     }
 
     async function confirmCheckout() {
-        // Capture stable reference to avoid undefined during async closure
-        const currentOrder = order;
-        if (!currentOrder || !canConfirmCheckout) {
-            console.error('[CHECKOUT] Cannot confirm checkout: order is undefined or invalid');
-            return;
-        }
+        if (!order || !canConfirmCheckout) return;
 
         checkoutLoading = true;
         checkoutError = '';
 
         try {
-            currentOrder.printStatus = 'printing';
-            const printResult = await printReceipt(currentOrder.id);
+            const printResult = await printReceipt(order.id);
 
             if (!printResult.success) {
                 checkoutError = printResult.error || 'Unknown Printer Error';
-                currentOrder.printStatus = 'failed';
                 checkoutLoading = false;
                 return;
             }
 
-            finalizeCheckout(false);
+            await finalizeCheckout();
         } catch (err) {
             console.error('[CHECKOUT] Error during confirmCheckout:', err);
             checkoutError = err instanceof Error ? err.message : 'Unknown error during checkout';
-            if (currentOrder) currentOrder.printStatus = 'failed';
             checkoutLoading = false;
         }
     }
 
-    function skipReceipt() {
-        finalizeCheckout(true);
+    async function skipReceipt() {
+        await finalizeCheckout();
     }
 
-    function finalizeCheckout(skippedPrint: boolean = false) {
-        const currentOrder = order;
-        if (!currentOrder) {
-            console.error('[CHECKOUT] Cannot finalize: order is undefined');
+    async function finalizeCheckout() {
+        if (!order) { checkoutLoading = false; return; }
+
+        try {
+            await checkoutOrder(order.id, checkoutMethod, order.tableId ?? null);
+        } catch (err) {
+            console.error('[CHECKOUT] finalizeCheckout error:', err);
+            checkoutError = err instanceof Error ? err.message : 'Checkout failed';
             checkoutLoading = false;
             return;
         }
 
-        currentOrder.printStatus = skippedPrint ? 'failed' : 'success';
-        const methodLabel = checkoutMethod === 'cash' ? 'Cash' : checkoutMethod === 'gcash' ? 'GCash' : 'Maya';
-        const label = currentOrder.orderType === 'takeout'
-            ? `Takeout (${currentOrder.customerName ?? 'Walk-in'})`
-            : (table?.label ?? '');
+        // Snapshot after checkoutOrder so the payment is included,
+        // but before reactive unmount clears the order reference.
+        const snapshot: Order = { ...order, payments: [...order.payments], items: [...order.items] };
 
-        // Record payment
-        currentOrder.payments.push({
-            method: checkoutMethod,
-            amount: currentOrder.total
-        });
-        currentOrder.status = 'paid';
-        currentOrder.closedAt = new Date().toISOString();
-        currentOrder.closedBy = session.userName || 'Staff';
-
-        // Capture duration before closeTable() clears elapsedSeconds (Fix 3)
-        const capturedElapsed = table?.elapsedSeconds ?? null;
-
-        // Free the table for dine-in
-        if (currentOrder.tableId) {
-            closeTable(currentOrder.tableId);
-        }
-
-        log.tableClosed(label, currentOrder.total, methodLabel, capturedElapsed ?? undefined);
         checkoutError = '';
         checkoutLoading = false;
-        onsuccess();
+        onsuccess(snapshot);
     }
 </script>
 

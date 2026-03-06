@@ -1,37 +1,25 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
-	import { salesSummary } from '$lib/stores/reports.svelte';
+	import { salesByDay, salesByWeek } from '$lib/stores/reports.svelte';
 
 	type Period = 'daily' | 'weekly';
 	let period = $state<Period>('daily');
 
-	// Today's live row — derived from the store
-	const todayRow = $derived(salesSummary());
-	// VAT rate is 12% - calculate VAT-exclusive amount properly
 	const VAT_RATE = 0.12;
-	const vatSales = $derived(Math.round(todayRow.netSales / (1 + VAT_RATE)));
-	const nonVatSales = $derived(todayRow.netSales - vatSales);
-	const taxCollected = $derived(Math.round(vatSales * VAT_RATE));
 
-	// Historical seed rows (past days) augmented with today's live data
-	const historicalDaily = [
-		{ date: 'Mar 2', grossSales: 28400, discounts: 1200, netSales: 27200, vatSales: 24800, nonVatSales: 2400, taxCollected: 2976, pax: 38 },
-		{ date: 'Mar 1', grossSales: 42100, discounts: 600,  netSales: 41500, vatSales: 37800, nonVatSales: 3700, taxCollected: 4536, pax: 52 },
-		{ date: 'Feb 28', grossSales: 31200, discounts: 1500, netSales: 29700, vatSales: 27000, nonVatSales: 2700, taxCollected: 3240, pax: 41 },
-		{ date: 'Feb 27', grossSales: 38900, discounts: 780,  netSales: 38120, vatSales: 34800, nonVatSales: 3320, taxCollected: 4176, pax: 48 },
-		{ date: 'Feb 26', grossSales: 26500, discounts: 400,  netSales: 26100, vatSales: 23600, nonVatSales: 2500, taxCollected: 2832, pax: 33 },
-		{ date: 'Feb 25', grossSales: 44200, discounts: 1100, netSales: 43100, vatSales: 39200, nonVatSales: 3900, taxCollected: 4704, pax: 55 },
-	];
+	function withVatBreakdown<T extends { netSales: number }>(row: T) {
+		const vatSales = Math.round(row.netSales / (1 + VAT_RATE));
+		return { ...row, vatSales, nonVatSales: row.netSales - vatSales, taxCollected: Math.round(vatSales * VAT_RATE) };
+	}
 
-	const weeklyData = [
-		{ date: 'Week 9 (Mar 1-3)', grossSales: 105196, discounts: 2748, netSales: 102448, vatSales: 92768, nonVatSales: 9680, taxCollected: 11130, pax: 136 },
-		{ date: 'Week 8 (Feb 22-28)', grossSales: 180300, discounts: 5280, netSales: 175020, vatSales: 159200, nonVatSales: 15820, taxCollected: 19104, pax: 232 },
-	];
+	const dailyRows = $derived(
+		salesByDay(14).map(r => ({ ...withVatBreakdown(r), date: r.isToday ? 'Today (live)' : r.date, pax: r.totalPax }))
+	);
+	const weeklyRows = $derived(
+		salesByWeek(8).map(r => ({ ...withVatBreakdown(r), date: r.weekLabel, isToday: false, pax: r.totalPax }))
+	);
 
-	const rows = $derived(period === 'weekly' ? weeklyData : [
-		{ date: 'Today (live)', grossSales: todayRow.grossSales, discounts: todayRow.discounts, netSales: todayRow.netSales, vatSales, nonVatSales, taxCollected, pax: todayRow.totalPax },
-		...historicalDaily,
-	]);
+	const rows = $derived(period === 'weekly' ? weeklyRows : dailyRows);
 
 	const totals = $derived({
 		grossSales:   rows.reduce((s, r) => s + r.grossSales, 0),
@@ -103,11 +91,11 @@
 			</tr>
 		</thead>
 		<tbody class="divide-y divide-border">
-			{#each rows as row, i}
-				<tr class={cn('hover:bg-gray-50', i === 0 && period === 'daily' && 'bg-accent/5')}>
+			{#each rows as row}
+				<tr class={cn('hover:bg-gray-50', row.isToday && period === 'daily' && 'bg-accent/5')}>
 					<td class="px-4 py-3 font-medium text-gray-900">
 						{row.date}
-						{#if i === 0 && period === 'daily'}<span class="ml-2 rounded-full bg-status-green-light px-2 py-0.5 text-[10px] font-semibold text-status-green">LIVE</span>{/if}
+						{#if row.isToday && period === 'daily'}<span class="ml-2 rounded-full bg-status-green-light px-2 py-0.5 text-[10px] font-semibold text-status-green">LIVE</span>{/if}
 					</td>
 					<td class="px-4 py-3 text-right font-mono text-gray-700">{formatPeso(row.grossSales)}</td>
 					<td class="px-4 py-3 text-right font-mono text-status-red">

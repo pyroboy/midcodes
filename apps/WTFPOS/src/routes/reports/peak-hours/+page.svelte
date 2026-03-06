@@ -1,16 +1,44 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
+	import { orders as allOrders } from '$lib/stores/pos.svelte';
+	import { session } from '$lib/stores/session.svelte';
+	import { inPeriod } from '$lib/stores/reports.svelte';
 
-	// Operating hours 10:00 AM to 11:00 PM (13 hours)
-	const hours = ['10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm'];
+	type Period = 'today' | 'week';
+	let period = $state<Period>('today');
 
-	// Pax per hour (mock heatmap data)
-	const paxPerHour = [4, 6, 14, 18, 12, 8, 6, 10, 22, 28, 24, 16, 8];
-	const ordersPerHour = [2, 3, 6, 8, 5, 4, 3, 5, 10, 12, 11, 7, 4];
+	const HOURS = ['10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm'];
 
-	const maxPax = Math.max(...paxPerHour);
+	function computeHourly(p: Period) {
+		const pax = new Array(13).fill(0);
+		const orderCount = new Array(13).fill(0);
+		let totalDurationMs = 0;
+		let durationCount = 0;
 
-	// Cell intensity
+		for (const o of allOrders.value) {
+			if (o.status === 'cancelled') continue;
+			if (session.locationId !== 'all' && o.locationId !== session.locationId) continue;
+			if (!inPeriod(o.createdAt, p)) continue;
+
+			const idx = new Date(o.createdAt).getHours() - 10;
+			if (idx >= 0 && idx < 13) {
+				pax[idx] += o.pax ?? 0;
+				orderCount[idx]++;
+			}
+			if (o.status === 'paid' && o.closedAt) {
+				totalDurationMs += new Date(o.closedAt).getTime() - new Date(o.createdAt).getTime();
+				durationCount++;
+			}
+		}
+
+		return { pax, orders: orderCount, avgDurationMin: durationCount > 0 ? Math.round(totalDurationMs / durationCount / 60000) : 0 };
+	}
+
+	const hourly = $derived(computeHourly(period));
+	const maxPax = $derived(Math.max(...hourly.pax, 1));
+	const totalPax = $derived(hourly.pax.reduce((a, b) => a + b, 0));
+	const peakHourIdx = $derived(hourly.pax.indexOf(Math.max(...hourly.pax)));
+
 	function intensity(value: number): string {
 		const pct = value / maxPax;
 		if (pct >= 0.8) return 'bg-status-red text-white font-bold';
@@ -19,45 +47,51 @@
 		if (pct >= 0.2) return 'bg-yellow-200 text-gray-700';
 		return 'bg-gray-100 text-gray-500';
 	}
-
-	// Summary stats
-	const totalPax = paxPerHour.reduce((a, b) => a + b, 0);
-	const peakHourIdx = paxPerHour.indexOf(maxPax);
-	const avgOccupancy = 72; // minutes mock
-	const avgResetTime = 8;  // minutes mock
 </script>
 
+<!-- Period toggle -->
+<div class="mb-5 flex items-center gap-2">
+	{#each (['today', 'week'] as const) as p}
+		<button
+			onclick={() => (period = p)}
+			class={cn(
+				'rounded-md px-4 py-1.5 text-sm font-semibold transition-colors',
+				period === p ? 'bg-accent text-white' : 'border border-border bg-white text-gray-600 hover:bg-gray-50'
+			)}
+			style="min-height: unset"
+		>
+			{p === 'today' ? 'Today' : 'This Week'}
+		</button>
+	{/each}
+</div>
+
 <!-- Summary cards -->
-<div class="mb-5 grid grid-cols-4 gap-4">
+<div class="mb-5 grid grid-cols-3 gap-4">
 	<div class="rounded-xl border border-border bg-white p-4">
 		<p class="text-xs font-medium uppercase tracking-wide text-gray-400">Total Guest Covers</p>
 		<p class="mt-1 text-2xl font-bold text-gray-900">{totalPax}</p>
 	</div>
 	<div class="rounded-xl border border-status-red/20 bg-status-red-light p-4">
 		<p class="text-xs font-medium uppercase tracking-wide text-status-red">Peak Hour</p>
-		<p class="mt-1 text-2xl font-bold text-status-red">{hours[peakHourIdx]} ({maxPax} pax)</p>
+		<p class="mt-1 text-2xl font-bold text-status-red">{maxPax > 0 ? `${HOURS[peakHourIdx]} (${maxPax} pax)` : '—'}</p>
 	</div>
 	<div class="rounded-xl border border-border bg-white p-4">
 		<p class="text-xs font-medium uppercase tracking-wide text-gray-400">Avg Table Duration</p>
-		<p class="mt-1 text-2xl font-bold text-gray-900">{avgOccupancy} min</p>
-	</div>
-	<div class="rounded-xl border border-status-yellow/30 bg-status-yellow-light p-4">
-		<p class="text-xs font-medium uppercase tracking-wide text-status-yellow">Avg Reset Time</p>
-		<p class="mt-1 text-2xl font-bold text-status-yellow">{avgResetTime} min</p>
+		<p class="mt-1 text-2xl font-bold text-gray-900">{hourly.avgDurationMin > 0 ? `${hourly.avgDurationMin} min` : '—'}</p>
 	</div>
 </div>
 
 <!-- Heat map -->
 <div class="rounded-xl border border-border bg-white p-5 mb-5">
 	<h2 class="mb-4 font-bold text-gray-900">Guest Cover Heat Map</h2>
-	<div class="grid gap-2" style="grid-template-columns: repeat({hours.length}, 1fr);">
-		{#each hours as hour, i}
+	<div class="grid gap-2" style="grid-template-columns: repeat({HOURS.length}, 1fr);">
+		{#each HOURS as hour, i}
 			<div class="text-center">
 				<p class="mb-1 text-xs font-medium text-gray-400">{hour}</p>
-				<div class={cn('flex h-16 items-center justify-center rounded-lg text-sm', intensity(paxPerHour[i]))}>
-					{paxPerHour[i]}
+				<div class={cn('flex h-16 items-center justify-center rounded-lg text-sm', intensity(hourly.pax[i]))}>
+					{hourly.pax[i]}
 				</div>
-				<p class="mt-1 text-[10px] text-gray-400">{ordersPerHour[i]} orders</p>
+				<p class="mt-1 text-[10px] text-gray-400">{hourly.orders[i]} orders</p>
 			</div>
 		{/each}
 	</div>
@@ -82,15 +116,15 @@
 			</tr>
 		</thead>
 		<tbody class="divide-y divide-border">
-			{#each hours as hour, i}
+			{#each HOURS as hour, i}
 				<tr class="hover:bg-gray-50">
 					<td class="px-4 py-3 font-medium text-gray-900">{hour}</td>
-					<td class="px-4 py-3 text-right font-mono text-gray-700">{paxPerHour[i]}</td>
-					<td class="px-4 py-3 text-right font-mono text-gray-500">{ordersPerHour[i]}</td>
+					<td class="px-4 py-3 text-right font-mono text-gray-700">{hourly.pax[i]}</td>
+					<td class="px-4 py-3 text-right font-mono text-gray-500">{hourly.orders[i]}</td>
 					<td class="px-4 py-3">
 						<div class="h-2 w-full max-w-[200px] overflow-hidden rounded-full bg-gray-100">
-							<div class={cn('h-full rounded-full', paxPerHour[i] / maxPax >= 0.8 ? 'bg-status-red' : paxPerHour[i] / maxPax >= 0.5 ? 'bg-status-yellow' : 'bg-status-green')}
-								style="width: {(paxPerHour[i] / maxPax * 100)}%">
+							<div class={cn('h-full rounded-full', hourly.pax[i] / maxPax >= 0.8 ? 'bg-status-red' : hourly.pax[i] / maxPax >= 0.5 ? 'bg-status-yellow' : 'bg-status-green')}
+								style="width: {hourly.pax[i] / maxPax * 100}%">
 							</div>
 						</div>
 					</td>

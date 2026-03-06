@@ -3,12 +3,12 @@ import type { RxJsonSchema } from 'rxdb';
 // ─── Tables ──────────────────────────────────────────────────────────────────
 export const tableSchema: RxJsonSchema<any> = {
 	title: 'table schema',
-	version: 0,
+	version: 2,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		locationId: { type: 'string' },
+		locationId: { type: 'string', maxLength: 100 },
 		number: { type: 'number' },
 		label: { type: 'string' },
 		zone: { type: 'string' },
@@ -18,27 +18,29 @@ export const tableSchema: RxJsonSchema<any> = {
 		width: { type: 'number' },
 		height: { type: 'number' },
 		shape: { type: 'string' },
-		status: { type: 'string' },
+		status: { type: 'string', maxLength: 50 },
 		sessionStartedAt: { type: ['string', 'null'] },
 		elapsedSeconds: { type: ['number', 'null'] },
 		currentOrderId: { type: ['string', 'null'] },
-		billTotal: { type: ['number', 'null'] }
+		billTotal: { type: ['number', 'null'] },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'locationId', 'number', 'label', 'zone', 'capacity', 'x', 'y', 'status']
+	required: ['id', 'locationId', 'number', 'label', 'zone', 'capacity', 'x', 'y', 'status', 'updatedAt'],
+	indexes: ['locationId', 'status', ['locationId', 'status'], 'updatedAt']
 };
 
 // ─── Order ───────────────────────────────────────────────────────────────────
 export const orderSchema: RxJsonSchema<any> = {
 	title: 'order schema',
-	version: 0,
+	version: 4,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		locationId: { type: 'string' },
-		orderType: { type: 'string' },
+		locationId: { type: 'string', maxLength: 100 },
+		orderType: { type: 'string', maxLength: 50 },
 		customerName: { type: 'string' }, // Takeout
-		tableId: { type: ['string', 'null'] },
+		tableId: { type: ['string', 'null'], maxLength: 100 },
 		tableNumber: { type: ['number', 'null'] },
 		packageName: { type: ['string', 'null'] },
 		packageId: { type: ['string', 'null'] },
@@ -58,10 +60,11 @@ export const orderSchema: RxJsonSchema<any> = {
 					sentAt: { type: ['string', 'null'] },
 					tag: { type: ['string', 'null'] },
 					notes: { type: 'string' }
-				}
+				},
+				required: ['id', 'menuItemId', 'menuItemName', 'quantity', 'unitPrice', 'status']
 			}
 		},
-		status: { type: 'string' },
+		status: { type: 'string', maxLength: 50 },
 		discountType: { type: 'string' },
 		discountPax: { type: 'number' },
 		discountIds: { type: 'array', items: { type: 'string' } },
@@ -76,10 +79,11 @@ export const orderSchema: RxJsonSchema<any> = {
 				properties: {
 					method: { type: 'string' },
 					amount: { type: 'number' }
-				}
+				},
+				required: ['method', 'amount']
 			}
 		},
-		createdAt: { type: 'string' },
+		createdAt: { type: 'string', maxLength: 30 },
 		closedAt: { type: ['string', 'null'] },
 		billPrinted: { type: 'boolean' },
 		notes: { type: 'string' },
@@ -90,16 +94,41 @@ export const orderSchema: RxJsonSchema<any> = {
 		pendingPaymentMethod: { type: 'string' },
 		takeoutStatus: { type: 'string' },
 		splitType: { type: 'string' },
-		subBills: { type: 'array' }, // Simplification for now
-		printStatus: { type: 'string' }
+		subBills: {
+			type: 'array',
+			items: {
+				type: 'object',
+				properties: {
+					id: { type: 'string' },
+					label: { type: 'string' },
+					itemIds: { type: 'array', items: { type: 'string' } },
+					subtotal: { type: 'number' },
+					discountAmount: { type: 'number' },
+					vatAmount: { type: 'number' },
+					total: { type: 'number' },
+					payment: {
+						type: ['object', 'null'],
+						properties: {
+							method: { type: 'string' },
+							amount: { type: 'number' }
+						}
+					},
+					paidAt: { type: ['string', 'null'] }
+				},
+				required: ['id', 'label', 'itemIds', 'subtotal', 'discountAmount', 'vatAmount', 'total']
+			}
+		},
+		printStatus: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'locationId', 'orderType', 'pax', 'items', 'status', 'subtotal', 'discountAmount', 'vatAmount', 'total', 'payments', 'createdAt', 'billPrinted']
+	required: ['id', 'locationId', 'orderType', 'pax', 'items', 'status', 'subtotal', 'discountAmount', 'vatAmount', 'total', 'payments', 'createdAt', 'billPrinted', 'updatedAt'],
+	indexes: ['locationId', 'status', 'createdAt', ['locationId', 'status'], ['locationId', 'createdAt'], 'updatedAt']
 };
 
 // ─── Menu Item ───────────────────────────────────────────────────────────────
 export const menuItemSchema: RxJsonSchema<any> = {
 	title: 'menu item schema',
-	version: 0,
+	version: 1,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -118,115 +147,127 @@ export const menuItemSchema: RxJsonSchema<any> = {
 		isRetail: { type: 'boolean' },
 		meats: { type: 'array', items: { type: 'string' } },
 		autoSides: { type: 'array', items: { type: 'string' } },
-		image: { type: 'string' }
+		image: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'name', 'category', 'price', 'isWeightBased', 'available']
+	required: ['id', 'name', 'category', 'price', 'isWeightBased', 'available', 'updatedAt'],
+	indexes: ['updatedAt']
 };
 
 // ─── Stock Item ──────────────────────────────────────────────────────────────
 export const stockItemSchema: RxJsonSchema<any> = {
 	title: 'stock item schema',
-	version: 0,
+	version: 2,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		menuItemId: { type: 'string' },
+		menuItemId: { type: 'string', maxLength: 100 },
 		name: { type: 'string' },
-		category: { type: 'string' },
+		category: { type: 'string', maxLength: 50 },
 		proteinType: { type: 'string' },
-		locationId: { type: 'string' },
+		locationId: { type: 'string', maxLength: 100 },
 		openingStock: { type: 'number' },
 		unit: { type: 'string' },
-		minLevel: { type: 'number' }
+		minLevel: { type: 'number' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'menuItemId', 'name', 'category', 'locationId', 'openingStock', 'unit', 'minLevel']
+	required: ['id', 'menuItemId', 'name', 'category', 'locationId', 'openingStock', 'unit', 'minLevel', 'updatedAt'],
+	indexes: ['locationId', 'category', 'menuItemId', ['locationId', 'category'], 'updatedAt']
 };
 
 // ─── Delivery ────────────────────────────────────────────────────────────────
 export const deliverySchema: RxJsonSchema<any> = {
 	title: 'delivery schema',
-	version: 0,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		stockItemId: { type: 'string' },
+		stockItemId: { type: 'string', maxLength: 100 },
 		itemName: { type: 'string' },
 		qty: { type: 'number' },
 		unit: { type: 'string' },
 		supplier: { type: 'string' },
 		notes: { type: 'string' },
-		receivedAt: { type: 'string' },
+		receivedAt: { type: 'string', maxLength: 30 },
 		batchNo: { type: 'string' },
 		expiryDate: { type: 'string' },
 		usedQty: { type: 'number' },
 		depleted: { type: 'boolean' },
-		photo: { type: 'string' }
+		photo: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'stockItemId', 'itemName', 'qty', 'unit', 'supplier', 'receivedAt']
+	required: ['id', 'stockItemId', 'itemName', 'qty', 'unit', 'supplier', 'receivedAt', 'depleted', 'updatedAt'],
+	indexes: ['stockItemId', 'depleted', 'receivedAt', ['stockItemId', 'depleted'], 'updatedAt']
 };
 
 // ─── Waste ───────────────────────────────────────────────────────────────────
 export const wasteSchema: RxJsonSchema<any> = {
 	title: 'waste schema',
-	version: 0,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		stockItemId: { type: 'string' },
+		stockItemId: { type: 'string', maxLength: 100 },
 		itemName: { type: 'string' },
 		qty: { type: 'number' },
 		unit: { type: 'string' },
 		reason: { type: 'string' },
 		loggedBy: { type: 'string' },
-		loggedAt: { type: 'string' }
+		loggedAt: { type: 'string', maxLength: 30 },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'stockItemId', 'itemName', 'qty', 'unit', 'reason', 'loggedBy', 'loggedAt']
+	required: ['id', 'stockItemId', 'itemName', 'qty', 'unit', 'reason', 'loggedBy', 'loggedAt', 'updatedAt'],
+	indexes: ['stockItemId', 'loggedAt', 'updatedAt']
 };
 
 // ─── Deduction ───────────────────────────────────────────────────────────────
 export const deductionSchema: RxJsonSchema<any> = {
 	title: 'deduction schema',
-	version: 0,
+	version: 2,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		stockItemId: { type: 'string' },
+		stockItemId: { type: 'string', maxLength: 100 },
 		qty: { type: 'number' },
 		tableId: { type: 'string' },
-		orderId: { type: 'string' },
-		timestamp: { type: 'string' }
+		orderId: { type: 'string', maxLength: 100 },
+		timestamp: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'stockItemId', 'qty', 'tableId', 'orderId', 'timestamp']
+	required: ['id', 'stockItemId', 'qty', 'tableId', 'orderId', 'timestamp', 'updatedAt'],
+	indexes: ['stockItemId', 'orderId', ['stockItemId', 'orderId'], 'updatedAt']
 };
 
 // ─── Adjustment ──────────────────────────────────────────────────────────────
 export const adjustmentSchema: RxJsonSchema<any> = {
 	title: 'adjustment schema',
-	version: 0,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		stockItemId: { type: 'string' },
+		stockItemId: { type: 'string', maxLength: 100 },
 		itemName: { type: 'string' },
 		type: { type: 'string' }, // 'add' | 'deduct'
 		qty: { type: 'number' },
 		unit: { type: 'string' },
 		reason: { type: 'string' },
 		loggedBy: { type: 'string' },
-		loggedAt: { type: 'string' }
+		loggedAt: { type: 'string', maxLength: 30 },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'stockItemId', 'itemName', 'type', 'qty', 'unit', 'reason', 'loggedBy', 'loggedAt']
+	required: ['id', 'stockItemId', 'itemName', 'type', 'qty', 'unit', 'reason', 'loggedBy', 'loggedAt', 'updatedAt'],
+	indexes: ['stockItemId', 'loggedAt', 'updatedAt']
 };
 
 // ─── Stock Count ─────────────────────────────────────────────────────────────
 export const stockCountSchema: RxJsonSchema<any> = {
 	title: 'stock count schema',
-	version: 1,
+	version: 2,
 	primaryKey: 'stockItemId',
 	type: 'object',
 	properties: {
@@ -238,15 +279,17 @@ export const stockCountSchema: RxJsonSchema<any> = {
 				pm4: { type: ['number', 'null'] },
 				pm10: { type: ['number', 'null'] }
 			}
-		}
+		},
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['stockItemId', 'counted']
+	required: ['stockItemId', 'counted', 'updatedAt'],
+	indexes: ['updatedAt']
 };
 
 // ─── Device ─────────────────────────────────────────────────────────────────
 export const deviceSchema: RxJsonSchema<any> = {
 	title: 'device schema',
-	version: 0,
+	version: 1,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -262,40 +305,44 @@ export const deviceSchema: RxJsonSchema<any> = {
 		syncStatus: { type: 'string' },
 		deviceType: { type: 'string' },
 		screenWidth: { type: 'number' },
-		userAgent: { type: 'string' }
+		userAgent: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'name', 'lastSeenAt', 'isOnline', 'syncStatus', 'appVersion', 'buildDate']
+	required: ['id', 'name', 'lastSeenAt', 'isOnline', 'syncStatus', 'appVersion', 'buildDate', 'updatedAt'],
+	indexes: ['updatedAt']
 };
 
 // ─── Expense ─────────────────────────────────────────────────────────────────
 export const expenseSchema: RxJsonSchema<any> = {
 	title: 'expense schema',
-	version: 0,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		category: { type: 'string' },
+		category: { type: 'string', maxLength: 100 },
 		amount: { type: 'number' },
 		description: { type: 'string' },
 		paidBy: { type: 'string' },
-		locationId: { type: 'string' },
+		locationId: { type: 'string', maxLength: 100 },
 		createdBy: { type: 'string' },
-		createdAt: { type: 'string' },
-		receiptPhoto: { type: 'string' }
+		createdAt: { type: 'string', maxLength: 30 },
+		receiptPhoto: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'category', 'amount', 'description', 'paidBy', 'locationId', 'createdBy', 'createdAt']
+	required: ['id', 'category', 'amount', 'description', 'paidBy', 'locationId', 'createdBy', 'createdAt', 'updatedAt'],
+	indexes: ['locationId', 'createdAt', ['locationId', 'createdAt'], 'updatedAt']
 };
 
 // ─── KDS History ─────────────────────────────────────────────────────────────
 export const kdsTicketSchema: RxJsonSchema<any> = {
 	title: 'kds ticket schema',
-	version: 0,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		orderId: { type: 'string' },
+		orderId: { type: 'string', maxLength: 100 },
 		tableNumber: { type: ['number', 'null'] },
 		customerName: { type: ['string', 'null'] },
 		items: {
@@ -310,17 +357,20 @@ export const kdsTicketSchema: RxJsonSchema<any> = {
 					weight: { type: ['number', 'null'] },
 					category: { type: 'string' },
 					notes: { type: 'string' }
-				}
+				},
+				required: ['id', 'menuItemName', 'quantity', 'status']
 			}
 		},
-		createdAt: { type: 'string' }
+		createdAt: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'orderId', 'items', 'createdAt']
+	required: ['id', 'orderId', 'items', 'createdAt', 'updatedAt'],
+	indexes: ['orderId', 'updatedAt']
 };
 
 export const kdsHistorySchema: RxJsonSchema<any> = {
 	title: 'kds history schema',
-	version: 0,
+	version: 2,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -340,20 +390,23 @@ export const kdsHistorySchema: RxJsonSchema<any> = {
 					weight: { type: ['number', 'null'] },
 					category: { type: 'string' },
 					notes: { type: 'string' }
-				}
+				},
+				required: ['id', 'menuItemName', 'quantity', 'status']
 			}
 		},
 		createdAt: { type: 'string' },
 		bumpedAt: { type: 'string' },
-		bumpedBy: { type: 'string' }
+		bumpedBy: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'orderId', 'items', 'createdAt', 'bumpedAt', 'bumpedBy']
+	required: ['id', 'orderId', 'items', 'createdAt', 'bumpedAt', 'bumpedBy', 'updatedAt'],
+	indexes: ['updatedAt']
 };
 
 // ─── X-Read ──────────────────────────────────────────────────────────────────
 export const xReadSchema: RxJsonSchema<any> = {
 	title: 'x-read schema',
-	version: 0,
+	version: 1,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -369,23 +422,55 @@ export const xReadSchema: RxJsonSchema<any> = {
 		card: { type: 'number' },
 		voidCount: { type: 'number' },
 		discountCount: { type: 'number' },
-		generatedBy: { type: 'string' }
+		generatedBy: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'timestamp', 'grossSales', 'discounts', 'netSales', 'generatedBy']
+	required: ['id', 'timestamp', 'grossSales', 'discounts', 'netSales', 'generatedBy', 'updatedAt'],
+	indexes: ['updatedAt']
 };
 
-// ─── Utility Reading ─────────────────────────────────────────────────────────
-export const utilityReadingSchema: RxJsonSchema<any> = {
-	title: 'utility reading schema',
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+export const auditLogSchema: RxJsonSchema<any> = {
+	title: 'audit log schema',
 	version: 0,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		date: { type: 'string' },
-		electricity: { type: 'number' },
-		gas: { type: 'number' },
-		recordedBy: { type: 'string' }
+		isoTimestamp: { type: 'string', maxLength: 30 },
+		timestamp: { type: 'string' },
+		user: { type: 'string' },
+		role: { type: 'string' },
+		action: { type: 'string', maxLength: 50 },
+		description: { type: 'string' },
+		branch: { type: 'string' },
+		meta: { type: 'string' },
+		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'date', 'electricity', 'gas', 'recordedBy']
+	required: ['id', 'isoTimestamp', 'timestamp', 'user', 'role', 'action', 'description', 'branch', 'updatedAt'],
+	indexes: ['isoTimestamp', 'action', 'updatedAt']
 };
+
+// ─── Kitchen Alert ───────────────────────────────────────────────────────────
+export const kitchenAlertSchema: RxJsonSchema<any> = {
+	title: 'kitchen alert schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		orderId: { type: 'string', maxLength: 100 },
+		tableNumber: { type: ['number', 'null'] },
+		itemName: { type: 'string' },
+		reason: { type: 'string' },
+		createdAt: { type: 'string' },
+		acknowledgedBy: { type: 'string' },
+		acknowledgedAt: { type: 'string' },
+		itemId: { type: 'string' },
+		restoredStock: { type: 'boolean' },
+		updatedAt: { type: 'string', maxLength: 30 }
+	},
+	required: ['id', 'orderId', 'itemName', 'reason', 'createdAt', 'updatedAt'],
+	indexes: ['orderId', 'updatedAt']
+};
+

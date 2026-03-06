@@ -67,19 +67,22 @@ export function isRetailSession(): boolean {
 	return !isWarehouseSession();
 }
 
+/** Pure derivation of location and lock state from role — no side effects. */
+export function deriveSessionState(
+	role: Role,
+	locationId: LocationId
+): { resolvedLocationId: LocationId; isLocked: boolean } {
+	const isElevated = ELEVATED_ROLES.includes(role);
+	return {
+		resolvedLocationId: (!isElevated && locationId === 'all') ? 'qc' : locationId,
+		isLocked: !isElevated
+	};
+}
+
 export function setSession(userName: string, role: Role, locationId: LocationId = 'qc') {
 	session.userName = userName;
 	session.role     = role;
-
-	const isElevated = ELEVATED_ROLES.includes(role);
-
-	// Non-elevated roles cannot be placed in the aggregate 'all' view
-	if (!isElevated && locationId === 'all') {
-		session.locationId = 'qc';
-	} else {
-		session.locationId = locationId;
-	}
-
-	// Non-elevated roles are locked to their assigned location
-	session.isLocked = !isElevated;
+	const { resolvedLocationId, isLocked } = deriveSessionState(role, locationId);
+	session.locationId = resolvedLocationId;
+	session.isLocked   = isLocked;
 }

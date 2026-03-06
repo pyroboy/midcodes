@@ -2,6 +2,7 @@
     import { cn } from '$lib/utils';
     import { stockItems } from '$lib/stores/stock.svelte';
     import { session } from '$lib/stores/session.svelte';
+    import { log } from '$lib/stores/audit.svelte';
     import ManagerPinModal from '$lib/components/pos/ManagerPinModal.svelte';
 
     interface Props {
@@ -32,13 +33,7 @@
 
     function handlePinVerify() {
         const item = meatItems.find(m => m.id === selectedMeatId);
-        import('$lib/stores/audit.svelte').then(({ log }) => {
-            if (typeof (log as any).yieldRecorded === 'function') {
-                (log as any).yieldRecorded(item?.name || 'Unknown', rawWeight, trimmedWeight, yieldPct);
-            } else if (typeof (log as any).writeLog === 'function') {
-                (log as any).writeLog(`Yield Recorded: ${item?.name} - ${yieldPct.toFixed(1)}% yield from ${rawWeight}g raw`);
-            }
-        }).catch(() => {});
+        log.yieldRecorded(item?.name || 'Unknown', rawWeight, trimmedWeight, yieldPct);
         showPin = false;
         onClose();
         rawWeightInput = '';

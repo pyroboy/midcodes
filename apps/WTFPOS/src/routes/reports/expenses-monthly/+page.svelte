@@ -20,30 +20,30 @@
 		'Miscellaneous': '📦'
 	};
 
-	// We only have live data for current month. For previous month, we'll use placeholder data
-	const prevMonthData: Record<string, number> = {
-		'Meat Procurement': 275000,
-		'Produce & Sides': 71200,
-		'Utilities': 32400,
-		'Wages': 144000,
-		'Rent': 50000,
-		'Miscellaneous': 18600
-	};
+	const now = new Date();
+	const thisMonth = { month: now.getMonth(), year: now.getFullYear() };
+	const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+	const prevMonth = { month: prevMonthDate.getMonth(), year: prevMonthDate.getFullYear() };
 
 	const currentMonthExpenses = $derived(
 		allExpenses.value.filter(e => {
 			const d = new Date(e.createdAt);
-			const now = new Date();
-			return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+			return d.getMonth() === thisMonth.month && d.getFullYear() === thisMonth.year;
+		})
+	);
+
+	const prevMonthExpenses = $derived(
+		allExpenses.value.filter(e => {
+			const d = new Date(e.createdAt);
+			return d.getMonth() === prevMonth.month && d.getFullYear() === prevMonth.year;
 		})
 	);
 
 	const rows = $derived(expenseCategories.map(cat => {
-		const current = currentMonthExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
-		const previous = prevMonthData[cat] || 1; // avoid division by zero
-		const rawVariance = ((current - previous) / previous) * 100;
+		const current  = currentMonthExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+		const previous = prevMonthExpenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0);
+		const rawVariance = previous > 0 ? ((current - previous) / previous) * 100 : 0;
 		const variance = isNaN(rawVariance) ? 0 : rawVariance;
-		
 		return {
 			category: cat,
 			icon: categoryIcons[cat] || '📦',
@@ -52,7 +52,7 @@
 			variance,
 			flagged: variance > 15
 		};
-	}).filter(r => r.current > 0 || r.previous > 1));
+	}).filter(r => r.current > 0 || r.previous > 0));
 
 	const totalCurrent  = $derived(rows.reduce((s, r) => s + r.current, 0));
 	const totalPrevious = $derived(rows.reduce((s, r) => s + r.previous, 0));

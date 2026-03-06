@@ -62,6 +62,7 @@
     // ─── Modal State ──────────────────────────────────────────────────────────
     let showAddItem = $state(false);
     let showCheckout = $state(false);
+    let checkoutOrder = $state<Order | null>(null); // captured when checkout opens
     let showVoidConfirm = $state(false);
     let showTransferModal = $state(false);
     let showPackageChange = $state(false);
@@ -162,16 +163,13 @@
         closeBill();
     }
 
-    function handleCheckoutSuccess() {
-        const order = currentActiveOrder;
-        if (!order) return;
-        
-        receiptOrder = order;
-        const cashPayment = order.payments.find(p => p.method === 'cash');
-        receiptChange = cashPayment ? cashPayment.amount - order.total : 0;
-        
+    function handleCheckoutSuccess(paidOrder: Order) {
+        receiptOrder = paidOrder;
+        const cashPayment = paidOrder.payments.find(p => p.method === 'cash');
+        receiptChange = cashPayment ? cashPayment.amount - paidOrder.total : 0;
+
         // Determine payment method from actual payments
-        const primaryPayment = order.payments[order.payments.length - 1];
+        const primaryPayment = paidOrder.payments[paidOrder.payments.length - 1];
         receiptMethod = primaryPayment ? 
             primaryPayment.method === 'gcash' ? 'GCash' :
             primaryPayment.method === 'maya' ? 'Maya' :
@@ -180,6 +178,7 @@
             
         showReceipt = true;
         showCheckout = false;
+        checkoutOrder = null;
         closeBill();
     }
 
@@ -300,6 +299,7 @@
                     if (currentActiveOrder?.packageId) {
                         showLeftoverPenalty = true;
                     } else {
+                        checkoutOrder = currentActiveOrder ?? null;
                         showCheckout = true;
                     }
                 }}
@@ -323,11 +323,11 @@
     />
 {/if}
 
-{#if showCheckout && currentActiveOrder}
-    <CheckoutModal 
-        order={currentActiveOrder}
+{#if showCheckout && checkoutOrder}
+    <CheckoutModal
+        order={checkoutOrder}
         table={selectedTable}
-        onclose={() => showCheckout = false}
+        onclose={() => { showCheckout = false; checkoutOrder = null; }}
         onsuccess={handleCheckoutSuccess}
     />
 {/if}
@@ -421,6 +421,7 @@
     onClose={() => showLeftoverPenalty = false}
     onPreCheckout={() => {
         showLeftoverPenalty = false;
+        checkoutOrder = currentActiveOrder ?? null;
         showCheckout = true;
     }}
 />

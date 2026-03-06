@@ -3,18 +3,21 @@
  * Reactive inventory connected to POS deductions, deliveries, and waste.
  */
 import { nanoid } from 'nanoid';
-import { log } from '$lib/stores/audit.svelte';
+import { log, writeLog } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { browser } from '$app/environment';
 import { getDb } from '$lib/db';
+import { STOCK_ITEMS_LIST, getProteinType, type StockCategory, type MeatProtein } from '$lib/stores/stock.constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type StockStatus   = 'ok' | 'low' | 'critical';
-export type StockCategory = 'Meats' | 'Sides' | 'Dishes' | 'Drinks';
 export type CountPeriod   = 'am10' | 'pm4' | 'pm10';
-export type MeatProtein = 'beef' | 'pork' | 'chicken' | 'other';
+
+// Re-exported from constants for backward-compatible imports
+export type { StockCategory, MeatProtein };
+export { STOCK_ITEMS_LIST };
 
 export interface StockItem {
 	id: string;
@@ -27,6 +30,7 @@ export interface StockItem {
 	openingStock: number;
 	unit: string;
 	minLevel: number;
+	updatedAt: string;
 }
 
 export interface Delivery {
@@ -43,6 +47,7 @@ export interface Delivery {
 	usedQty?: number;
 	depleted?: boolean;
 	photo?: string;
+	updatedAt: string;
 }
 
 export interface WasteEntry {
@@ -54,6 +59,7 @@ export interface WasteEntry {
 	reason: string;
 	loggedBy: string;
 	loggedAt: string;
+	updatedAt: string;
 }
 
 export interface StockAdjustment {
@@ -66,6 +72,7 @@ export interface StockAdjustment {
 	reason: string;
 	loggedBy: string;
 	loggedAt: string;
+	updatedAt: string;
 }
 
 export interface Deduction {
@@ -75,259 +82,15 @@ export interface Deduction {
 	tableId: string;
 	orderId: string;
 	timestamp: string;
+	updatedAt: string;
 }
 
 export interface StockCount {
 	stockItemId: string;
 	counted: Record<CountPeriod, number | null>;
+	updatedAt: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-export const STOCK_ITEMS_LIST: { menuItemId: string; name: string; category: StockCategory; proteinType?: MeatProtein; locationId: string; unit: string; minLevel: number }[] = [
-	// ── QC Branch Stock ──────────────────────────────────────────────────────
-	{ menuItemId: 'meat-pork-bone-in',   name: 'Pork Bone-In',               category: 'Meats', proteinType: 'pork', locationId: 'qc', unit: 'g',        minLevel: 5000 },
-	{ menuItemId: 'meat-pork-bone-out',  name: 'Pork Bone-Out',              category: 'Meats', proteinType: 'pork', locationId: 'qc', unit: 'g',        minLevel: 5000 },
-	{ menuItemId: 'meat-pork-sliced',    name: 'Sliced Pork',                category: 'Meats', proteinType: 'pork', locationId: 'qc', unit: 'g',        minLevel: 5000 },
-	{ menuItemId: 'meat-pork-bones',     name: 'Pork Bones',                 category: 'Meats', proteinType: 'pork', locationId: 'qc', unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'meat-pork-trimmings', name: 'Pork Trimmings',             category: 'Meats', proteinType: 'pork', locationId: 'qc', unit: 'g',        minLevel: 1000 },
-	{ menuItemId: 'meat-beef-bone-in',   name: 'Beef Bone-In',               category: 'Meats', proteinType: 'beef', locationId: 'qc', unit: 'g',        minLevel: 3000 },
-	{ menuItemId: 'meat-beef-bone-out',  name: 'Beef Bone-Out',              category: 'Meats', proteinType: 'beef', locationId: 'qc', unit: 'g',        minLevel: 3000 },
-	{ menuItemId: 'meat-beef-sliced',    name: 'Sliced Beef',                category: 'Meats', proteinType: 'beef', locationId: 'qc', unit: 'g',        minLevel: 3000 },
-	{ menuItemId: 'meat-beef-bones',     name: 'Beef Bones',                 category: 'Meats', proteinType: 'beef', locationId: 'qc', unit: 'g',        minLevel: 1000 },
-	{ menuItemId: 'meat-beef-trimmings', name: 'Beef Trimmings',             category: 'Meats', proteinType: 'beef', locationId: 'qc', unit: 'g',        minLevel: 500  },
-	{ menuItemId: 'meat-chicken-wing',   name: 'Chicken Wing',               category: 'Meats', proteinType: 'chicken', locationId: 'qc', unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'meat-chicken-leg',    name: 'Chicken Leg',                category: 'Meats', proteinType: 'chicken', locationId: 'qc', unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'side-kimchi',         name: 'Kimchi',                     category: 'Sides',  locationId: 'qc', unit: 'portions', minLevel: 10   },
-	{ menuItemId: 'side-rice',           name: 'Steamed Rice',               category: 'Sides',  locationId: 'qc', unit: 'portions', minLevel: 15   },
-	{ menuItemId: 'drink-soju',          name: 'Soju (Original)',            category: 'Drinks', locationId: 'qc', unit: 'bottles',  minLevel: 12   },
-
-	// ── Additional Mock Data for qc ─────────────────────────────────────────────────────────
-	{ menuItemId: 'sides-lettuce',                         name: 'Lettuce',                   category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-perilla-leaves-kkaennip',         name: 'Perilla Leaves (Kkaennip)', category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-garlic-whole-cloves',             name: 'Garlic (Whole Cloves)',     category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-garlic-sliced',                   name: 'Garlic (Sliced)',           category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-green-onions-scallions',          name: 'Green Onions / Scallions',  category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-jalape-o-green-chilies',          name: 'Jalapeño / Green Chilies',  category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-white-yellow-onions',             name: 'White/Yellow Onions',       category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-korean-radish-mu',                name: 'Korean Radish (Mu)',        category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-enoki-mushrooms',                 name: 'Enoki Mushrooms',           category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-button-mushrooms',                name: 'Button Mushrooms',          category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-corn',                            name: 'Corn',                      category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-baguio-pechay',                   name: 'Baguio Pechay',             category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-squash',                          name: 'Squash',                    category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-baechu-kimchi',                   name: 'Baechu Kimchi',             category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-kkakdugi',                        name: 'Kkakdugi',                  category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-kongnamul-muchim',                name: 'Kongnamul-muchim',          category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-oi-muchim',                       name: 'Oi Muchim',                 category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-pickled-white-onions',            name: 'Pickled White Onions',      category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-pickled-daikon-radish',           name: 'Pickled Daikon Radish',     category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-eomuk-bokkeum',                   name: 'Eomuk Bokkeum',             category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-japchae',                         name: 'Japchae',                   category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gamja-jorim',                     name: 'Gamja Jorim',               category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gyeran-jjim',                     name: 'Gyeran-jjim',               category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-pajeon',                          name: 'Pajeon',                    category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gamja-salad',                     name: 'Gamja Salad',               category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-cheesy-tteokbokki',               name: 'Cheesy Tteokbokki',         category: 'Sides',     locationId: 'qc',      unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gochujang',                       name: 'Gochujang',                 category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-doenjang',                        name: 'Doenjang',                  category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-gochugaru-coarse',                name: 'Gochugaru (Coarse)',        category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-gochugaru-fine',                  name: 'Gochugaru (Fine)',          category: 'Sides',     locationId: 'qc',      unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-jin-ganjang-dark-soy-sauce',      name: 'Jin-ganjang (Dark Soy Sauce)', category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-guk-ganjang-soup-soy-sauce',      name: 'Guk-ganjang (Soup Soy Sauce)', category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-yangjo-ganjang-brewed-soy',       name: 'Yangjo-ganjang (Brewed Soy)', category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-toasted-sesame-oil',              name: 'Toasted Sesame Oil',        category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-mulyeot-corn-rice-syrup',         name: 'Mulyeot (Corn/Rice Syrup)', category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-mirin-rice-wine',                 name: 'Mirin / Rice Wine',         category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-aekjeot-fish-sauce',              name: 'Aekjeot (Fish Sauce)',      category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-dasida-beef-stock-powder',        name: 'Dasida (Beef Stock Powder)', category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-mayonnaise',                      name: 'Mayonnaise',                category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-ssamjang',                        name: 'Ssamjang',                  category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'sides-sogeumjang',                      name: 'Sogeumjang',                category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'sides-cheese-sauce',                    name: 'Cheese Sauce',              category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'sides-wasabi-soy',                      name: 'Wasabi Soy',                category: 'Sides',     locationId: 'qc',      unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'drinks-original-soju',                  name: 'Original Soju',             category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-grapefruit',       name: 'Flavored Soju - Grapefruit', category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-green-grape',      name: 'Flavored Soju - Green Grape', category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-plum',             name: 'Flavored Soju - Plum',      category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-strawberry',       name: 'Flavored Soju - Strawberry', category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-makgeolli',                      name: 'Makgeolli',                 category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-san-miguel-pilsen',              name: 'San Miguel Pilsen',         category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-san-miguel-light',               name: 'San Miguel Light',          category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-red-horse',                      name: 'Red Horse',                 category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-cass',                           name: 'Cass',                      category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-hite',                           name: 'Hite',                      category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-ob',                             name: 'OB',                        category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-taedonggang',                    name: 'Taedonggang',               category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-coca-cola',                      name: 'Coca-Cola',                 category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-sprite',                         name: 'Sprite',                    category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-coke-zero',                      name: 'Coke Zero',                 category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-chilsung-cider',                 name: 'Chilsung Cider',            category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-iced-red-tea',                   name: 'Iced Red Tea',              category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-barley-tea-boricha',             name: 'Barley Tea (Boricha)',      category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-lemonade',                       name: 'Lemonade',                  category: 'Drinks',    locationId: 'qc',      unit: 'bottles',    minLevel: 24     },
-
-	// ── Makati Branch Stock ──────────────────────────────────────────────────
-	{ menuItemId: 'meat-pork-bone-in',   name: 'Pork Bone-In',               category: 'Meats', proteinType: 'pork', locationId: 'mkti', unit: 'g',        minLevel: 5000 },
-	{ menuItemId: 'meat-pork-bone-out',  name: 'Pork Bone-Out',              category: 'Meats', proteinType: 'pork', locationId: 'mkti', unit: 'g',        minLevel: 5000 },
-	{ menuItemId: 'meat-pork-sliced',    name: 'Sliced Pork',                category: 'Meats', proteinType: 'pork', locationId: 'mkti', unit: 'g',        minLevel: 5000 },
-	{ menuItemId: 'meat-pork-bones',     name: 'Pork Bones',                 category: 'Meats', proteinType: 'pork', locationId: 'mkti', unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'meat-pork-trimmings', name: 'Pork Trimmings',             category: 'Meats', proteinType: 'pork', locationId: 'mkti', unit: 'g',        minLevel: 1000 },
-	{ menuItemId: 'meat-beef-bone-in',   name: 'Beef Bone-In',               category: 'Meats', proteinType: 'beef', locationId: 'mkti', unit: 'g',        minLevel: 3000 },
-	{ menuItemId: 'meat-beef-bone-out',  name: 'Beef Bone-Out',              category: 'Meats', proteinType: 'beef', locationId: 'mkti', unit: 'g',        minLevel: 3000 },
-	{ menuItemId: 'meat-beef-sliced',    name: 'Sliced Beef',                category: 'Meats', proteinType: 'beef', locationId: 'mkti', unit: 'g',        minLevel: 3000 },
-	{ menuItemId: 'meat-beef-bones',     name: 'Beef Bones',                 category: 'Meats', proteinType: 'beef', locationId: 'mkti', unit: 'g',        minLevel: 1000 },
-	{ menuItemId: 'meat-beef-trimmings', name: 'Beef Trimmings',             category: 'Meats', proteinType: 'beef', locationId: 'mkti', unit: 'g',        minLevel: 500  },
-	{ menuItemId: 'meat-chicken-wing',   name: 'Chicken Wing',               category: 'Meats', proteinType: 'chicken', locationId: 'mkti', unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'meat-chicken-leg',    name: 'Chicken Leg',                category: 'Meats', proteinType: 'chicken', locationId: 'mkti', unit: 'g',        minLevel: 2000 },
-	{ menuItemId: 'drink-soju',          name: 'Soju (Original)',            category: 'Drinks', locationId: 'mkti', unit: 'bottles',  minLevel: 12   },
-
-	// ── Additional Mock Data for mkti ─────────────────────────────────────────────────────────
-	{ menuItemId: 'sides-lettuce',                         name: 'Lettuce',                   category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-perilla-leaves-kkaennip',         name: 'Perilla Leaves (Kkaennip)', category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-garlic-whole-cloves',             name: 'Garlic (Whole Cloves)',     category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-garlic-sliced',                   name: 'Garlic (Sliced)',           category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-green-onions-scallions',          name: 'Green Onions / Scallions',  category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-jalape-o-green-chilies',          name: 'Jalapeño / Green Chilies',  category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-white-yellow-onions',             name: 'White/Yellow Onions',       category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-korean-radish-mu',                name: 'Korean Radish (Mu)',        category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-enoki-mushrooms',                 name: 'Enoki Mushrooms',           category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-button-mushrooms',                name: 'Button Mushrooms',          category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-corn',                            name: 'Corn',                      category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-baguio-pechay',                   name: 'Baguio Pechay',             category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-squash',                          name: 'Squash',                    category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-baechu-kimchi',                   name: 'Baechu Kimchi',             category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-kkakdugi',                        name: 'Kkakdugi',                  category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-kongnamul-muchim',                name: 'Kongnamul-muchim',          category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-oi-muchim',                       name: 'Oi Muchim',                 category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-pickled-white-onions',            name: 'Pickled White Onions',      category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-pickled-daikon-radish',           name: 'Pickled Daikon Radish',     category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-eomuk-bokkeum',                   name: 'Eomuk Bokkeum',             category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-japchae',                         name: 'Japchae',                   category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gamja-jorim',                     name: 'Gamja Jorim',               category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gyeran-jjim',                     name: 'Gyeran-jjim',               category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-pajeon',                          name: 'Pajeon',                    category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gamja-salad',                     name: 'Gamja Salad',               category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-cheesy-tteokbokki',               name: 'Cheesy Tteokbokki',         category: 'Sides',     locationId: 'mkti',    unit: 'portions',   minLevel: 20     },
-	{ menuItemId: 'sides-gochujang',                       name: 'Gochujang',                 category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-doenjang',                        name: 'Doenjang',                  category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-gochugaru-coarse',                name: 'Gochugaru (Coarse)',        category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-gochugaru-fine',                  name: 'Gochugaru (Fine)',          category: 'Sides',     locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
-	{ menuItemId: 'sides-jin-ganjang-dark-soy-sauce',      name: 'Jin-ganjang (Dark Soy Sauce)', category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-guk-ganjang-soup-soy-sauce',      name: 'Guk-ganjang (Soup Soy Sauce)', category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-yangjo-ganjang-brewed-soy',       name: 'Yangjo-ganjang (Brewed Soy)', category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-toasted-sesame-oil',              name: 'Toasted Sesame Oil',        category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-mulyeot-corn-rice-syrup',         name: 'Mulyeot (Corn/Rice Syrup)', category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-mirin-rice-wine',                 name: 'Mirin / Rice Wine',         category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-aekjeot-fish-sauce',              name: 'Aekjeot (Fish Sauce)',      category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-dasida-beef-stock-powder',        name: 'Dasida (Beef Stock Powder)', category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-mayonnaise',                      name: 'Mayonnaise',                category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
-	{ menuItemId: 'sides-ssamjang',                        name: 'Ssamjang',                  category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'sides-sogeumjang',                      name: 'Sogeumjang',                category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'sides-cheese-sauce',                    name: 'Cheese Sauce',              category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'sides-wasabi-soy',                      name: 'Wasabi Soy',                category: 'Sides',     locationId: 'mkti',    unit: 'ml',         minLevel: 1000   },
-	{ menuItemId: 'drinks-original-soju',                  name: 'Original Soju',             category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-grapefruit',       name: 'Flavored Soju - Grapefruit', category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-green-grape',      name: 'Flavored Soju - Green Grape', category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-plum',             name: 'Flavored Soju - Plum',      category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-flavored-soju-strawberry',       name: 'Flavored Soju - Strawberry', category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-makgeolli',                      name: 'Makgeolli',                 category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-san-miguel-pilsen',              name: 'San Miguel Pilsen',         category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-san-miguel-light',               name: 'San Miguel Light',          category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-red-horse',                      name: 'Red Horse',                 category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-cass',                           name: 'Cass',                      category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-hite',                           name: 'Hite',                      category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-ob',                             name: 'OB',                        category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-taedonggang',                    name: 'Taedonggang',               category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-coca-cola',                      name: 'Coca-Cola',                 category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-sprite',                         name: 'Sprite',                    category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-coke-zero',                      name: 'Coke Zero',                 category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-chilsung-cider',                 name: 'Chilsung Cider',            category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-iced-red-tea',                   name: 'Iced Red Tea',              category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-barley-tea-boricha',             name: 'Barley Tea (Boricha)',      category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-	{ menuItemId: 'drinks-lemonade',                       name: 'Lemonade',                  category: 'Drinks',    locationId: 'mkti',    unit: 'bottles',    minLevel: 24     },
-
-	// ── Central Warehouse Stock ──────────────────────────────────────────────
-	{ menuItemId: 'meat-pork-bone-in',   name: 'Pork Bone-In (Bulk)',        category: 'Meats', proteinType: 'pork', locationId: 'wh-qc', unit: 'g',        minLevel: 20000 },
-	{ menuItemId: 'meat-pork-bone-out',  name: 'Pork Bone-Out (Bulk)',       category: 'Meats', proteinType: 'pork', locationId: 'wh-qc', unit: 'g',        minLevel: 20000 },
-	{ menuItemId: 'meat-pork-sliced',    name: 'Sliced Pork (Bulk)',         category: 'Meats', proteinType: 'pork', locationId: 'wh-qc', unit: 'g',        minLevel: 20000 },
-	{ menuItemId: 'meat-pork-bones',     name: 'Pork Bones (Bulk)',          category: 'Meats', proteinType: 'pork', locationId: 'wh-qc', unit: 'g',        minLevel: 10000 },
-	{ menuItemId: 'meat-pork-trimmings', name: 'Pork Trimmings (Bulk)',      category: 'Meats', proteinType: 'pork', locationId: 'wh-qc', unit: 'g',        minLevel: 5000  },
-	{ menuItemId: 'meat-beef-bone-in',   name: 'Beef Bone-In (Bulk)',        category: 'Meats', proteinType: 'beef', locationId: 'wh-qc', unit: 'g',        minLevel: 15000 },
-	{ menuItemId: 'meat-beef-bone-out',  name: 'Beef Bone-Out (Bulk)',       category: 'Meats', proteinType: 'beef', locationId: 'wh-qc', unit: 'g',        minLevel: 15000 },
-	{ menuItemId: 'meat-beef-sliced',    name: 'Sliced Beef (Bulk)',         category: 'Meats', proteinType: 'beef', locationId: 'wh-qc', unit: 'g',        minLevel: 15000 },
-	{ menuItemId: 'meat-beef-bones',     name: 'Beef Bones (Bulk)',          category: 'Meats', proteinType: 'beef', locationId: 'wh-qc', unit: 'g',        minLevel: 10000 },
-	{ menuItemId: 'meat-beef-trimmings', name: 'Beef Trimmings (Bulk)',      category: 'Meats', proteinType: 'beef', locationId: 'wh-qc', unit: 'g',        minLevel: 5000  },
-	{ menuItemId: 'meat-chicken-wing',   name: 'Chicken Wing (Bulk)',        category: 'Meats', proteinType: 'chicken', locationId: 'wh-qc', unit: 'g',        minLevel: 10000 },
-	{ menuItemId: 'meat-chicken-leg',    name: 'Chicken Leg (Bulk)',         category: 'Meats', proteinType: 'chicken', locationId: 'wh-qc', unit: 'g',        minLevel: 10000 },
-	{ menuItemId: 'side-noodles',        name: 'Dangmyeon Bulk',             category: 'Sides',  locationId: 'wh-qc', unit: 'portions', minLevel: 50    },
-
-	// ── Additional Mock Data for wh-qc ─────────────────────────────────────────────────────────
-	{ menuItemId: 'sides-lettuce',                         name: 'Lettuce',                   category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-perilla-leaves-kkaennip',         name: 'Perilla Leaves (Kkaennip)', category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-garlic-whole-cloves',             name: 'Garlic (Whole Cloves)',     category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-garlic-sliced',                   name: 'Garlic (Sliced)',           category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-green-onions-scallions',          name: 'Green Onions / Scallions',  category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-jalape-o-green-chilies',          name: 'Jalapeño / Green Chilies',  category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-white-yellow-onions',             name: 'White/Yellow Onions',       category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-korean-radish-mu',                name: 'Korean Radish (Mu)',        category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-enoki-mushrooms',                 name: 'Enoki Mushrooms',           category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-button-mushrooms',                name: 'Button Mushrooms',          category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-corn',                            name: 'Corn',                      category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-baguio-pechay',                   name: 'Baguio Pechay',             category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-squash',                          name: 'Squash',                    category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-baechu-kimchi',                   name: 'Baechu Kimchi',             category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-kkakdugi',                        name: 'Kkakdugi',                  category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-kongnamul-muchim',                name: 'Kongnamul-muchim',          category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-oi-muchim',                       name: 'Oi Muchim',                 category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-pickled-white-onions',            name: 'Pickled White Onions',      category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-pickled-daikon-radish',           name: 'Pickled Daikon Radish',     category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-eomuk-bokkeum',                   name: 'Eomuk Bokkeum',             category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-japchae',                         name: 'Japchae',                   category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-gamja-jorim',                     name: 'Gamja Jorim',               category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-gyeran-jjim',                     name: 'Gyeran-jjim',               category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-pajeon',                          name: 'Pajeon',                    category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-gamja-salad',                     name: 'Gamja Salad',               category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-cheesy-tteokbokki',               name: 'Cheesy Tteokbokki',         category: 'Sides',     locationId: 'wh-qc',   unit: 'portions',   minLevel: 80     },
-	{ menuItemId: 'sides-gochujang',                       name: 'Gochujang',                 category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-doenjang',                        name: 'Doenjang',                  category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-gochugaru-coarse',                name: 'Gochugaru (Coarse)',        category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-gochugaru-fine',                  name: 'Gochugaru (Fine)',          category: 'Sides',     locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
-	{ menuItemId: 'sides-jin-ganjang-dark-soy-sauce',      name: 'Jin-ganjang (Dark Soy Sauce)', category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-guk-ganjang-soup-soy-sauce',      name: 'Guk-ganjang (Soup Soy Sauce)', category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-yangjo-ganjang-brewed-soy',       name: 'Yangjo-ganjang (Brewed Soy)', category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-toasted-sesame-oil',              name: 'Toasted Sesame Oil',        category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-mulyeot-corn-rice-syrup',         name: 'Mulyeot (Corn/Rice Syrup)', category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-mirin-rice-wine',                 name: 'Mirin / Rice Wine',         category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-aekjeot-fish-sauce',              name: 'Aekjeot (Fish Sauce)',      category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-dasida-beef-stock-powder',        name: 'Dasida (Beef Stock Powder)', category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-mayonnaise',                      name: 'Mayonnaise',                category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
-	{ menuItemId: 'sides-ssamjang',                        name: 'Ssamjang',                  category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 4000   },
-	{ menuItemId: 'sides-sogeumjang',                      name: 'Sogeumjang',                category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 4000   },
-	{ menuItemId: 'sides-cheese-sauce',                    name: 'Cheese Sauce',              category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 4000   },
-	{ menuItemId: 'sides-wasabi-soy',                      name: 'Wasabi Soy',                category: 'Sides',     locationId: 'wh-qc',   unit: 'ml',         minLevel: 4000   },
-	{ menuItemId: 'drinks-original-soju',                  name: 'Original Soju',             category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-flavored-soju-grapefruit',       name: 'Flavored Soju - Grapefruit', category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-flavored-soju-green-grape',      name: 'Flavored Soju - Green Grape', category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-flavored-soju-plum',             name: 'Flavored Soju - Plum',      category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-flavored-soju-strawberry',       name: 'Flavored Soju - Strawberry', category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-makgeolli',                      name: 'Makgeolli',                 category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-san-miguel-pilsen',              name: 'San Miguel Pilsen',         category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-san-miguel-light',               name: 'San Miguel Light',          category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-red-horse',                      name: 'Red Horse',                 category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-cass',                           name: 'Cass',                      category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-hite',                           name: 'Hite',                      category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-ob',                             name: 'OB',                        category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-taedonggang',                    name: 'Taedonggang',               category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-coca-cola',                      name: 'Coca-Cola',                 category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-sprite',                         name: 'Sprite',                    category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-coke-zero',                      name: 'Coke Zero',                 category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-chilsung-cider',                 name: 'Chilsung Cider',            category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-iced-red-tea',                   name: 'Iced Red Tea',              category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-barley-tea-boricha',             name: 'Barley Tea (Boricha)',      category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-	{ menuItemId: 'drinks-lemonade',                       name: 'Lemonade',                  category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
-
-];
 
 export const WASTE_REASONS = ['Dropped / Spilled', 'Expired', 'Unusable (damaged)', 'Overcooked', 'Trimming (bone/fat)', 'Other'] as const;
 
@@ -370,12 +133,7 @@ export const proteinConfig: Record<MeatProtein, {
   },
 };
 
-export function getProteinType(menuItemId: string): MeatProtein | undefined {
-  if (menuItemId.includes('beef')) return 'beef';
-  if (menuItemId.includes('pork')) return 'pork';
-  if (menuItemId.includes('chicken')) return 'chicken';
-  return undefined;
-}
+export { getProteinType };
 
 // ─── Initial Mock Data ────────────────────────────────────────────────────────
 export const INITIAL_STOCK_ITEMS: StockItem[] = STOCK_ITEMS_LIST.map((s, i) => ({
@@ -388,6 +146,7 @@ export const INITIAL_STOCK_ITEMS: StockItem[] = STOCK_ITEMS_LIST.map((s, i) => (
 	openingStock: getOpeningStock(s.menuItemId, s.locationId),
 	unit: s.unit,
 	minLevel: s.minLevel,
+	updatedAt: new Date().toISOString(),
 }));
 
 function getSiId(menuItemId: string, locationId: string): string {
@@ -401,15 +160,15 @@ function getSiId(menuItemId: string, locationId: string): string {
 }
 
 export const INITIAL_DELIVERIES: Delivery[] = [
-	{ id: 'd1', stockItemId: getSiId('meat-pork-bone-in', 'qc'), itemName: 'Pork Bone-In',            qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: new Date().toISOString(), usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0] },
-	{ id: 'd2', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: new Date(Date.now() - 3600000).toISOString(), usedQty: 0, depleted: false, batchNo: 'B-242' },
-	{ id: 'd3', stockItemId: getSiId('side-kimchi', 'qc'), itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: new Date(Date.now() - 7200000).toISOString(), usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0] },
+	{ id: 'd1', stockItemId: getSiId('meat-pork-bone-in', 'qc'), itemName: 'Pork Bone-In',            qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: new Date().toISOString(), usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0], updatedAt: new Date().toISOString() },
+	{ id: 'd2', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: new Date(Date.now() - 3600000).toISOString(), usedQty: 0, depleted: false, batchNo: 'B-242', updatedAt: new Date().toISOString() },
+	{ id: 'd3', stockItemId: getSiId('side-kimchi', 'qc'), itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: new Date(Date.now() - 7200000).toISOString(), usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], updatedAt: new Date().toISOString() },
 ];
 
 export const INITIAL_WASTE_ENTRIES: WasteEntry[] = [
-	{ id: 'w1', stockItemId: getSiId('meat-pork-bones', 'qc'),  itemName: 'Pork Bones',            qty: 150, unit: 'g',        reason: 'Trimming (bone/fat)', loggedBy: 'Maria S.', loggedAt: new Date(Date.now() - 14400000).toISOString() },
-	{ id: 'w2', stockItemId: getSiId('side-rice', 'qc'), itemName: 'Steamed Rice',          qty: 2,   unit: 'portions', reason: 'Overcooked',          loggedBy: 'Pedro C.', loggedAt: new Date(Date.now() - 7200000).toISOString() },
-	{ id: 'w3', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',       qty: 1,   unit: 'bottles',  reason: 'Unusable (damaged)',  loggedBy: 'Maria S.', loggedAt: new Date().toISOString() },
+	{ id: 'w1', stockItemId: getSiId('meat-pork-bones', 'qc'),  itemName: 'Pork Bones',            qty: 150, unit: 'g',        reason: 'Trimming (bone/fat)', loggedBy: 'Maria S.', loggedAt: new Date(Date.now() - 14400000).toISOString(), updatedAt: new Date().toISOString() },
+	{ id: 'w2', stockItemId: getSiId('side-rice', 'qc'), itemName: 'Steamed Rice',          qty: 2,   unit: 'portions', reason: 'Overcooked',          loggedBy: 'Pedro C.', loggedAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString() },
+	{ id: 'w3', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',       qty: 1,   unit: 'bottles',  reason: 'Unusable (damaged)',  loggedBy: 'Maria S.', loggedAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export const INITIAL_DEDUCTIONS: Deduction[] = [];
@@ -421,6 +180,7 @@ export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => (
 		pm4: getAfternoonCount(s.menuItemId),
 		pm10: null,
 	},
+	updatedAt: new Date().toISOString(),
 }));
 
 export const INITIAL_ADJUSTMENTS: StockAdjustment[] = [];
@@ -527,7 +287,8 @@ export async function receiveDelivery(stockItemId: string, itemName: string, qty
 			expiryDate,
 			usedQty: 0,
 			depleted: false,
-			...(photo && { photo })
+			...(photo && { photo }),
+			updatedAt: new Date().toISOString(),
 		});
 		log.deliveryReceived(itemName, qty, unit, supplier);
 		return { success: true, id };
@@ -561,6 +322,7 @@ export async function logWaste(stockItemId: string, itemName: string, qty: numbe
 			reason: reason.trim(),
 			loggedBy: logger,
 			loggedAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
 		});
 		log.wasteLogged(itemName, qty, unit, reason);
 		return { success: true, id };
@@ -604,7 +366,9 @@ export async function adjustStock(
 			reason: reason.trim(),
 			loggedBy: logger,
 			loggedAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
 		});
+		writeLog('stock', `Stock ${type === 'add' ? 'added' : 'deducted'}: ${qty}${unit} ${itemName} — ${reason} (by ${logger})`);
 		return { success: true, id };
 	} catch (err) {
 		console.error('[STOCK] Failed to adjust stock:', err);
@@ -658,6 +422,7 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
 			tableId,
 			orderId,
 			timestamp: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
 		});
 
 		// Process FIFO queue for batches
@@ -676,9 +441,10 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
 				const newUsedQty = dUsed + deductNow;
 				const doc = await db.deliveries.findOne(d.id).exec();
 				if (doc) {
-					await doc.patch({
+					await doc.incrementalPatch({
 						usedQty: newUsedQty,
-						depleted: newUsedQty >= d.qty
+						depleted: newUsedQty >= d.qty,
+						updatedAt: new Date().toISOString(),
 					});
 				}
 				remainingToDeduct -= deductNow;
@@ -721,10 +487,8 @@ export async function restoreStock(menuItemId: string, qty: number, orderId: str
 		const restoreNow = Math.min(used, remainingToRestore);
 		const newUsedQty = used - restoreNow;
 		
-		await db.deliveries.findOne(d.id).patch({
-			usedQty: newUsedQty,
-			depleted: false
-		});
+		const dDoc = await db.deliveries.findOne(d.id).exec();
+		if (dDoc) await dDoc.incrementalPatch({ usedQty: newUsedQty, depleted: false, updatedAt: new Date().toISOString() });
 
 		remainingToRestore -= restoreNow;
 		if (remainingToRestore <= 0) break;
@@ -775,7 +539,8 @@ export async function submitCount(stockItemId: string, period: CountPeriod, valu
 	const doc = await db.stock_counts.findOne({ selector: { stockItemId } }).exec();
 	if (doc) {
 		await doc.incrementalPatch({
-			counted: { ...doc.counted, [period]: value }
+			counted: { ...doc.counted, [period]: value },
+			updatedAt: new Date().toISOString(),
 		});
 	}
 }
@@ -811,8 +576,6 @@ function getAfternoonCount(menuItemId: string): number | null {
 export async function updateStockItem(id: string, updates: Partial<StockItem>) {
 	if (!browser) return;
 	const db = await getDb();
-	const existing = stockItems.value.find(s => s.id === id);
-	if (existing) {
-		await db.stock_items.findOne({ selector: { id } }).patch(updates);
-	}
+	const doc = await db.stock_items.findOne(id).exec();
+	if (doc) await doc.incrementalPatch({ ...updates, updatedAt: new Date().toISOString() });
 }

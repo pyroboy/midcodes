@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
 	import { allExpenses, expenseCategories } from '$lib/stores/expenses.svelte';
-	import { eodSummary } from '$lib/stores/reports.svelte';
+	import { netSalesByPeriod } from '$lib/stores/reports.svelte';
 
 	type Period = 'today' | 'week' | 'month';
 	let period = $state<Period>('today');
@@ -22,18 +22,26 @@
 		'Miscellaneous': '📦'
 	};
 
-	const salesData = {
-		get today() { return eodSummary().netSales || 34696; },
-		week: 198400,
-		month: 824000
-	};
+	const salesData = $derived({
+		today: netSalesByPeriod('today'),
+		week:  netSalesByPeriod('week'),
+		month: netSalesByPeriod('month'),
+	});
+
+	function getISOWeekMonday(d: Date): Date {
+		const day = d.getDay();
+		const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+		return new Date(d.getFullYear(), d.getMonth(), diff, 0, 0, 0, 0);
+	}
 
 	function filterExpensesByPeriod(p: Period) {
 		const now = new Date();
+		const todayStr = now.toDateString();
+		const weekStart = getISOWeekMonday(now);
 		return allExpenses.value.filter(e => {
 			const d = new Date(e.createdAt);
-			if (p === 'today') return d.toDateString() === now.toDateString();
-			if (p === 'week') return (now.getTime() - d.getTime()) < 7 * 24 * 60 * 60 * 1000;
+			if (p === 'today') return d.toDateString() === todayStr;
+			if (p === 'week')  return d >= weekStart;
 			if (p === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
 			return false;
 		});

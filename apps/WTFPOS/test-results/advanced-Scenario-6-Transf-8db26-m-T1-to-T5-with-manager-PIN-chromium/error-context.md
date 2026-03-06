@@ -1,0 +1,189 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]: WTF! SAMGYUP
+        - generic [ref=e7]: POS
+        - generic "v0.1.0 — Built Mar 6, 2026 3:26 AM" [ref=e8]: v0.1.0
+      - navigation [ref=e9]:
+        - link "💻 POS" [ref=e10] [cursor=pointer]:
+          - /url: /pos
+          - generic [ref=e11]: 💻
+          - text: POS
+      - generic [ref=e12]:
+        - generic [ref=e14]:
+          - img [ref=e15]
+          - generic [ref=e16]: Alta Cita (QC)
+        - generic [ref=e17]: staff
+        - generic [ref=e18]:
+          - generic [ref=e19]: M
+          - generic [ref=e20]: Maria Santos
+        - generic [ref=e21]:
+          - button "Barcode Scanner (Keyboard listener active)" [ref=e22] [cursor=pointer]:
+            - img [ref=e23]
+          - button "Hardware Status Simulation" [ref=e25] [cursor=pointer]:
+            - img [ref=e26]
+          - button "No Sale" [ref=e27] [cursor=pointer]
+        - link "Logout" [ref=e28] [cursor=pointer]:
+          - /url: /
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]:
+            - heading "POS" [level=1] [ref=e33]
+            - generic [ref=e34]: 1 occ
+            - generic [ref=e35]: 7 free
+          - generic [ref=e36]:
+            - generic [ref=e37]:
+              - generic [ref=e38]: Available
+              - generic [ref=e40]: Dining (Green)
+              - generic [ref=e42]: Ready / Bill (Orange)
+            - button "📦 New Takeout" [ref=e44] [cursor=pointer]
+            - button "🧾 History 66" [ref=e45] [cursor=pointer]:
+              - text: 🧾 History
+              - generic [ref=e46]: "66"
+        - generic [ref=e47]:
+          - heading "Main Dining" [level=2] [ref=e48]
+          - generic [ref=e49]:
+            - button "Table T1" [ref=e50] [cursor=pointer]:
+              - generic [ref=e51]:
+                - generic [ref=e52]: T1
+                - generic [ref=e53]: 00:00
+              - generic [ref=e54]: 2p
+              - generic [ref=e55]: ₱1,798.00
+            - button "Table T2" [ref=e57] [cursor=pointer]:
+              - generic [ref=e59]: T2
+              - generic [ref=e60]: 4p
+            - button "Table T3" [ref=e61] [cursor=pointer]:
+              - generic [ref=e63]: T3
+              - generic [ref=e64]: 4p
+            - button "Table T4" [ref=e65] [cursor=pointer]:
+              - generic [ref=e67]: T4
+              - generic [ref=e68]: 4p
+            - button "Table T5" [ref=e69] [cursor=pointer]:
+              - generic [ref=e71]: T5
+              - generic [ref=e72]: 4p
+            - button "Table T6" [ref=e73] [cursor=pointer]:
+              - generic [ref=e75]: T6
+              - generic [ref=e76]: 4p
+            - button "Table T7" [ref=e77] [cursor=pointer]:
+              - generic [ref=e79]: T7
+              - generic [ref=e80]: 2p
+            - button "Table T8" [ref=e81] [cursor=pointer]:
+              - generic [ref=e83]: T8
+              - generic [ref=e84]: 2p
+            - generic [ref=e85]:
+              - generic [ref=e86]: 🍳 KITCHEN
+              - generic [ref=e87]: 🚪 ENTRANCE
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - generic [ref=e90]:
+            - button "+ ADD" [ref=e91] [cursor=pointer]
+            - generic [ref=e92]:
+              - generic [ref=e93]: T1
+              - generic [ref=e94]: 👥 2 pax
+            - button "✕" [ref=e95] [cursor=pointer]
+          - generic [ref=e96]:
+            - generic [ref=e97]: 🔥 🔥 Unli Pork & Beef
+            - generic [ref=e98]: ⏱ 0m
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - generic [ref=e101]:
+              - generic [ref=e103]: 🔥 Unli Pork & Beef
+              - generic [ref=e104]: 04:19 AM
+            - generic [ref=e106]:
+              - generic [ref=e107]: ₱1,798.00
+              - generic [ref=e108]: PKG
+          - generic [ref=e109]:
+            - generic [ref=e110]:
+              - generic [ref=e111]:
+                - generic [ref=e112]: Samgyupsal
+                - generic [ref=e113]: 300g
+              - generic [ref=e114]: 04:19 AM
+            - generic [ref=e116]: FREE
+          - generic [ref=e117]:
+            - generic [ref=e118]:
+              - generic [ref=e119]:
+                - generic [ref=e120]: Chadolbaegi
+                - generic [ref=e121]: 300g
+              - generic [ref=e122]: 04:19 AM
+            - generic [ref=e124]: FREE
+          - generic [ref=e125]:
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - generic [ref=e128]: Pork Sliced
+                - generic [ref=e129]: 300g
+              - generic [ref=e130]: 04:19 AM
+            - generic [ref=e132]: FREE
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - generic [ref=e136]: Galbi
+                - generic [ref=e137]: 300g
+              - generic [ref=e138]: 04:19 AM
+            - generic [ref=e140]: FREE
+          - generic [ref=e141]:
+            - generic [ref=e142]:
+              - generic [ref=e143]:
+                - generic [ref=e144]: US Beef Belly
+                - generic [ref=e145]: 300g
+              - generic [ref=e146]: 04:19 AM
+            - generic [ref=e148]: FREE
+          - generic [ref=e149]:
+            - generic [ref=e150]:
+              - generic [ref=e151]:
+                - generic [ref=e152]: Beef Sliced
+                - generic [ref=e153]: 300g
+              - generic [ref=e154]: 04:19 AM
+            - generic [ref=e156]: FREE
+          - generic [ref=e157]:
+            - generic [ref=e158]:
+              - generic [ref=e160]: Kimchi
+              - generic [ref=e161]: 04:19 AM
+            - generic [ref=e163]: FREE
+          - generic [ref=e164]:
+            - generic [ref=e165]:
+              - generic [ref=e167]: Steamed Rice
+              - generic [ref=e168]: 04:19 AM
+            - generic [ref=e170]: FREE
+        - generic [ref=e171]:
+          - generic [ref=e173]: 9 items
+          - generic [ref=e174]:
+            - generic [ref=e175]: BILL
+            - generic [ref=e176]: ₱1,798.00
+        - generic [ref=e177]:
+          - generic [ref=e178]:
+            - button "🗑 Void" [ref=e179] [cursor=pointer]
+            - button "💳 Checkout" [ref=e180] [cursor=pointer]
+            - button "🖨" [ref=e181] [cursor=pointer]
+          - generic [ref=e182]:
+            - button "🔀 Transfer" [ref=e183] [cursor=pointer]
+            - button "👥 Pax" [ref=e184] [cursor=pointer]
+            - button "🔄 Change Pkg" [ref=e185] [cursor=pointer]
+            - button "✂️ Split Bill" [ref=e186] [cursor=pointer]
+            - button "➕ Merge Table" [ref=e187] [cursor=pointer]
+  - generic [ref=e189]:
+    - generic [ref=e190]:
+      - heading "Manager PIN Required" [level=3] [ref=e191]
+      - paragraph [ref=e192]: Transfer T1 → T5
+    - generic [ref=e199]:
+      - button "1" [ref=e200] [cursor=pointer]
+      - button "2" [ref=e201] [cursor=pointer]
+      - button "3" [ref=e202] [cursor=pointer]
+      - button "4" [ref=e203] [cursor=pointer]
+      - button "5" [ref=e204] [cursor=pointer]
+      - button "6" [ref=e205] [cursor=pointer]
+      - button "7" [ref=e206] [cursor=pointer]
+      - button "8" [ref=e207] [cursor=pointer]
+      - button "9" [ref=e208] [cursor=pointer]
+      - button "Clear" [ref=e209] [cursor=pointer]
+      - button "0" [ref=e210] [cursor=pointer]
+      - button "⌫" [ref=e211] [cursor=pointer]
+    - generic [ref=e212]:
+      - button "← Back" [ref=e213] [cursor=pointer]
+      - button "✓ Confirm Transfer" [active] [ref=e214] [cursor=pointer]
+  - generic [ref=e215]: WTF! Samgyup POS
+```

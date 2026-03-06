@@ -2,69 +2,161 @@
 
 ## For AI Agents: SvelteKit + RxDB Local-First Development
 
-This guide defines how to migrate WTFPOS from in-memory `$state` stores to RxDB-backed persistence. Follow these rules strictly.
+This guide defines how WTFPOS uses RxDB for persistence. Follow these rules strictly.
+
+**RxDB version: `^16.21.1`** (v16 line — all examples use v16 APIs)
 
 ---
 
 ## Current Architecture
 
 ```
-BEFORE (current):
-  Component → $state arrays (pos.svelte.ts) → lost on refresh
-
-AFTER (target):
-  Component → reactive getters → createRxStore() → RxDB Observable → IndexedDB
-                                ↓ writes
-                          db.collection.insert/update/remove → IndexedDB
+Component → reactive getters → createRxStore() → RxDB Observable → IndexedDB (Dexie)
+                                    ↓ writes
+                          db.collection.insert / incrementalPatch / incrementalModify
 ```
 
-### What Exists Already
+---
+
+## What Exists
 
 | File | Status | Purpose |
 |---|---|---|
-| `src/lib/db/index.ts` | ✅ Working | Singleton `getDb()`, creates RxDB with Dexie storage, 8 collections |
-| `src/lib/db/schemas.ts` | ✅ Working | All 8 schemas (version 0, no migrations) |
-| `src/lib/db/seed.ts` | ✅ Working | Seeds empty DB from existing mock data constants |
-| `src/lib/stores/sync.svelte.ts` | ⚠️ Partial | `createRxStore()` — read-only bridge, no write helpers |
-| `src/routes/test-db/+page.svelte` | ✅ Working | Test harness proving RxDB works |
+| `src/lib/db/index.ts` | Working | Singleton `getDb()`, creates RxDB with Dexie storage, all collections |
+| `src/lib/db/schemas.ts` | Working | All schemas (mostly version 0, stock_counts at version 1) |
+| `src/lib/db/seed.ts` | Working | Seeds empty DB from mock data constants |
+| `src/lib/stores/sync.svelte.ts` | Working | `createRxStore()` — reactive read bridge |
+| `src/lib/stores/pos.svelte.ts` | Migrated | Tables, orders, menu items — all RxDB-backed |
+| `src/lib/stores/stock.svelte.ts` | Migrated | Stock, deliveries, waste, deductions |
+| `src/lib/stores/expenses.svelte.ts` | Migrated | Expenses |
+| `src/lib/stores/audit.svelte.ts` | Partial | Audit log |
+| `src/lib/stores/session.svelte.ts` | In-memory | Device-local — DO NOT migrate |
 
-### What Needs Migration
+### Collections Registered in `db/index.ts`
 
-| Store File | Collections Used | Priority |
+| Collection | Schema | Version |
 |---|---|---|
-| `pos.svelte.ts` | `tables`, `orders`, `menu_items` | 🔴 Critical — core POS |
-| `stock.svelte.ts` | `stock_items`, `deliveries`, `waste`, `deductions` | 🟡 High |
-| `expenses.svelte.ts` | `expenses` | 🟢 Low |
-| `reports.svelte.ts` | None (derived from pos + stock) | 🟢 Auto-fixed when pos/stock migrate |
-| `audit.svelte.ts` | Needs new collection | 🟡 High |
-| `session.svelte.ts` | None (stays in-memory, device-local) | ⚪ No change |
+| `tables` | `tableSchema` | 1 |
+| `orders` | `orderSchema` | 2 |
+| `menu_items` | `menuItemSchema` | 0 |
+| `stock_items` | `stockItemSchema` | 1 |
+| `deliveries` | `deliverySchema` | 2 |
+| `waste` | `wasteSchema` | 2 |
+| `deductions` | `deductionSchema` | 1 |
+| `expenses` | `expenseSchema` | 2 |
+| `adjustments` | `adjustmentSchema` | 2 |
+| `stock_counts` | `stockCountSchema` | 1 (has migration) |
+| `devices` | `deviceSchema` | 0 |
+| `kds_tickets` | `kdsTicketSchema` | 1 |
+| `kds_history` | `kdsHistorySchema` | 0 |
+| `x_reads` | `xReadSchema` | 0 |
+| `utility_readings` | `utilityReadingSchema` | 0 |
 
 ---
 
 ## Rule 1: Browser-Only — Never Run RxDB on Server
 
-RxDB uses IndexedDB which only exists in the browser. SvelteKit renders on both server and client.
+RxDB uses IndexedDB which only exists in the browser.
 
 ```ts
-// ✅ CORRECT — guard with `browser`
+// CORRECT — guard with `browser`
 import { browser } from '$app/environment';
 
 if (browser) {
     const db = await getDb();
 }
 
-// ❌ WRONG — will crash during SSR
-const db = await getDb(); // IndexedDB doesn't exist on server
+// WRONG — will crash during SSR
+const db = await getDb();
 ```
 
-The existing `createRxStore()` already has this guard. Every new function that touches `getDb()` must also check `browser`.
+Every function that calls `getDb()` must check `browser` first, or be called only from component event handlers (which only fire in the browser).
 
 ---
 
-## Rule 2: How createRxStore Works
+## Rule 2: NEVER Use `.patch()` or `.modify()` — Always Use Incremental Variants
+
+This is the most critical rule. Using `.patch()` or `.modify()` on a document fetched even milliseconds ago will throw a **409 CONFLICT** error if any other write happened in between.
+
+| Method | Retries on Conflict? | Use When |
+|---|---|---|
+| `incrementalModify(fn)` | YES — re-runs fn on latest doc | Arrays, computed fields, or anything reading current doc state |
+| `incrementalPatch({...})` | YES — applies patch to latest doc | Simple scalar field updates (status, billTotal, etc.) |
+| `patch({...})` | NO — throws 409 CONFLICT | NEVER use this |
+| `modify(fn)` | NO — throws 409 CONFLICT | NEVER use this |
 
 ```ts
-// src/lib/stores/sync.svelte.ts — existing code
+// CORRECT — incrementalPatch for scalar fields
+await tableDoc.incrementalPatch({ status: 'occupied', billTotal: 1398 });
+
+// CORRECT — incrementalModify when reading current array state
+await orderDoc.incrementalModify((doc: Order) => {
+    doc.items = [...doc.items, newItem];
+    Object.assign(doc, calculateOrderTotals(doc));
+    return doc;
+});
+
+// WRONG — throws 409 if any concurrent write happened
+await tableDoc.patch({ status: 'occupied' });
+
+// WRONG — stale array data causes items to be lost
+const order = orderDoc.toMutableJSON();
+await orderDoc.patch({ items: [...order.items, newItem] }); // order.items may be stale
+```
+
+### When to use `incrementalModify` vs `incrementalPatch`
+
+Use `incrementalModify` when:
+- You are **merging arrays** (items, payments, sub-bills)
+- Your new value **depends on the current doc value** (`doc.items`, `doc.pax`, etc.)
+- You need to **compute new totals** from the updated doc
+
+Use `incrementalPatch` when:
+- You are setting **independent scalar fields** (status, billTotal, currentOrderId)
+- The new value does **not depend** on the current doc state
+
+### `incrementalPatch` is shallow — nested objects are overwritten
+
+```ts
+// If doc.meta = { field1: 1, field2: 2 }
+await doc.incrementalPatch({ meta: { field1: 3 } });
+// Result: doc.meta = { field1: 3 }  ← field2 is GONE
+
+// Use incrementalModify for nested object merges instead:
+await doc.incrementalModify((doc: any) => {
+    doc.meta = { ...doc.meta, field1: 3 };
+    return doc;
+});
+```
+
+This is relevant for `subBills`, nested `items`, and any nested object in schemas.
+
+---
+
+## Rule 3: Read from RxDB Doc Inside Mutations — Not from Svelte Store State
+
+Inside any `incrementalModify` callback, always read from `doc` — not from `orders.value`, `kdsTickets.value`, or any Svelte reactive store. Svelte store state may lag behind by one or more writes.
+
+```ts
+// WRONG — `order.items` is from Svelte store state, may be 1-2 writes behind
+const order = orders.value.find(o => o.id === orderId);
+await orderDoc.incrementalPatch({ items: [...order.items, newItem] });
+
+// CORRECT — `doc.items` is always the latest revision from IndexedDB
+await orderDoc.incrementalModify((doc: Order) => {
+    doc.items = [...doc.items, newItem];
+    return doc;
+});
+```
+
+**Rule of thumb:** Use Svelte store state (`orders.value`, `tables.value`) for **display only**. Use RxDB document data (`doc.*` inside `incrementalModify`) for **writes**.
+
+---
+
+## Rule 4: How `createRxStore` Works
+
+```ts
+// src/lib/stores/sync.svelte.ts
 export function createRxStore<T = any>(
     collectionName: string,
     queryFn: (db: any) => any
@@ -89,51 +181,64 @@ export function createRxStore<T = any>(
 }
 ```
 
-**Key behavior:**
-- `query.$` is an RxDB Observable — fires automatically on ANY insert/update/delete to that collection
-- `.toJSON()` strips RxDB metadata, returns plain objects matching your TypeScript types
-- State starts as `[]` until DB initializes (check `initialized` before relying on data)
-- This is READ-ONLY — writes go directly through `db.collection.insert()` etc.
+Key behavior:
+- `query.$` fires automatically on ANY insert/update/delete to that collection
+- `.toJSON()` strips RxDB internal fields (`_rev`, `_meta`, etc.), returns plain objects
+- State starts as `[]` until DB initializes — check `initialized` before relying on data
+- **READ-ONLY** — writes go directly through `db.collection.insert()` / `incrementalPatch()` / `incrementalModify()`
+
+### Branch-scoped queries
+
+`createRxStore` captures the query at init time. If `session.locationId` changes, the query won't update. Filter in a `$derived` instead:
+
+```ts
+// Recommended approach: fetch all, filter reactively
+const _allTables = createRxStore<Table>('tables', db => db.tables.find());
+export const tables = {
+    get value() {
+        return _allTables.value.filter(t => t.locationId === session.branch);
+    }
+};
+```
 
 ---
 
-## Rule 3: Migration Pattern — Store by Store
-
-### Step 1: Create the reactive read store
+## Rule 5: Write Helper Pattern
 
 ```ts
-// Example: migrating tables from pos.svelte.ts
-
-// BEFORE:
-export const tables = $state<Table[]>(makeTables());
-
-// AFTER:
-import { createRxStore } from './sync.svelte';
-const _tables = createRxStore<Table>('tables', db => db.tables.find());
-export const tables = { get value() { return _tables.value; } };
-```
-
-### Step 2: Create write helpers using getDb()
-
-```ts
-// Add to the store file or a new db helper file
 import { getDb } from '$lib/db';
 import { browser } from '$app/environment';
 
+// Simple scalar update — incrementalPatch is fine
+export async function setTableStatus(id: string, status: string) {
+    if (!browser) return;
+    const db = await getDb();
+    const doc = await db.tables.findOne(id).exec();
+    if (doc) await doc.incrementalPatch({ status });
+}
+
+// Array merge — always use incrementalModify
+export async function addPaymentToOrder(orderId: string, method: string, amount: number) {
+    if (!browser) return;
+    const db = await getDb();
+    const doc = await db.orders.findOne(orderId).exec();
+    if (doc) {
+        await doc.incrementalModify((d: Order) => {
+            d.payments = [...d.payments, { method, amount }];
+            return d;
+        });
+    }
+}
+
+// Insert — no conflict risk
 export async function insertTable(table: Table) {
     if (!browser) return;
     const db = await getDb();
     await db.tables.insert(table);
-    // No need to update $state — the RxDB observable fires automatically
+    // No need to update Svelte state — the RxDB observable fires automatically
 }
 
-export async function updateTable(id: string, patch: Partial<Table>) {
-    if (!browser) return;
-    const db = await getDb();
-    const doc = await db.tables.findOne(id).exec();
-    if (doc) await doc.patch(patch);
-}
-
+// Remove
 export async function removeTable(id: string) {
     if (!browser) return;
     const db = await getDb();
@@ -142,61 +247,11 @@ export async function removeTable(id: string) {
 }
 ```
 
-### Step 3: Replace all direct array mutations
-
-```ts
-// BEFORE (direct $state mutation):
-tables.push(newTable);
-const idx = tables.findIndex(t => t.id === id);
-tables[idx].status = 'occupied';
-tables.splice(idx, 1);
-
-// AFTER (RxDB operations):
-await insertTable(newTable);
-await updateTable(id, { status: 'occupied' });
-await removeTable(id);
-```
-
-**Critical: The observable auto-updates the reactive state.** You do NOT manually push to arrays after a write.
-
 ---
 
-## Rule 4: Functions Become Async
+## Rule 6: Functions Must Be Async
 
-Every store function that mutates data must become `async`. This is the biggest code change.
-
-```ts
-// BEFORE:
-export function openTable(tableId: string, pax: number) {
-    const table = tables.find(t => t.id === tableId);
-    if (!table) return;
-    table.status = 'occupied';
-    table.sessionStartedAt = new Date().toISOString();
-    // ... create order, etc.
-}
-
-// AFTER:
-export async function openTable(tableId: string, pax: number) {
-    const db = await getDb();
-    const tableDoc = await db.tables.findOne(tableId).exec();
-    if (!tableDoc) return;
-
-    await tableDoc.patch({
-        status: 'occupied',
-        sessionStartedAt: new Date().toISOString(),
-        elapsedSeconds: 0
-    });
-
-    // Create the order
-    const order: Order = { /* ... */ };
-    await db.orders.insert(order);
-
-    // Link order to table
-    await tableDoc.patch({ currentOrderId: order.id });
-}
-```
-
-### Handling async in Svelte components
+Every store function that mutates data must be `async`. Call them with `await` from Svelte component handlers.
 
 ```svelte
 <script lang="ts">
@@ -211,81 +266,173 @@ export async function openTable(tableId: string, pax: number) {
     }
 </script>
 
-<button onclick={handleOpen} disabled={loading}>
-    Open Table
-</button>
+<button onclick={handleOpen} disabled={loading}>Open Table</button>
 ```
 
 ---
 
-## Rule 5: Querying Data
+## Rule 7: Querying Data
 
-### Simple find all
 ```ts
-const allTables = createRxStore<Table>('tables', db => db.tables.find());
-```
+// Find all (unfiltered)
+const allOrders = createRxStore<Order>('orders', db => db.orders.find());
 
-### Filter by locationId (branch scoping)
-```ts
-import { session } from './session.svelte';
-
-// Reactive query filtered by current branch
-const branchTables = createRxStore<Table>('tables', db =>
-    db.tables.find({ selector: { locationId: session.locationId } })
+// Filtered
+const openOrders = createRxStore<Order>('orders', db =>
+    db.orders.find({ selector: { status: 'open' } })
 );
-```
 
-**⚠️ Limitation:** `createRxStore` captures the query at init time. If `session.locationId` changes after init, the query won't update. For dynamic filtering, either:
-- Re-create the store when branch changes (simple, recommended for now)
-- Filter in a `$derived` from the full collection (works, slightly less efficient)
-
-```ts
-// Option B: derive from full collection
-const _allTables = createRxStore<Table>('tables', db => db.tables.find());
-export const tables = $derived(
-    _allTables.value.filter(t => t.locationId === session.locationId)
+// Sorted + limited
+const recentOrders = createRxStore<Order>('orders', db =>
+    db.orders.find({ sort: [{ createdAt: 'desc' }], limit: 100 })
 );
-```
 
-### Find one by ID
-```ts
-// For one-off lookups (not reactive):
+// One-off lookup (not reactive)
 const db = await getDb();
 const doc = await db.tables.findOne('QC-T1').exec();
 const table = doc?.toJSON() as Table;
-
-// For reactive single-doc (use in components):
-const tableStore = createRxStore<Table>('tables', db =>
-    db.tables.findOne('QC-T1')
-);
 ```
 
-### Sorted queries
+### Specify indexes for performance-critical queries
+
+By default RxDB's query planner picks an index, but you can force it:
+
 ```ts
-const recentOrders = createRxStore<Order>('orders', db =>
-    db.orders.find({ sort: [{ createdAt: 'desc' }], limit: 50 })
-);
+db.orders.find({
+    selector: { locationId: 'qc', status: 'open' },
+    index: ['locationId', 'status']  // Compound index — add to schema
+})
 ```
 
 ---
 
-## Rule 6: Schema Rules
+## Rule 8: Schema Design & Indexing
 
-### Current schemas are version 0 — no migrations needed yet
+### SC34: String fields used in indexes MUST have `maxLength`
 
-When you need to add a field later:
-1. Bump `version` to 1
-2. Add a `migrationStrategies` object to the collection config in `db/index.ts`
-3. The migration runs automatically on next DB open
+**Error SC34** (from RxDB dev-mode): `"Fields of type string that are used in an index, must have set the maxLength attribute"`
+
+This error fires at startup when `addCollections()` is called. It will crash the entire DB init. Every string field that appears in `indexes: [...]` must explicitly set `maxLength`:
 
 ```ts
-// Example future migration:
+// WRONG — crashes with SC34 at startup
+export const orderSchema = {
+    properties: {
+        status: { type: 'string' },       // ← no maxLength
+        createdAt: { type: 'string' },    // ← no maxLength
+    },
+    indexes: ['status', 'createdAt']      // ← these will throw SC34
+};
+
+// CORRECT
+export const orderSchema = {
+    properties: {
+        status: { type: 'string', maxLength: 50 },
+        createdAt: { type: 'string', maxLength: 30 },  // ISO 8601 = 24 chars, use 30 for safety
+    },
+    indexes: ['status', 'createdAt']
+};
+```
+
+**Recommended `maxLength` values by field type:**
+
+| Field type | maxLength |
+|---|---|
+| Primary keys / IDs (nanoid) | 100 |
+| Status enums (e.g. `'open'`, `'paid'`) | 50 |
+| ISO 8601 datetime strings | 30 |
+| Location / branch IDs | 100 |
+| Category strings | 100 |
+
+### SC36: Nullable / union types cannot be indexed
+
+**Error SC36**: `"A field of this type cannot be used as index"`
+
+RxDB only supports `string`, `number`, `integer`, and `boolean` as index types. Nullable unions like `['string', 'null']` will throw SC36.
+
+```ts
+// WRONG — SC36 at startup
+tableId: { type: ['string', 'null'] }
+// indexes: ['tableId']  ← throws SC36
+
+// FIX option 1 — remove it from the index (preferred if not queried by this field)
+// FIX option 2 — use a sentinel value ('') instead of null and keep type: 'string'
+```
+
+### SC38: Boolean index fields must be in `required`
+
+**Error SC38**: `"Fields of type boolean that are used in an index, must be required in the schema"`
+
+```ts
+// WRONG — SC38
+depleted: { type: 'boolean' }
+// required: ['id', 'stockItemId']  ← 'depleted' missing → SC38
+
+// CORRECT
+required: ['id', 'stockItemId', 'depleted']
+// migration must default depleted: oldDoc.depleted ?? false
+```
+
+### SC34: String index fields must have `maxLength`
+
+**Every field in an index must have `maxLength` — including fields inside compound indexes:**
+```ts
+// Compound index ['locationId', 'status'] requires BOTH fields to have maxLength
+indexes: [['locationId', 'status']]
+// → locationId must have maxLength ✅
+// → status must have maxLength ✅
+```
+
+### Index rules
+
+- Put the most selective field first in compound indexes
+- Only index fields used in `selector` or `sort`
+- All string fields used in any index (simple or compound) must have `maxLength`
+- Adding indexes requires a schema version bump + identity migration
+
+### Current indexes in this app
+
+```ts
+tableSchema:     ['locationId', 'status', ['locationId', 'status']]
+orderSchema:     ['locationId', 'status', 'createdAt', ['locationId', 'status'], ['locationId', 'createdAt']]
+stockItemSchema: ['locationId', 'category', 'menuItemId', ['locationId', 'category']]
+deliverySchema:  ['stockItemId', 'depleted', 'receivedAt', ['stockItemId', 'depleted']]
+wasteSchema:     ['stockItemId', 'loggedAt']
+deductionSchema: ['stockItemId', 'orderId', ['stockItemId', 'orderId']]
+adjustmentSchema:['stockItemId', 'loggedAt']
+expenseSchema:   ['locationId', 'createdAt', ['locationId', 'createdAt']]
+kdsTicketSchema: ['orderId']
+```
+
+---
+
+## Rule 9: Schema Migrations
+
+When you change ANY schema property — including adding `maxLength`, adding indexes, or adding/renaming fields:
+
+1. Bump `version` in the schema
+2. Add a `migrationStrategies` entry in `db/index.ts`
+3. Migration runs automatically on next DB open
+
+If the data shape hasn't changed (only constraints or indexes changed), use an identity migration:
+
+```ts
+// db/index.ts
+const identityMigration1 = { 1: (oldDoc: any) => oldDoc };
+const identityMigration2 = { 1: (oldDoc: any) => oldDoc, 2: (oldDoc: any) => oldDoc };
+
+// schema bumped 0→1: use identityMigration1
+// schema bumped 0→1→2: use identityMigration2
+```
+
+```ts
+// db/index.ts — adding a migration
 await db.addCollections({
-    tables: {
-        schema: tableSchemaV1, // version: 1
+    orders: {
+        schema: orderSchemaV1, // version: 1
         migrationStrategies: {
             1: (oldDoc) => {
-                oldDoc.newField = 'default_value';
+                oldDoc.cancelReason = oldDoc.cancelReason ?? null;
                 return oldDoc;
             }
         }
@@ -293,104 +440,30 @@ await db.addCollections({
 });
 ```
 
-### Schema-Type alignment gaps to fix
-
-| Schema | Issue | Fix |
-|---|---|---|
-| `orderSchema` | `subBills` is untyped `{ type: 'array' }` | Add full SubBill item schema |
-| `stockItemSchema` | `proteinType` missing from `required` | OK — it's optional in the type too |
-| seed `expenses` | Uses stale `loc-ayala`/`loc-bgc` IDs | Change to `qc`/`mkti` |
-| `audit` | No schema or collection exists | Need to create `auditSchema` + add collection |
-| `kds_tickets` | No schema or collection exists | Need to create if KDS data should persist |
-
----
-
-## Rule 7: What Stays In-Memory (Do NOT Migrate)
-
-| Data | Why it stays in `$state` |
-|---|---|
-| `session` (user, role, branch) | Device-local, no persistence needed |
-| `connectionState` | Runtime-only, reflects current network |
-| `hardwareState` | Runtime-only, reflects current hardware |
-| `alerts` (KDS kitchen alerts) | Ephemeral, cleared each shift |
-| Timer tick state | Computed from `elapsedSeconds` which IS persisted |
-| `kdsTickets` | Consider: these are derived from orders. Could stay derived. |
-
----
-
-## Rule 8: The Seed File
-
-`src/lib/db/seed.ts` runs on every `getDb()` call but only inserts data if `menu_items` collection is empty.
-
-**Known issues to fix:**
-- Expense seeds use wrong locationIds (`loc-ayala`, `loc-bgc` → should be `qc`, `mkti`)
-- No audit log seeding
-- Stock items use sequential IDs (`si-0`, `si-1`) — consider using `nanoid` for consistency
-
-**When to re-seed:** If you change schemas and need fresh data, clear IndexedDB:
-```js
-// In browser console:
-indexedDB.deleteDatabase('wtfpos_db');
-location.reload();
-```
-
----
-
-## Rule 9: Migration Order (Do One Store at a Time)
-
-### Phase 1: Menu Items (safest, read-heavy)
-1. Replace `menuItems` in `pos.svelte.ts` with `createRxStore`
-2. Convert `addMenuItem`, `updateMenuItem`, `deleteMenuItem`, `toggleMenuItemAvailability` to async RxDB ops
-3. Test: admin menu page still works, items persist on refresh
-
-### Phase 2: Tables
-1. Replace `tables` array with `createRxStore`
-2. Convert `openTable`, `closeTable`, `transferTable`, `mergeTables`, `addTable`, `deleteTable`, `updateTableLayout`, `setTableMaintenance` to async
-3. Handle `tickTimers` — this runs every second. Batch-update `elapsedSeconds` via RxDB (see performance note below)
-4. Test: floor page works, table state persists
-
-### Phase 3: Orders
-1. Replace `orders` array with `createRxStore`
-2. This is the largest migration — ~20 functions touch orders
-3. Convert all payment, discount, split-bill, void functions
-4. Test: full order lifecycle (open → items → pay → close)
-
-### Phase 4: Stock
-1. Replace `stockItems`, `deliveries`, `wasteEntries`, `deductions` with `createRxStore`
-2. Convert `receiveDelivery`, `logWaste`, `deductFromStock`, `transferStock`, `adjustStock`
-3. Test: receive delivery, serve order (auto-deduct), check variance
-
-### Phase 5: Expenses
-1. Replace `allExpenses` with `createRxStore`
-2. Convert `addExpense`, `deleteExpense`
-3. Simplest migration
-
-### Phase 6: Audit Log
-1. Create `auditSchema` and add `audit_logs` collection
-2. Replace `auditLog` array with `createRxStore`
-3. Convert `writeLog` to async insert
+**Migration rules:**
+- You cannot remove a `required` field without a migration
+- You can add optional fields without bumping version (they just won't exist on old docs)
+- Test migrations locally before deploying: create data on old version, load new code, verify
 
 ---
 
 ## Rule 10: Performance — Timer Ticks
 
-`tickTimers()` runs every 1 second and updates `elapsedSeconds` on every occupied table. Writing to RxDB 8-16 times per second is fine for IndexedDB, but be aware:
+`tickTimers()` runs every second and updates `elapsedSeconds` on occupied tables. Keep it in memory and only flush periodically:
 
 ```ts
-// Option A: Direct patch (simple, fine for <20 tables)
+// Option A: Full RxDB write every second (fine for < 20 tables, but generates many writes)
 export async function tickTimers() {
     const db = await getDb();
     const occupiedDocs = await db.tables.find({
         selector: { status: { $in: ['occupied', 'warning', 'critical'] } }
     }).exec();
-
     for (const doc of occupiedDocs) {
-        await doc.patch({ elapsedSeconds: (doc.elapsedSeconds ?? 0) + 1 });
+        await doc.incrementalPatch({ elapsedSeconds: (doc.elapsedSeconds ?? 0) + 1 });
     }
 }
 
-// Option B: Keep timer in memory, persist periodically (better performance)
-// Update in-memory every second, write to RxDB every 10-30 seconds
+// Option B: In-memory tick, flush to RxDB every 15 seconds (recommended)
 let timerCache = new Map<string, number>();
 
 export function tickTimersLocal() {
@@ -403,36 +476,17 @@ export async function flushTimers() {
     const db = await getDb();
     for (const [id, seconds] of timerCache) {
         const doc = await db.tables.findOne(id).exec();
-        if (doc) await doc.patch({ elapsedSeconds: seconds });
+        if (doc) await doc.incrementalPatch({ elapsedSeconds: seconds });
     }
 }
 // Call flushTimers() every 15 seconds via setInterval
 ```
 
-**Recommendation:** Option B — keep timers snappy in memory, persist periodically. A 15-second write interval is more than enough for timer state that's only used for display.
+**Recommendation:** Option B — keep timers snappy in memory, persist every 15 seconds.
 
 ---
 
-## Rule 11: Derived/Computed Data (Reports)
-
-`reports.svelte.ts` computes everything from `pos` and `stock` state. After migration:
-
-```ts
-// Reports will automatically work IF they read from the reactive stores
-// Example:
-export function salesSummary() {
-    // This reads from the createRxStore-backed `orders`
-    // which auto-updates when RxDB data changes
-    const todayOrders = orders.value.filter(o => /* ... */);
-    return { /* computed values */ };
-}
-```
-
-No migration needed for reports — they just need to read from the new reactive getters.
-
----
-
-## Rule 12: Error Handling Pattern
+## Rule 11: Error Handling
 
 ```ts
 export async function safeDbOp<T>(operation: () => Promise<T>, fallback?: T): Promise<T | undefined> {
@@ -441,60 +495,62 @@ export async function safeDbOp<T>(operation: () => Promise<T>, fallback?: T): Pr
         return await operation();
     } catch (err) {
         console.error('[RxDB Operation Failed]', err);
-        // TODO: queue for retry if offline
         return fallback;
     }
 }
 
 // Usage:
 await safeDbOp(() => db.orders.insert(newOrder));
+await safeDbOp(() => orderDoc.incrementalModify(mutateFn));
 ```
+
+Note: `incrementalPatch` and `incrementalModify` already retry on 409 CONFLICT internally. You still need error handling for other failure types (IndexedDB quota exceeded, etc.).
 
 ---
 
-## Rule 13: Testing After Migration
+## Rule 12: What Stays In-Memory (Do NOT Migrate)
 
-After each phase, verify:
+| Data | Why it stays in `$state` |
+|---|---|
+| `session` (user, role, branch) | Device-local, no persistence needed |
+| `connectionState` | Runtime-only |
+| `hardwareState` | Runtime-only |
+| `alerts` (KDS kitchen alerts) | Ephemeral, cleared each shift |
+| Timer display tick | Computed from `elapsedSeconds` which IS persisted |
 
-1. **Persistence:** Perform an action → refresh the page → data still there
-2. **Reactivity:** Open two browser tabs → change data in one → other tab updates
-3. **Seed data:** Clear IndexedDB → reload → mock data appears
-4. **No SSR crashes:** Run `pnpm build` — no IndexedDB errors during SSR
+---
 
-Quick test commands:
-```bash
-pnpm dev          # Test in browser
-pnpm check        # TypeScript errors from async changes
-pnpm build        # Verify no SSR issues
-```
+## Rule 13: Seed File
 
-Browser console helpers:
+`src/lib/db/seed.ts` runs on every `getDb()` call but only inserts if `menu_items` is empty.
+
+**Known issues:**
+- Expense seeds use wrong locationIds (`loc-ayala`, `loc-bgc` → should be `qc`, `mkti`)
+- No audit log seeding
+- Stock items use sequential IDs (`si-0`, `si-1`) — use `nanoid` for consistency
+
+**Reset DB in browser console:**
 ```js
-// Check DB contents
-const { getDb } = await import('/src/lib/db/index.ts');
-const db = await getDb();
-const tables = await db.tables.find().exec();
-console.log(tables.map(t => t.toJSON()));
-
-// Nuke and re-seed
 indexedDB.deleteDatabase('wtfpos_db');
 location.reload();
 ```
 
 ---
 
-## Rule 14: Production Update Protocol
+## Rule 14: RxDB 16 Specifics (current version)
 
-### Version Tracking
+Key changes in v16 that affect this codebase:
 
-The app version is defined in `src/lib/version.ts`:
-- `APP_VERSION` — manually bumped string (e.g. `'0.1.0'`)
-- `BUILD_DATE` — auto-injected by Vite at build time
-- `BUILD_MODE` — `'production'` or `'development'`
+- **`memory-synced` storage removed** — use memory-mapped storage instead if needed
+- **Conflict handler split**: `conflictHandler` now has separate `isEqual()` and `resolve()` methods. The default handler keeps master state (correct for offline-first).
+- **Dev-mode requires a schema validator** — already configured in `db/index.ts` with `wrappedValidateIsMyJsonValidStorage`
+- **`toggleOnDocumentVisible` defaults to `true`** — replication pauses when tab is hidden, resumes when visible
+- **`eventReduce: true`** is already set in our config — this enables EventReduce algorithm that avoids re-running queries on every change (significant perf win)
+- **`multiInstance: true`** is set — allows multiple tabs to share the same IndexedDB; important for multi-tablet POS use
 
-Displayed in the TopBar as a subtle `v0.1.0` badge. Hover shows full build timestamp.
+---
 
-**Always bump `APP_VERSION` before deploying.** This is how you confirm which version each tablet is running.
+## Rule 15: Production Update Protocol
 
 ### When Is It Safe to Update?
 
@@ -504,19 +560,19 @@ Displayed in the TopBar as a subtle `v0.1.0` badge. Hover shows full build times
 ├────────────────────────┬───────────────┬────────────────────────┤
 │  Change Type           │  Safe Window  │  Risk                  │
 ├────────────────────────┼───────────────┼────────────────────────┤
-│  UI tweaks, labels,    │  Anytime      │  None — no data        │
-│  colors, typo fixes    │               │  impact                │
+│  UI tweaks, labels,    │  Anytime      │  None                  │
+│  colors, typo fixes    │               │                        │
 ├────────────────────────┼───────────────┼────────────────────────┤
 │  Bug fixes (no schema) │  Anytime      │  Low — test first      │
 ├────────────────────────┼───────────────┼────────────────────────┤
-│  New features reading  │  Slow hours   │  Low — new code reads  │
-│  existing data         │  (2–4 PM)     │  existing collections  │
+│  New features reading  │  Slow hours   │  Low                   │
+│  existing data         │  (2–4 PM)     │                        │
 ├────────────────────────┼───────────────┼────────────────────────┤
 │  New store logic that  │  Between      │  Medium — verify       │
 │  changes write paths   │  shifts       │  data integrity        │
 ├────────────────────────┼───────────────┼────────────────────────┤
-│  New RxDB collection   │  Between      │  Medium — no migration │
-│  (addCollections)      │  shifts       │  but restart needed    │
+│  New RxDB collection   │  Between      │  Medium — restart      │
+│  (addCollections)      │  shifts       │  needed                │
 ├────────────────────────┼───────────────┼────────────────────────┤
 │  Schema version bump   │  After close  │  HIGH — migration runs │
 │  (field add/rename)    │  (10 PM+)     │  on every document     │
@@ -530,68 +586,31 @@ Displayed in the TopBar as a subtle `v0.1.0` badge. Hover shows full build times
 └────────────────────────┴───────────────┴────────────────────────┘
 ```
 
-### Rollout Order (Always)
+### Rollout Order
 
 ```
-1. Deploy new build to server/hosting
-   ↓
+1. Deploy new build to server
 2. Update ONE tablet at one branch (canary)
    → Verify for 15 minutes: orders, tables, stock all work
-   ↓
-3. Update remaining tablets at that branch
-   → Main POS first, then Kitchen KDS
-   ↓
-4. Move to next branch, repeat steps 2–3
-   ↓
-5. Owner phones last (lowest priority, lowest risk)
+3. Update remaining tablets at that branch (main POS first, then KDS)
+4. Move to next branch, repeat
+5. Owner phones last
 ```
 
-### How Staff Triggers Updates (Option B — Manual Prompt)
-
-Updates should NEVER auto-refresh mid-transaction. When a new build is deployed:
-
-1. The service worker (future PWA) detects a new version is available
-2. A non-intrusive banner appears: **"Update available (v0.2.0)"**
-3. Staff/manager taps **"Update Now"** when they're between customers
-4. App reloads with new code; RxDB reopens existing IndexedDB (data intact)
-
-Until the PWA service worker is implemented, updates happen via manual browser refresh.
-The version badge in the TopBar lets you confirm the update took effect.
-
-### Schema Migration Checklist (for version bumps)
-
-Before deploying a schema change:
+### Schema Migration Checklist
 
 ```
 □ Bumped schema version number in schemas.ts
-□ Added migrationStrategies in db/index.ts for the new version
+□ Added migrationStrategies in db/index.ts
 □ Tested locally:
   - Created data on OLD version
   - Switched to NEW code, reloaded
   - Verified all old data migrated correctly
-  - Verified new features work with migrated data
 □ Tested fresh install (cleared IndexedDB, re-seeded)
 □ Bumped APP_VERSION in version.ts
 □ Deployed after service hours (10 PM+)
 □ Canary tablet updated first
 ```
-
-### Offline Branch Update Scenario
-
-If a branch has been offline for days and you deployed an update:
-
-```
-Day 1: You deploy v0.2.0 (with schema v1 migration)
-Day 1: Branch A updates → migration runs → all good
-Day 3: Branch B comes back online
-        → Tablet loads new app code (v0.2.0)
-        → RxDB detects schema v0 → v1 mismatch
-        → Migration runs on all local documents
-        → Branch B is now on v0.2.0 with migrated data
-        → Sync layer (when built) replays 2 days of data to server
-```
-
-This works because migrations are **per-device, automatic, and sequential**. Each tablet independently migrates its own IndexedDB. No coordination required.
 
 ---
 
@@ -599,17 +618,17 @@ This works because migrations are **per-device, automatic, and sequential**. Eac
 
 | File | Purpose |
 |---|---|
-| `src/lib/db/index.ts` | DB singleton, collection registration |
+| `src/lib/db/index.ts` | DB singleton, collection registration, error recovery |
 | `src/lib/db/schemas.ts` | All RxJsonSchema definitions |
 | `src/lib/db/seed.ts` | First-run mock data seeder |
 | `src/lib/stores/sync.svelte.ts` | `createRxStore()` — reactive read bridge |
-| `src/lib/stores/pos.svelte.ts` | Main POS store (tables, orders, menu) — **migrate this** |
-| `src/lib/stores/stock.svelte.ts` | Stock store — **migrate this** |
-| `src/lib/stores/expenses.svelte.ts` | Expenses — **migrate this** |
-| `src/lib/stores/audit.svelte.ts` | Audit log — **needs schema + migrate** |
-| `src/lib/stores/session.svelte.ts` | Session — **do NOT migrate** (stays in-memory) |
-| `src/lib/stores/connection.svelte.ts` | Network state — **do NOT migrate** |
-| `src/lib/stores/hardware.svelte.ts` | Hardware sim — **do NOT migrate** |
-| `src/lib/version.ts` | App version + build date + update protocol notes |
+| `src/lib/stores/pos.svelte.ts` | Main POS store (tables, orders, menu) |
+| `src/lib/stores/stock.svelte.ts` | Stock store |
+| `src/lib/stores/expenses.svelte.ts` | Expenses |
+| `src/lib/stores/audit.svelte.ts` | Audit log |
+| `src/lib/stores/session.svelte.ts` | Session — DO NOT migrate (stays in-memory) |
+| `src/lib/stores/connection.svelte.ts` | Network state — DO NOT migrate |
+| `src/lib/stores/hardware.svelte.ts` | Hardware sim — DO NOT migrate |
+| `src/lib/version.ts` | App version + build date |
 | `src/lib/types.ts` | All TypeScript interfaces |
 | `src/routes/test-db/+page.svelte` | Dev test page for RxDB |
