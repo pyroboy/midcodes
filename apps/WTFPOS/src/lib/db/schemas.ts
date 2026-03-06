@@ -157,7 +157,7 @@ export const menuItemSchema: RxJsonSchema<any> = {
 // ─── Stock Item ──────────────────────────────────────────────────────────────
 export const stockItemSchema: RxJsonSchema<any> = {
 	title: 'stock item schema',
-	version: 2,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -170,6 +170,7 @@ export const stockItemSchema: RxJsonSchema<any> = {
 		openingStock: { type: 'number' },
 		unit: { type: 'string' },
 		minLevel: { type: 'number' },
+		image: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
 	required: ['id', 'menuItemId', 'name', 'category', 'locationId', 'openingStock', 'unit', 'minLevel', 'updatedAt'],

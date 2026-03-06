@@ -60,16 +60,25 @@
 		isHovered ? 'shadow-md -translate-y-0.5 ring-2 ring-accent/30' : ''
 	)}
 >
-	<div class={cn("h-1 w-full relative overflow-hidden transition-all", getProteinStripeClass(item.proteinType))}>
-		{#if isHovered}
-			<div class="absolute inset-0 bg-white/30 animate-pulse"></div>
-		{/if}
-	</div>
+	{#if item.image}
+		<div class="w-full h-40 bg-gray-100 relative overflow-hidden">
+			<img src={item.image} alt={item.name} class="w-full h-full object-cover" />
+			<div class={cn("absolute bottom-0 left-0 right-0 h-1", getProteinStripeClass(item.proteinType))}></div>
+		</div>
+	{:else}
+		<div class={cn("h-1 w-full relative overflow-hidden transition-all", getProteinStripeClass(item.proteinType))}>
+			{#if isHovered}
+				<div class="absolute inset-0 bg-white/30 animate-pulse"></div>
+			{/if}
+		</div>
+	{/if}
 
 	<div class="flex flex-col gap-2 p-4 pt-3" in:fade={{ duration: 200, delay: 100 }}>
-		<div class="flex flex-wrap items-center gap-2">
-			<CategoryIcon category={item.category} class="h-8 w-8" iconClass="w-4 h-4" />
-		</div>
+		{#if !item.image}
+			<div class="flex flex-wrap items-center gap-2">
+				<CategoryIcon category={item.category} class="h-8 w-8" iconClass="w-4 h-4" />
+			</div>
+		{/if}
 
 		<p class="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 mt-2">{item.name}</p>
 

@@ -1,13 +1,16 @@
 <script lang="ts">
-	import { kdsTickets } from '$lib/stores/pos.svelte';
+	import { kdsTickets, dispatchMeatWeight } from '$lib/stores/pos.svelte';
 	import { cn } from '$lib/utils';
 	import YieldCalculatorModal from '$lib/components/kitchen/YieldCalculatorModal.svelte';
+	import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
+	import { btScale } from '$lib/stores/bluetooth-scale.svelte';
+	import { Bluetooth } from 'lucide-svelte';
 
-	// Pending meat orders across all tickets
+	// Only show meat refill requests that haven't been weighed yet (no weight set)
 	const pendingMeatOrders = $derived(
 		kdsTickets.value.flatMap(t =>
 			t.items
-				.filter(i => i.category === 'meats' && i.status !== 'served' && i.status !== 'cancelled')
+				.filter(i => i.category === 'meats' && i.status === 'pending' && !i.weight)
 				.map(i => ({
 					orderId: t.orderId,
 					tableNumber: t.tableNumber,
@@ -24,6 +27,9 @@
 	let weightInput = $state('');
 	let dispatched = $state<{ table: number | null; name: string; weight: number; time: string }[]>([]);
 	let showYieldCalc = $state(false);
+	let inputMode = $state<'manual' | 'scale'>('manual');
+
+	const btConnected = $derived(btScale.connectionStatus === 'connected');
 
 	// Shift totals
 	const totalDispatched = $derived(dispatched.reduce((s, d) => s + d.weight, 0));
@@ -34,11 +40,15 @@
 		if (weightInput.length < 5) weightInput += key;
 	}
 
-	function dispatch() {
+	async function dispatch() {
 		if (!selectedOrder || !weightInput) return;
 		const grams = parseInt(weightInput);
 		if (isNaN(grams) || grams <= 0) return;
 
+		// Write weight to RxDB, deduct stock, update KDS ticket
+		await dispatchMeatWeight(selectedOrder.orderId, selectedOrder.itemId, grams);
+
+		// Local shift tally (UI display only)
 		dispatched = [
 			{
 				table: selectedOrder.tableNumber,
@@ -49,7 +59,6 @@
 			...dispatched
 		];
 
-		// Reset
 		selectedOrder = null;
 		weightInput = '';
 	}
@@ -114,37 +123,97 @@
 				</div>
 			</div>
 
-			<!-- Weight display -->
-			<div class="w-full max-w-sm rounded-2xl border-2 border-gray-600 bg-gray-800 px-8 py-6 text-center">
-				<div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weight (grams)</div>
-				<div class="text-6xl font-extrabold font-mono tracking-tight min-h-[72px] flex items-center justify-center">
-					{#if weightInput}
-						{weightInput}<span class="text-2xl text-gray-500 ml-1">g</span>
+			<!-- Mode toggle (only when BT connected) -->
+			{#if btConnected}
+				<div class="flex rounded-xl bg-gray-800 p-1 w-full max-w-sm">
+					<button
+						onclick={() => { inputMode = 'manual'; }}
+						class={cn(
+							'flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors',
+							inputMode === 'manual' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-gray-200'
+						)}
+						style="min-height: unset"
+					>
+						Manual
+					</button>
+					<button
+						onclick={() => { inputMode = 'scale'; }}
+						class={cn(
+							'flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors flex items-center justify-center gap-1.5',
+							inputMode === 'scale' ? 'bg-status-bluetooth text-white' : 'text-gray-400 hover:text-gray-200'
+						)}
+						style="min-height: unset"
+					>
+						<Bluetooth class="w-4 h-4" />
+						Scale
+					</button>
+				</div>
+			{/if}
+
+			{#if btConnected && inputMode === 'scale'}
+				<!-- BT Scale mode: live weight display + auto-fill input -->
+				<BluetoothWeightInput
+					id="weigh-station"
+					value={weightInput}
+					onValueChange={(v) => { weightInput = v; }}
+					theme="dark"
+					class="w-full max-w-sm"
+				/>
+				<div class="w-full max-w-sm rounded-2xl border-2 border-status-bluetooth/30 bg-gray-800 px-8 py-6 text-center">
+					<div class="text-xs font-semibold text-status-bluetooth uppercase tracking-wider mb-2">
+						Live Scale Reading
+					</div>
+					<div class={cn(
+						'text-6xl font-extrabold font-mono tracking-tight min-h-[72px] flex items-center justify-center',
+						btScale.stability === 'stable' ? 'text-status-green' :
+						btScale.stability === 'unstable' ? 'text-status-yellow' : 'text-gray-600'
+					)}>
+						{btScale.stability === 'unstable' ? '~' : ''}{btScale.currentWeight}<span class="text-2xl text-gray-500 ml-1">g</span>
+					</div>
+					{#if btScale.stability !== 'idle'}
+						<span class={cn(
+							'text-xs font-bold uppercase mt-2 inline-block',
+							btScale.stability === 'stable' ? 'text-status-green' : 'text-status-yellow'
+						)}>
+							{btScale.stability}
+						</span>
 					{:else}
-						<span class="text-gray-600">0</span><span class="text-2xl text-gray-700 ml-1">g</span>
+						<span class="text-xs text-gray-500 mt-2 inline-block">Place item on scale</span>
 					{/if}
 				</div>
-			</div>
+			{:else}
+				<!-- Manual mode: original weight display + numpad -->
+				<div class="w-full max-w-sm rounded-2xl border-2 border-gray-600 bg-gray-800 px-8 py-6 text-center">
+					<div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Weight (grams)</div>
+					<div class="text-6xl font-extrabold font-mono tracking-tight min-h-[72px] flex items-center justify-center">
+						{#if weightInput}
+							{weightInput}<span class="text-2xl text-gray-500 ml-1">g</span>
+						{:else}
+							<span class="text-gray-600">0</span><span class="text-2xl text-gray-700 ml-1">g</span>
+						{/if}
+					</div>
+				</div>
 
-			<!-- Numpad — massive touch targets -->
-			<div class="grid grid-cols-3 gap-3 w-full max-w-sm">
-				{#each numpadKeys as key}
-					<button
-						onclick={() => handleNumpad(key)}
-						class={cn(
-							'flex items-center justify-center rounded-xl text-2xl font-bold transition-all active:scale-95',
-							key === 'C'
-								? 'bg-status-red/20 text-status-red hover:bg-status-red/30'
-								: key === '⌫'
-									? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-									: 'bg-gray-800 text-white hover:bg-gray-700'
-						)}
-						style="min-height: 72px"
-					>
-						{key}
-					</button>
-				{/each}
-			</div>
+				<!-- Numpad — massive touch targets -->
+				<div class="grid grid-cols-3 gap-3 w-full max-w-sm">
+					{#each numpadKeys as key}
+						<button
+							onclick={() => handleNumpad(key)}
+							class={cn(
+								'flex items-center justify-center rounded-xl text-2xl font-bold transition-all active:scale-95',
+								key === 'C'
+									? 'bg-status-red/20 text-status-red hover:bg-status-red/30'
+									: key === '⌫'
+										? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+										: 'bg-gray-800 text-white hover:bg-gray-700'
+							)}
+							style="min-height: 72px"
+						>
+							{key}
+						</button>
+					{/each}
+				</div>
+			{/if}
 
 			<!-- DISPATCH button -->
 			<button

@@ -12,9 +12,14 @@ import { getDb } from '$lib/db';
 import { browser } from '$app/environment';
 import { closeTable, tables } from '$lib/stores/pos/tables.svelte';
 import { kdsTickets } from '$lib/stores/pos/kds.svelte';
+import { menuItems } from '$lib/stores/pos/menu.svelte';
 import { calculateOrderTotals } from '$lib/stores/pos/utils';
 import { deriveOrderItemProps } from '$lib/stores/pos/item.utils';
 import { calculateLeftoverPenalty } from '$lib/stores/pos/payment.utils';
+import { getOrderLabel } from '$lib/stores/pos/label.utils';
+
+export const REFILL_NOTE = 'refill' as const;
+export const LEFTOVER_PENALTY_ITEM_ID = 'penalty-leftover' as const;
 
 const _orders = createRxStore<Order>('orders', db => db.orders.find());
 
@@ -75,7 +80,7 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 
 	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes: notes ?? '' };
 
-	let totals: ReturnType<typeof calculateOrderTotals>;
+	let totals!: ReturnType<typeof calculateOrderTotals>;
 	await orderDoc.incrementalModify((doc: Order) => {
 		const updatedItems = [...doc.items, newItem];
 		totals = calculateOrderTotals({ ...doc, items: updatedItems } as Order);
@@ -86,7 +91,6 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 		doc.updatedAt = new Date().toISOString();
 		return doc;
 	});
-	totals = totals!;
 
 	if (order.tableId) {
 		const tableDoc = await db.tables.findOne(order.tableId).exec();
@@ -123,7 +127,7 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 		});
 	}
 
-	const tableLabel = order.tableId ? (tables.value.find(t => t.id === order.tableId)?.label ?? order.tableId) : 'Takeout';
+	const tableLabel = getOrderLabel(order);
 	log.itemCharged(item.name, tableLabel, weight ?? null, qty);
 }
 
@@ -195,9 +199,7 @@ export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' 
 		}
 	}
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? order.tableId)
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 
 	if (order.subtotal === 0) {
 		log.zeroValueCancellation(label, reason, capturedElapsed ?? undefined);
@@ -330,9 +332,7 @@ export async function changePax(orderId: string, newPax: number) {
 		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
 	}
 
-	const tableLabel = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const tableLabel = getOrderLabel(order);
 	log.paxChanged(tableLabel, oldPax, newPax);
 }
 
@@ -343,7 +343,7 @@ export async function applyLeftoverPenalty(orderId: string, weightGrams: number,
 	const db = await getDb();
 	const penalty = calculateLeftoverPenalty(weightGrams, ratePerHundredGrams);
 	const penaltyItem = {
-		id: nanoid(), menuItemId: 'penalty-leftover', menuItemName: 'Leftover Penalty',
+		id: nanoid(), menuItemId: LEFTOVER_PENALTY_ITEM_ID, menuItemName: 'Leftover Penalty',
 		quantity: 1, unitPrice: penalty, weight: weightGrams, status: 'served' as const, sentAt: null, tag: null as 'PKG' | 'FREE' | null,
 		notes: `${weightGrams}g leftover @ ₱${ratePerHundredGrams}/100g`
 	};
@@ -367,9 +367,7 @@ export async function applyLeftoverPenalty(orderId: string, weightGrams: number,
 		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
 	}
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 	log.leftoverPenaltyApplied(label, weightGrams, penalty);
 }
 
@@ -382,7 +380,7 @@ export async function waiveLeftoverPenalty(orderId: string) {
 	const orderDoc = await db.orders.findOne(orderId).exec();
 	if (orderDoc) {
 		await orderDoc.incrementalModify((doc: Order) => {
-			doc.items = doc.items.filter(i => i.menuItemId !== 'penalty-leftover');
+			doc.items = doc.items.filter(i => i.menuItemId !== LEFTOVER_PENALTY_ITEM_ID);
 			doc.leftoverPenaltyAmount = 0;
 			const totals = calculateOrderTotals(doc);
 			Object.assign(doc, totals);
@@ -397,9 +395,7 @@ export async function waiveLeftoverPenalty(orderId: string) {
 		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
 	}
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 	log.leftoverPenaltyWaived(label);
 }
 
@@ -570,6 +566,140 @@ export async function mergeTables(primaryTableId: string, secondaryTableId: stri
 	return { success: true };
 }
 
+// ─── Refill Workflow ─────────────────────────────────────────────────────────
+
+/**
+ * Adds a meat (or side) item as a refill request with weight: null.
+ * Kitchen will weigh and dispatch via dispatchMeatWeight().
+ * Does NOT deduct stock — stock deduction happens at dispatch time.
+ */
+export async function addRefillRequest(orderId: string, menuItem: MenuItem): Promise<void> {
+	if (!browser) return;
+	const db = await getDb();
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (!orderDoc) return;
+	const order = orderDoc.toMutableJSON() as Order;
+
+	const newItem = {
+		id: nanoid(),
+		menuItemId: menuItem.id,
+		menuItemName: menuItem.name,
+		quantity: 1,
+		unitPrice: 0,
+		weight: null,
+		status: 'pending' as const,
+		sentAt: null,
+		tag: 'FREE' as const,
+		notes: REFILL_NOTE
+	};
+
+	let totals!: ReturnType<typeof calculateOrderTotals>;
+	await orderDoc.incrementalModify((doc: Order) => {
+		doc.items = [...doc.items, newItem];
+		totals = calculateOrderTotals(doc);
+		Object.assign(doc, totals);
+		doc.updatedAt = new Date().toISOString();
+		return doc;
+	});
+
+	// KDS item built before parallel writes below
+	const kdsItem = {
+		id: newItem.id,
+		menuItemName: menuItem.name,
+		quantity: 1,
+		status: 'pending' as const,
+		category: menuItem.category,
+		notes: REFILL_NOTE
+	};
+
+	// In-memory ticket lookup (synchronous) before any async work
+	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
+
+	// Table update and KDS ticket update are independent — run in parallel
+	await Promise.all([
+		(async () => {
+			if (!order.tableId) return;
+			const tableDoc = await db.tables.findOne(order.tableId).exec();
+			if (tableDoc) await tableDoc.incrementalPatch({ billTotal: totals.total, updatedAt: new Date().toISOString() });
+		})(),
+		(async () => {
+			if (ticket) {
+				const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+				if (tDoc) {
+					await tDoc.incrementalModify((doc: any) => {
+						doc.items = [...doc.items, kdsItem];
+						doc.updatedAt = new Date().toISOString();
+						return doc;
+					});
+				}
+			} else {
+				await db.kds_tickets.insert({
+					id: nanoid(),
+					orderId,
+					tableNumber: order.tableNumber,
+					customerName: order.customerName,
+					items: [kdsItem],
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString()
+				});
+			}
+		})()
+	]);
+
+	const tableLabel = getOrderLabel(order);
+	log.itemCharged(menuItem.name, tableLabel, null, 1);
+}
+
+/**
+ * Called from the weigh station when meat is weighed and dispatched.
+ * Writes actual weight to the order item, deducts stock, updates KDS to 'cooking'.
+ */
+export async function dispatchMeatWeight(orderId: string, itemId: string, weightGrams: number): Promise<void> {
+	if (!browser) return;
+	const db = await getDb();
+	const order = orders.value.find(o => o.id === orderId);
+	if (!order) return;
+	const item = order.items.find(i => i.id === itemId);
+	if (!item) return;
+
+	// `order` snapshot is used only for read-only metadata (tableId, tableNumber, logging).
+	// The DB write uses a fresh orderDoc fetch to avoid stale-write risk.
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (orderDoc) {
+		await orderDoc.incrementalModify((doc: Order) => {
+			doc.items = doc.items.map(i =>
+				i.id === itemId ? { ...i, weight: weightGrams, status: 'cooking' as const } : i
+			);
+			// Totals are not recalculated: weight/status changes don't affect price
+			// (refill meats are FREE, unitPrice=0). The billing total is unchanged.
+			doc.updatedAt = new Date().toISOString();
+			return doc;
+		});
+	}
+
+	if (weightGrams > 0) {
+		const mi = menuItems.value.find(m => m.id === item.menuItemId);
+		await deductFromStock(item.menuItemId, weightGrams, order.tableId ?? 'takeout', orderId, mi?.trackInventory ?? true);
+	}
+
+	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
+	if (ticket) {
+		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+		if (tDoc) {
+			await tDoc.incrementalModify((doc: any) => {
+				doc.items = doc.items.map((i: any) =>
+					i.id === itemId ? { ...i, weight: weightGrams, status: 'cooking' } : i
+				);
+				doc.updatedAt = new Date().toISOString();
+				return doc;
+			});
+		}
+	}
+
+	const tableLabel = getOrderLabel(order);
+	log.itemCharged(item.menuItemName, tableLabel, weightGrams, 1);
+}
+
 export async function changePackage(orderId: string, newPackageId: string) {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || !order.packageId) return;
@@ -603,9 +733,7 @@ export async function changePackage(orderId: string, newPackageId: string) {
 		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
 	}
 
-	const tableLabel = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const tableLabel = getOrderLabel(order);
 	const diff = Math.abs(finalTotal - order.total);
 	const direction = finalTotal > order.total ? 'upgrade' : 'downgrade';
 	log.packageChanged(tableLabel, oldPkgName, newPkg.name, direction, diff);

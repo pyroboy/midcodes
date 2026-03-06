@@ -4,6 +4,7 @@
     import { session } from '$lib/stores/session.svelte';
     import { log } from '$lib/stores/audit.svelte';
     import ManagerPinModal from '$lib/components/pos/ManagerPinModal.svelte';
+    import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
 
     interface Props {
         isOpen: boolean;
@@ -60,15 +61,25 @@
                     </select>
                 </label>
 
-                <label class="flex flex-col gap-1.5">
+                <div class="flex flex-col gap-1.5">
                     <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Raw Slab Weight (g)</span>
-                    <input type="number" bind:value={rawWeightInput} class="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white font-mono text-xl text-right" placeholder="0" />
-                </label>
+                    <BluetoothWeightInput
+                        id="yield-raw"
+                        value={rawWeightInput}
+                        onValueChange={(v) => { rawWeightInput = v; }}
+                        theme="dark"
+                    />
+                </div>
 
-                <label class="flex flex-col gap-1.5">
+                <div class="flex flex-col gap-1.5">
                     <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Trimmed Usable Weight (g)</span>
-                    <input type="number" bind:value={trimmedWeightInput} class="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white font-mono text-xl text-right" placeholder="0" />
-                </label>
+                    <BluetoothWeightInput
+                        id="yield-trimmed"
+                        value={trimmedWeightInput}
+                        onValueChange={(v) => { trimmedWeightInput = v; }}
+                        theme="dark"
+                    />
+                </div>
 
                 <div class="my-2 rounded-xl border border-gray-700 bg-gray-800 p-5 text-center">
                     <span class="text-xs font-semibold uppercase tracking-widest text-gray-400">Yield Percentage</span>

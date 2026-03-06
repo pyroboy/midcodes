@@ -8,6 +8,7 @@ import { session } from '$lib/stores/session.svelte';
 import { getDb } from '$lib/db';
 import { closeTable, tables } from '$lib/stores/pos/tables.svelte';
 import { orders } from '$lib/stores/pos/orders.svelte';
+import { getOrderLabel } from '$lib/stores/pos/label.utils';
 import { calculateEqualSplit } from '$lib/stores/pos/payment.utils';
 
 // ─── Direct Checkout (cash / GCash / Maya) ───────────────────────────────────
@@ -42,9 +43,7 @@ export async function checkoutOrder(
 
 	const order = orders.value.find(o => o.id === orderId);
 	const methodLabel = method === 'gcash' ? 'GCash' : method === 'maya' ? 'Maya' : 'Cash';
-	const label = tableId
-		? (tables.value.find(t => t.id === tableId)?.label ?? tableId)
-		: `Takeout (${order?.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order, tableId);
 
 	log.tableClosed(label, order?.total ?? 0, methodLabel, capturedElapsed ?? undefined);
 }
@@ -65,9 +64,7 @@ export async function holdPayment(orderId: string, method: 'gcash' | 'maya') {
 		});
 	}
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 	log.paymentHeld(label);
 }
 
@@ -77,9 +74,7 @@ export async function confirmHeldPayment(orderId: string) {
 
 	const db = await getDb();
 	const method = order.pendingPaymentMethod ?? 'gcash';
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 
 	const capturedElapsed = order.tableId
 		? (tables.value.find(t => t.id === order.tableId)?.elapsedSeconds ?? null)
@@ -117,9 +112,7 @@ export async function cancelHeldPayment(orderId: string) {
 		});
 	}
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 	log.paymentCancelled(label);
 }
 
@@ -158,9 +151,7 @@ export async function initEqualSplit(orderId: string, splitCount: number) {
 		return doc;
 	});
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 	log.splitInitiated(label, 'equal', splitCount);
 }
 
@@ -180,9 +171,7 @@ export async function initItemSplit(orderId: string, splitCount: number) {
 	const orderDoc = await db.orders.findOne(orderId).exec();
 	if (orderDoc) await orderDoc.incrementalPatch({ splitType: 'by-item', subBills, updatedAt: new Date().toISOString() });
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 	log.splitInitiated(label, 'by-item', splitCount);
 }
 
@@ -256,9 +245,7 @@ export async function paySubBill(orderId: string, subBillId: string, method: Pay
 		return doc;
 	});
 
-	const tableLabel = tableId
-		? (tables.value.find(t => t.id === tableId)?.label ?? tableId)
-		: `Takeout (${order?.customerName ?? 'Walk-in'})`;
+	const tableLabel = getOrderLabel(order, tableId);
 	const methodLabel = method === 'gcash' ? 'GCash' : method === 'maya' ? 'Maya' : method === 'card' ? 'Card' : 'Cash';
 	log.subBillPaid(guestLabel, tableLabel, amount, methodLabel);
 
@@ -286,8 +273,6 @@ export async function cancelSplit(orderId: string) {
 		updatedAt: new Date().toISOString()
 	});
 
-	const label = order.tableId
-		? (tables.value.find(t => t.id === order.tableId)?.label ?? '')
-		: `Takeout (${order.customerName ?? 'Walk-in'})`;
+	const label = getOrderLabel(order);
 	log.splitCancelled(label);
 }

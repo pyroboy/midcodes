@@ -257,6 +257,9 @@
                             {#if maintenance > 0}
                                 <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-gray-400"></span>🔧 Maint ({maintenance})</span>
                             {/if}
+                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-pink-200 border border-pink-300"></span>Pork</span>
+                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-purple-200 border border-purple-300"></span>Beef</span>
+                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-gradient-to-r from-pink-200 to-purple-200 border border-purple-300"></span>P&amp;B</span>
                         </div>
                         <button
                             onclick={openTakeoutModal}

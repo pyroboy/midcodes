@@ -114,7 +114,15 @@ export async function getDb() {
 					schema: stockItemSchema,
 					migrationStrategies: {
 						1: (d: any) => d,
-						2: (d: any) => addUpdatedAt(d) // v1→v2: +updatedAt
+						2: (d: any) => addUpdatedAt(d), // v1→v2: +updatedAt
+						3: (d: any) => {
+							const colors: Record<string, string> = { Meats: 'DC2626', Sides: '10B981', Dishes: 'F59E0B', Drinks: '3B82F6' };
+							const bg = colors[d.category] || '6B7280';
+							const label = (d.name || '').replace(/\s*\(.*?\)\s*/g, '').trim().substring(0, 18);
+							const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="#${bg}"/><text x="100" y="108" font-family="Inter,sans-serif" font-size="14" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`;
+							d.image = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+							return d;
+						} // v2→v3: +image
 					}
 				},
 				deliveries: {
@@ -217,8 +225,8 @@ export async function getDb() {
 			globalForRxDB.__wtfposDbPromise = null;
 
 			// Auto-recovery for critical schema mismatch or corrupted storage
-			// DM4: Migration error, DB9: Database creation failed, SC1/SC34: Schema validation failed
-			if (err?.code === 'DM4' || err?.code === 'DB9' || err?.code === 'SC1' || err?.code === 'SC34' ||
+			// COL12: Migration strategy mismatch, DM4: Migration error, DB9: Database creation failed, SC1/SC34: Schema validation failed
+			if (err?.code === 'COL12' || err?.code === 'DM4' || err?.code === 'DB9' || err?.code === 'SC1' || err?.code === 'SC34' ||
 			    err?.message?.includes('closed') || err?.message?.includes('NotFound')) {
 				console.warn('[RxDB] Unrecoverable database state detected. Initiating emergency reset...');
 				if (typeof window !== 'undefined') {

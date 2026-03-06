@@ -3,6 +3,8 @@
     import type { Order } from '$lib/types';
     import ManagerPinModal from './ManagerPinModal.svelte';
     import { applyLeftoverPenalty, waiveLeftoverPenalty } from '$lib/stores/pos.svelte';
+    import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
+    import { btScale } from '$lib/stores/bluetooth-scale.svelte';
 
     interface Props {
         isOpen: boolean;
@@ -69,6 +71,15 @@
                 <h2 class="text-xl font-black text-gray-900">Leftover Penalty?</h2>
                 <p class="text-sm text-gray-500">Unconsumed meat over 100g applies penalty.</p>
             </div>
+
+            {#if btScale.connectionStatus === 'connected'}
+                <BluetoothWeightInput
+                    id="leftover-weight"
+                    value={weightStr}
+                    onValueChange={(v) => { weightStr = v; }}
+                    theme="light"
+                />
+            {/if}
 
             <div class="flex flex-col items-center justify-center gap-2 rounded-xl bg-gray-50 p-4 border border-border">
                 <span class="text-3xl font-black {weightGrams > 0 ? 'text-accent' : 'text-gray-300'}">{weightGrams} g</span>

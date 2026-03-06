@@ -2,6 +2,8 @@
     import type { Order, MenuItem, MenuCategory } from '$lib/types';
     import { menuItems, addItemToOrder } from '$lib/stores/pos.svelte';
     import { formatPeso, cn } from '$lib/utils';
+    import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
+    import { btScale } from '$lib/stores/bluetooth-scale.svelte';
 
     interface Props {
         order: Order;
@@ -18,8 +20,10 @@
         { id: 'drinks',   label: '🥤 Drinks' }
     ];
 
-    let activeCategory = $state<MenuCategory>('packages');
-    
+    let activeCategory = $state<MenuCategory>(
+        order.orderType === 'takeout' ? 'sides' : (order.packageId ? 'meats' : 'packages')
+    );
+
     // Pending items staged before pushing to bill
     let pendingItems = $state<{ item: MenuItem; qty: number; weight?: number; forceFree?: boolean; isTakeout?: boolean }[]>([]);
     
@@ -158,14 +162,16 @@
                             {/each}
                         </div>
                         <div class="mt-4 flex flex-col items-center gap-3">
-                            <span class="text-xs font-semibold uppercase text-gray-400">Custom Amount</span>
+                            <span class="text-xs font-semibold uppercase text-gray-400">
+                                {btScale.connectionStatus === 'connected' ? 'Scale / Custom Amount' : 'Custom Amount'}
+                            </span>
                             <div class="flex items-center gap-3">
-                                <input
-                                    type="number"
-                                    bind:value={weightInput}
+                                <BluetoothWeightInput
+                                    id="add-item-meat-weight"
+                                    value={weightInput}
+                                    onValueChange={(val) => { weightInput = val; }}
                                     placeholder="e.g. 235"
-                                    class="pos-input text-center font-mono text-xl w-32"
-                                    onkeydown={(e) => e.key === 'Enter' && commitMeat(parseFloat(weightInput))}
+                                    class="w-32"
                                 />
                                 <button onclick={() => commitMeat(parseFloat(weightInput))} class="btn-primary">Add</button>
                             </div>
@@ -182,7 +188,7 @@
                             <button
                                 onclick={() => tapItem(item)}
                                 class={cn(
-                                    'relative flex flex-col gap-2.5 rounded-xl border p-5 text-left transition-all active:scale-[0.98]',
+                                    'relative flex flex-col gap-2.5 rounded-xl border text-left transition-all active:scale-[0.98] overflow-hidden',
                                     pendingItems.some(p => p.item.id === item.id)
                                         ? 'border-accent bg-accent-light'
                                         : 'border-border bg-surface-secondary hover:border-gray-300',
@@ -191,38 +197,45 @@
                                     item.protein === 'chicken' ? '!border-l-yellow-500 !border-l-4' : ''
                                 )}
                             >
-                                {#if item.protein}
-                                    <span class={cn(
-                                        "absolute top-3 right-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                                        item.protein === 'beef' ? 'bg-red-100 text-red-700' : '',
-                                        item.protein === 'pork' ? 'bg-orange-100 text-orange-700' : '',
-                                        item.protein === 'chicken' ? 'bg-yellow-100 text-yellow-700' : ''
-                                    )}>
-                                        {item.protein === 'beef' ? '🥩' : item.protein === 'pork' ? '🐷' : '🍗'} {item.protein}
-                                    </span>
-                                {/if}
-                                {#if item.category === 'packages'}
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-base font-bold text-gray-900">{item.name}</span>
-                                        {#if pendingItems.some(p => p.item.id === item.id)}
-                                            <span class="rounded bg-accent px-2 py-0.5 text-[10px] font-bold text-white">ACTIVE</span>
-                                        {/if}
+                                {#if item.image}
+                                    <div class="w-full h-28 bg-gray-100">
+                                        <img src={item.image} alt={item.name} class="w-full h-full object-cover" />
                                     </div>
-                                    {#if item.desc}<p class="text-sm text-gray-500">{item.desc}</p>{/if}
-                                    <p class="font-mono text-sm font-bold text-gray-900">₱{item.price}/pax</p>
-                                    {#if item.perks}<p class="text-xs text-status-green">✓ {item.perks}</p>{/if}
-                                {:else if item.isWeightBased}
-                                    <span class="text-sm font-semibold text-gray-900">{item.name}</span>
-                                    <span class="text-xs text-gray-400">tap to enter weight</span>
-                                    <span class="font-mono text-xs font-bold text-gray-700">₱{((item.pricePerGram ?? 0) * 100).toFixed(0)}/100g</span>
-                                {:else}
-                                    <span class="text-sm font-semibold text-gray-900">{item.name}</span>
-                                    {#if item.isFree}
-                                        <span class="text-xs font-semibold text-status-green">FREE</span>
-                                    {:else}
-                                        <span class="font-mono text-sm font-bold text-gray-900">{formatPeso(item.price)}</span>
-                                    {/if}
                                 {/if}
+                                <div class={cn('flex flex-col gap-2.5 px-5 pb-5', item.image ? 'pt-3' : 'pt-5')}>
+                                    {#if item.protein}
+                                        <span class={cn(
+                                            "absolute top-3 right-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                                            item.protein === 'beef' ? 'bg-red-100 text-red-700' : '',
+                                            item.protein === 'pork' ? 'bg-orange-100 text-orange-700' : '',
+                                            item.protein === 'chicken' ? 'bg-yellow-100 text-yellow-700' : ''
+                                        )}>
+                                            {item.protein === 'beef' ? '🥩' : item.protein === 'pork' ? '🐷' : '🍗'} {item.protein}
+                                        </span>
+                                    {/if}
+                                    {#if item.category === 'packages'}
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-base font-bold text-gray-900">{item.name}</span>
+                                            {#if pendingItems.some(p => p.item.id === item.id)}
+                                                <span class="rounded bg-accent px-2 py-0.5 text-[10px] font-bold text-white">ACTIVE</span>
+                                            {/if}
+                                        </div>
+                                        {#if item.desc}<p class="text-sm text-gray-500">{item.desc}</p>{/if}
+                                        <p class="font-mono text-sm font-bold text-gray-900">₱{item.price}/pax</p>
+                                        {#if item.perks}<p class="text-xs text-status-green">✓ {item.perks}</p>{/if}
+                                    {:else if item.isWeightBased}
+                                        <span class="text-sm font-semibold text-gray-900">{item.name}</span>
+                                        <span class="text-xs text-gray-400">tap to enter weight</span>
+                                        <span class="font-mono text-xs font-bold text-gray-700">₱{((item.pricePerGram ?? 0) * 100).toFixed(0)}/100g</span>
+                                    {:else}
+                                        <span class="text-sm font-semibold text-gray-900">{item.name}</span>
+                                        {#if item.isFree}
+                                            <span class="text-xs font-semibold text-status-green">FREE</span>
+                                        {:else}
+                                            <span class="font-mono text-sm font-bold text-gray-900">{formatPeso(item.price)}</span>
+                                        {/if}
+                                    {/if}
+                                </div>
                             </button>
                         {/each}
                     </div>

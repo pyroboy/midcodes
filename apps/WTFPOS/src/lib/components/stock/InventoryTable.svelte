@@ -5,8 +5,120 @@
 		stockItems, getCurrentStock, getStockStatus,
 		type StockStatus, type StockCategory, type StockItem
 	} from '$lib/stores/stock.svelte';
+	import { menuItems } from '$lib/stores/pos.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { Search } from 'lucide-svelte';
+
+	/** Real food images keyed by menuItemId, served from static/images/stock/. */
+	const STOCK_IMAGES: Record<string, string> = {
+		// Meats
+		'meat-pork-bone-in':   '/images/menu/pork-sliced.jpg',
+		'meat-pork-bone-out':  '/images/menu/samgyupsal.jpg',
+		'meat-pork-sliced':    '/images/menu/samgyupsal.jpg',
+		'meat-pork-bones':     '/images/menu/pork-sliced.jpg',
+		'meat-pork-trimmings': '/images/menu/pork-sliced.jpg',
+		'meat-beef-bone-in':   '/images/stock/standing-rib-roast.jpg',
+		'meat-beef-bone-out':  '/images/stock/standing-rib-roast.jpg',
+		'meat-beef-sliced':    '/images/menu/galbi.jpg',
+		'meat-beef-bones':     '/images/stock/standing-rib-roast.jpg',
+		'meat-beef-trimmings': '/images/stock/standing-rib-roast.jpg',
+		'meat-chicken-wing':   '/images/stock/fried-chicken.jpg',
+		'meat-chicken-leg':    '/images/stock/fried-chicken.jpg',
+		// Sides — fresh vegetables
+		'sides-lettuce':                    '/images/stock/lettuce.jpg',
+		'sides-perilla-leaves-kkaennip':    '/images/stock/banchan.jpg',
+		'sides-garlic-whole-cloves':        '/images/stock/garlic.jpg',
+		'sides-garlic-sliced':              '/images/stock/garlic.jpg',
+		'sides-green-onions-scallions':     '/images/stock/spring-onions.jpg',
+		'sides-jalape-o-green-chilies':     '/images/stock/gochujang.jpg',
+		'sides-white-yellow-onions':        '/images/stock/mixed-onions.jpg',
+		'sides-korean-radish-mu':           '/images/stock/mixed-onions.jpg',
+		'sides-enoki-mushrooms':            '/images/stock/enoki-mushrooms.jpg',
+		'sides-button-mushrooms':           '/images/stock/button-mushrooms.jpg',
+		'sides-corn':                       '/images/stock/corn.jpg',
+		'sides-baguio-pechay':              '/images/stock/lettuce.jpg',
+		'sides-squash':                     '/images/stock/squash.jpg',
+		// Sides — banchan (prepared)
+		'side-kimchi':                      '/images/menu/kimchi.jpg',
+		'sides-baechu-kimchi':              '/images/menu/kimchi.jpg',
+		'sides-kkakdugi':                   '/images/stock/kkakdugi.jpg',
+		'sides-kongnamul-muchim':           '/images/stock/kongnamul.jpg',
+		'sides-oi-muchim':                  '/images/stock/pickled.jpg',
+		'sides-pickled-white-onions':       '/images/stock/pickled.jpg',
+		'sides-pickled-daikon-radish':      '/images/stock/pickled.jpg',
+		'sides-eomuk-bokkeum':              '/images/stock/fish-cakes.jpg',
+		'sides-japchae':                    '/images/menu/japchae.jpg',
+		'side-japchae':                     '/images/menu/japchae.jpg',
+		'sides-gamja-jorim':                '/images/stock/gamjajeon.jpg',
+		'sides-gyeran-jjim':                '/images/stock/gyeranjjim.jpg',
+		'sides-pajeon':                     '/images/stock/pajeon.jpg',
+		'sides-gamja-salad':                '/images/stock/gamjajeon.jpg',
+		'sides-cheesy-tteokbokki':          '/images/stock/tteokbokki.jpg',
+		'side-rice':                        '/images/menu/rice.jpg',
+		'side-noodles':                     '/images/menu/japchae.jpg',
+		// Sides — sauces & condiments
+		'sides-gochujang':                  '/images/stock/gochujang.jpg',
+		'sides-doenjang':                   '/images/stock/doenjang.jpg',
+		'sides-gochugaru-coarse':           '/images/stock/gochujang.jpg',
+		'sides-gochugaru-fine':             '/images/stock/gochujang.jpg',
+		'sides-jin-ganjang-dark-soy-sauce': '/images/stock/soy-sauce.jpg',
+		'sides-guk-ganjang-soup-soy-sauce': '/images/stock/soy-sauce.jpg',
+		'sides-yangjo-ganjang-brewed-soy':  '/images/stock/soy-sauce.jpg',
+		'sides-toasted-sesame-oil':         '/images/stock/sesame-oil.jpg',
+		'sides-mulyeot-corn-rice-syrup':    '/images/stock/sesame-oil.jpg',
+		'sides-mirin-rice-wine':            '/images/stock/soy-sauce.jpg',
+		'sides-aekjeot-fish-sauce':         '/images/stock/fish-sauce.jpg',
+		'sides-dasida-beef-stock-powder':   '/images/stock/doenjang.jpg',
+		'sides-mayonnaise':                 '/images/stock/mayonnaise.jpg',
+		'sides-ssamjang':                   '/images/stock/ssamjang.jpg',
+		'sides-sogeumjang':                 '/images/stock/ssamjang.jpg',
+		'sides-cheese-sauce':               '/images/stock/cheese-sauce.jpg',
+		'sides-wasabi-soy':                 '/images/stock/wasabi.jpg',
+		// Drinks
+		'drink-soju':                       '/images/menu/soju.jpg',
+		'drinks-original-soju':             '/images/menu/soju.jpg',
+		'drinks-flavored-soju-grapefruit':  '/images/menu/soju.jpg',
+		'drinks-flavored-soju-green-grape': '/images/menu/soju.jpg',
+		'drinks-flavored-soju-plum':        '/images/menu/soju.jpg',
+		'drinks-flavored-soju-strawberry':  '/images/menu/soju.jpg',
+		'drinks-makgeolli':                 '/images/stock/makgeolli.jpg',
+		'drinks-san-miguel-pilsen':         '/images/menu/san-miguel.jpg',
+		'drinks-san-miguel-light':          '/images/menu/san-miguel.jpg',
+		'drinks-red-horse':                 '/images/menu/san-miguel.jpg',
+		'drinks-cass':                      '/images/menu/soju.jpg',
+		'drinks-hite':                      '/images/menu/soju.jpg',
+		'drinks-ob':                        '/images/menu/soju.jpg',
+		'drinks-taedonggang':               '/images/menu/soju.jpg',
+		'drinks-coca-cola':                 '/images/stock/cola.jpg',
+		'drinks-sprite':                    '/images/stock/sprite.jpg',
+		'drinks-coke-zero':                 '/images/stock/cola.jpg',
+		'drinks-chilsung-cider':            '/images/stock/sprite.jpg',
+		'drinks-iced-red-tea':              '/images/menu/iced-tea.jpg',
+		'drinks-barley-tea-boricha':        '/images/stock/barley-tea.jpg',
+		'drinks-lemonade':                  '/images/stock/lemonade.jpg',
+		// Pantry / Kitchen Staples
+		'pantry-raw-rice':                  '/images/stock/raw-rice.jpg',
+		'pantry-salt':                      '/images/stock/salt.jpg',
+		'pantry-black-pepper':              '/images/stock/black-pepper.jpg',
+		'pantry-sugar':                     '/images/stock/sugar.jpg',
+		'pantry-cooking-oil':               '/images/stock/cooking-oil.jpg',
+		'pantry-sesame-seeds':              '/images/stock/sesame-seeds.jpg',
+		'pantry-eggs':                      '/images/stock/eggs.jpg',
+		'pantry-tofu':                      '/images/stock/tofu.jpg',
+		'pantry-dried-seaweed':             '/images/stock/seaweed.jpg',
+		'pantry-tteok':                     '/images/stock/tteok.jpg',
+		'pantry-flour':                     '/images/stock/sugar.jpg',
+		'pantry-cornstarch':                '/images/stock/cornstarch.jpg',
+		'pantry-vinegar':                   '/images/stock/vinegar.jpg',
+		'pantry-dangmyeon':                 '/images/stock/dangmyeon.jpg',
+		'pantry-charcoal':                  '/images/stock/charcoal.jpg',
+	};
+
+	function fallbackImage(name: string, menuItemId: string): string {
+		if (STOCK_IMAGES[menuItemId]) return STOCK_IMAGES[menuItemId];
+		const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="#6B7280"/><text x="100" y="108" font-family="Inter,sans-serif" font-size="13" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${name.substring(0, 15)}</text></svg>`;
+		return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+	}
 
 	import StockHealthStrip from './StockHealthStrip.svelte';
 	import CategoryIcon from './CategoryIcon.svelte';
@@ -39,11 +151,15 @@
 	const items = $derived(
 		stockItems.value
 			.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
-			.map(s => ({
-				...s,
-				currentStock: getCurrentStock(s.id),
-				status: getStockStatus(s.id),
-			} as InventoryItem))
+			.map(s => {
+				const menuItem = menuItems.value.find(m => m.id === s.menuItemId);
+				return {
+					...s,
+					currentStock: getCurrentStock(s.id),
+					status: getStockStatus(s.id),
+					image: s.image || menuItem?.image || fallbackImage(s.name, s.menuItemId),
+				} as InventoryItem;
+			})
 	);
 
 	const filteredAndSorted = $derived.by(() => {

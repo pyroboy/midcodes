@@ -9,6 +9,7 @@
 	export interface InventoryItem extends StockItem {
 		currentStock: number;
 		status: StockStatus;
+		image?: string;
 	}
 
 	const statusConfig: Record<StockStatus, { label: string; badgeClass: string; dotClass: string }> = {
@@ -42,7 +43,13 @@
 >
 	<td class="px-4 py-3" in:fade={{ duration: 200 }}>
 		<div class="flex items-center gap-2 w-max">
-			<CategoryIcon category={item.category} class="h-9 w-9" iconClass="w-4 h-4" />
+			{#if item.image}
+				<div class="h-14 w-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-border">
+					<img src={item.image} alt={item.name} class="w-full h-full object-cover" />
+				</div>
+			{:else}
+				<CategoryIcon category={item.category} class="h-9 w-9" iconClass="w-4 h-4" />
+			{/if}
 		</div>
 	</td>
 	<td class="px-4 py-3">

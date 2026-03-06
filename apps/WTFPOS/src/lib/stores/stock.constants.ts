@@ -3,7 +3,7 @@
  * Separated from stock.svelte.ts to reduce file size.
  */
 
-export type StockCategory = 'Meats' | 'Sides' | 'Dishes' | 'Drinks';
+export type StockCategory = 'Meats' | 'Sides' | 'Dishes' | 'Drinks' | 'Pantry';
 export type MeatProtein = 'beef' | 'pork' | 'chicken' | 'other';
 
 /** Infers protein type from a menuItemId string (beef/pork/chicken check order matters). */
@@ -264,4 +264,55 @@ export const STOCK_ITEMS_LIST: {
 	{ menuItemId: 'drinks-iced-red-tea',                   name: 'Iced Red Tea',              category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
 	{ menuItemId: 'drinks-barley-tea-boricha',             name: 'Barley Tea (Boricha)',      category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
 	{ menuItemId: 'drinks-lemonade',                       name: 'Lemonade',                  category: 'Drinks',    locationId: 'wh-qc',   unit: 'bottles',    minLevel: 96     },
+
+	// ── QC Pantry / Kitchen Staples ──────────────────────────────────────────
+	{ menuItemId: 'pantry-raw-rice',           name: 'Raw Rice (Uncooked)',       category: 'Pantry',    locationId: 'qc',      unit: 'kg',         minLevel: 25     },
+	{ menuItemId: 'pantry-salt',               name: 'Salt',                      category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 3000   },
+	{ menuItemId: 'pantry-black-pepper',       name: 'Black Pepper (Ground)',     category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 500    },
+	{ menuItemId: 'pantry-sugar',              name: 'Sugar',                     category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 2000   },
+	{ menuItemId: 'pantry-cooking-oil',        name: 'Cooking Oil',               category: 'Pantry',    locationId: 'qc',      unit: 'ml',         minLevel: 5000   },
+	{ menuItemId: 'pantry-sesame-seeds',       name: 'Sesame Seeds (Roasted)',    category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 1000   },
+	{ menuItemId: 'pantry-eggs',               name: 'Eggs',                      category: 'Pantry',    locationId: 'qc',      unit: 'pcs',        minLevel: 60     },
+	{ menuItemId: 'pantry-tofu',               name: 'Tofu',                      category: 'Pantry',    locationId: 'qc',      unit: 'blocks',     minLevel: 10     },
+	{ menuItemId: 'pantry-dried-seaweed',      name: 'Dried Seaweed (Gim)',       category: 'Pantry',    locationId: 'qc',      unit: 'packs',      minLevel: 20     },
+	{ menuItemId: 'pantry-tteok',              name: 'Tteok (Rice Cakes)',        category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 3000   },
+	{ menuItemId: 'pantry-flour',              name: 'Flour',                     category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 2000   },
+	{ menuItemId: 'pantry-cornstarch',         name: 'Cornstarch',                category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 1000   },
+	{ menuItemId: 'pantry-vinegar',            name: 'Vinegar',                   category: 'Pantry',    locationId: 'qc',      unit: 'ml',         minLevel: 2000   },
+	{ menuItemId: 'pantry-dangmyeon',          name: 'Dangmyeon (Glass Noodles)', category: 'Pantry',    locationId: 'qc',      unit: 'g',          minLevel: 2000   },
+	{ menuItemId: 'pantry-charcoal',           name: 'Charcoal',                  category: 'Pantry',    locationId: 'qc',      unit: 'kg',         minLevel: 20     },
+
+	// ── Makati Pantry / Kitchen Staples ──────────────────────────────────────
+	{ menuItemId: 'pantry-raw-rice',           name: 'Raw Rice (Uncooked)',       category: 'Pantry',    locationId: 'mkti',    unit: 'kg',         minLevel: 25     },
+	{ menuItemId: 'pantry-salt',               name: 'Salt',                      category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 3000   },
+	{ menuItemId: 'pantry-black-pepper',       name: 'Black Pepper (Ground)',     category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 500    },
+	{ menuItemId: 'pantry-sugar',              name: 'Sugar',                     category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
+	{ menuItemId: 'pantry-cooking-oil',        name: 'Cooking Oil',               category: 'Pantry',    locationId: 'mkti',    unit: 'ml',         minLevel: 5000   },
+	{ menuItemId: 'pantry-sesame-seeds',       name: 'Sesame Seeds (Roasted)',    category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 1000   },
+	{ menuItemId: 'pantry-eggs',               name: 'Eggs',                      category: 'Pantry',    locationId: 'mkti',    unit: 'pcs',        minLevel: 60     },
+	{ menuItemId: 'pantry-tofu',               name: 'Tofu',                      category: 'Pantry',    locationId: 'mkti',    unit: 'blocks',     minLevel: 10     },
+	{ menuItemId: 'pantry-dried-seaweed',      name: 'Dried Seaweed (Gim)',       category: 'Pantry',    locationId: 'mkti',    unit: 'packs',      minLevel: 20     },
+	{ menuItemId: 'pantry-tteok',              name: 'Tteok (Rice Cakes)',        category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 3000   },
+	{ menuItemId: 'pantry-flour',              name: 'Flour',                     category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
+	{ menuItemId: 'pantry-cornstarch',         name: 'Cornstarch',                category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 1000   },
+	{ menuItemId: 'pantry-vinegar',            name: 'Vinegar',                   category: 'Pantry',    locationId: 'mkti',    unit: 'ml',         minLevel: 2000   },
+	{ menuItemId: 'pantry-dangmyeon',          name: 'Dangmyeon (Glass Noodles)', category: 'Pantry',    locationId: 'mkti',    unit: 'g',          minLevel: 2000   },
+	{ menuItemId: 'pantry-charcoal',           name: 'Charcoal',                  category: 'Pantry',    locationId: 'mkti',    unit: 'kg',         minLevel: 20     },
+
+	// ── Warehouse Pantry / Kitchen Staples ───────────────────────────────────
+	{ menuItemId: 'pantry-raw-rice',           name: 'Raw Rice (Bulk)',           category: 'Pantry',    locationId: 'wh-qc',   unit: 'kg',         minLevel: 100    },
+	{ menuItemId: 'pantry-salt',               name: 'Salt (Bulk)',               category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 10000  },
+	{ menuItemId: 'pantry-black-pepper',       name: 'Black Pepper (Bulk)',       category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 2000   },
+	{ menuItemId: 'pantry-sugar',              name: 'Sugar (Bulk)',              category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
+	{ menuItemId: 'pantry-cooking-oil',        name: 'Cooking Oil (Bulk)',        category: 'Pantry',    locationId: 'wh-qc',   unit: 'ml',         minLevel: 20000  },
+	{ menuItemId: 'pantry-sesame-seeds',       name: 'Sesame Seeds (Bulk)',       category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 4000   },
+	{ menuItemId: 'pantry-eggs',               name: 'Eggs (Bulk)',               category: 'Pantry',    locationId: 'wh-qc',   unit: 'pcs',        minLevel: 240    },
+	{ menuItemId: 'pantry-tofu',               name: 'Tofu (Bulk)',               category: 'Pantry',    locationId: 'wh-qc',   unit: 'blocks',     minLevel: 40     },
+	{ menuItemId: 'pantry-dried-seaweed',      name: 'Dried Seaweed (Bulk)',      category: 'Pantry',    locationId: 'wh-qc',   unit: 'packs',      minLevel: 80     },
+	{ menuItemId: 'pantry-tteok',              name: 'Tteok (Bulk)',              category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 12000  },
+	{ menuItemId: 'pantry-flour',              name: 'Flour (Bulk)',              category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
+	{ menuItemId: 'pantry-cornstarch',         name: 'Cornstarch (Bulk)',         category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 4000   },
+	{ menuItemId: 'pantry-vinegar',            name: 'Vinegar (Bulk)',            category: 'Pantry',    locationId: 'wh-qc',   unit: 'ml',         minLevel: 8000   },
+	{ menuItemId: 'pantry-dangmyeon',          name: 'Dangmyeon (Bulk)',          category: 'Pantry',    locationId: 'wh-qc',   unit: 'g',          minLevel: 8000   },
+	{ menuItemId: 'pantry-charcoal',           name: 'Charcoal (Bulk)',           category: 'Pantry',    locationId: 'wh-qc',   unit: 'kg',         minLevel: 80     },
 ];

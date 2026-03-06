@@ -30,6 +30,7 @@ export interface StockItem {
 	openingStock: number;
 	unit: string;
 	minLevel: number;
+	image?: string;
 	updatedAt: string;
 }
 
@@ -136,6 +137,21 @@ export const proteinConfig: Record<MeatProtein, {
 export { getProteinType };
 
 // ─── Initial Mock Data ────────────────────────────────────────────────────────
+const STOCK_IMAGE_COLORS: Record<StockCategory, { bg: string; fg: string }> = {
+	Meats:  { bg: 'DC2626', fg: 'FFFFFF' },
+	Sides:  { bg: '10B981', fg: 'FFFFFF' },
+	Dishes: { bg: 'F59E0B', fg: 'FFFFFF' },
+	Drinks: { bg: '3B82F6', fg: 'FFFFFF' },
+	Pantry: { bg: 'D97706', fg: 'FFFFFF' },
+};
+
+function stockPlaceholderImage(name: string, category: StockCategory): string {
+	const { bg, fg } = STOCK_IMAGE_COLORS[category];
+	const label = name.replace(/\s*\(.*?\)\s*/g, '').trim().substring(0, 18);
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="#${bg}"/><text x="100" y="108" font-family="Inter,sans-serif" font-size="14" font-weight="600" fill="#${fg}" text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`;
+	return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 export const INITIAL_STOCK_ITEMS: StockItem[] = STOCK_ITEMS_LIST.map((s, i) => ({
 	id: `si-${i}`,
 	menuItemId: s.menuItemId,
@@ -146,6 +162,7 @@ export const INITIAL_STOCK_ITEMS: StockItem[] = STOCK_ITEMS_LIST.map((s, i) => (
 	openingStock: getOpeningStock(s.menuItemId, s.locationId),
 	unit: s.unit,
 	minLevel: s.minLevel,
+	image: stockPlaceholderImage(s.name, s.category),
 	updatedAt: new Date().toISOString(),
 }));
 

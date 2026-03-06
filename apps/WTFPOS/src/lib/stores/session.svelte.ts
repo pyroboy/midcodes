@@ -2,7 +2,11 @@
  * Global Session State — Svelte 5 Runes
  * Holds the currently logged-in user and selected location.
  * Locations can be 'retail' (tables + POS + KDS) or 'warehouse' (inventory only).
+ * Session is persisted to localStorage so it survives page reloads.
  */
+import { browser } from '$app/environment';
+
+const SESSION_KEY = 'wtfpos_session';
 
 export type Role         = 'staff' | 'manager' | 'kitchen' | 'owner' | 'admin';
 export type LocationType = 'retail' | 'warehouse';
@@ -43,13 +47,24 @@ export const ROLE_NAV_ACCESS: Record<Role, string[]> = {
 	admin:   ['/pos', '/kitchen', '/stock', '/reports', '/admin'],
 };
 
+function loadPersistedSession(): { userName: string; role: Role; locationId: LocationId; isLocked: boolean } {
+	if (!browser) return { userName: '', role: 'staff', locationId: 'qc', isLocked: false };
+	try {
+		const raw = localStorage.getItem(SESSION_KEY);
+		if (raw) return JSON.parse(raw);
+	} catch {}
+	return { userName: '', role: 'staff', locationId: 'qc', isLocked: false };
+}
+
+const _persisted = loadPersistedSession();
+
 export const session = $state({
-	userName:   '',
-	role:       'staff' as Role,
+	userName:   _persisted.userName,
+	role:       _persisted.role,
 	/** Current location; replaces the old 'branch' field */
-	locationId: 'qc' as LocationId,
+	locationId: _persisted.locationId,
 	/** True when the user cannot switch locations */
-	isLocked:   false,
+	isLocked:   _persisted.isLocked,
 });
 
 // ─── Location Helpers ─────────────────────────────────────────────────────────
@@ -85,4 +100,20 @@ export function setSession(userName: string, role: Role, locationId: LocationId 
 	const { resolvedLocationId, isLocked } = deriveSessionState(role, locationId);
 	session.locationId = resolvedLocationId;
 	session.isLocked   = isLocked;
+	if (browser) {
+		localStorage.setItem(SESSION_KEY, JSON.stringify({
+			userName: session.userName,
+			role:     session.role,
+			locationId: session.locationId,
+			isLocked:   session.isLocked,
+		}));
+	}
+}
+
+export function clearSession() {
+	session.userName   = '';
+	session.role       = 'staff';
+	session.locationId = 'qc';
+	session.isLocked   = false;
+	if (browser) localStorage.removeItem(SESSION_KEY);
 }

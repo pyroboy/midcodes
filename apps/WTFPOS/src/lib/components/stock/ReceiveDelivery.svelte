@@ -3,6 +3,8 @@
 	import {
 		stockItems, deliveries, receiveDelivery,
 	} from '$lib/stores/stock.svelte';
+	import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
+	import { btScale } from '$lib/stores/bluetooth-scale.svelte';
 
 	const UNITS = ['grams', 'kg', 'portions', 'bowls', 'bottles', 'liters', 'pcs'];
 
@@ -26,6 +28,8 @@
 
 	const selectedItem = $derived(stockItems.value.find(s => s.id === selectedStockId));
 	const canSave = $derived(selectedStockId !== '' && parseFloat(qty) > 0 && supplier.trim() !== '');
+	const isWeightUnit = $derived(unit === 'grams' || unit === 'kg');
+	const btConnected = $derived(btScale.connectionStatus === 'connected');
 
 	async function handleReceive() {
 		if (!canSave) return;
@@ -76,7 +80,16 @@
 			<div class="grid grid-cols-2 gap-3">
 				<div class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Quantity *</span>
-					<input type="number" bind:value={qty} placeholder="0" min="0" class="pos-input" />
+					{#if isWeightUnit && btConnected}
+						<BluetoothWeightInput
+							id="delivery-qty"
+							value={qty}
+							onValueChange={(v) => { qty = v; }}
+							theme="light"
+						/>
+					{:else}
+						<input type="number" bind:value={qty} placeholder="0" min="0" class="pos-input" />
+					{/if}
 				</div>
 				<div class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Unit</span>

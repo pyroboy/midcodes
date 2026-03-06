@@ -29,7 +29,9 @@ export default {
 					purple: '#8B5CF6',
 					'purple-light': '#F5F3FF',
 					cyan: '#06B6D4',
-					'cyan-light': '#ECFEFF'
+					'cyan-light': '#ECFEFF',
+					bluetooth: '#3B82F6',
+					'bluetooth-light': '#EFF6FF'
 				}
 			},
 			fontFamily: {
@@ -46,6 +48,7 @@ export default {
 				'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 				'border-pulse-red': 'borderPulseRed 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 				'border-pulse-yellow': 'borderPulseYellow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'border-pulse-bluetooth': 'borderPulseBluetooth 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 			},
 			keyframes: {
 				borderPulseRed: {
@@ -55,6 +58,10 @@ export default {
 				borderPulseYellow: {
 					'0%, 100%': { borderColor: 'rgba(250, 204, 21, 1)' }, // yellow-400
 					'50%': { borderColor: 'rgba(250, 204, 21, 0.3)' },
+				},
+				borderPulseBluetooth: {
+					'0%, 100%': { borderColor: 'rgba(59, 130, 246, 1)' }, // blue-500
+					'50%': { borderColor: 'rgba(59, 130, 246, 0.3)' },
 				}
 			}
 		}

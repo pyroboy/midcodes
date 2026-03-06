@@ -4,6 +4,7 @@
 	import { session, LOCATIONS, ELEVATED_ROLES, ROLE_NAV_ACCESS, getCurrentLocation } from '$lib/stores/session.svelte';
 	import type { LocationId } from '$lib/stores/session.svelte';
 	import HardwareStatus from '$lib/components/HardwareStatus.svelte';
+	import BluetoothScaleStatus from '$lib/components/BluetoothScaleStatus.svelte';
 	import NoSaleModal from '$lib/components/NoSaleModal.svelte';
 	import ExpensesModal from '$lib/components/ExpensesModal.svelte';
 	import { ScanBarcode, MapPin, ChevronDown } from 'lucide-svelte';
@@ -201,6 +202,7 @@
 				<ScanBarcode class="w-5 h-5 text-gray-400" />
 			</button>
 			
+			<BluetoothScaleStatus />
 			<HardwareStatus />
 
 			<!-- No Sale Button -->

@@ -12,6 +12,15 @@ export function formatCountdown(seconds: number): string {
 	return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/** Format a past ISO timestamp as "Xm ago" / "Xh ago" / "just now" */
+export function formatTimeAgo(isoTimestamp: string): string {
+	const diff = Date.now() - new Date(isoTimestamp).getTime();
+	const minutes = Math.floor(diff / 60000);
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return `${minutes}m ago`;
+	return `${Math.floor(minutes / 60)}h ago`;
+}
+
 /** Format pesos */
 export function formatPeso(amount: number): string {
 	return new Intl.NumberFormat('en-PH', {

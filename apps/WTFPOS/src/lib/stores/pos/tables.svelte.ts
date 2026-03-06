@@ -22,7 +22,7 @@ function makeTables(): Table[] {
 			id: `${prefix}-T${i + 1}`, locationId, number: i + 1, label: `T${i + 1}`, zone: 'main' as TableZone, capacity: i < 6 ? 4 : 2,
 			x: FLOOR_POSITIONS[i]?.x ?? (i % 4) * 155 + 40,
 			y: FLOOR_POSITIONS[i]?.y ?? Math.floor(i / 4) * 155 + 40,
-			width: 92, height: 92,
+			width: 112, height: 112,
 			status: 'available' as const, sessionStartedAt: null, elapsedSeconds: null, currentOrderId: null, billTotal: null,
 		updatedAt: new Date().toISOString()
 		}))
@@ -194,7 +194,7 @@ export async function addTable(locationId: string, label: string, capacity: numb
 	const id = `${locationId === 'qc' ? 'QC' : 'MK'}-T${number}-${nanoid(4)}`;
 	await db.tables.insert({
 		id, locationId, number, label, zone: 'main', capacity,
-		x, y, width: 92, height: 92,
+		x, y, width: 112, height: 112,
 		shape: 'rect',
 		status: 'available', sessionStartedAt: null, elapsedSeconds: null, currentOrderId: null, billTotal: null,
 		updatedAt: new Date().toISOString()

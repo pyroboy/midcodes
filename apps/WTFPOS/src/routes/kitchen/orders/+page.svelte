@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket } from '$lib/stores/pos.svelte';
+	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, REFILL_NOTE } from '$lib/stores/pos.svelte';
 	import type { KdsTicket } from '$lib/types';
 	import { refuseItem } from '$lib/stores/alert.svelte';
 	import { formatCountdown, cn } from '$lib/utils';
@@ -164,7 +164,11 @@
 								<div class="flex items-center justify-between py-0.5 group">
 									<div class="flex-1">
 										<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
-										{#if item.weight}<span class="text-[10px] text-gray-400 ml-1">{item.weight}g</span>{/if}
+										{#if item.weight}
+											<span class="text-[10px] text-gray-400 ml-1">{item.weight}g</span>
+										{:else if item.notes === REFILL_NOTE}
+											<span class="text-[10px] font-bold text-amber-500 ml-1 animate-pulse">WEIGHING</span>
+										{/if}
 									</div>
 									<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
 										<button

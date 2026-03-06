@@ -46,6 +46,7 @@
 	.badge-green  { @apply badge bg-status-green-light text-status-green; }
 	.badge-yellow { @apply badge bg-status-yellow-light text-status-yellow; }
 	.badge-red    { @apply badge bg-status-red-light text-status-red; }
+	.badge-bluetooth { @apply badge bg-status-bluetooth-light text-status-bluetooth; }
 
 	/* TopBar ----------------------------------------------------------------- */
 	.topbar {
