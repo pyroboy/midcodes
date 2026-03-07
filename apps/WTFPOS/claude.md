@@ -69,35 +69,162 @@ src/
 ├── app.html                         # HTML shell
 ├── lib/
 │   ├── utils.ts                     # cn(), formatCountdown(), formatPeso()
-│   ├── types.ts                     # Table, MenuItem, Order, KdsTicket types
+│   ├── version.ts                   # App version + build date
+│   ├── types.ts                     # Table, FloorElement, Order, KdsTicket, MenuItem, StockItem…
+│   ├── db/
+│   │   ├── index.ts                 # RxDB singleton (getDb), collection registration, migrations
+│   │   ├── schemas.ts               # All 17 RxDB collection schemas + version numbers
+│   │   ├── seed.ts                  # Initial seed data (tables, menu items, stock items)
+│   │   └── seed-history.ts          # Historical order/expense seed for reports dev
 │   ├── stores/
 │   │   ├── session.svelte.ts        # Auth: userName, role, locationId, isLocked + ROLE_NAV_ACCESS
-│   │   ├── pos.svelte.ts            # Tables, orders, menu items, payment logic
-│   │   ├── stock.svelte.ts          # Inventory, receiving, waste, stock counts
-│   │   ├── reports.svelte.ts        # Report data (sales, expenses, analytics)
-│   │   └── audit.svelte.ts          # Audit log entries + helper writers
+│   │   ├── sync.svelte.ts           # createRxStore() bridge — RxDB → Svelte 5 $state
+│   │   ├── pos.svelte.ts            # Re-export shim (legacy) — real logic split into stores/pos/
+│   │   ├── pos/                     # POS domain sub-stores
+│   │   │   ├── orders.svelte.ts     # Order CRUD, takeout, void, checkout lifecycle
+│   │   │   ├── tables.svelte.ts     # Table status, open/close, transfer, merge
+│   │   │   ├── kds.svelte.ts        # KDS ticket creation, bump, refuse, history
+│   │   │   ├── menu.svelte.ts       # Menu item reads + availability toggle
+│   │   │   ├── payments.svelte.ts   # Payment processing, split bill, sub-bills
+│   │   │   ├── utils.ts             # calculateOrderTotals(), discount math
+│   │   │   ├── item.utils.ts        # deriveOrderItemProps(), item state helpers
+│   │   │   ├── payment.utils.ts     # calculateLeftoverPenalty(), VAT helpers
+│   │   │   └── label.utils.ts       # getOrderLabel() — table/takeout display labels
+│   │   ├── stock.svelte.ts          # Inventory, deliveries, waste, deductions, adjustments
+│   │   ├── floor-layout.svelte.ts   # Read-only floor tables/elements for POS floor plan
+│   │   ├── floor-editor.svelte.ts   # Floor editor state: drag, resize, select, canvas config
+│   │   ├── reports.svelte.ts        # Report queries: sales, expenses, meat, x-read, z-read
+│   │   ├── expenses.svelte.ts       # Expense CRUD + category helpers
+│   │   ├── audit.svelte.ts          # Audit log store (RxDB backed)
+│   │   ├── audit.utils.ts           # log() helper writers for common audit actions
+│   │   ├── expenses.utils.ts        # Expense category definitions + formatting
+│   │   ├── alert.svelte.ts          # In-app alert banner state (AlertBanner)
+│   │   ├── bluetooth-scale.svelte.ts # Web Bluetooth scale connection + weight stream
+│   │   ├── hardware.svelte.ts       # Hardware registry (scale, future printer/scanner)
+│   │   ├── connection.svelte.ts     # Network online/offline monitor
+│   │   ├── device.svelte.ts         # Device heartbeat + registration in RxDB
+│   │   ├── db-health.svelte.ts      # RxDB health check + emergency reset trigger
+│   │   └── admin-guard.svelte.ts    # Admin-change confirmation modal state
 │   └── components/
 │       ├── AppSidebar.svelte        # Collapsible left sidebar (icon-rail desktop / Sheet mobile)
 │       ├── MobileTopBar.svelte      # Mobile-only top bar with hamburger (md:hidden)
 │       ├── TopBar.svelte            # DEPRECATED — do not use in new pages
 │       ├── SubNav.svelte            # Tab-style sub-navigation for section pages
 │       ├── TableCard.svelte         # Floor table status card with countdown
+│       ├── ConnectionStatus.svelte  # Floating online/offline pill (root layout)
+│       ├── DbHealthBanner.svelte    # Floating DB health warning + reset button (root layout)
+│       ├── AlertBanner.svelte       # Dismissable in-app alert banner
+│       ├── HardwareStatus.svelte    # Bluetooth scale + hardware connection indicator
+│       ├── NoSaleModal.svelte       # No-sale drawer open confirmation
+│       ├── ExpensesModal.svelte     # Quick expense entry modal
+│       ├── AdminChangeGuardModal.svelte  # Confirmation guard for admin destructive actions
+│       ├── PhotoCapture.svelte      # Camera/file receipt photo capture
+│       ├── BluetoothWeightInput.svelte   # Weight input wired to Bluetooth scale
+│       ├── BluetoothScalePairModal.svelte # BT scale pairing flow
+│       ├── BluetoothScaleStatus.svelte   # Scale connection status badge
+│       ├── BluetoothScaleSimulator.svelte # Dev-only scale simulator
+│       ├── pos/
+│       │   ├── FloorPlan.svelte          # SVG floor plan canvas (reads floor-layout store)
+│       │   ├── OrderSidebar.svelte       # Right-side active order panel
+│       │   ├── AddItemModal.svelte        # Full-screen menu item picker
+│       │   ├── CheckoutModal.svelte       # Payment entry + receipt flow
+│       │   ├── ReceiptModal.svelte        # Printed receipt preview
+│       │   ├── PaxModal.svelte            # Pax entry on table open
+│       │   ├── PaxChangeModal.svelte      # Pax change (manager PIN required)
+│       │   ├── PackageChangeModal.svelte  # Package upgrade/change
+│       │   ├── VoidModal.svelte           # Item void with reason
+│       │   ├── ManagerPinModal.svelte     # 4-digit manager PIN gate
+│       │   ├── TransferTableModal.svelte  # Move order to another table
+│       │   ├── MergeTablesModal.svelte    # Merge two table orders
+│       │   ├── SplitBillModal.svelte      # Bill splitting UI
+│       │   ├── LeftoverPenaltyModal.svelte # AYCE leftover penalty entry
+│       │   ├── OrderHistoryModal.svelte   # Closed order history browser
+│       │   ├── NewTakeoutModal.svelte     # Create takeout order
+│       │   ├── TakeoutQueue.svelte        # Takeout orders queue panel
+│       │   ├── RefillPanel.svelte         # Refill request panel (AYCE sides)
+│       │   └── AllBranchesDashboard.svelte # Owner 'all' location overview
+│       ├── kitchen/
+│       │   ├── KdsHistoryModal.svelte     # Bumped ticket history viewer
+│       │   ├── RefuseReasonModal.svelte   # Kitchen refuse item with reason
+│       │   └── YieldCalculatorModal.svelte # Meat yield / portion calculator
 │       ├── stock/
-│       │   ├── LocationBanner.svelte    # ← Always-visible location context (mounted in root layout)
+│       │   ├── LocationBanner.svelte      # ← Always-visible location context (root layout)
 │       │   ├── LocationSelectorModal.svelte
-│       │   ├── InventoryTable.svelte
-│       │   ├── ReceiveDelivery.svelte
-│       │   ├── StockCounts.svelte
-│       │   └── WasteLog.svelte
-│       └── ui/                      # shadcn-svelte generated components (sidebar, sheet, button…)
+│       │   ├── InventoryTable.svelte      # Full inventory data table
+│       │   ├── InventoryItemCard.svelte   # Card view for mobile inventory
+│       │   ├── InventoryItemRow.svelte    # Row view for desktop inventory
+│       │   ├── InventoryEditModal.svelte  # Edit stock item details
+│       │   ├── InventoryToolbar.svelte    # Search/filter/sort toolbar
+│       │   ├── InventoryActionModal.svelte # Quick adjust/restock modal
+│       │   ├── AllLocationsInventory.svelte # Cross-branch inventory view (owner)
+│       │   ├── ReceiveDelivery.svelte     # Delivery receive form
+│       │   ├── WasteLog.svelte            # Waste entry + history
+│       │   ├── StockCounts.svelte         # AM10/PM4/PM10 count entry
+│       │   ├── StockLevelBar.svelte       # Visual stock level indicator
+│       │   ├── StockHealthStrip.svelte    # Health strip across stock items
+│       │   ├── VarianceBar.svelte         # Count vs. expected variance bar
+│       │   ├── ProgressRing.svelte        # Circular progress ring (stock %)
+│       │   ├── QuickNumberInput.svelte    # Numpad-style quick number entry
+│       │   ├── ProteinDonutChart.svelte   # Protein category donut chart
+│       │   ├── ProteinGroupHeader.svelte  # Group header for protein sections
+│       │   └── CategoryIcon.svelte        # Stock category icon resolver
+│       ├── floor-editor/
+│       │   ├── TableSVG.svelte            # SVG table shape renderer (editor mode)
+│       │   ├── FloorElementSVG.svelte     # SVG wall/furniture/label renderer
+│       │   └── ChairEditorModal.svelte    # Chair configuration modal
+│       ├── reports/
+│       │   ├── MeatSalesCard.svelte       # Per-cut meat sales summary card
+│       │   ├── MeatFlowBar.svelte         # Meat in/out flow bar chart
+│       │   ├── MeatOntologyGraph.svelte   # Meat type hierarchy graph
+│       │   └── LocationMeatCard.svelte    # Per-location meat card (branch comparison)
+│       └── ui/                            # shadcn-svelte generated components (sidebar, sheet, button…)
 └── routes/
     ├── +page.svelte                 # LOGIN screen — no sidebar, no LocationBanner
-    ├── +layout.svelte               # Root layout: SidebarProvider > AppSidebar + SidebarInset > MobileTopBar > LocationBanner > {children}
+    ├── +layout.svelte               # Root layout (see Layout Architecture below)
     ├── pos/+page.svelte             # POS floor plan + order sidebar
-    ├── kitchen/+layout.svelte       # Kitchen sub-nav (All Orders | Queue | Weigh Station)
-    ├── stock/+layout.svelte         # Stock tab nav (Inventory | Deliveries | Transfers | Counts | Waste)
-    ├── reports/+layout.svelte       # Reports grouped tab nav (5 groups, 14 tabs)
-    └── admin/+layout.svelte         # Admin tab nav (Users | Menu | Logs | Floor Editor | Devices)
+    ├── expenses/+page.svelte        # Quick expense entry page
+    ├── dashboard/+page.svelte       # Stub dashboard (Phase 3)
+    ├── test-db/+page.svelte         # Dev RxDB health + data inspector
+    ├── kitchen/
+    │   ├── +layout.svelte           # Kitchen sub-nav
+    │   ├── +page.svelte             # Redirect → kitchen/orders
+    │   ├── orders/+page.svelte      # KDS queue (active tickets)
+    │   ├── all-orders/+page.svelte  # All open orders list view
+    │   └── weigh-station/+page.svelte # Bluetooth scale + meat weighing
+    ├── stock/
+    │   ├── +layout.svelte           # Stock tab nav
+    │   ├── +page.svelte             # Redirect → stock/inventory
+    │   ├── inventory/+page.svelte   # Inventory list (card + table views)
+    │   ├── deliveries/+page.svelte  # Receive deliveries + delivery log
+    │   ├── transfers/+page.svelte   # Inter-branch stock transfers
+    │   ├── counts/+page.svelte      # AM/PM stock counts
+    │   ├── waste/+page.svelte       # Waste log entry
+    │   └── receive/+page.svelte     # Receive delivery (alternate entry)
+    ├── reports/
+    │   ├── +layout.svelte           # Reports grouped tab nav
+    │   ├── +page.svelte             # Redirect → reports/x-read
+    │   ├── x-read/+page.svelte      # BIR X-Reading (mid-day)
+    │   ├── eod/+page.svelte         # Z-Reading / End-of-Day close
+    │   ├── expenses-daily/+page.svelte   # Daily expense breakdown
+    │   ├── expenses-monthly/+page.svelte # Monthly expense summary
+    │   ├── sales-summary/+page.svelte    # Sales by category/package
+    │   ├── best-sellers/+page.svelte     # Top menu items by volume
+    │   ├── voids-discounts/+page.svelte  # Void + discount audit
+    │   ├── profit-gross/+page.svelte     # Gross profit report
+    │   ├── profit-net/+page.svelte       # Net profit report
+    │   ├── peak-hours/+page.svelte       # Hourly traffic heatmap
+    │   ├── staff-performance/+page.svelte # Sales per cashier
+    │   ├── table-sales/+page.svelte      # Per-table revenue
+    │   ├── meat-report/+page.svelte      # Meat usage vs. sales (ontology)
+    │   └── branch-comparison/+page.svelte # Cross-branch side-by-side
+    └── admin/
+        ├── +layout.svelte           # Admin tab nav
+        ├── +page.svelte             # Redirect → admin/users
+        ├── users/+page.svelte       # User management
+        ├── menu/+page.svelte        # Menu item CRUD
+        ├── logs/+page.svelte        # Audit log viewer
+        ├── floor-editor/+page.svelte # Visual floor plan editor
+        └── devices/+page.svelte     # Registered device list + heartbeat
 ```
 
 ---
@@ -107,19 +234,35 @@ src/
 The root layout (`+layout.svelte`) is the single shell for all authenticated pages:
 
 ```
-SidebarProvider
-├── AppSidebar          ← collapsible left rail (desktop) / Sheet drawer (mobile)
-└── SidebarInset
-    ├── MobileTopBar    ← md:hidden — brand + hamburger for mobile
-    ├── LocationBanner  ← ALWAYS VISIBLE on all authenticated pages
-    └── {children}      ← page/section content
+<ConnectionStatus />          ← floating pill, always rendered (fixed position)
+<DbHealthBanner />            ← floating warning banner (fixed), emergency DB reset
+{#if showSidebar}
+  <SidebarProvider>
+    <AppSidebar />            ← collapsible left rail (desktop) / Sheet drawer (mobile)
+    <SidebarInset>
+      <MobileTopBar />        ← md:hidden — brand + hamburger for mobile
+      <LocationBanner />      ← ALWAYS VISIBLE on all authenticated pages
+      {children}              ← page/section content
+    </SidebarInset>
+  </SidebarProvider>
+{:else}
+  {children}                  ← login page only
+{/if}
 ```
+
+Root layout also mounts a **dev error overlay** (DEV mode only) that captures `window.error` and `unhandledrejection` events and shows them in a fixed panel — useful during development.
+
+On `onMount`, the root layout initialises three global monitors:
+- `initConnectionMonitor()` — tracks network online/offline
+- `initDeviceHeartbeat()` — registers + pings device record in RxDB
+- `initDbHealthCheck()` — polls RxDB health, triggers banner on failure
 
 **Rules:**
 - The login page (`/`) opts out of the sidebar via `showSidebar = page.url.pathname !== '/'`
 - Section layouts (`kitchen`, `stock`, `reports`, `admin`) use `h-full` not `h-screen` — height is managed by `SidebarInset`
 - **Never add `TopBar` to new pages** — it is deprecated. Navigation lives in `AppSidebar`
 - **Never add `LocationBanner` to individual section layouts** — it lives in root layout only
+- **Never add `ConnectionStatus` or `DbHealthBanner` to page components** — they live in root layout only
 
 ---
 
@@ -346,6 +489,30 @@ All data is persisted in **RxDB v16** using IndexedDB (Dexie) in the browser. Be
 | `skills/rxdb/references/RXDB_SCHEMA_VALIDATION_GUIDE.md` | Schema errors (SC34, SC36, SC38, DXE1, etc.) |
 | `skills/rxdb/references/RXDB_REPLICATION_GUIDE.md` | Multi-device sync, `updatedAt` requirements |
 
+### RxDB Collections (current schema versions)
+
+| Collection       | Schema v | Primary Key  | Notes                                          |
+|------------------|----------|--------------|------------------------------------------------|
+| `tables`         | 3        | `id`         | Per-location; holds live session + order state |
+| `floor_elements` | 2        | `id`         | Walls, dividers, furniture for floor editor    |
+| `orders`         | 4        | `id`         | Dine-in + takeout; includes sub-bills          |
+| `menu_items`     | 1        | `id`         | Global (no locationId) — shared across branches |
+| `stock_items`    | 3        | `id`         | Per-location meat + pantry items               |
+| `deliveries`     | 3        | `id`         | Delivery batches with batch/expiry tracking    |
+| `waste`          | 3        | `id`         | Waste log entries                              |
+| `deductions`     | 2        | `id`         | Auto-deductions tied to order items            |
+| `adjustments`    | 3        | `id`         | Manual stock add/deduct adjustments            |
+| `stock_counts`   | 2        | `stockItemId`| AM10/PM4/PM10 count slots — one doc per item  |
+| `devices`        | 1        | `id`         | Device heartbeat registry                      |
+| `expenses`       | 3        | `id`         | Per-location cash/card expenses                |
+| `kds_tickets`    | 5        | `id`         | Kitchen display tickets; `bumpedAt` = history  |
+| `x_reads`        | 2        | `id`         | BIR X-Reading snapshots                        |
+| `z_reads`        | 0        | `id`         | EOD Z-Readings (business date close)           |
+| `audit_logs`     | 0        | `id`         | Immutable action log; `meta` is JSON string    |
+| `kitchen_alerts` | 0        | `id`         | Refuse/out-of-stock alerts from kitchen        |
+
+> **Schema version bumps** require a migration strategy in `db/index.ts`. Never bump without a migration.
+
 **Non-negotiable rules (always apply):**
 - **NEVER** use `.patch()` or `.modify()` — always use `incrementalPatch` / `incrementalModify`
 - **Every write** must include `updatedAt: new Date().toISOString()`
@@ -355,7 +522,7 @@ All data is persisted in **RxDB v16** using IndexedDB (Dexie) in the browser. Be
 - **Schema version bumps** require migration strategies in `db/index.ts`
 - **Every record** must include `locationId` — this enforces branch scoping at the data layer
 
-Key files: `src/lib/db/index.ts` (singleton), `src/lib/db/schemas.ts` (schemas), `src/lib/db/seed.ts` (seeder), `src/lib/stores/sync.svelte.ts` (`createRxStore()` bridge).
+Key files: `src/lib/db/index.ts` (singleton + migrations), `src/lib/db/schemas.ts` (all 17 schemas), `src/lib/db/seed.ts` (initial seed), `src/lib/db/seed-history.ts` (dev history seed), `src/lib/stores/sync.svelte.ts` (`createRxStore()` bridge).
 
 ---
 

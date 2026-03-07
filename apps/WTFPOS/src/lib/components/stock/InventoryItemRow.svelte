@@ -30,11 +30,13 @@
 		onOpenModal: (item: InventoryItem) => void;
 		onEditClick: (item: InventoryItem, e: MouseEvent) => void;
 		onHover?: (id: string | null) => void;
+		onToggle86?: () => void;
+		menuAvailable?: boolean;
 		animate?: boolean;
 		readonly?: boolean;
 	}
 
-	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, animate = false, readonly = false }: Props = $props();
+	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, onToggle86, menuAvailable = true, animate = false, readonly = false }: Props = $props();
 	const display = $derived(getStatusDisplay(item.status, item.currentStock, item.minLevel));
 </script>
 
@@ -82,13 +84,29 @@
 	</td>
 	<td class="px-4 py-3 text-right">
 		{#if !readonly}
-			<button
-				class="text-gray-400 hover:text-accent transition-colors"
-				onclick={(e) => onEditClick(item, e)}
-				aria-label="Edit Info"
-			>
-				<Edit3 class="w-4 h-4" />
-			</button>
+			<div class="flex items-center justify-end gap-2">
+				{#if onToggle86}
+					<button
+						onclick={(e) => { e.stopPropagation(); onToggle86!(); }}
+						class={cn(
+							'rounded px-2 py-0.5 text-[10px] font-bold border transition-colors',
+							menuAvailable
+								? 'border-gray-200 text-gray-400 hover:border-status-red/40 hover:text-status-red hover:bg-status-red-light'
+								: 'border-status-red/40 bg-status-red-light text-status-red'
+						)}
+						title={menuAvailable ? 'Mark as sold out (86)' : 'Unmark — restore to menu'}
+					>
+						{menuAvailable ? '86' : '86\'d'}
+					</button>
+				{/if}
+				<button
+					class="text-gray-400 hover:text-accent transition-colors"
+					onclick={(e) => onEditClick(item, e)}
+					aria-label="Edit Info"
+				>
+					<Edit3 class="w-4 h-4" />
+				</button>
+			</div>
 		{/if}
 	</td>
 </tr>

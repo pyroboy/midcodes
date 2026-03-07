@@ -4,7 +4,7 @@
  * Import specific derived values here instead of duplicating per page.
  */
 import { orders as allOrders, tables as allTables, menuItems } from '$lib/stores/pos.svelte';
-import { stockItems, deliveries, deductions, wasteEntries, getCurrentStock, getStockStatus } from '$lib/stores/stock.svelte';
+import { stockItems, deliveries, deductions, wasteEntries, stockEvents, getCurrentStock, getStockStatus } from '$lib/stores/stock.svelte';
 import { PROTEIN_ORDER, type MeatProtein } from '$lib/stores/stock.constants';
 import { session } from '$lib/stores/session.svelte';
 import { log, auditLog, writeLog } from '$lib/stores/audit.svelte';
@@ -294,10 +294,12 @@ export function eodSummary() {
 
 // ─── X-Read Mid-Shift Audit ──────────────────────────────────────────────────
 
-export interface XReadSnapshot {
+// ─── Unified Readings store (x-read + z-read) ────────────────────────────────
+
+export interface Reading {
 	id: string;
+	type: 'x-read' | 'z-read';
 	locationId: string;
-	timestamp: string;
 	grossSales: number;
 	discounts: number;
 	netSales: number;
@@ -306,33 +308,53 @@ export interface XReadSnapshot {
 	cash: number;
 	gcash: number;
 	card: number;
-	voidCount: number;
-	discountCount: number;
-	generatedBy: string;
+	// x-read fields
+	timestamp?: string | null;
+	voidCount?: number | null;
+	discountCount?: number | null;
+	generatedBy?: string | null;
+	// z-read fields
+	date?: string | null;
+	submittedAt?: string | null;
+	submittedBy?: string | null;
+	cashExpenses?: number | null;
+	openingCash?: number | null;
+	closingActual?: number | null;
+	cashVariance?: number | null;
+	updatedAt: string;
 }
 
-const _xReadHistory = createRxStore<XReadSnapshot>('x_reads', db => db.x_reads.find().sort({ timestamp: 'desc' }));
+/** @deprecated Use Reading with type === 'x-read' */
+export type XReadSnapshot = Reading & { type: 'x-read' };
+/** @deprecated Use Reading with type === 'z-read' */
+export type ZReadSnapshot = Reading & { type: 'z-read' };
+
+const _readings = createRxStore<Reading>('readings', db => db.readings.find().sort({ updatedAt: 'desc' }));
 
 export const xReadHistory = {
 	get value() {
 		const loc = session.locationId;
-		if (loc === 'all') return _xReadHistory.value;
-		return _xReadHistory.value.filter(xr => xr.locationId === loc);
+		const xreads = _readings.value.filter(r => r.type === 'x-read');
+		if (loc === 'all') return xreads;
+		return xreads.filter(r => r.locationId === loc);
 	},
-	get initialized() { return _xReadHistory.initialized; }
+	get initialized() { return _readings.initialized; }
 };
 
-export async function generateXRead(): Promise<XReadSnapshot> {
+export async function generateXRead(): Promise<Reading> {
 	const summary = eodSummary();
 	const voids = getOrders().filter(o => o.status === 'cancelled');
 	const discounted = getOrders().filter(o => o.status === 'paid' && o.discountType !== 'none');
 	const paid = getOrders().filter(o => o.status === 'paid');
 	const totalPax = paid.reduce((s, o) => s + (o.pax ?? 0), 0);
 
-	const snapshot: XReadSnapshot = {
+	const now = new Date().toISOString();
+	const snapshot: Reading = {
 		id: nanoid(),
+		type: 'x-read' as const,
 		locationId: session.locationId === 'all' ? 'tag' : session.locationId,
-		timestamp: new Date().toISOString(),
+		timestamp: now,
+		updatedAt: now,
 		grossSales: summary.grossSales,
 		discounts: summary.discounts,
 		netSales: summary.netSales,
@@ -347,7 +369,7 @@ export async function generateXRead(): Promise<XReadSnapshot> {
 	};
 
 	const db = await getDb();
-	await db.x_reads.insert(snapshot);
+	await db.readings.insert(snapshot);
 	log.xReadGenerated();
 	return snapshot;
 }
@@ -556,34 +578,21 @@ export function netSalesByPeriod(period: 'today' | 'week' | 'month'): number {
 
 // ─── Z-Read (EOD permanent record) ───────────────────────────────────────────
 
-export interface ZReadSnapshot {
-	id: string;
-	date: string; // YYYY-MM-DD
-	locationId: string;
-	submittedAt: string;
-	submittedBy: string;
-	grossSales: number;
-	discounts: number;
-	netSales: number;
-	vatAmount: number;
-	totalPax: number;
-	cash: number;
-	gcash: number;
-	card: number;
-	cashExpenses: number;
-	openingCash: number;
-	closingActual: number;
-	cashVariance: number;
-	updatedAt: string;
-}
+export const zReadHistory = {
+	get value() {
+		const loc = session.locationId;
+		const zreads = _readings.value.filter(r => r.type === 'z-read');
+		if (loc === 'all') return zreads;
+		return zreads.filter(r => r.locationId === loc);
+	},
+	get initialized() { return _readings.initialized; }
+};
 
-export const zReadHistory = createRxStore<ZReadSnapshot>('z_reads', db => db.z_reads.find().sort({ submittedAt: 'desc' }));
-
-export async function saveZRead(params: Omit<ZReadSnapshot, 'id' | 'updatedAt'>): Promise<ZReadSnapshot> {
+export async function saveZRead(params: Omit<Reading, 'id' | 'type' | 'updatedAt'>): Promise<Reading> {
 	const now = new Date().toISOString();
-	const snapshot: ZReadSnapshot = { id: nanoid(), updatedAt: now, ...params };
+	const snapshot: Reading = { id: nanoid(), type: 'z-read' as const, updatedAt: now, ...params };
 	const db = await getDb();
-	await db.z_reads.insert(snapshot);
+	await db.readings.insert(snapshot);
 	writeLog('admin', 'EOD Z-Read submitted', { meta: { date: params.date, netSales: params.netSales } });
 	return snapshot;
 }

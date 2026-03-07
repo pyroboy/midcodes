@@ -36,6 +36,7 @@ export interface StockItem {
 
 export interface Delivery {
 	id: string;
+	locationId: string;
 	stockItemId: string;
 	itemName: string;
 	qty: number;
@@ -51,10 +52,12 @@ export interface Delivery {
 	updatedAt: string;
 }
 
-export interface WasteEntry {
+export interface StockEvent {
 	id: string;
+	locationId: string;
 	stockItemId: string;
 	itemName: string;
+	type: 'waste' | 'add' | 'deduct';
 	qty: number;
 	unit: string;
 	reason: string;
@@ -63,21 +66,14 @@ export interface WasteEntry {
 	updatedAt: string;
 }
 
-export interface StockAdjustment {
-	id: string;
-	stockItemId: string;
-	itemName: string;
-	type: 'add' | 'deduct';
-	qty: number;
-	unit: string;
-	reason: string;
-	loggedBy: string;
-	loggedAt: string;
-	updatedAt: string;
-}
+/** @deprecated Use StockEvent with type === 'waste' */
+export type WasteEntry = StockEvent & { type: 'waste' };
+/** @deprecated Use StockEvent with type === 'add' | 'deduct' */
+export type StockAdjustment = StockEvent & { type: 'add' | 'deduct' };
 
 export interface Deduction {
 	id: string;
+	locationId: string;
 	stockItemId: string;
 	qty: number;
 	tableId: string;
@@ -209,39 +205,39 @@ const now = new Date().toISOString();
 
 export const INITIAL_DELIVERIES: Delivery[] = [
 	// Original supplier deliveries
-	{ id: 'd1', stockItemId: getSiId('meat-pork-bone-in', 'tag'), itemName: 'Pork Bone-In',            qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: now, usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0], updatedAt: now },
-	{ id: 'd2', stockItemId: getSiId('drink-soju', 'tag'), itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: hoursAgo(1), usedQty: 0, depleted: false, batchNo: 'B-242', updatedAt: now },
-	{ id: 'd3', stockItemId: getSiId('side-kimchi', 'tag'), itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: hoursAgo(2), usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], updatedAt: now },
+	{ id: 'd1', locationId: 'tag', stockItemId: getSiId('meat-pork-bone-in', 'tag'), itemName: 'Pork Bone-In',            qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: now, usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0], updatedAt: now },
+	{ id: 'd2', locationId: 'tag', stockItemId: getSiId('drink-soju', 'tag'), itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: hoursAgo(1), usedQty: 0, depleted: false, batchNo: 'B-242', updatedAt: now },
+	{ id: 'd3', locationId: 'tag', stockItemId: getSiId('side-kimchi', 'tag'), itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: hoursAgo(2), usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], updatedAt: now },
 
 	// ── Transfers: Warehouse → Tagbilaran (today, morning dispatch) ────────────────────
-	{ id: 'trf-tag-1', stockItemId: getSiId('meat-pork-bone-in', 'tag'),   itemName: 'Pork Bone-In',   qty: 8000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 3200, depleted: false, batchNo: 'TRF-A1TAG', updatedAt: now },
-	{ id: 'trf-tag-2', stockItemId: getSiId('meat-pork-bone-out', 'tag'),  itemName: 'Pork Bone-Out',  qty: 6000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 2400, depleted: false, batchNo: 'TRF-A2TAG', updatedAt: now },
-	{ id: 'trf-tag-3', stockItemId: getSiId('meat-beef-bone-in', 'tag'),   itemName: 'Beef Bone-In',   qty: 5000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1800, depleted: false, batchNo: 'TRF-A3TAG', updatedAt: now },
-	{ id: 'trf-tag-4', stockItemId: getSiId('meat-beef-sliced', 'tag'),    itemName: 'Sliced Beef',     qty: 4000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1500, depleted: false, batchNo: 'TRF-A4TAG', updatedAt: now },
-	{ id: 'trf-tag-5', stockItemId: getSiId('meat-chicken-wing', 'tag'),   itemName: 'Chicken Wing',    qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1200, depleted: false, batchNo: 'TRF-A5TAG', updatedAt: now },
-	{ id: 'trf-tag-6', stockItemId: getSiId('meat-chicken-leg', 'tag'),    itemName: 'Chicken Leg',     qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 900,  depleted: false, batchNo: 'TRF-A6TAG', updatedAt: now },
+	{ id: 'trf-tag-1', locationId: 'tag', stockItemId: getSiId('meat-pork-bone-in', 'tag'),   itemName: 'Pork Bone-In',   qty: 8000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 3200, depleted: false, batchNo: 'TRF-A1TAG', updatedAt: now },
+	{ id: 'trf-tag-2', locationId: 'tag', stockItemId: getSiId('meat-pork-bone-out', 'tag'),  itemName: 'Pork Bone-Out',  qty: 6000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 2400, depleted: false, batchNo: 'TRF-A2TAG', updatedAt: now },
+	{ id: 'trf-tag-3', locationId: 'tag', stockItemId: getSiId('meat-beef-bone-in', 'tag'),   itemName: 'Beef Bone-In',   qty: 5000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1800, depleted: false, batchNo: 'TRF-A3TAG', updatedAt: now },
+	{ id: 'trf-tag-4', locationId: 'tag', stockItemId: getSiId('meat-beef-sliced', 'tag'),    itemName: 'Sliced Beef',     qty: 4000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1500, depleted: false, batchNo: 'TRF-A4TAG', updatedAt: now },
+	{ id: 'trf-tag-5', locationId: 'tag', stockItemId: getSiId('meat-chicken-wing', 'tag'),   itemName: 'Chicken Wing',    qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1200, depleted: false, batchNo: 'TRF-A5TAG', updatedAt: now },
+	{ id: 'trf-tag-6', locationId: 'tag', stockItemId: getSiId('meat-chicken-leg', 'tag'),    itemName: 'Chicken Leg',     qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 900,  depleted: false, batchNo: 'TRF-A6TAG', updatedAt: now },
 
 	// ── Transfers: Warehouse → Panglao (today, morning dispatch) ────────────────
-	{ id: 'trf-mk-1', stockItemId: getSiId('meat-pork-bone-in', 'pgl'),  itemName: 'Pork Bone-In',   qty: 7000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 2800, depleted: false, batchNo: 'TRF-B1MK', updatedAt: now },
-	{ id: 'trf-mk-2', stockItemId: getSiId('meat-pork-sliced', 'pgl'),   itemName: 'Sliced Pork',     qty: 5000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 2000, depleted: false, batchNo: 'TRF-B2MK', updatedAt: now },
-	{ id: 'trf-mk-3', stockItemId: getSiId('meat-beef-bone-in', 'pgl'),  itemName: 'Beef Bone-In',   qty: 4000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1600, depleted: false, batchNo: 'TRF-B3MK', updatedAt: now },
-	{ id: 'trf-mk-4', stockItemId: getSiId('meat-beef-bone-out', 'pgl'), itemName: 'Beef Bone-Out',  qty: 3500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1200, depleted: false, batchNo: 'TRF-B4MK', updatedAt: now },
-	{ id: 'trf-mk-5', stockItemId: getSiId('meat-chicken-wing', 'pgl'),  itemName: 'Chicken Wing',    qty: 2500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1000, depleted: false, batchNo: 'TRF-B5MK', updatedAt: now },
+	{ id: 'trf-mk-1', locationId: 'pgl', stockItemId: getSiId('meat-pork-bone-in', 'pgl'),  itemName: 'Pork Bone-In',   qty: 7000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 2800, depleted: false, batchNo: 'TRF-B1MK', updatedAt: now },
+	{ id: 'trf-mk-2', locationId: 'pgl', stockItemId: getSiId('meat-pork-sliced', 'pgl'),   itemName: 'Sliced Pork',     qty: 5000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 2000, depleted: false, batchNo: 'TRF-B2MK', updatedAt: now },
+	{ id: 'trf-mk-3', locationId: 'pgl', stockItemId: getSiId('meat-beef-bone-in', 'pgl'),  itemName: 'Beef Bone-In',   qty: 4000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1600, depleted: false, batchNo: 'TRF-B3MK', updatedAt: now },
+	{ id: 'trf-mk-4', locationId: 'pgl', stockItemId: getSiId('meat-beef-bone-out', 'pgl'), itemName: 'Beef Bone-Out',  qty: 3500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1200, depleted: false, batchNo: 'TRF-B4MK', updatedAt: now },
+	{ id: 'trf-mk-5', locationId: 'pgl', stockItemId: getSiId('meat-chicken-wing', 'pgl'),  itemName: 'Chicken Wing',    qty: 2500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1000, depleted: false, batchNo: 'TRF-B5MK', updatedAt: now },
 
 	// ── Transfers: Warehouse → Tagbilaran (yesterday, afternoon restock) ───────────────
-	{ id: 'trf-tag-y1', stockItemId: getSiId('meat-pork-sliced', 'tag'),   itemName: 'Sliced Pork',     qty: 4500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 4500, depleted: true,  batchNo: 'TRF-Y1TAG', updatedAt: now },
-	{ id: 'trf-tag-y2', stockItemId: getSiId('meat-beef-bone-out', 'tag'), itemName: 'Beef Bone-Out',  qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 3000, depleted: true,  batchNo: 'TRF-Y2TAG', updatedAt: now },
-	{ id: 'trf-tag-y3', stockItemId: getSiId('meat-chicken-leg', 'tag'),   itemName: 'Chicken Leg',     qty: 2000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 2000, depleted: true,  batchNo: 'TRF-Y3TAG', updatedAt: now },
+	{ id: 'trf-tag-y1', locationId: 'tag', stockItemId: getSiId('meat-pork-sliced', 'tag'),   itemName: 'Sliced Pork',     qty: 4500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 4500, depleted: true,  batchNo: 'TRF-Y1TAG', updatedAt: now },
+	{ id: 'trf-tag-y2', locationId: 'tag', stockItemId: getSiId('meat-beef-bone-out', 'tag'), itemName: 'Beef Bone-Out',  qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 3000, depleted: true,  batchNo: 'TRF-Y2TAG', updatedAt: now },
+	{ id: 'trf-tag-y3', locationId: 'tag', stockItemId: getSiId('meat-chicken-leg', 'tag'),   itemName: 'Chicken Leg',     qty: 2000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 2000, depleted: true,  batchNo: 'TRF-Y3TAG', updatedAt: now },
 
 	// ── Transfers: Warehouse → Panglao (yesterday) ──────────────────────────────
-	{ id: 'trf-mk-y1', stockItemId: getSiId('meat-pork-bone-out', 'pgl'), itemName: 'Pork Bone-Out', qty: 5500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Daily dispatch',    receivedAt: hoursAgo(26), usedQty: 5500, depleted: true,  batchNo: 'TRF-Y1MK', updatedAt: now },
-	{ id: 'trf-mk-y2', stockItemId: getSiId('meat-beef-sliced', 'pgl'),  itemName: 'Sliced Beef',     qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Daily dispatch',    receivedAt: hoursAgo(26), usedQty: 3000, depleted: true,  batchNo: 'TRF-Y2MK', updatedAt: now },
+	{ id: 'trf-mk-y1', locationId: 'pgl', stockItemId: getSiId('meat-pork-bone-out', 'pgl'), itemName: 'Pork Bone-Out', qty: 5500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Daily dispatch',    receivedAt: hoursAgo(26), usedQty: 5500, depleted: true,  batchNo: 'TRF-Y1MK', updatedAt: now },
+	{ id: 'trf-mk-y2', locationId: 'pgl', stockItemId: getSiId('meat-beef-sliced', 'pgl'),  itemName: 'Sliced Beef',     qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Daily dispatch',    receivedAt: hoursAgo(26), usedQty: 3000, depleted: true,  batchNo: 'TRF-Y2MK', updatedAt: now },
 ];
 
-export const INITIAL_WASTE_ENTRIES: WasteEntry[] = [
-	{ id: 'w1', stockItemId: getSiId('meat-pork-bones', 'tag'),  itemName: 'Pork Bones',            qty: 150, unit: 'g',        reason: 'Trimming (bone/fat)', loggedBy: 'Maria S.', loggedAt: new Date(Date.now() - 14400000).toISOString(), updatedAt: new Date().toISOString() },
-	{ id: 'w2', stockItemId: getSiId('side-rice', 'tag'), itemName: 'Steamed Rice',          qty: 2,   unit: 'portions', reason: 'Overcooked',          loggedBy: 'Pedro C.', loggedAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString() },
-	{ id: 'w3', stockItemId: getSiId('drink-soju', 'tag'), itemName: 'Soju (Original)',       qty: 1,   unit: 'bottles',  reason: 'Unusable (damaged)',  loggedBy: 'Maria S.', loggedAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+export const INITIAL_STOCK_EVENTS: StockEvent[] = [
+	{ id: 'w1', locationId: 'tag', type: 'waste' as const, stockItemId: getSiId('meat-pork-bones', 'tag'),  itemName: 'Pork Bones',            qty: 150, unit: 'g',        reason: 'Trimming (bone/fat)', loggedBy: 'Maria S.', loggedAt: new Date(Date.now() - 14400000).toISOString(), updatedAt: new Date().toISOString() },
+	{ id: 'w2', locationId: 'tag', type: 'waste' as const, stockItemId: getSiId('side-rice', 'tag'), itemName: 'Steamed Rice',          qty: 2,   unit: 'portions', reason: 'Overcooked',          loggedBy: 'Pedro C.', loggedAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString() },
+	{ id: 'w3', locationId: 'tag', type: 'waste' as const, stockItemId: getSiId('drink-soju', 'tag'), itemName: 'Soju (Original)',       qty: 1,   unit: 'bottles',  reason: 'Unusable (damaged)',  loggedBy: 'Maria S.', loggedAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export const INITIAL_DEDUCTIONS: Deduction[] = [];
@@ -256,40 +252,55 @@ export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => (
 	updatedAt: new Date().toISOString(),
 }));
 
-export const INITIAL_ADJUSTMENTS: StockAdjustment[] = [
+export const INITIAL_ADJUSTMENT_EVENTS: StockEvent[] = [
 	// ── Warehouse deductions for today's Tagbilaran transfers ──────────────────────────
-	{ id: 'adj-trf-tag-1', stockItemId: getSiId('meat-pork-bone-in', 'wh-tag'),  itemName: 'Pork Bone-In (Bulk)',  type: 'deduct', qty: 8000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
-	{ id: 'adj-trf-tag-2', stockItemId: getSiId('meat-pork-bone-out', 'wh-tag'), itemName: 'Pork Bone-Out (Bulk)', type: 'deduct', qty: 6000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
-	{ id: 'adj-trf-tag-3', stockItemId: getSiId('meat-beef-bone-in', 'wh-tag'),  itemName: 'Beef Bone-In (Bulk)',  type: 'deduct', qty: 5000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
-	{ id: 'adj-trf-tag-4', stockItemId: getSiId('meat-beef-sliced', 'wh-tag'),   itemName: 'Sliced Beef (Bulk)',    type: 'deduct', qty: 4000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
-	{ id: 'adj-trf-tag-5', stockItemId: getSiId('meat-chicken-wing', 'wh-tag'),  itemName: 'Chicken Wing (Bulk)',   type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
-	{ id: 'adj-trf-tag-6', stockItemId: getSiId('meat-chicken-leg', 'wh-tag'),   itemName: 'Chicken Leg (Bulk)',    type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-1', locationId: 'wh-tag', stockItemId: getSiId('meat-pork-bone-in', 'wh-tag'),  itemName: 'Pork Bone-In (Bulk)',  type: 'deduct', qty: 8000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-2', locationId: 'wh-tag', stockItemId: getSiId('meat-pork-bone-out', 'wh-tag'), itemName: 'Pork Bone-Out (Bulk)', type: 'deduct', qty: 6000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-3', locationId: 'wh-tag', stockItemId: getSiId('meat-beef-bone-in', 'wh-tag'),  itemName: 'Beef Bone-In (Bulk)',  type: 'deduct', qty: 5000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-4', locationId: 'wh-tag', stockItemId: getSiId('meat-beef-sliced', 'wh-tag'),   itemName: 'Sliced Beef (Bulk)',    type: 'deduct', qty: 4000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-5', locationId: 'wh-tag', stockItemId: getSiId('meat-chicken-wing', 'wh-tag'),  itemName: 'Chicken Wing (Bulk)',   type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-6', locationId: 'wh-tag', stockItemId: getSiId('meat-chicken-leg', 'wh-tag'),   itemName: 'Chicken Leg (Bulk)',    type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
 
 	// ── Warehouse deductions for today's Panglao transfers ──────────────────────
-	{ id: 'adj-trf-mk-1', stockItemId: getSiId('meat-pork-bone-in', 'wh-tag'),  itemName: 'Pork Bone-In (Bulk)',  type: 'deduct', qty: 7000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
-	{ id: 'adj-trf-mk-2', stockItemId: getSiId('meat-pork-sliced', 'wh-tag'),   itemName: 'Sliced Pork (Bulk)',    type: 'deduct', qty: 5000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
-	{ id: 'adj-trf-mk-3', stockItemId: getSiId('meat-beef-bone-in', 'wh-tag'),  itemName: 'Beef Bone-In (Bulk)',  type: 'deduct', qty: 4000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
-	{ id: 'adj-trf-mk-4', stockItemId: getSiId('meat-beef-bone-out', 'wh-tag'), itemName: 'Beef Bone-Out (Bulk)', type: 'deduct', qty: 3500, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
-	{ id: 'adj-trf-mk-5', stockItemId: getSiId('meat-chicken-wing', 'wh-tag'),  itemName: 'Chicken Wing (Bulk)',   type: 'deduct', qty: 2500, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-1', locationId: 'wh-tag', stockItemId: getSiId('meat-pork-bone-in', 'wh-tag'),  itemName: 'Pork Bone-In (Bulk)',  type: 'deduct', qty: 7000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-2', locationId: 'wh-tag', stockItemId: getSiId('meat-pork-sliced', 'wh-tag'),   itemName: 'Sliced Pork (Bulk)',    type: 'deduct', qty: 5000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-3', locationId: 'wh-tag', stockItemId: getSiId('meat-beef-bone-in', 'wh-tag'),  itemName: 'Beef Bone-In (Bulk)',  type: 'deduct', qty: 4000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-4', locationId: 'wh-tag', stockItemId: getSiId('meat-beef-bone-out', 'wh-tag'), itemName: 'Beef Bone-Out (Bulk)', type: 'deduct', qty: 3500, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-5', locationId: 'wh-tag', stockItemId: getSiId('meat-chicken-wing', 'wh-tag'),  itemName: 'Chicken Wing (Bulk)',   type: 'deduct', qty: 2500, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
 
 	// ── Warehouse deductions for yesterday's Tagbilaran transfers ──────────────────────
-	{ id: 'adj-trf-tag-y1', stockItemId: getSiId('meat-pork-sliced', 'wh-tag'),   itemName: 'Sliced Pork (Bulk)',    type: 'deduct', qty: 4500, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
-	{ id: 'adj-trf-tag-y2', stockItemId: getSiId('meat-beef-bone-out', 'wh-tag'), itemName: 'Beef Bone-Out (Bulk)', type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
-	{ id: 'adj-trf-tag-y3', stockItemId: getSiId('meat-chicken-leg', 'wh-tag'),   itemName: 'Chicken Leg (Bulk)',    type: 'deduct', qty: 2000, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
+	{ id: 'adj-trf-tag-y1', locationId: 'wh-tag', stockItemId: getSiId('meat-pork-sliced', 'wh-tag'),   itemName: 'Sliced Pork (Bulk)',    type: 'deduct', qty: 4500, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
+	{ id: 'adj-trf-tag-y2', locationId: 'wh-tag', stockItemId: getSiId('meat-beef-bone-out', 'wh-tag'), itemName: 'Beef Bone-Out (Bulk)', type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
+	{ id: 'adj-trf-tag-y3', locationId: 'wh-tag', stockItemId: getSiId('meat-chicken-leg', 'wh-tag'),   itemName: 'Chicken Leg (Bulk)',    type: 'deduct', qty: 2000, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
 
 	// ── Warehouse deductions for yesterday's Panglao transfers ──────────────────
-	{ id: 'adj-trf-mk-y1', stockItemId: getSiId('meat-pork-bone-out', 'wh-tag'), itemName: 'Pork Bone-Out (Bulk)', type: 'deduct', qty: 5500, unit: 'g', reason: 'Transfer to pgl — Daily dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(26), updatedAt: now },
-	{ id: 'adj-trf-mk-y2', stockItemId: getSiId('meat-beef-sliced', 'wh-tag'),   itemName: 'Sliced Beef (Bulk)',    type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to pgl — Daily dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(26), updatedAt: now },
+	{ id: 'adj-trf-mk-y1', locationId: 'wh-tag', stockItemId: getSiId('meat-pork-bone-out', 'wh-tag'), itemName: 'Pork Bone-Out (Bulk)', type: 'deduct', qty: 5500, unit: 'g', reason: 'Transfer to pgl — Daily dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(26), updatedAt: now },
+	{ id: 'adj-trf-mk-y2', locationId: 'wh-tag', stockItemId: getSiId('meat-beef-sliced', 'wh-tag'),   itemName: 'Sliced Beef (Bulk)',    type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to pgl — Daily dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(26), updatedAt: now },
 ];
 
 // ─── Reactive State (RxDB Stores) ─────────────────────────────────────────────
 
 export const stockItems = createRxStore<StockItem>('stock_items', db => db.stock_items.find());
 export const deliveries = createRxStore<Delivery>('deliveries', db => db.deliveries.find());
-export const wasteEntries = createRxStore<WasteEntry>('waste', db => db.waste.find());
+const _stockEvents = createRxStore<StockEvent>('stock_events', db => db.stock_events.find());
+
+/** All stock events (waste, manual add, manual deduct) */
+export const stockEvents = {
+	get value() { return _stockEvents.value; },
+	get initialized() { return _stockEvents.initialized; }
+};
+/** Filtered view: waste events only */
+export const wasteEntries = {
+	get value() { return _stockEvents.value.filter(e => e.type === 'waste') as WasteEntry[]; },
+	get initialized() { return _stockEvents.initialized; }
+};
+/** Filtered view: manual add/deduct adjustments only */
+export const adjustments = {
+	get value() { return _stockEvents.value.filter(e => e.type === 'add' || e.type === 'deduct') as StockAdjustment[]; },
+	get initialized() { return _stockEvents.initialized; }
+};
 export const deductions = createRxStore<Deduction>('deductions', db => db.deductions.find());
 export const stockCounts = createRxStore<StockCount>('stock_counts', db => db.stock_counts.find());
-export const adjustments = createRxStore<StockAdjustment>('adjustments', db => db.adjustments.find());
 
 export const countPeriods = $state<{ id: CountPeriod; label: string; time: string; status: 'done' | 'pending' }[]>([
 	{ id: 'am10', label: 'Morning',   time: '10:00 AM', status: 'done' },
@@ -302,11 +313,11 @@ export function getCurrentStock(stockItemId: string): number {
 	const item = stockItems.value.find(s => s.id === stockItemId);
 	if (!item) return 0;
 	const totalDelivered  = deliveries.value.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
-	const totalWasted     = wasteEntries.value.filter(w => w.stockItemId === stockItemId).reduce((s, w) => s + w.qty, 0);
-	const totalDeducted   = deductions.value.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
-	const totalAdjAdded   = adjustments.value.filter(a => a.stockItemId === stockItemId && a.type === 'add').reduce((s, a) => s + a.qty, 0);
-	const totalAdjDeducted = adjustments.value.filter(a => a.stockItemId === stockItemId && a.type === 'deduct').reduce((s, a) => s + a.qty, 0);
-	return item.openingStock + totalDelivered - totalWasted - totalDeducted + totalAdjAdded - totalAdjDeducted;
+	const events = stockEvents.value.filter(e => e.stockItemId === stockItemId);
+	const totalEventsOut = events.filter(e => e.type === 'waste' || e.type === 'deduct').reduce((s, e) => s + e.qty, 0);
+	const totalEventsIn  = events.filter(e => e.type === 'add').reduce((s, e) => s + e.qty, 0);
+	const totalDeducted  = deductions.value.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
+	return item.openingStock + totalDelivered - totalDeducted - totalEventsOut + totalEventsIn;
 }
 
 export function getStockStatus(stockItemId: string): StockStatus {
@@ -373,6 +384,7 @@ export async function receiveDelivery(stockItemId: string, itemName: string, qty
 		const id = nanoid();
 		await db.deliveries.insert({
 			id,
+			locationId: session.locationId,
 			stockItemId,
 			itemName: itemName.trim(),
 			qty,
@@ -410,10 +422,12 @@ export async function logWaste(stockItemId: string, itemName: string, qty: numbe
 	try {
 		const db = await getDb();
 		const id = nanoid();
-		await db.waste.insert({
+		await db.stock_events.insert({
 			id,
+			locationId: session.locationId,
 			stockItemId,
 			itemName: itemName.trim(),
+			type: 'waste' as const,
 			qty,
 			unit: unit.trim(),
 			reason: reason.trim(),
@@ -453,8 +467,9 @@ export async function adjustStock(
 	try {
 		const db = await getDb();
 		const id = nanoid();
-		await db.adjustments.insert({
+		await db.stock_events.insert({
 			id,
+			locationId: session.locationId,
 			stockItemId,
 			itemName: itemName.trim(),
 			type,
@@ -514,6 +529,7 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
 		// Insert deduction record
 		await db.deductions.insert({
 			id: nanoid(),
+			locationId: locId,
 			stockItemId: item.id,
 			qty: deductQty,
 			tableId,

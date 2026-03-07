@@ -106,14 +106,23 @@
 								)}>
 									{formatPeso(order.total)}
 								</span>
-								{#if order.status !== 'cancelled'}
-									<button
-										onclick={() => onViewOrder(order)}
-										class="text-xs font-semibold text-accent hover:underline"
-										style="min-height: unset"
-									>
-										View
-									</button>
+								{#if order.status === 'paid'}
+									<div class="flex items-center gap-1.5">
+										<button onclick={() => onViewOrder(order)} class="text-xs font-semibold text-accent hover:underline" style="min-height: unset">View</button>
+										{#if correctingOrderId === order.id}
+											<div class="flex items-center gap-1">
+												{#each PAYMENT_METHODS as pm}
+													{@const isCurrent = order.payments[0]?.method === pm.method}
+													<button onclick={() => requestCorrection(order, pm.method)} disabled={isCurrent} class={cn('rounded px-2 py-0.5 text-[10px] font-bold border transition-colors', isCurrent ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-default' : 'bg-white text-gray-700 border-gray-300 hover:bg-accent hover:text-white hover:border-accent')} style="min-height: unset">{pm.label}</button>
+												{/each}
+												<button onclick={() => (correctingOrderId = null)} class="text-gray-400 hover:text-gray-600 text-xs px-1" style="min-height: unset">✕</button>
+											</div>
+										{:else}
+											<button onclick={() => (correctingOrderId = order.id)} class="text-[10px] font-semibold text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 hover:border-gray-300" style="min-height: unset">Correct</button>
+										{/if}
+									</div>
+								{:else if order.status !== 'cancelled'}
+									<button onclick={() => onViewOrder(order)} class="text-xs font-semibold text-accent hover:underline" style="min-height: unset">View</button>
 								{/if}
 							</div>
 						</div>
@@ -138,3 +147,12 @@
 		</div>
 	</div>
 {/if}
+
+<ManagerPinModal
+	isOpen={showCorrectionPin}
+	title="Authorize Payment Correction"
+	description="Correcting a closed order's payment method requires Manager PIN. This action is logged."
+	confirmLabel="Correct Payment"
+	onClose={() => { showCorrectionPin = false; correctingOrderId = null; pendingMethod = null; }}
+	onConfirm={handleCorrectionConfirmed}
+/>

@@ -356,6 +356,8 @@ export async function seedHistory(db: RxDatabase) {
             const xReadTime = new Date(date.getTime() + 14 * 3600000); // Around midnight
             xReads.push({
                 id: nanoid(),
+                type: 'x-read' as const,
+                locationId: branch,
                 timestamp: xReadTime.toISOString(),
                 grossSales: dailyGrossSales,
                 discounts: dailyDiscounts,
@@ -518,6 +520,7 @@ export async function seedHistory(db: RxDatabase) {
                     id: nanoid(),
                     stockItemId,
                     itemName: item.name,
+                    type: 'waste' as const,
                     qty: 50 + Math.floor(Math.random() * 300),
                     unit: 'g',
                     reason: wasteReasons[Math.floor(Math.random() * wasteReasons.length)],
@@ -560,9 +563,9 @@ export async function seedHistory(db: RxDatabase) {
         db.deductions.bulkInsert(clean(deductions)),
         db.deliveries.bulkInsert(clean(deliveries)),
         db.expenses.bulkInsert(clean(expenses)),
-        db.x_reads.bulkInsert(clean(xReads)),
+        db.readings.bulkInsert(clean(xReads)),
         db.kds_tickets.bulkInsert(clean(kdsHistoryTickets)),
-        db.waste.bulkInsert(clean(wasteEntries)),
+        db.stock_events.bulkInsert(clean(wasteEntries)),
     ]);
 
     // Insert audit log entries (including utility readings) into RxDB

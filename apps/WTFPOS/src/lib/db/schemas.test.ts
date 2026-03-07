@@ -5,14 +5,13 @@ import {
 	menuItemSchema,
 	stockItemSchema,
 	deliverySchema,
-	wasteSchema,
+	stockEventSchema,
 	deductionSchema,
-	adjustmentSchema,
 	stockCountSchema,
 	deviceSchema,
 	expenseSchema,
 	kdsTicketSchema,
-	xReadSchema,
+	readingSchema,
 	auditLogSchema,
 	kitchenAlertSchema,
 	floorElementSchema
@@ -24,14 +23,13 @@ const ALL_SCHEMAS = [
 	{ name: 'menuItemSchema', schema: menuItemSchema },
 	{ name: 'stockItemSchema', schema: stockItemSchema },
 	{ name: 'deliverySchema', schema: deliverySchema },
-	{ name: 'wasteSchema', schema: wasteSchema },
+	{ name: 'stockEventSchema', schema: stockEventSchema },
 	{ name: 'deductionSchema', schema: deductionSchema },
-	{ name: 'adjustmentSchema', schema: adjustmentSchema },
 	{ name: 'stockCountSchema', schema: stockCountSchema },
 	{ name: 'deviceSchema', schema: deviceSchema },
 	{ name: 'expenseSchema', schema: expenseSchema },
 	{ name: 'kdsTicketSchema', schema: kdsTicketSchema },
-	{ name: 'xReadSchema', schema: xReadSchema },
+	{ name: 'readingSchema', schema: readingSchema },
 	{ name: 'auditLogSchema', schema: auditLogSchema },
 	{ name: 'kitchenAlertSchema', schema: kitchenAlertSchema },
 	{ name: 'floorElementSchema', schema: floorElementSchema },
@@ -98,7 +96,7 @@ describe('RxDB schemas — structural integrity', () => {
 		}
 	});
 
-	it('covers all 16 schemas', () => {
-		expect(ALL_SCHEMAS).toHaveLength(16);
+	it('covers all 15 schemas', () => {
+		expect(ALL_SCHEMAS).toHaveLength(15);
 	});
 });

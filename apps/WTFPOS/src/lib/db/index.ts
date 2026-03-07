@@ -9,15 +9,13 @@ import {
 	menuItemSchema,
 	stockItemSchema,
 	deliverySchema,
-	wasteSchema,
+	stockEventSchema,
 	deductionSchema,
 	expenseSchema,
-	adjustmentSchema,
 	stockCountSchema,
 	deviceSchema,
 	kdsTicketSchema,
-	xReadSchema,
-	zReadSchema,
+	readingSchema,
 	auditLogSchema,
 	kitchenAlertSchema,
 	floorElementSchema
@@ -110,7 +108,8 @@ export async function getDb() {
 						1: (d: any) => d,
 						2: (d: any) => d,
 						3: (d: any) => d, // v2→v3: nested required
-						4: (d: any) => addUpdatedAt(d, 'createdAt') // v3→v4: +updatedAt
+						4: (d: any) => addUpdatedAt(d, 'createdAt'), // v3→v4: +updatedAt
+					5: (d: any) => d  // v4→v5: nullable string fields (schema-only fix)
 					}
 				},
 				menu_items: {
@@ -139,22 +138,22 @@ export async function getDb() {
 					migrationStrategies: {
 						1: (d: any) => d,
 						2: (d: any) => { d.depleted = d.depleted ?? false; return d; },
-						3: (d: any) => addUpdatedAt(d, 'receivedAt') // v2→v3: +updatedAt
+						3: (d: any) => addUpdatedAt(d, 'receivedAt'), // v2→v3: +updatedAt
+					4: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v3→v4: +locationId (defaults to primary branch)
 					}
 				},
-				waste: {
-					schema: wasteSchema,
+				stock_events: {
+					schema: stockEventSchema,
 					migrationStrategies: {
-						1: (d: any) => d,
-						2: (d: any) => d,
-						3: (d: any) => addUpdatedAt(d, 'loggedAt') // v2→v3: +updatedAt
+						1: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v0→v1: +locationId (defaults to primary branch)
 					}
 				},
 				deductions: {
 					schema: deductionSchema,
 					migrationStrategies: {
 						1: (d: any) => d,
-						2: (d: any) => addUpdatedAt(d, 'timestamp') // v1→v2: +updatedAt
+						2: (d: any) => addUpdatedAt(d, 'timestamp'), // v1→v2: +updatedAt
+					3: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v2→v3: +locationId (defaults to primary branch)
 					}
 				},
 				expenses: {
@@ -163,14 +162,6 @@ export async function getDb() {
 						1: (d: any) => d,
 						2: (d: any) => d,
 						3: (d: any) => addUpdatedAt(d, 'createdAt'), // v2→v3: +updatedAt
-					}
-				},
-				adjustments: {
-					schema: adjustmentSchema,
-					migrationStrategies: {
-						1: (d: any) => d,
-						2: (d: any) => d,
-						3: (d: any) => addUpdatedAt(d, 'loggedAt') // v2→v3: +updatedAt
 					}
 				},
 				stock_counts: {
@@ -202,19 +193,13 @@ export async function getDb() {
 						2: (d: any) => d, // v1→v2: nested required
 						3: (d: any) => addUpdatedAt(d, 'createdAt'), // v2→v3: +updatedAt
 						4: (d: any) => ({ ...d, bumpedAt: null, bumpedBy: null }), // v3→v4: merged kds_history
-						5: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v4→v5: +locationId
+						5: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }), // v4→v5: +locationId
+						6: (d: any) => d  // v5→v6: locationId maxLength fix (schema-only)
 					}
 				},
-				x_reads: {
-					schema: xReadSchema,
-					migrationStrategies: {
-						1: (d: any) => addUpdatedAt(d, 'timestamp'), // v0→v1: +updatedAt
-						2: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v1→v2: +locationId
-					}
-				},
-				z_reads: {
-					schema: zReadSchema
-					// v0 — new collection, no migrations needed
+				readings: {
+					schema: readingSchema
+					// v0 — new merged collection (replaces x_reads + z_reads), no migrations needed
 				},
 				audit_logs: {
 					schema: auditLogSchema

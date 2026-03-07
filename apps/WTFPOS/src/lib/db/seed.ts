@@ -3,7 +3,8 @@ import { INITIAL_TABLES as sourceTables, INITIAL_MENU_ITEMS as sourceMenu } from
 import { 
     INITIAL_STOCK_ITEMS, 
     INITIAL_DELIVERIES, 
-    INITIAL_WASTE_ENTRIES,
+    INITIAL_STOCK_EVENTS,
+    INITIAL_ADJUSTMENT_EVENTS,
     INITIAL_STOCK_COUNTS
 } from '$lib/stores/stock.svelte';
 import { expenseCategories } from '$lib/stores/expenses.svelte';
@@ -40,7 +41,7 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
             await db.stock_items.bulkInsert(JSON.parse(JSON.stringify(mappedStockItems)));
             await db.stock_counts.bulkInsert(JSON.parse(JSON.stringify(INITIAL_STOCK_COUNTS)));
             await db.deliveries.bulkInsert(JSON.parse(JSON.stringify(INITIAL_DELIVERIES)));
-            await db.waste.bulkInsert(JSON.parse(JSON.stringify(INITIAL_WASTE_ENTRIES)));
+            await db.stock_events.bulkInsert(JSON.parse(JSON.stringify([...INITIAL_STOCK_EVENTS, ...INITIAL_ADJUSTMENT_EVENTS])));
             
             // 4. Seed Historical Data (1 week)
             try {

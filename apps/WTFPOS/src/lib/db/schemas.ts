@@ -72,7 +72,7 @@ export const floorElementSchema: RxJsonSchema<any> = {
 // ─── Order ───────────────────────────────────────────────────────────────────
 export const orderSchema: RxJsonSchema<any> = {
 	title: 'order schema',
-	version: 4,
+	version: 5,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -105,7 +105,7 @@ export const orderSchema: RxJsonSchema<any> = {
 			}
 		},
 		status: { type: 'string', maxLength: 50 },
-		discountType: { type: 'string' },
+		discountType: { type: ['string', 'null'] },
 		discountPax: { type: 'number' },
 		discountIds: { type: 'array', items: { type: 'string' } },
 		subtotal: { type: 'number' },
@@ -126,14 +126,14 @@ export const orderSchema: RxJsonSchema<any> = {
 		createdAt: { type: 'string', maxLength: 30 },
 		closedAt: { type: ['string', 'null'] },
 		billPrinted: { type: 'boolean' },
-		notes: { type: 'string' },
-		cancelReason: { type: 'string' },
-		closedBy: { type: 'string' },
+		notes: { type: ['string', 'null'] },
+		cancelReason: { type: ['string', 'null'] },
+		closedBy: { type: ['string', 'null'] },
 		originalPax: { type: 'number' },
 		leftoverPenaltyAmount: { type: 'number' },
-		pendingPaymentMethod: { type: 'string' },
-		takeoutStatus: { type: 'string' },
-		splitType: { type: 'string' },
+		pendingPaymentMethod: { type: ['string', 'null'] },
+		takeoutStatus: { type: ['string', 'null'] },
+		splitType: { type: ['string', 'null'] },
 		subBills: {
 			type: 'array',
 			items: {
@@ -158,7 +158,7 @@ export const orderSchema: RxJsonSchema<any> = {
 				required: ['id', 'label', 'itemIds', 'subtotal', 'discountAmount', 'vatAmount', 'total']
 			}
 		},
-		printStatus: { type: 'string' },
+		printStatus: { type: ['string', 'null'] },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
 	required: ['id', 'locationId', 'orderType', 'pax', 'items', 'status', 'subtotal', 'discountAmount', 'vatAmount', 'total', 'payments', 'createdAt', 'billPrinted', 'updatedAt'],
@@ -220,11 +220,12 @@ export const stockItemSchema: RxJsonSchema<any> = {
 // ─── Delivery ────────────────────────────────────────────────────────────────
 export const deliverySchema: RxJsonSchema<any> = {
 	title: 'delivery schema',
-	version: 3,
+	version: 4,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
 		stockItemId: { type: 'string', maxLength: 100 },
 		itemName: { type: 'string' },
 		qty: { type: 'number' },
@@ -239,20 +240,25 @@ export const deliverySchema: RxJsonSchema<any> = {
 		photo: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'stockItemId', 'itemName', 'qty', 'unit', 'supplier', 'receivedAt', 'depleted', 'updatedAt'],
-	indexes: ['stockItemId', 'depleted', 'receivedAt', ['stockItemId', 'depleted'], 'updatedAt']
+	required: ['id', 'locationId', 'stockItemId', 'itemName', 'qty', 'unit', 'supplier', 'receivedAt', 'depleted', 'updatedAt'],
+	indexes: ['locationId', 'stockItemId', 'depleted', 'receivedAt', ['locationId', 'stockItemId'], ['stockItemId', 'depleted'], 'updatedAt']
 };
 
-// ─── Waste ───────────────────────────────────────────────────────────────────
-export const wasteSchema: RxJsonSchema<any> = {
-	title: 'waste schema',
-	version: 3,
+// ─── Stock Event (merged: waste + manual adjustments) ────────────────────────
+// type: 'waste'  — user-logged waste (always a stock reduction)
+// type: 'add'    — manual stock addition (correction, found stock)
+// type: 'deduct' — manual stock deduction (transfer out, correction)
+export const stockEventSchema: RxJsonSchema<any> = {
+	title: 'stock event schema',
+	version: 1,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
 		stockItemId: { type: 'string', maxLength: 100 },
 		itemName: { type: 'string' },
+		type: { type: 'string', maxLength: 10 },
 		qty: { type: 'number' },
 		unit: { type: 'string' },
 		reason: { type: 'string' },
@@ -260,18 +266,19 @@ export const wasteSchema: RxJsonSchema<any> = {
 		loggedAt: { type: 'string', maxLength: 30 },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'stockItemId', 'itemName', 'qty', 'unit', 'reason', 'loggedBy', 'loggedAt', 'updatedAt'],
-	indexes: ['stockItemId', 'loggedAt', 'updatedAt']
+	required: ['id', 'locationId', 'stockItemId', 'itemName', 'type', 'qty', 'unit', 'reason', 'loggedBy', 'loggedAt', 'updatedAt'],
+	indexes: ['locationId', 'stockItemId', 'type', 'loggedAt', ['locationId', 'type'], ['stockItemId', 'type'], 'updatedAt']
 };
 
 // ─── Deduction ───────────────────────────────────────────────────────────────
 export const deductionSchema: RxJsonSchema<any> = {
 	title: 'deduction schema',
-	version: 2,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
 		stockItemId: { type: 'string', maxLength: 100 },
 		qty: { type: 'number' },
 		tableId: { type: 'string' },
@@ -279,31 +286,11 @@ export const deductionSchema: RxJsonSchema<any> = {
 		timestamp: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'stockItemId', 'qty', 'tableId', 'orderId', 'timestamp', 'updatedAt'],
-	indexes: ['stockItemId', 'orderId', ['stockItemId', 'orderId'], 'updatedAt']
+	required: ['id', 'locationId', 'stockItemId', 'qty', 'tableId', 'orderId', 'timestamp', 'updatedAt'],
+	indexes: ['locationId', 'stockItemId', 'orderId', ['locationId', 'stockItemId'], ['stockItemId', 'orderId'], 'updatedAt']
 };
 
-// ─── Adjustment ──────────────────────────────────────────────────────────────
-export const adjustmentSchema: RxJsonSchema<any> = {
-	title: 'adjustment schema',
-	version: 3,
-	primaryKey: 'id',
-	type: 'object',
-	properties: {
-		id: { type: 'string', maxLength: 100 },
-		stockItemId: { type: 'string', maxLength: 100 },
-		itemName: { type: 'string' },
-		type: { type: 'string' }, // 'add' | 'deduct'
-		qty: { type: 'number' },
-		unit: { type: 'string' },
-		reason: { type: 'string' },
-		loggedBy: { type: 'string' },
-		loggedAt: { type: 'string', maxLength: 30 },
-		updatedAt: { type: 'string', maxLength: 30 }
-	},
-	required: ['id', 'stockItemId', 'itemName', 'type', 'qty', 'unit', 'reason', 'loggedBy', 'loggedAt', 'updatedAt'],
-	indexes: ['stockItemId', 'loggedAt', 'updatedAt']
-};
+// (adjustmentSchema removed — merged into stockEventSchema above)
 
 // ─── Stock Count ─────────────────────────────────────────────────────────────
 export const stockCountSchema: RxJsonSchema<any> = {
@@ -378,13 +365,13 @@ export const expenseSchema: RxJsonSchema<any> = {
 // ─── KDS Tickets (active + history, distinguished by bumpedAt) ───────────────
 export const kdsTicketSchema: RxJsonSchema<any> = {
 	title: 'kds ticket schema',
-	version: 5,
+	version: 6,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
 		orderId: { type: 'string', maxLength: 100 },
-		locationId: { type: 'string', maxLength: 20 },
+		locationId: { type: 'string', maxLength: 100 },
 		tableNumber: { type: ['number', 'null'] },
 		customerName: { type: ['string', 'null'] },
 		items: {
@@ -412,45 +399,18 @@ export const kdsTicketSchema: RxJsonSchema<any> = {
 	indexes: ['orderId', 'locationId', 'updatedAt']
 };
 
-// ─── X-Read ──────────────────────────────────────────────────────────────────
-export const xReadSchema: RxJsonSchema<any> = {
-	title: 'x-read schema',
-	version: 2,
-	primaryKey: 'id',
-	type: 'object',
-	properties: {
-		id: { type: 'string', maxLength: 100 },
-		locationId: { type: 'string', maxLength: 100 },
-		timestamp: { type: 'string' },
-		grossSales: { type: 'number' },
-		discounts: { type: 'number' },
-		netSales: { type: 'number' },
-		vatAmount: { type: 'number' },
-		totalPax: { type: 'number' },
-		cash: { type: 'number' },
-		gcash: { type: 'number' },
-		card: { type: 'number' },
-		voidCount: { type: 'number' },
-		discountCount: { type: 'number' },
-		generatedBy: { type: 'string' },
-		updatedAt: { type: 'string', maxLength: 30 }
-	},
-	required: ['id', 'locationId', 'timestamp', 'grossSales', 'discounts', 'netSales', 'generatedBy', 'updatedAt'],
-	indexes: ['updatedAt', 'locationId']
-};
-
-// ─── Z-Read (EOD) ────────────────────────────────────────────────────────────
-export const zReadSchema: RxJsonSchema<any> = {
-	title: 'z-read schema',
+// ─── Reading (merged: X-Read mid-shift + Z-Read EOD) ─────────────────────────
+// type: 'x-read' — mid-shift BIR audit snapshot (generated any time during the day)
+// type: 'z-read' — end-of-day permanent close (one per business date per location)
+export const readingSchema: RxJsonSchema<any> = {
+	title: 'reading schema',
 	version: 0,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
-		date: { type: 'string', maxLength: 30 },          // YYYY-MM-DD — the business date closed
+		type: { type: 'string', maxLength: 10 },
 		locationId: { type: 'string', maxLength: 100 },
-		submittedAt: { type: 'string' },
-		submittedBy: { type: 'string' },
 		grossSales: { type: 'number' },
 		discounts: { type: 'number' },
 		netSales: { type: 'number' },
@@ -459,14 +419,23 @@ export const zReadSchema: RxJsonSchema<any> = {
 		cash: { type: 'number' },
 		gcash: { type: 'number' },
 		card: { type: 'number' },
-		cashExpenses: { type: 'number' },
-		openingCash: { type: 'number' },
-		closingActual: { type: 'number' },
-		cashVariance: { type: 'number' },
+		// x-read fields
+		timestamp: { type: ['string', 'null'] },
+		voidCount: { type: ['number', 'null'] },
+		discountCount: { type: ['number', 'null'] },
+		generatedBy: { type: ['string', 'null'] },
+		// z-read fields
+		date: { type: ['string', 'null'], maxLength: 30 },
+		submittedAt: { type: ['string', 'null'] },
+		submittedBy: { type: ['string', 'null'] },
+		cashExpenses: { type: ['number', 'null'] },
+		openingCash: { type: ['number', 'null'] },
+		closingActual: { type: ['number', 'null'] },
+		cashVariance: { type: ['number', 'null'] },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'date', 'locationId', 'submittedAt', 'submittedBy', 'grossSales', 'updatedAt'],
-	indexes: ['date', 'locationId', 'submittedAt', 'updatedAt']
+	required: ['id', 'type', 'locationId', 'grossSales', 'discounts', 'netSales', 'updatedAt'],
+	indexes: ['type', 'locationId', ['type', 'locationId'], 'updatedAt']
 };
 
 // ─── Audit Log ───────────────────────────────────────────────────────────────

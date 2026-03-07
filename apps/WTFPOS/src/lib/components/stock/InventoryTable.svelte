@@ -5,7 +5,7 @@
 		stockItems, getCurrentStock, getStockStatus,
 		type StockStatus, type StockCategory, type StockItem
 	} from '$lib/stores/stock.svelte';
-	import { menuItems } from '$lib/stores/pos.svelte';
+	import { menuItems, toggleMenuItemAvailability } from '$lib/stores/pos.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { Search } from 'lucide-svelte';
 	import { STOCK_IMAGES } from '$lib/stores/stock.images';
@@ -327,6 +327,8 @@
 											readonly={isReadonly}
 											onHover={(id) => hoveredItemId = id}
 											animate={true}
+											menuAvailable={menuItemsById.get(item.menuItemId)?.available ?? true}
+											onToggle86={isReadonly ? undefined : () => toggleMenuItemAvailability(item.menuItemId)}
 										/>
 									{/each}
 								{/if}
@@ -343,6 +345,8 @@
 									onOpenModal={openItemModal}
 									onEditClick={openEditModalClick}
 									readonly={isReadonly}
+									menuAvailable={menuItemsById.get(item.menuItemId)?.available ?? true}
+									onToggle86={isReadonly ? undefined : () => toggleMenuItemAvailability(item.menuItemId)}
 								/>
 							{/each}
 						{/if}
