@@ -43,7 +43,7 @@ const ROUTES = [
 	'/reports/eod',
 	'/reports/expenses-daily',
 	'/reports/expenses-monthly',
-	'/reports/meat-variance',
+	'/reports/meat-report',
 	'/reports/peak-hours',
 	'/reports/profit-gross',
 	'/reports/profit-net',

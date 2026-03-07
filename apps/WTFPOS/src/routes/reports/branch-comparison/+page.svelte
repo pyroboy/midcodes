@@ -8,8 +8,8 @@
 	let period = $state<Period>('month');
 
 	const BRANCHES = [
-		{ id: 'qc',   name: 'QC Branch' },
-		{ id: 'mkti', name: 'Makati Branch' },
+		{ id: 'tag', name: 'Tagbilaran Branch' },
+		{ id: 'pgl', name: 'Panglao Branch' },
 	];
 	const FOOD_COGS = new Set(['Meat Procurement', 'Produce & Sides']);
 

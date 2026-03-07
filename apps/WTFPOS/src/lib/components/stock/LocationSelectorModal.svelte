@@ -1,26 +1,28 @@
 <script lang="ts">
 	import { fade, fly } from 'svelte/transition';
-	import { session, LOCATIONS, type LocationId, ADMIN_ROLES } from '$lib/stores/session.svelte';
-	import { MapPin, CheckCircle, Package, AlertCircle, Lock } from 'lucide-svelte';
+	import { session, LOCATIONS, type LocationId, ADMIN_ROLES, ELEVATED_ROLES } from '$lib/stores/session.svelte';
+	import { MapPin, CheckCircle, Package, AlertCircle, Lock, Globe } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
-	
+
 	let { onClose }: { onClose: () => void } = $props();
 
 	// In a real app, these values would come from a store or API
 	const MOCK_STATS: Record<string, { activeStaff: number; alerts: number }> = {
-		'qc': { activeStaff: 3, alerts: 1 },
-		'mkti': { activeStaff: 2, alerts: 0 },
-		'wh-qc': { activeStaff: 1, alerts: 0 },
+		'tag': { activeStaff: 3, alerts: 1 },
+		'pgl': { activeStaff: 2, alerts: 0 },
+		'wh-tag': { activeStaff: 1, alerts: 0 },
 		'all': { activeStaff: 0, alerts: 0 }
 	};
 
 	const retailBranches = $derived(LOCATIONS.filter(l => l.type === 'retail' && l.id !== 'all'));
 	const warehouses     = $derived(LOCATIONS.filter(l => l.type === 'warehouse'));
-	
-	const canAccessWarehouse = $derived(ADMIN_ROLES.includes(session.role));
+	const allLocation    = $derived(LOCATIONS.find(l => l.id === 'all'));
+
+	const canAccessWarehouse  = $derived(ADMIN_ROLES.includes(session.role));
+	const canAccessAllBranches = $derived(ELEVATED_ROLES.includes(session.role));
 
 	function selectLocation(id: LocationId) {
-		if (id === 'wh-qc' && !canAccessWarehouse) return; // Guardrail
+		if (id === 'wh-tag' && !canAccessWarehouse) return; // Guardrail
 		session.locationId = id;
 		onClose();
 	}
@@ -117,6 +119,45 @@
 					</button>
 				{/each}
 			</div>
+
+			{#if canAccessAllBranches && allLocation}
+				<div class="mb-4 flex items-center gap-2">
+					<Globe class="h-5 w-5 text-gray-400" />
+					<h3 class="text-sm font-bold uppercase tracking-widest text-gray-500">Cross-Branch</h3>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+					<button
+						onclick={() => selectLocation('all')}
+						class={cn(
+							'relative flex flex-col text-left rounded-xl border p-5 transition-all text-gray-900',
+							session.locationId === 'all'
+								? 'border-purple-500 bg-purple-50 ring-1 ring-purple-500'
+								: 'border-gray-200 hover:border-purple-300 hover:shadow-md'
+						)}
+					>
+						<div class="mb-4 flex items-center justify-between">
+							<div class={cn('flex h-10 w-10 items-center justify-center rounded-lg', session.locationId === 'all' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-500')}>
+								<Globe class="h-5 w-5" />
+							</div>
+							{#if session.locationId === 'all'}
+								<span class="inline-flex items-center gap-1.5 rounded-full bg-purple-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+									<CheckCircle class="h-3 w-3" /> Current
+								</span>
+							{/if}
+						</div>
+
+						<h4 class="text-lg font-black tracking-tight">{allLocation.name}</h4>
+
+						<hr class="my-4 border-gray-100" />
+
+						<div class="space-y-2 text-sm text-gray-600">
+							<p><strong>View:</strong> Aggregate across all branches</p>
+							<p><strong>Access:</strong> Reports & Comparisons</p>
+						</div>
+					</button>
+				</div>
+			{/if}
 
 			<div class="mb-4 flex items-center gap-2">
 				<Package class="h-5 w-5 text-gray-400" />

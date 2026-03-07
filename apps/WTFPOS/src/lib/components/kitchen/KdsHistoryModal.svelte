@@ -44,7 +44,7 @@
 										<span class="text-sm font-bold text-gray-900">
 											{entry.tableNumber !== null ? `T${entry.tableNumber}` : entry.customerName ?? 'Takeout'}
 										</span>
-										<span class="text-xs text-gray-400">Bumped {formatTime(entry.bumpedAt)}</span>
+										<span class="text-xs text-gray-400">Bumped {formatTime(entry.bumpedAt!)}</span>
 									</div>
 									<button
 										onclick={() => handleRecall(entry.orderId)}

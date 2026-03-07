@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { STOCK_ITEMS_LIST } from './stock.constants';
 
 const VALID_CATEGORIES = new Set(['Meats', 'Sides', 'Dishes', 'Drinks']);
-const VALID_LOCATIONS = new Set(['qc', 'mkti', 'wh-qc']);
+const VALID_LOCATIONS = new Set(['tag', 'pgl', 'wh-tag']);
 const VALID_PROTEINS = new Set(['beef', 'pork', 'chicken', 'other']);
 
 describe('STOCK_ITEMS_LIST — structural integrity', () => {
@@ -56,22 +56,22 @@ describe('STOCK_ITEMS_LIST — structural integrity', () => {
 		}
 	});
 
-	it('has entries for both qc and mkti branches', () => {
+	it('has entries for both tag and pgl branches', () => {
 		const locations = new Set(STOCK_ITEMS_LIST.map(i => i.locationId));
-		expect(locations.has('qc')).toBe(true);
-		expect(locations.has('mkti')).toBe(true);
+		expect(locations.has('tag')).toBe(true);
+		expect(locations.has('pgl')).toBe(true);
 	});
 
-	it('qc and mkti branches have the same set of meat menuItemIds', () => {
-		const qcMeats = STOCK_ITEMS_LIST
-			.filter(i => i.locationId === 'qc' && i.category === 'Meats')
+	it('tag and pgl branches have the same set of meat menuItemIds', () => {
+		const tagMeats = STOCK_ITEMS_LIST
+			.filter(i => i.locationId === 'tag' && i.category === 'Meats')
 			.map(i => i.menuItemId)
 			.sort();
-		const mktiMeats = STOCK_ITEMS_LIST
-			.filter(i => i.locationId === 'mkti' && i.category === 'Meats')
+		const pglMeats = STOCK_ITEMS_LIST
+			.filter(i => i.locationId === 'pgl' && i.category === 'Meats')
 			.map(i => i.menuItemId)
 			.sort();
-		expect(qcMeats).toEqual(mktiMeats);
+		expect(tagMeats).toEqual(pglMeats);
 	});
 
 	it('no item has a negative minLevel', () => {

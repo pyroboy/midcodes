@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { cn } from '$lib/utils';
-	import TopBar from '$lib/components/TopBar.svelte';
 	import { getSpoilageAlerts, countPeriods } from '$lib/stores/stock.svelte';
 	import { Package, Truck, ArrowLeftRight, ClipboardCheck, Trash2 } from 'lucide-svelte';
-	import LocationBanner from '$lib/components/stock/LocationBanner.svelte';
 	let { children }: { children: import('svelte').Snippet } = $props();
 
 	let currentRoute = $derived(page.url.pathname);
@@ -21,10 +19,7 @@
 	]);
 </script>
 
-<div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
-	<TopBar />
-	<LocationBanner />
-
+<div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
 	<!-- Section header -->
 	<div class="shrink-0 bg-white border-b border-border">
 		<div class="flex items-center justify-between px-6 pt-3 pb-2">

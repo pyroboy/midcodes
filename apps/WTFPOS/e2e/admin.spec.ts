@@ -48,7 +48,7 @@ test.describe('Admin — Users', () => {
     await page.locator('#displayName').fill('Test User E2E');
     await page.locator('#username').fill('testuser_e2e');
     await page.locator('#role').selectOption('staff');
-    await page.locator('#branch').selectOption('qc');
+    await page.locator('#branch').selectOption('tag');
     await page.locator('#tempPass').fill('testpass');
 
     await page.locator('button', { hasText: 'Create User' }).click();

@@ -1,31 +1,34 @@
 <script lang="ts">
-	import TopBar from '$lib/components/TopBar.svelte';
 	import SubNav from '$lib/components/SubNav.svelte';
 	import { session } from '$lib/stores/session.svelte';
+	import { startKitchenPush } from '$lib/stores/kitchen-push';
 	import type { Snippet } from 'svelte';
 
 	const { children }: { children: Snippet } = $props();
 
-	const links = [
-		{ href: '/kitchen/all-orders',    label: '🧾 All Orders' },
-		{ href: '/kitchen/orders',        label: '📋 Order Queue' },
-		{ href: '/kitchen/weigh-station', label: '⚖️ Weigh Station' }
-	];
+	// In aggregate mode, only All Orders is meaningful (Queue/Weigh are branch-specific ops)
+	const links = $derived(
+		session.locationId === 'all'
+			? [{ href: '/kitchen/all-orders', label: '🧾 All Orders' }]
+			: [
+					{ href: '/kitchen/all-orders', label: '🧾 All Orders' },
+					{ href: '/kitchen/orders', label: '📋 Order Queue' },
+					{ href: '/kitchen/weigh-station', label: '⚖️ Weigh Station' }
+				]
+	);
+
+	// Push active orders to local server whenever RxDB changes.
+	// Re-runs when locationId changes (reactive dependency via session read).
+	// No-op when locationId === 'all' or 'wh-tag' (handled inside startKitchenPush).
+	$effect(() => {
+		void session.locationId;
+		return startKitchenPush();
+	});
 </script>
 
-<div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
-	<TopBar />
+<div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
 	<SubNav {links} />
-
-	{#if session.locationId === 'all'}
-		<div class="flex flex-1 flex-col items-center justify-center gap-4 bg-gray-50 border-t border-border">
-			<span class="text-5xl">🔒</span>
-			<h2 class="text-xl font-bold text-gray-700">Select a specific location to view the Kitchen Queue</h2>
-			<p class="text-sm text-gray-400">Use the location selector in the top bar to choose a branch.</p>
-		</div>
-	{:else}
-		<main class="flex-1 overflow-y-auto p-6">
-			{@render children()}
-		</main>
-	{/if}
+	<main class="flex-1 overflow-y-auto p-6">
+		{@render children()}
+	</main>
 </div>

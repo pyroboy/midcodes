@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { cn } from '$lib/utils';
-	import TopBar from '$lib/components/TopBar.svelte';
 	import { session, ADMIN_ROLES } from '$lib/stores/session.svelte';
 	import { goto } from '$app/navigation';
 
@@ -23,9 +22,7 @@
 	];
 </script>
 
-<div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
-	<TopBar />
-
+<div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
 	<div class="shrink-0 bg-white border-b border-border px-6 py-3 flex items-center justify-between">
 		<div class="flex items-center gap-3">
 			<h1 class="text-xl font-bold text-gray-900 tracking-tight">Admin Portal</h1>

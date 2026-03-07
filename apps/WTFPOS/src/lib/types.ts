@@ -2,6 +2,54 @@
 
 export type TableZone = 'main';
 export type TableStatus = 'available' | 'occupied' | 'warning' | 'critical' | 'billing' | 'maintenance';
+
+export type ChairType = 'individual' | 'lounge' | 'l-shape' | 'diner' | 'none';
+
+export interface ChairSide {
+	type: ChairType;
+	count: number;       // used by 'individual' and 'diner'; ignored by 'lounge'/'l-shape'
+	color?: string;      // hex
+	opacity?: number;    // 0–1
+}
+
+export interface ChairConfig {
+	top: ChairSide;
+	bottom: ChairSide;
+	left: ChairSide;
+	right: ChairSide;
+}
+
+export type FloorElementType =
+	| 'wall' | 'divider' | 'entrance' | 'exit'
+	| 'furniture' | 'bar' | 'kitchen' | 'stairs' | 'label';
+
+export type FloorElementShape = 'rect' | 'circle' | 'line';
+
+export interface FloorElement {
+	id: string;
+	locationId: string;
+	type: FloorElementType;
+	shape: FloorElementShape;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	rotation?: number;
+	color?: string;
+	opacity?: number;
+	label?: string;
+	updatedAt: string;
+}
+
+export interface FloorCanvasConfig {
+	id: string;         // = locationId (one config per branch)
+	locationId: string;
+	width: number;
+	height: number;
+	gridSize: number;   // default 20
+	updatedAt: string;
+}
+
 export interface Table {
 	id: string;
 	locationId: string; // Changed from branchId
@@ -14,6 +62,12 @@ export interface Table {
 	width?: number;
 	height?: number;
 	shape?: 'rect' | 'circle';
+	color?: string;           // table fill color (hex)
+	opacity?: number;         // 0–1
+	borderRadius?: number;    // px
+	borderWidth?: number;     // stroke width (px)
+	rotation?: number;        // degrees
+	chairConfig?: ChairConfig | null;
 	status: TableStatus;
 	sessionStartedAt: string | null;
 	elapsedSeconds: number | null;
@@ -157,12 +211,9 @@ export interface KdsTicket {
 	customerName?: string;         // for takeout orders
 	items: KdsTicketItem[];
 	createdAt: string;
+	bumpedAt: string | null;       // null = active ticket, set = history
+	bumpedBy: string | null;
 	printStatus?: 'pending' | 'success' | 'failed'; // Tier 4
 	updatedAt: string;
-}
-
-export interface KdsHistoryEntry extends KdsTicket {
-	bumpedAt: string;
-	bumpedBy: string;
 }
 

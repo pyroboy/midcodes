@@ -30,13 +30,13 @@
     let weightScreenItem = $state<MenuItem | null>(null);
     let weightInput = $state('');
 
-    const activePax = $derived(order?.pax ?? 1);
+    const activePax = $derived(order.pax);
 
     // Takeout hides "packages" + "meats"; dine-in hides packages if already set
     const visibleCategories = $derived(
-        order?.orderType === 'takeout'
+        order.orderType === 'takeout'
             ? categories.filter(c => c.id !== 'packages' && c.id !== 'meats')
-            : (order?.packageId
+            : (order.packageId
                 ? categories.filter(c => c.id !== 'packages')
                 : categories)
     );
@@ -57,7 +57,7 @@
             if (item.meats) {
                 for (const meatId of item.meats) {
                     const meat = menuItems.value.find(m => m.id === meatId);
-                    if (meat) pendingItems.push({ item: meat, qty: 1, weight: 150 * activePax, forceFree: true });
+                    if (meat) pendingItems.push({ item: meat, qty: 1, forceFree: true });
                 }
             }
             if (item.autoSides) {

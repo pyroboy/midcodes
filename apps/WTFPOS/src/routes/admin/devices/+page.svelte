@@ -39,9 +39,9 @@
 		}
 
 		return [
-			{ id: 'qc', name: 'Alta Cita · QC', items: groups['qc'] },
-			{ id: 'mkti', name: 'Alona · Makati', items: groups['mkti'] },
-			{ id: 'wh-qc', name: 'QC Warehouse', items: groups['wh-qc'] },
+			{ id: 'tag', name: 'Alta Citta · Tagbilaran', items: groups['tag'] },
+			{ id: 'pgl', name: 'Alona Beach · Panglao', items: groups['pgl'] },
+			{ id: 'wh-tag', name: 'Tagbilaran Warehouse', items: groups['wh-tag'] },
 			{ id: 'all', name: 'Remote / HQ', items: groups['all'] },
 			{ id: 'remote', name: 'Unknown Location', items: groups['remote'] },
 		].filter(g => g.items.length > 0);

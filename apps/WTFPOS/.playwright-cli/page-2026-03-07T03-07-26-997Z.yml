@@ -1,0 +1,92 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - generic [ref=e116]:
+        - generic [ref=e118]: W!
+        - generic [ref=e119]:
+          - generic [ref=e120]: WTF! SAMGYUP
+          - generic [ref=e121]: POS System
+      - separator [ref=e122]
+      - list [ref=e126]:
+        - listitem [ref=e127]:
+          - link "POS" [ref=e128] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e129]
+            - generic [ref=e130]: POS
+      - generic [ref=e131]:
+        - separator [ref=e132]
+        - generic [ref=e133]:
+          - generic [ref=e134]: A
+          - generic [ref=e135]:
+            - generic [ref=e136]: Ana Lim
+            - generic [ref=e137]: staff
+        - link "Logout" [ref=e139] [cursor=pointer]:
+          - /url: /
+          - img [ref=e140]
+          - generic [ref=e141]: Logout
+      - button "Toggle Sidebar" [ref=e142]
+    - main [ref=e143]:
+      - generic [ref=e145]:
+        - img [ref=e147]
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - paragraph [ref=e150]: You are viewing
+            - generic [ref=e151]: Retail
+          - heading "ALONA (MAKATI)" [level=2] [ref=e152]
+          - generic [ref=e153]:
+            - paragraph [ref=e154]:
+              - generic [ref=e155]: "Role: staff"
+            - generic [ref=e156]: "|"
+            - paragraph [ref=e157]:
+              - img [ref=e158]
+              - text: "Access: View Only"
+      - generic [ref=e160]:
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - heading "POS" [level=1] [ref=e164]
+              - generic [ref=e165]: 0 occ
+              - generic [ref=e166]: 8 free
+            - generic [ref=e167]:
+              - generic [ref=e168]:
+                - generic [ref=e169]: Available
+                - generic [ref=e171]: Dining (Green)
+                - generic [ref=e173]: Ready / Bill (Orange)
+                - generic [ref=e175]: Pork
+                - generic [ref=e177]: Beef
+                - generic [ref=e179]: P&B
+              - button "📦 New Takeout" [ref=e181] [cursor=pointer]
+              - button "🧾 History 75" [ref=e182] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e183]: "75"
+          - generic [ref=e184]:
+            - heading "Main Dining" [level=2] [ref=e185]
+            - generic [ref=e186]:
+              - button "Table T1" [ref=e187] [cursor=pointer]:
+                - generic [ref=e189]: T1
+              - button "Table T2" [ref=e190] [cursor=pointer]:
+                - generic [ref=e192]: T2
+              - button "Table T3" [ref=e193] [cursor=pointer]:
+                - generic [ref=e195]: T3
+              - button "Table T4" [ref=e196] [cursor=pointer]:
+                - generic [ref=e198]: T4
+              - button "Table T5" [ref=e199] [cursor=pointer]:
+                - generic [ref=e201]: T5
+              - button "Table T6" [ref=e202] [cursor=pointer]:
+                - generic [ref=e204]: T6
+              - button "Table T7" [ref=e205] [cursor=pointer]:
+                - generic [ref=e207]: T7
+              - button "Table T8" [ref=e208] [cursor=pointer]:
+                - generic [ref=e210]: T8
+              - generic [ref=e211]:
+                - generic [ref=e212]: 🍳 KITCHEN
+                - generic [ref=e213]: 🚪 ENTRANCE
+        - generic [ref=e215]:
+          - generic [ref=e216]: 🧾
+          - generic [ref=e217]:
+            - generic [ref=e218]: No Table Selected
+            - generic [ref=e219]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e220]:
+            - generic [ref=e221]: Green = available — tap to open
+            - generic [ref=e223]: Orange = occupied — tap to view bill
+  - generic [ref=e109]: WTF! Samgyup POS

@@ -43,7 +43,7 @@ The WTFPOS application currently implements approximately **40% of the documente
 | **1: Morning Review & Analytics** | ✅ IMPLEMENTED | [`reports/`](src/routes/reports/) - EOD, Sales Summary, Best Sellers, Profit reports available |
 | **2: Menu & Pricing Updates** | ✅ IMPLEMENTED | [`admin/menu/+page.svelte`](src/routes/admin/menu/+page.svelte) - Full CRUD for menu items with instant sync |
 | **3: Floor Layout Changes** | 🔄 PARTIAL | [`admin/floor-editor/+page.svelte`](src/routes/admin/floor-editor/+page.svelte) - Can move tables but no "VIP Event" grouping feature |
-| **4: Multi-Branch Monitoring** | ✅ IMPLEMENTED | [`AllBranchesDashboard.svelte`](src/lib/components/pos/AllBranchesDashboard.svelte) - Live view of QC + Makati branches |
+| **4: Multi-Branch Monitoring** | ✅ IMPLEMENTED | [`AllBranchesDashboard.svelte`](src/lib/components/pos/AllBranchesDashboard.svelte) - Live view of Tagbilaran + Panglao branches |
 | **5: Recording Operational Expenses** | ❌ MISSING | [`expenses/+page.svelte`](src/routes/expenses/+page.svelte) shows "Phase 3" placeholder - NOT IMPLEMENTED |
 | **6: Staff Accountability & Payroll Logging** | 🔄 PARTIAL | [`audit.svelte.ts`](src/lib/stores/audit.svelte.ts) has logging but no performance metrics or void analysis |
 | **7: VIP & Comping Meals** | 🔄 PARTIAL | [`CheckoutModal.svelte`](src/lib/components/pos/CheckoutModal.svelte) has 'comp' discount type but no manager PIN required |

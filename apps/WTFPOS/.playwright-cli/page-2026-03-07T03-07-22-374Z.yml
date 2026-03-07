@@ -1,0 +1,119 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - generic [ref=e116]:
+        - generic [ref=e118]: W!
+        - generic [ref=e119]:
+          - generic [ref=e120]: WTF! SAMGYUP
+          - generic [ref=e121]: POS System
+      - separator [ref=e122]
+      - list [ref=e126]:
+        - listitem [ref=e127]:
+          - link "POS" [ref=e128] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e129]
+            - generic [ref=e130]: POS
+      - generic [ref=e131]:
+        - separator [ref=e132]
+        - generic [ref=e133]:
+          - generic [ref=e134]: M
+          - generic [ref=e135]:
+            - generic [ref=e136]: Maria Santos
+            - generic [ref=e137]: staff
+        - link "Logout" [ref=e139] [cursor=pointer]:
+          - /url: /
+          - img [ref=e140]
+          - generic [ref=e141]: Logout
+      - button "Toggle Sidebar" [ref=e142]
+    - main [ref=e143]:
+      - generic [ref=e145]:
+        - img [ref=e147]
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - paragraph [ref=e150]: You are viewing
+            - generic [ref=e151]: Retail
+          - heading "ALTA CITA (QC)" [level=2] [ref=e152]
+          - generic [ref=e153]:
+            - paragraph [ref=e154]:
+              - generic [ref=e155]: "Role: staff"
+            - generic [ref=e156]: "|"
+            - paragraph [ref=e157]:
+              - img [ref=e158]
+              - text: "Access: View Only"
+      - generic [ref=e160]:
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - heading "POS" [level=1] [ref=e164]
+              - generic [ref=e165]: 0 occ
+              - generic [ref=e166]: 8 free
+            - generic [ref=e167]:
+              - generic [ref=e168]:
+                - generic [ref=e169]: Available
+                - generic [ref=e171]: Dining (Green)
+                - generic [ref=e173]: Ready / Bill (Orange)
+                - generic [ref=e175]: Pork
+                - generic [ref=e177]: Beef
+                - generic [ref=e179]: P&B
+              - button "📦 New Takeout" [ref=e181] [cursor=pointer]
+              - button "🧾 History 82" [ref=e182] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e183]: "82"
+          - generic [ref=e184]:
+            - heading "Main Dining" [level=2] [ref=e185]
+            - generic [ref=e186]:
+              - button "Table T1" [ref=e187] [cursor=pointer]:
+                - generic [ref=e189]: PORK
+                - generic [ref=e191]: T1
+              - button "Table T2" [ref=e192] [cursor=pointer]:
+                - generic [ref=e194]: P&B
+                - generic [ref=e196]: T2
+              - button "Table T3" [ref=e197] [cursor=pointer]:
+                - generic [ref=e199]: PORK
+                - generic [ref=e201]: T3
+              - button "Table T4" [ref=e202] [cursor=pointer]:
+                - generic [ref=e204]: T4
+              - button "Table T5" [ref=e205] [cursor=pointer]:
+                - generic [ref=e207]: P&B
+                - generic [ref=e209]: T5
+              - button "Table T6" [ref=e210] [cursor=pointer]:
+                - generic [ref=e212]: T6
+              - button "Table T7" [ref=e213] [cursor=pointer]:
+                - generic [ref=e215]: P&B
+                - generic [ref=e217]: T7
+              - button "Table T8" [ref=e218] [cursor=pointer]:
+                - generic [ref=e220]: BEEF
+                - generic [ref=e222]: T8
+              - generic [ref=e223]:
+                - generic [ref=e224]: 🍳 KITCHEN
+                - generic [ref=e225]: 🚪 ENTRANCE
+          - generic [ref=e226]:
+            - heading "📦 Takeout Orders 2" [level=2] [ref=e227]:
+              - text: 📦 Takeout Orders
+              - generic [ref=e228]: "2"
+            - generic [ref=e229]:
+              - generic [ref=e230]:
+                - button "#TO01 Maria ₱1,112.00 3 items" [ref=e231] [cursor=pointer]:
+                  - text: "#TO01"
+                  - generic [ref=e232]: Maria
+                  - text: ₱1,112.00
+                  - generic [ref=e233]: 3 items
+                - generic [ref=e234]: PREP
+                - button "→ Mark Ready" [ref=e235] [cursor=pointer]
+              - generic [ref=e236]:
+                - button "#TO02 Carmen ₱1,984.00 5 items" [ref=e237] [cursor=pointer]:
+                  - text: "#TO02"
+                  - generic [ref=e238]: Carmen
+                  - text: ₱1,984.00
+                  - generic [ref=e239]: 5 items
+                - generic [ref=e240]: PREP
+                - button "→ Mark Ready" [ref=e241] [cursor=pointer]
+        - generic [ref=e243]:
+          - generic [ref=e244]: 🧾
+          - generic [ref=e245]:
+            - generic [ref=e246]: No Table Selected
+            - generic [ref=e247]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e248]:
+            - generic [ref=e249]: Green = available — tap to open
+            - generic [ref=e251]: Orange = occupied — tap to view bill
+  - generic [ref=e109]: WTF! Samgyup POS

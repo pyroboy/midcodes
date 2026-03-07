@@ -9,19 +9,19 @@
 	let currentStep = $state<1 | 2 | 3>(1);
 
 	// ─── Source (derived from session) ───────────────────────────────────────────
-	const sourceLocationId = $derived(isWarehouseSession() ? 'wh-qc' : session.locationId);
+	const sourceLocationId = $derived(isWarehouseSession() ? 'wh-tag' : session.locationId);
 	const sourceItems = $derived(stockItems.value.filter(s => s.locationId === sourceLocationId));
 
 	const locationLabels: Record<string, string> = {
-		'qc':    'QC Branch (Alta Cita)',
-		'mkti':  'Makati Branch (Alona)',
-		'wh-qc': 'Central Warehouse',
+		'tag':    'Tagbilaran Branch (Alta Citta)',
+		'pgl':    'Panglao Branch (Alona Beach)',
+		'wh-tag': 'Central Warehouse',
 	};
 
 	const allLocations = [
-		{ id: 'qc',    name: 'QC Branch (Alta Cita)' },
-		{ id: 'mkti',  name: 'Makati Branch (Alona)' },
-		{ id: 'wh-qc', name: 'Central Warehouse' },
+		{ id: 'tag',    name: 'Tagbilaran Branch (Alta Citta)' },
+		{ id: 'pgl',    name: 'Panglao Branch (Alona Beach)' },
+		{ id: 'wh-tag', name: 'Central Warehouse' },
 	];
 
 	// ─── Form state ─────────────────────────────────────────────────────────────

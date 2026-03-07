@@ -1,21 +1,24 @@
 /**
  * POS KDS — Kitchen Display System state and ticket management.
  */
-import type { KdsTicket, KdsHistoryEntry } from '$lib/types';
+import type { KdsTicket } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { log } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { getDb } from '$lib/db';
 
-const _kdsTickets = createRxStore<KdsTicket>('kds_tickets', db => db.kds_tickets.find());
-const _kdsHistory = createRxStore<KdsHistoryEntry>('kds_history', db => db.kds_history.find({
+const _kdsActive = createRxStore<KdsTicket>('kds_tickets', db => db.kds_tickets.find({
+	selector: { bumpedAt: null }
+}));
+const _kdsHistory = createRxStore<KdsTicket>('kds_tickets_history', db => db.kds_tickets.find({
+	selector: { bumpedAt: { $ne: null } },
 	sort: [{ bumpedAt: 'desc' }]
 }));
 
 export const kdsTickets = {
-	get value() { return _kdsTickets.value; },
-	get initialized() { return _kdsTickets.initialized; }
+	get value() { return _kdsActive.value; },
+	get initialized() { return _kdsActive.initialized; }
 };
 
 export const kdsTicketHistory = {
@@ -27,29 +30,25 @@ export const kdsTicketHistory = {
 
 export async function recallTicket(orderId: string) {
 	const db = await getDb();
-	const historyDoc = await db.kds_history.findOne({ selector: { orderId } }).exec();
+	const historyDoc = await db.kds_tickets.findOne({ selector: { orderId, bumpedAt: { $ne: null } } }).exec();
 	if (!historyDoc) return;
 
 	const entry = historyDoc.toJSON();
 	const restoredItems = entry.items.map((i: any) => i.status === 'served' ? { ...i, status: 'pending' } : i);
 
-	const existingTicket = await db.kds_tickets.findOne({ selector: { orderId } }).exec();
+	const existingTicket = await db.kds_tickets.findOne({ selector: { orderId, bumpedAt: null } }).exec();
 	if (existingTicket) {
 		console.warn(`[RECALL] Ticket for order ${orderId} already exists in active tickets`);
 		return;
 	}
 
-	await db.kds_tickets.insert({
-		id: nanoid(),
-		orderId: entry.orderId,
-		tableNumber: entry.tableNumber,
-		customerName: entry.customerName,
+	// Convert history ticket back to active by clearing bumped fields
+	await historyDoc.incrementalPatch({
 		items: restoredItems,
-		createdAt: entry.createdAt,
+		bumpedAt: null,
+		bumpedBy: null,
 		updatedAt: new Date().toISOString()
 	});
-
-	await historyDoc.remove();
 
 	const orderDoc = await db.orders.findOne(orderId).exec();
 	if (orderDoc) {

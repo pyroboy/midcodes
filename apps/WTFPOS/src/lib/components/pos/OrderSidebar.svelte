@@ -3,13 +3,13 @@
 	import { formatPeso, formatTimeAgo, cn } from '$lib/utils';
 	import { menuItems, printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus } from '$lib/stores/pos.svelte';
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
-	import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
 
 	interface Props {
 		order: Order | undefined;
 		table: Table | null;
 		onclose: () => void;
 		onadditem: () => void;
+		onrefill: () => void;
 		oncheckout: () => void;
 		onvoid: () => void;
 		ontransfer: () => void;
@@ -26,6 +26,7 @@
 		table,
 		onclose,
 		onadditem,
+		onrefill,
 		oncheckout,
 		onvoid,
 		ontransfer,
@@ -37,7 +38,6 @@
 		onacknowledgeRejection
 	}: Props = $props();
 
-	let showRefillPanel = $state(false);
 	let showMoreActions = $state(false);
 
 	function takeoutLabel(o: Order) {
@@ -146,38 +146,28 @@
 				<div class="text-sm font-semibold text-gray-700">{order.packageName}</div>
 			{/if}
 
-			<!-- Action buttons: REFILL (primary) + MORE (secondary) for AYCE, or plain ADD for others -->
+			<!-- Action buttons: REFILL + ADD ITEM for AYCE, or plain ADD for others -->
 			{#if order.orderType === 'dine-in' && order.packageId && order.status === 'open'}
 				<div class="flex gap-2">
 					<button
-						onclick={() => { showRefillPanel = !showRefillPanel; showMoreActions = false; }}
-						class={cn(
-							'flex-1 rounded-xl text-sm font-bold transition-all active:scale-95',
-							showRefillPanel
-								? 'bg-accent-dark text-white'
-								: 'bg-accent text-white hover:bg-accent-dark'
-						)}
+						onclick={onrefill}
+						class="flex-1 rounded-xl bg-accent text-sm font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
 						style="min-height: 56px"
 					>
 						Refill
 					</button>
 					<button
-						onclick={() => { onadditem(); showRefillPanel = false; }}
-						class="rounded-xl border border-border bg-surface px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:scale-95 transition-all"
+						onclick={onadditem}
+						class="rounded-xl border-2 border-accent bg-accent-light px-4 text-sm font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
 						style="min-height: 56px"
 					>
-						+ More
+						Add Item
 					</button>
 				</div>
 			{:else if order.status === 'open'}
 				<button onclick={onadditem} class="btn-primary w-full text-sm" style="min-height: 44px">+ Add Item</button>
 			{/if}
 		</div>
-
-		<!-- ── Inline Refill Panel ── -->
-		{#if showRefillPanel && order.status === 'open'}
-			<RefillPanel {order} onclose={() => showRefillPanel = false} />
-		{/if}
 
 		<!-- ── Kitchen Rejection Alerts ── -->
 		{#if pendingRejections.length > 0}
@@ -226,7 +216,11 @@
 						<div class="flex items-center gap-1.5 flex-wrap">
 							<span class="text-sm font-medium text-gray-900 truncate">{item.menuItemName}</span>
 							{#if badge === 'pending'}
-								<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-600">SENT</span>
+								{#if order.packageId}
+									<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">REQUESTING</span>
+								{:else}
+									<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-600">SENT</span>
+								{/if}
 							{:else if badge === 'weighing'}
 								<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">WEIGHING</span>
 							{:else if badge === 'cooking'}
@@ -297,7 +291,7 @@
 
 			<!-- More Options (overflow) -->
 			<button
-				onclick={() => { showMoreActions = !showMoreActions; showRefillPanel = false; }}
+				onclick={() => { showMoreActions = !showMoreActions; }}
 				class="w-full rounded-lg border border-border bg-surface py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all"
 				style="min-height: 36px"
 			>
@@ -313,7 +307,7 @@
 					{#if order.packageId && order.orderType === 'dine-in'}
 						<button onclick={onchangepackage} class="btn-secondary flex-1 text-xs" style="min-height: 36px">Change Pkg</button>
 					{/if}
-					{#if order.items.filter(i => i.status !== 'cancelled').length > 0}
+					{#if activeItemCount > 0}
 						<button onclick={onsplit} class="btn-secondary flex-1 text-xs" style="min-height: 36px">Split Bill</button>
 					{/if}
 					{#if order.orderType === 'dine-in' && table && onmerge}

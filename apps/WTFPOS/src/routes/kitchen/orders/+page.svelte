@@ -1,19 +1,109 @@
 <script lang="ts">
 	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, REFILL_NOTE } from '$lib/stores/pos.svelte';
-	import type { KdsTicket } from '$lib/types';
+	import type { KdsTicket, KdsTicketItem } from '$lib/types';
 	import { refuseItem } from '$lib/stores/alert.svelte';
-	import { formatCountdown, cn } from '$lib/utils';
+	import { formatCountdown, formatDisplayId, cn } from '$lib/utils';
 	import { printKitchenOrder } from '$lib/stores/hardware.svelte';
-	import { TriangleAlert } from 'lucide-svelte';
+	import { TriangleAlert, Check } from 'lucide-svelte';
+	import { untrack } from 'svelte';
 	import KdsHistoryModal from '$lib/components/kitchen/KdsHistoryModal.svelte';
+	import RefuseReasonModal from '$lib/components/kitchen/RefuseReasonModal.svelte';
 
+	// ── UI State ──
 	let showKdsHistory = $state(false);
+	let expandedItemId = $state<string | null>(null);
 
-	// Auto-print incoming tickets
+	// Refuse modal
+	let refuseTarget = $state<{ orderId: string; tableNumber: number | null; itemName: string } | null>(null);
+
+	// ── Live Timer ──
+	let now = $state(Date.now());
+	$effect(() => {
+		const id = setInterval(() => { now = Date.now(); }, 1000);
+		return () => clearInterval(id);
+	});
+
+	function ageMs(createdAt: string) { return now - new Date(createdAt).getTime(); }
+
+	function timerText(createdAt: string): string {
+		return formatCountdown(Math.floor(ageMs(createdAt) / 1000));
+	}
+
+	// ── Active Tickets (sorted oldest-first) ──
+	const activeTickets = $derived(
+		kdsTickets.value
+			.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
+			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+	);
+
+	// ── Stats ──
+	const queueOrders = $derived(activeTickets.length);
+	const activeTables = $derived(new Set(activeTickets.map((t) => t.tableNumber)).size);
+	const totalItems = $derived(
+		activeTickets.reduce((sum, t) => sum + t.items.filter(i => i.status !== 'cancelled').length, 0)
+	);
+
+	// ── Menu Item Lookup (O(1) instead of linear scan) ──
+	const menuItemsByName = $derived(new Map(menuItems.value.map(m => [m.name, m])));
+
+	// ── New Order Detection + Audio ──
+	let seenTicketIds = $state(new Set<string>());
+	let newTicketIds = $state(new Set<string>());
+	let isFirstRun = true;
+	let pulseTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	// Reuse a single Audio instance
+	let notificationAudio: HTMLAudioElement | null = null;
+	function playNewOrderSound() {
+		try {
+			if (!notificationAudio) {
+				notificationAudio = new Audio('/sounds/new-order.wav');
+				notificationAudio.volume = 0.7;
+			}
+			notificationAudio.currentTime = 0;
+			notificationAudio.play().catch(() => {});
+		} catch { /* skip if audio unavailable */ }
+	}
+
+	$effect(() => {
+		const currentIds = activeTickets.map(t => t.orderId);
+
+		// Use untrack to read seenTicketIds without creating a dependency
+		const seen = untrack(() => seenTicketIds);
+		const fresh = currentIds.filter(id => !seen.has(id));
+
+		if (fresh.length > 0) {
+			// On first mount, seed seenTicketIds without playing sound or animating
+			if (isFirstRun) {
+				isFirstRun = false;
+				seenTicketIds = new Set(currentIds);
+				return;
+			}
+			playNewOrderSound();
+			seenTicketIds = new Set([...seen, ...fresh]);
+			// Set newTicketIds for pulse animation, auto-clear after 3s
+			const freshSet = new Set(fresh);
+			newTicketIds = new Set([...untrack(() => newTicketIds), ...fresh]);
+			if (pulseTimeout) clearTimeout(pulseTimeout);
+			pulseTimeout = setTimeout(() => {
+				newTicketIds = new Set([...newTicketIds].filter(id => !freshSet.has(id)));
+				pulseTimeout = null;
+			}, 3000);
+		} else if (isFirstRun) {
+			isFirstRun = false;
+			seenTicketIds = new Set(currentIds);
+		}
+
+		return () => {
+			if (pulseTimeout) clearTimeout(pulseTimeout);
+		};
+	});
+
+	// ── Auto-print incoming tickets ──
 	$effect(() => {
 		const toPrint = activeTickets.filter(t => !t.printStatus || t.printStatus === 'pending');
 		for (const ticket of toPrint) {
-			ticket.printStatus = 'success'; // optimistic to prevent loop
+			ticket.printStatus = 'success';
 			printKitchenOrder(ticket.orderId).then(res => {
 				if (!res.success) ticket.printStatus = 'failed';
 			});
@@ -21,255 +111,394 @@
 	});
 
 	function retryPrint(ticket: KdsTicket) {
-		ticket.printStatus = 'success'; // optimistic
+		ticket.printStatus = 'success';
 		printKitchenOrder(ticket.orderId).then(res => {
 			if (!res.success) ticket.printStatus = 'failed';
 		});
 	}
 
-	const activeTickets = $derived(
-		kdsTickets.value.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
-	);
+	// ── Urgency Styling ──
+	const WARN_MS  = 5  * 60_000;
+	const CRIT_MS  = 10 * 60_000;
 
-	// Stat counts
-	const activeTables = $derived(new Set(activeTickets.map((t) => t.tableNumber)).size);
-	const menuOrders   = $derived(activeTickets.filter((t) => t.items.some((i) => i.category !== 'meats')).length);
-	const queueOrders  = $derived(activeTickets.length);
-
-	function ageMs(createdAt: string) { return Date.now() - new Date(createdAt).getTime(); }
-
-	function ticketBorderClass(createdAt: string) {
+	function urgencyLevel(createdAt: string): 'critical' | 'warning' | 'normal' {
 		const ms = ageMs(createdAt);
-		if (ms > 10 * 60_000) return 'border-status-red bg-status-red-light';
-		if (ms > 5 * 60_000)  return 'border-status-yellow bg-status-yellow-light';
+		if (ms > CRIT_MS) return 'critical';
+		if (ms > WARN_MS) return 'warning';
+		return 'normal';
+	}
+
+	function ticketBorderClass(level: ReturnType<typeof urgencyLevel>) {
+		if (level === 'critical') return 'border-status-red animate-border-pulse-red bg-status-red-light';
+		if (level === 'warning')  return 'border-status-yellow animate-border-pulse-yellow bg-status-yellow-light';
 		return 'border-border bg-surface';
 	}
 
-	function timerText(createdAt: string): string {
-		const s = Math.floor(ageMs(createdAt) / 1000);
-		return formatCountdown(s);
+	function timerBadgeClass(level: ReturnType<typeof urgencyLevel>) {
+		if (level === 'critical') return 'bg-status-red text-white';
+		if (level === 'warning')  return 'bg-status-yellow text-white';
+		return 'bg-gray-100 text-gray-600';
 	}
 
-	// Bump entire ticket
-	function bumpAll(orderId: string) {
-		const ticket = kdsTickets.value.find(t => t.orderId === orderId);
-		if (!ticket) return;
+	// ── Progress ──
+	function ticketProgress(ticket: KdsTicket) {
+		const active = ticket.items.filter(i => i.status !== 'cancelled');
+		const total = active.length;
+		const served = active.filter(i => i.status === 'served').length;
+		const pct = total > 0 ? (served / total) * 100 : 0;
+		return { served, total, pct };
+	}
+
+	// ── Group Items (served items STAY visible, only cancelled filtered out) ──
+	function groupItems(items: KdsTicketItem[]) {
+		const notCancelled = (i: KdsTicketItem) => i.status !== 'cancelled';
+		const meats  = items.filter(i => i.category === 'meats' && notCancelled(i));
+		const dishes = items.filter(i => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && notCancelled(i));
+		const extras = items.filter(i => i.category === 'packages' && notCancelled(i));
+		return { meats, dishes, extras };
+	}
+
+	// ── Actions ──
+	function completeAll(ticket: KdsTicket) {
 		for (const item of ticket.items) {
 			if (item.status !== 'served' && item.status !== 'cancelled') {
-				markItemServed(orderId, item.id);
+				markItemServed(ticket.orderId, item.id);
 			}
 		}
 	}
 
-	// Group items by category for kitchen display
-	function groupItems(items: KdsTicket['items']) {
-		const meats  = items.filter((i) => i.category === 'meats'   && i.status !== 'served');
-		const dishes = items.filter((i) => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && i.status !== 'served');
-		const extras = items.filter((i) => i.category === 'packages' && i.status !== 'served');
-		return { meats, dishes, extras };
+	function toggleExpand(itemId: string) {
+		expandedItemId = expandedItemId === itemId ? null : itemId;
 	}
 
-	// Helper to check if an item is already 86'd
-	function isSoldOut(menuItemId: string): boolean {
-		const mi = menuItems.value.find(m => m.name === menuItemId);
+	function openRefuseModal(orderId: string, tableNumber: number | null, itemName: string) {
+		refuseTarget = { orderId, tableNumber, itemName };
+	}
+
+	function handleRefuseConfirm(reason: string) {
+		if (refuseTarget) {
+			refuseItem(refuseTarget.orderId, refuseTarget.tableNumber, refuseTarget.itemName, reason);
+		}
+		refuseTarget = null;
+	}
+
+	function isSoldOut(menuItemName: string): boolean {
+		const mi = menuItemsByName.get(menuItemName);
 		return mi ? !mi.available : false;
 	}
-	
+
 	async function handleSoldOut(menuItemName: string) {
-		const mi = menuItems.value.find(m => m.name === menuItemName);
-		if (mi) {
-			await toggleMenuItemAvailability(mi.id);
-		}
+		const mi = menuItemsByName.get(menuItemName);
+		if (mi) await toggleMenuItemAvailability(mi.id);
 	}
 </script>
 
-<!-- Queue header -->
-<div class="flex items-center justify-between mb-6">
-	<h1 class="flex items-center gap-2 text-xl font-bold text-gray-900">
-		<span class="text-lg">🔍</span> Kitchen Order Queue
-	</h1>
-	<div class="flex items-center gap-2">
-		<span class="badge-orange">{activeTables} Active Tables</span>
-		<span class="badge-orange">{menuOrders} Menu Orders</span>
-		<span class="badge-orange">{queueOrders} In Queue</span>
+{#snippet itemActions(orderId: string, tableNumber: number | null, menuItemName: string)}
+	<div class="flex gap-2 px-4 py-2 bg-gray-50 border-t border-border/30">
 		<button
-			onclick={() => recallLastTicket()}
-			disabled={kdsTicketHistory.value.length === 0}
-			class="rounded-lg border border-accent bg-accent-light px-3 py-1.5 text-xs font-bold text-accent hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-			style="min-height: 32px"
+			onclick={() => openRefuseModal(orderId, tableNumber, menuItemName)}
+			class="btn-danger px-4 text-sm"
+			style="min-height: 44px"
 		>
-			↩ Recall Last
+			RETURN
 		</button>
 		<button
-			onclick={() => showKdsHistory = true}
-			class="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors"
-			style="min-height: 32px"
+			onclick={() => handleSoldOut(menuItemName)}
+			class={cn(
+				'px-4 text-sm font-bold rounded-lg active:scale-95 transition-all',
+				isSoldOut(menuItemName) ? 'bg-status-red text-white' : 'bg-gray-200 text-gray-600 border border-border'
+			)}
+			style="min-height: 44px"
 		>
-			📋 History {#if kdsTicketHistory.value.length > 0}<span class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold">{kdsTicketHistory.value.length}</span>{/if}
+			{isSoldOut(menuItemName) ? 'SOLD OUT &#10005;' : 'SOLD OUT'}
 		</button>
+	</div>
+{/snippet}
+
+<!-- ── Header ── -->
+<div class="mb-4 space-y-4">
+	<div class="flex items-center justify-between">
+		<h1 class="text-xl font-bold text-gray-900 no-select">Kitchen Queue</h1>
+		<div class="flex items-center gap-3">
+			<button
+				onclick={() => recallLastTicket()}
+				disabled={kdsTicketHistory.value.length === 0}
+				class="btn-primary px-5 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+				style="min-height: 48px"
+			>
+				&#8617; UNDO LAST
+			</button>
+			<button
+				onclick={() => showKdsHistory = true}
+				class="btn-secondary px-5 text-sm"
+				style="min-height: 48px"
+			>
+				History
+				{#if kdsTicketHistory.value.length > 0}
+					<span class="ml-1 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold">{kdsTicketHistory.value.length}</span>
+				{/if}
+			</button>
+		</div>
+	</div>
+
+	<!-- Stat blocks -->
+	<div class="flex gap-3">
+		<div class="flex items-center gap-3 rounded-xl border border-accent bg-accent-light px-5 py-2.5">
+			<span class="text-2xl font-black font-mono text-accent">{queueOrders}</span>
+			<span class="text-sm font-semibold text-accent/80">Orders</span>
+		</div>
+		<div class="flex items-center gap-3 rounded-xl border border-status-green bg-status-green-light px-5 py-2.5">
+			<span class="text-2xl font-black font-mono text-status-green">{activeTables}</span>
+			<span class="text-sm font-semibold text-status-green/80">Tables</span>
+		</div>
+		<div class="flex items-center gap-3 rounded-xl border border-status-cyan bg-status-cyan-light px-5 py-2.5">
+			<span class="text-2xl font-black font-mono text-status-cyan">{totalItems}</span>
+			<span class="text-sm font-semibold text-status-cyan/80">Items</span>
+		</div>
 	</div>
 </div>
 
+<!-- ── Queue ── -->
 {#if activeTickets.length === 0}
 	<div class="flex flex-1 items-center justify-center" style="min-height: 400px">
 		<div class="text-center text-gray-400">
-			<div class="mb-3 text-5xl">✅</div>
-			<p class="text-lg font-semibold">No actionable orders</p>
-			<p class="text-sm mt-1">New orders will appear here automatically</p>
+			<div class="mb-4 text-6xl">&#9989;</div>
+			<p class="text-xl font-bold">No pending orders</p>
+			<p class="text-sm mt-2">New orders will appear here automatically</p>
 		</div>
 	</div>
 {:else}
-	<div class="flex gap-4 overflow-x-auto pb-4" style="min-width: max-content">
+	<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
 		{#each activeTickets as ticket (ticket.orderId)}
 			{@const grouped = groupItems(ticket.items)}
-			<div class={cn('flex w-60 shrink-0 flex-col rounded-xl border-2 overflow-hidden transition-colors', ticket.printStatus === 'failed' ? 'border-red-500 bg-red-50' : ticketBorderClass(ticket.createdAt))}>
-				<!-- Ticket header -->
+			{@const progress = ticketProgress(ticket)}
+			{@const isNew = newTicketIds.has(ticket.orderId)}
+			{@const urgency = urgencyLevel(ticket.createdAt)}
+
+			<div class={cn(
+				'flex flex-col rounded-xl border-2 overflow-hidden transition-all',
+				ticket.printStatus === 'failed' ? 'border-red-500 bg-red-50' : ticketBorderClass(urgency),
+				isNew && 'animate-pulse'
+			)}>
+				<!-- Card Header -->
 				<div class="flex items-center justify-between px-4 py-3 bg-white/60">
 					<div class="flex items-center gap-2">
 						{#if ticket.tableNumber !== null}
-							<span class="text-lg font-extrabold text-gray-900">T{ticket.tableNumber}</span>
+							<span class="text-2xl font-black text-gray-900">T{ticket.tableNumber}</span>
 						{:else}
-							<span class="flex items-center gap-1">
-								<span class="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-white">📦</span>
-								<span class="text-sm font-extrabold text-gray-900">{ticket.customerName ?? 'Takeout'}</span>
+							<span class="flex items-center gap-2">
+								<span class="rounded-lg bg-status-purple px-2 py-1 text-xs font-bold text-white">TAKEOUT</span>
+								<span class="text-lg font-black text-gray-900">{ticket.customerName ?? 'Walk-in'}</span>
 							</span>
 						{/if}
+						<span class="font-mono text-xs font-bold text-gray-400">{formatDisplayId(ticket.orderId, ticket.tableNumber)}</span>
 
 						{#if ticket.printStatus === 'failed'}
-							<button onclick={() => retryPrint(ticket)} class="flex items-center gap-0.5 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-red-200 transition-colors" title="Printer Error. Click to Retry.">
-								<TriangleAlert class="w-2.5 h-2.5" /> Retry
+							<button
+								onclick={() => retryPrint(ticket)}
+								class="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 px-2.5 py-1.5 rounded-lg active:scale-95 transition-colors"
+								style="min-height: 44px"
+							>
+								<TriangleAlert class="w-4 h-4" /> Retry
 							</button>
 						{/if}
 					</div>
-					<span class={cn(
-						'rounded-full px-2 py-0.5 font-mono text-xs font-bold',
-						ageMs(ticket.createdAt) > 10 * 60_000
-							? 'bg-status-red text-white'
-							: ageMs(ticket.createdAt) > 5 * 60_000
-								? 'bg-status-yellow text-white'
-								: 'bg-gray-100 text-gray-600'
-					)}>
-						⏱ {timerText(ticket.createdAt)}
-					</span>
+
+					<div class="flex items-center gap-2">
+						<span class="text-sm font-bold text-gray-400 font-mono">{progress.served}/{progress.total}</span>
+						<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
+							{timerText(ticket.createdAt)}
+						</span>
+					</div>
 				</div>
 
-				<div class="flex flex-col gap-0 divide-y divide-border flex-1 px-4 py-2">
-					<!-- MEATS section -->
+				<!-- Progress Bar -->
+				<div class="h-1 bg-gray-100">
+					<div
+						class="h-full bg-status-green transition-all duration-500"
+						style="width: {progress.pct}%"
+					></div>
+				</div>
+
+				<!-- Items -->
+				<div class="flex flex-col gap-0 divide-y divide-border flex-1">
+					<!-- MEATS -->
 					{#if grouped.meats.length > 0}
-						<div class="py-3">
-							<p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-status-red">
-								🥩 MEATS — {grouped.meats.reduce((s: number, i: any) => s + (i.weight ?? 0), 0)}g total
-							</p>
+						<div class="py-2">
+							<div class="flex items-center justify-between px-4 py-1.5">
+								<span class="text-xs font-bold uppercase tracking-wider text-status-red">
+									&#129385; MEATS
+								</span>
+								<span class="text-xs font-mono font-bold text-status-red/70">
+									{grouped.meats.filter(i => i.status !== 'served').reduce((s: number, i) => s + (i.weight ?? 0), 0)}g
+								</span>
+							</div>
 							{#each grouped.meats as item (item.id)}
-								<div class="flex items-center justify-between py-0.5 group">
-									<div class="flex-1">
-										<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
-										{#if item.weight}
-											<span class="text-[10px] text-gray-400 ml-1">{item.weight}g</span>
-										{:else if item.notes === REFILL_NOTE}
-											<span class="text-[10px] font-bold text-amber-500 ml-1 animate-pulse">WEIGHING</span>
+								{@const isServed = item.status === 'served'}
+								{@const isExpanded = expandedItemId === item.id && !isServed}
+								{@const isRefill = item.notes === REFILL_NOTE && !item.weight}
+								<div class="border-b border-border/30 last:border-b-0">
+									<div
+										class={cn(
+											'flex items-center gap-2 px-4 py-2 transition-colors',
+											isServed ? 'opacity-50' : 'cursor-pointer active:bg-gray-50'
+										)}
+										onclick={() => !isServed && toggleExpand(item.id)}
+										role={isServed ? undefined : 'button'}
+										tabindex={isServed ? -1 : 0}
+									>
+										<div class="flex-1 flex items-center gap-2 min-w-0">
+											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
+												{item.menuItemName}
+											</span>
+											{#if item.weight}
+												<span class={cn(
+													'shrink-0 rounded-full px-2 py-0.5 text-xs font-mono font-bold',
+													isServed ? 'bg-gray-100 text-gray-400' : 'bg-pink-100 text-pink-700'
+												)}>
+													{item.weight}g
+												</span>
+											{/if}
+											{#if isRefill}
+												<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-600 animate-pulse">
+													REFILL
+												</span>
+											{/if}
+											{#if item.status === 'cooking' && item.weight}
+												<span class="shrink-0 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-bold text-orange-600">
+													ON GRILL
+												</span>
+											{/if}
+										</div>
+										{#if isServed}
+											<span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-status-green/10 text-status-green">
+												<Check class="w-5 h-5" strokeWidth={3} />
+											</span>
+										{:else}
+											<button
+												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
+												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
+												style="min-height: 48px"
+											>
+												&#10003;
+											</button>
 										{/if}
 									</div>
-									<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
-										<button
-											onclick={() => {
-												const reason = prompt(`Reason for refusing ${item.menuItemName}?`);
-												if (reason) refuseItem(ticket.orderId, ticket.tableNumber, item.menuItemName, reason);
-											}}
-											class="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-600 hover:bg-red-200"
-											title="Refuse Item"
-										>
-											Refuse
-										</button>
-										<button
-											onclick={() => handleSoldOut(item.menuItemName)}
-											class={cn('rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider', isSoldOut(item.menuItemName) ? 'bg-status-red text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
-											title="Toggle availability in POS"
-										>
-											{isSoldOut(item.menuItemName) ? 'Sold Out' : 'Mark Sold Out'}
-										</button>
-									</div>
-									<button
-										onclick={() => markItemServed(ticket.orderId, item.id)}
-										class="rounded text-[10px] font-semibold text-status-green hover:underline"
-										style="min-height: unset"
-									>
-										✓
-									</button>
+									{#if isExpanded}
+										{@render itemActions(ticket.orderId, ticket.tableNumber, item.menuItemName)}
+									{/if}
 								</div>
 							{/each}
 						</div>
 					{/if}
 
-					<!-- DISHES & DRINKS section -->
+					<!-- DISHES & DRINKS -->
 					{#if grouped.dishes.length > 0}
-						<div class="py-3">
-							<p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-status-cyan">
-								🍜 DISHES & DRINKS
-							</p>
+						<div class="py-2">
+							<div class="px-4 py-1.5">
+								<span class="text-xs font-bold uppercase tracking-wider text-status-cyan">
+									&#127836; DISHES & DRINKS
+								</span>
+							</div>
 							{#each grouped.dishes as item (item.id)}
-								<div class="flex items-center justify-between py-0.5 group">
-									<div class="flex-1">
-										<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
+								{@const isServed = item.status === 'served'}
+								{@const isExpanded = expandedItemId === item.id && !isServed}
+								<div class="border-b border-border/30 last:border-b-0">
+									<div
+										class={cn(
+											'flex items-center gap-2 px-4 py-2 transition-colors',
+											isServed ? 'opacity-50' : 'cursor-pointer active:bg-gray-50'
+										)}
+										onclick={() => !isServed && toggleExpand(item.id)}
+										role={isServed ? undefined : 'button'}
+										tabindex={isServed ? -1 : 0}
+									>
+										<div class="flex-1 flex items-center gap-2 min-w-0">
+											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
+												{item.menuItemName}
+											</span>
+											{#if item.quantity > 1}
+												<span class={cn(
+													'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold',
+													isServed ? 'bg-gray-100 text-gray-400' : 'bg-cyan-100 text-cyan-700'
+												)}>
+													{item.quantity}x
+												</span>
+											{/if}
+											{#if item.status === 'cooking' && item.category === 'dishes'}
+												<span class="shrink-0 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-bold text-orange-600">
+													COOKING
+												</span>
+											{/if}
+										</div>
+										{#if isServed}
+											<span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-status-green/10 text-status-green">
+												<Check class="w-5 h-5" strokeWidth={3} />
+											</span>
+										{:else}
+											<button
+												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
+												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
+												style="min-height: 48px"
+											>
+												&#10003;
+											</button>
+										{/if}
 									</div>
-									<div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
-										<button
-											onclick={() => {
-												const reason = prompt(`Reason for refusing ${item.menuItemName}?`);
-												if (reason) refuseItem(ticket.orderId, ticket.tableNumber, item.menuItemName, reason);
-											}}
-											class="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-red-100 text-red-600 hover:bg-red-200"
-											title="Refuse Item"
-										>
-											Refuse
-										</button>
-										<button
-											onclick={() => handleSoldOut(item.menuItemName)}
-											class={cn('rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider', isSoldOut(item.menuItemName) ? 'bg-status-red text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
-											title="Toggle availability in POS"
-										>
-											{isSoldOut(item.menuItemName) ? 'Sold Out' : 'Mark Sold Out'}
-										</button>
+									{#if isExpanded}
+										{@render itemActions(ticket.orderId, ticket.tableNumber, item.menuItemName)}
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- SIDE REQUESTS -->
+					{#if grouped.extras.length > 0}
+						<div class="py-2">
+							<div class="px-4 py-1.5">
+								<span class="text-xs font-bold uppercase tracking-wider text-status-purple">
+									&#127915; SIDE REQUESTS
+								</span>
+							</div>
+							{#each grouped.extras as item (item.id)}
+								{@const isServed = item.status === 'served'}
+								<div class="flex items-center gap-2 px-4 py-2">
+									<div class="flex-1 flex items-center gap-2 min-w-0">
+										<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
+											{item.menuItemName}
+										</span>
+										{#if item.quantity > 1}
+											<span class="shrink-0 text-xs text-gray-400">{item.quantity}x</span>
+										{/if}
 									</div>
-									<div class="flex items-center gap-2 shrink-0">
-										<span class="text-[10px] text-gray-400">{item.quantity}x</span>
+									{#if isServed}
+										<span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-status-green/10 text-status-green">
+											<Check class="w-5 h-5" strokeWidth={3} />
+										</span>
+									{:else}
 										<button
 											onclick={() => markItemServed(ticket.orderId, item.id)}
-											class="rounded text-[10px] font-semibold text-status-green hover:underline"
-											style="min-height: unset"
+											class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
+											style="min-height: 48px"
 										>
-											✓
+											&#10003;
 										</button>
-									</div>
-								</div>
-							{/each}
-						</div>
-					{/if}
-
-					<!-- Package / extras -->
-					{#if grouped.extras.length > 0}
-						<div class="py-3">
-							<p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-status-purple">
-								🎫 SIDE REQUESTS
-							</p>
-							{#each grouped.extras as item (item.id)}
-								<div class="flex justify-between py-0.5">
-									<span class="text-xs font-medium text-gray-900">{item.menuItemName}</span>
-									<span class="text-[10px] text-gray-400">{item.quantity}x</span>
+									{/if}
 								</div>
 							{/each}
 						</div>
 					{/if}
 				</div>
 
-				<!-- Bump All button -->
-				<div class="border-t border-border px-3 py-2">
+				<!-- ALL DONE -->
+				<div class="border-t border-border px-4 py-3">
 					<button
-						onclick={() => bumpAll(ticket.orderId)}
-						class="w-full rounded-lg bg-status-green py-2 text-xs font-bold text-white hover:bg-emerald-600 active:scale-95 transition-all"
-						style="min-height: 36px"
+						onclick={() => completeAll(ticket)}
+						class="w-full rounded-xl bg-status-green text-white font-black text-base uppercase tracking-wide active:scale-95 transition-all hover:bg-emerald-600 no-select"
+						style="min-height: 56px"
 					>
-						BUMP ALL ✓
+						ALL DONE &#10003;
 					</button>
 				</div>
 			</div>
@@ -277,4 +506,11 @@
 	</div>
 {/if}
 
+<!-- Modals -->
 <KdsHistoryModal isOpen={showKdsHistory} onClose={() => showKdsHistory = false} />
+<RefuseReasonModal
+	isOpen={refuseTarget !== null}
+	itemName={refuseTarget?.itemName ?? ''}
+	onConfirm={handleRefuseConfirm}
+	onCancel={() => refuseTarget = null}
+/>

@@ -1,0 +1,57 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph
+    - separator [ref=e17]
+    - list [ref=e21]:
+      - listitem [ref=e22]:
+        - link "POS" [ref=e23] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e24]
+          - generic [ref=e28]: POS
+    - generic [ref=e29]:
+      - separator [ref=e30]
+      - generic [ref=e31]:
+        - generic [ref=e32]: U
+        - generic [ref=e33]:
+          - generic [ref=e34]: User
+          - generic [ref=e35]: staff
+      - link "Logout" [ref=e37] [cursor=pointer]:
+        - /url: /
+        - img [ref=e38]
+        - generic [ref=e41]: Logout
+    - button "Toggle Sidebar" [ref=e42]
+  - main [ref=e43]:
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - heading "POS" [level=1] [ref=e49]
+            - generic [ref=e50]: 0 occ
+            - generic [ref=e51]: 0 free
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - generic [ref=e54]: Available
+              - generic [ref=e56]: Dining (Green)
+              - generic [ref=e58]: Ready / Bill (Orange)
+              - generic [ref=e60]: Pork
+              - generic [ref=e62]: Beef
+              - generic [ref=e64]: P&B
+            - button "📦 New Takeout" [ref=e66] [cursor=pointer]
+            - button "🧾 History" [ref=e67] [cursor=pointer]
+        - img [ref=e69]
+      - generic [ref=e73]:
+        - generic [ref=e74]: 🧾
+        - generic [ref=e75]:
+          - generic [ref=e76]: No Table Selected
+          - generic [ref=e77]: Tap an occupied table on the floor plan to view its running bill here.
+        - generic [ref=e78]:
+          - generic [ref=e79]: Green = available — tap to open
+          - generic [ref=e81]: Orange = occupied — tap to view bill

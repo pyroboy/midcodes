@@ -1,0 +1,55 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e16]:
+        - img [ref=e17]
+        - generic [ref=e20]: Alta Citta (Tagbilaran)
+    - separator [ref=e21]
+    - list [ref=e25]:
+      - listitem [ref=e26]:
+        - link "POS" [ref=e27] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e28]
+          - generic [ref=e32]: POS
+    - generic [ref=e33]:
+      - separator [ref=e34]
+      - generic [ref=e35]:
+        - generic [ref=e36]: U
+        - generic [ref=e37]:
+          - generic [ref=e38]: User
+          - generic [ref=e39]: staff
+      - link "Logout" [ref=e41] [cursor=pointer]:
+        - /url: /
+        - img [ref=e42]
+        - generic [ref=e45]: Logout
+    - button "Toggle Sidebar" [ref=e46]
+  - main [ref=e47]:
+    - generic [ref=e49]:
+      - heading "Stock Management" [level=1] [ref=e52]
+      - navigation [ref=e53]:
+        - link "Inventory" [ref=e54] [cursor=pointer]:
+          - /url: /stock/inventory
+          - img [ref=e55]
+          - text: Inventory
+        - link "Deliveries" [ref=e59] [cursor=pointer]:
+          - /url: /stock/deliveries
+          - img [ref=e60]
+          - text: Deliveries
+        - link "Transfers" [ref=e65] [cursor=pointer]:
+          - /url: /stock/transfers
+          - img [ref=e66]
+          - text: Transfers
+        - link "Counts 1" [ref=e69] [cursor=pointer]:
+          - /url: /stock/counts
+          - img [ref=e70]
+          - text: Counts
+          - generic [ref=e74]: "1"
+        - link "Waste Log" [ref=e75] [cursor=pointer]:
+          - /url: /stock/waste
+          - img [ref=e76]
+          - text: Waste Log

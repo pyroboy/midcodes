@@ -12,10 +12,10 @@ import {
 	deviceSchema,
 	expenseSchema,
 	kdsTicketSchema,
-	kdsHistorySchema,
 	xReadSchema,
 	auditLogSchema,
-	kitchenAlertSchema
+	kitchenAlertSchema,
+	floorElementSchema
 } from './schemas';
 
 const ALL_SCHEMAS = [
@@ -31,10 +31,10 @@ const ALL_SCHEMAS = [
 	{ name: 'deviceSchema', schema: deviceSchema },
 	{ name: 'expenseSchema', schema: expenseSchema },
 	{ name: 'kdsTicketSchema', schema: kdsTicketSchema },
-	{ name: 'kdsHistorySchema', schema: kdsHistorySchema },
 	{ name: 'xReadSchema', schema: xReadSchema },
 	{ name: 'auditLogSchema', schema: auditLogSchema },
 	{ name: 'kitchenAlertSchema', schema: kitchenAlertSchema },
+	{ name: 'floorElementSchema', schema: floorElementSchema },
 ];
 
 describe('RxDB schemas — structural integrity', () => {

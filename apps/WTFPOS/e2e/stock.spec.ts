@@ -105,7 +105,7 @@ test.describe('Stock — Receive Delivery', () => {
     await page.locator('input[type="number"]').first().fill('500');
 
     // Fill supplier
-    await page.locator('input[placeholder*="supplier" i], input[placeholder*="Supplier" i]').fill('QC Meats Inc.');
+    await page.locator('input[placeholder*="supplier" i], input[placeholder*="Supplier" i]').fill('Tagbilaran Meats Inc.');
 
     // Submit
     const saveBtn = page.locator('button', { hasText: /Save|Record|Receive/i });

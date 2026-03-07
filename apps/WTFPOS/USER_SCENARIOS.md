@@ -17,8 +17,8 @@ This document outlines the day-to-day scenarios and user journeys for the differ
   - **Action:** A large reservation for 20 people requires pushing tables together.
   - **Journey:** The Manager opens the *Admin Floor Editor*, drags Tables 1, 2, and 3 together, renames the grouping to "VIP Event," and saves. The POS automatically reflects this new layout for the Cashier.
 - **Scenario 4: Multi-Branch Monitoring**
-  - **Action:** Manager is off-site but needs an overview of both the Quezon City and Makati branches simultaneously.
-  - **Journey:** Opening the POS in "All Branches" mode, they gain a live bird's-eye view. They can see tables actively eating in Makati, how many takeout orders are pending, and compare live revenue without calling the store managers manually.
+  - **Action:** Manager is off-site but needs an overview of both the Tagbilaran and Panglao branches simultaneously.
+  - **Journey:** Opening the POS in "All Branches" mode, they gain a live bird's-eye view. They can see tables actively eating in Panglao, how many takeout orders are pending, and compare live revenue without calling the store managers manually.
 - **Scenario 5: Recording Operational Expenses**
   - **Action:** A water delivery and minor plumbing fix arrive at the branch mid-day. Cash needs to be pulled from the drawer to pay them.
   - **Journey:** The Manager logs a "Cash Out" in the Petty Cash tracker to deduct the exact amount from the End-Of-Day register float ensuring cash balancing is flawless during closing.
@@ -94,8 +94,8 @@ This document outlines the day-to-day scenarios and user journeys for the differ
   - **Action:** It's 7 PM and the restaurant is packed.
   - **Journey:** The POS system flashes a low-stock warning for "Soju." The Stock Controller sees this, runs to the backroom, grabs the remaining reserve boxes, and physically brings them to the front bar, averting a crisis before customers even try to order.
 - **Scenario 17: Inter-Branch Stock Transfers**
-  - **Action:** The Makati branch tells the Quezon City branch they ran out of Enoki mushrooms.
-  - **Journey:** The Stock Controller initiates an "Outgoing Transfer" for 2kg of Enoki mushrooms headed to Makati. When the runner arrives in Makati, the receiving branch accepts the transfer, instantly deducting 2kg from QC's live inventory and adding it to Makati's.
+  - **Action:** The Panglao branch tells the Tagbilaran branch they ran out of Enoki mushrooms.
+  - **Journey:** The Stock Controller initiates an "Outgoing Transfer" for 2kg of Enoki mushrooms headed to Panglao. When the runner arrives in Panglao, the receiving branch accepts the transfer, instantly deducting 2kg from Tagbilaran's live inventory and adding it to Panglao's.
 - **Scenario 18: Month-end Physical Inventory Audit**
   - **Action:** It's the end of the month, and the system numbers must match the physical reality.
   - **Journey:** The Controller does a physical walkthrough with a tablet. They count 25 bottles of Soy Sauce while the system expects 28. They input "25" as an override count. The system produces a variance report highlighting the 3 missing bottles for managerial review.
@@ -249,9 +249,9 @@ This document outlines the day-to-day scenarios and user journeys for the differ
   - **Journey:** Most POS systems break because they force "per table" pricing. In WTFPOS, the Cashier seats "6 Pax". They select 4x "Premium Unli" and assign them to Seats 1-4. They select 1x "Kids Free (Under 4ft)" for Seat 5, validating the free unli access while assigning an inventory tracking pack. Finally, they assign 1x "Ala-Carte Bibimbap" to Seat 6. The overall table timer begins based strictly on the 4 paying Unli adults, and the system explicitly restricts ordering Unli refills on the KDS beyond the limit of 4 active pax worth of portions.
 - **Scenario 53: Extreme Edge Case - Central Warehouse to Branch Meat Transfer**
   - **Action:** The restaurant group has a central commissary (warehouse) that pre-marinates 100kg of Spicy Pork, which needs to be dispatched to 3 separate branches logically.
-  - **Journey:** The Warehouse Manager logs into the Cloud Admin Portal. They select "Bulk Transfer Out" and specify: 40kg to Makati, 40kg to QC, 20kg to BGC. 
+  - **Journey:** The Warehouse Manager logs into the Cloud Admin Portal. They select "Bulk Transfer Out" and specify: 40kg to Panglao, 40kg to Tagbilaran, 20kg to BGC. 
   - The stock leaves the Warehouse system, but immediately enters a "In Transit" limbo state. It does NOT appear in the Branch's front-stock yet.
-  - 2 hours later, the QC Branch Manager physically receives the truck, weighs the container, notices it's only 39.5kg, and taps "Receive Transfer" on their POS -> inputting 39.5kg. The system automatically tags 0.5kg as "Transit Shrinkage/Spill" and completes the loop seamlessly.
+  - 2 hours later, the Tagbilaran Branch Manager physically receives the truck, weighs the container, notices it's only 39.5kg, and taps "Receive Transfer" on their POS -> inputting 39.5kg. The system automatically tags 0.5kg as "Transit Shrinkage/Spill" and completes the loop seamlessly.
 - **Scenario 54: Extreme Edge Case - Device Crash Mid-Payment**
   - **Action:** The Cashier taps "Pay - ₱2,000 Cash", the drawer pops open, but immediately the iPad/Desktop tablet overheats or runs out of battery and dies before printing the receipt.
   - **Journey:** The Manager grabs a backup tablet and logs in. Because WTFPOS utilizes cloud-state locking, Table 7 is still marked as "Processing Payment - Awaiting Print". The Manager clicks Table 7, and taps "Recover & Reprint Receipt", completing the transaction without double-charging the table or dealing with lost data.
@@ -355,7 +355,7 @@ This document outlines the day-to-day scenarios and user journeys for the differ
 **Goal:** Prove the platform empowers upper management and silent partners to manipulate, isolate, and forecast their restaurant's data securely without touching the floor.
 
 - **Scenario 80: The "Silent Partner" Dashboard Check**
-  - **Action:** An investor who lives in another country wants to know if their 30% stake in the Makati branch is paying off.
+  - **Action:** An investor who lives in another country wants to know if their 30% stake in the Panglao branch is paying off.
   - **Journey:** They log into the WTFPOS cloud portal using an "Investor-Read-Only" role. They cannot change prices or see employee wages, but they have access to a live Dashboard showing real-time `Total Gross Sales`, `Pax Count`, and `Average Spend per Head`. They see the current daily average is ₱840 per customer, satisfying their ROI projections without ever texting the busy operational manager.
 - **Scenario 81: Price Experimentation (A/B Testing the Menu)**
   - **Action:** The owner thinks raising the "Unli Basic Promo" from ₱499 to ₱549 will increase profits without hurting volume, but isn't sure.
@@ -370,5 +370,5 @@ This document outlines the day-to-day scenarios and user journeys for the differ
   - **Action:** The owner feels the menu is too cluttered with obscure side dishes holding up prep time.
   - **Journey:** They pull the `Product Mix` velocity report, sorting by "Least Ordered". They immediately see that "Spicy Octopus Rings" have only been ordered 4 times in the last 30 days, yet the restaurant wastes money constantly stocking the ingredients. The owner deletes it from the central menu, simplifying the kitchen's life drastically.
 - **Scenario 85: Tracing Fraud (The "Manager Void" Abuse Pattern)**
-  - **Action:** The owner notices overall profits are down slightly at the QC branch despite headcounts remaining identical.
+  - **Action:** The owner notices overall profits are down slightly at the Tagbilaran branch despite headcounts remaining identical.
   - **Journey:** Opening the `Void & Override` audit, WTFPOS provides a scatter plot of when voids occur. The owner notices a glaring anomaly: "Manager PIN #002 (John) manually voids exactly 2 whole tables every Friday at 10 PM right before closing." The owner isolates the exact timestamp, checks the local CCTV footage, and catches the manager pocketing the cash from those two tables. The owner initiates termination.

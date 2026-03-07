@@ -71,7 +71,7 @@ test.describe('Reports — EOD', () => {
 test.describe('Reports — Meat Variance', () => {
   test('meat variance loads with category breakdown', async ({ page }) => {
     await loginAsOwner(page);
-    await goToReport(page, '/reports/meat-variance');
+    await goToReport(page, '/reports/meat-report');
     await expect(
       page.locator('text=/Variance|meat|Samgyupsal|No data/i').first()
     ).toBeVisible({ timeout: 10000 });
@@ -122,13 +122,13 @@ test.describe('Reports — Net Profit', () => {
 });
 
 test.describe('Reports — Branch Comparison', () => {
-  test('branch comparison shows both QC and Makati data (owner-only)', async ({ page }) => {
+  test('branch comparison shows both Tagbilaran and Panglao data (owner-only)', async ({ page }) => {
     await loginAsOwner(page);
     await goToReport(page, '/reports/branch-comparison');
     await expect(page.locator('body')).not.toContainText('Error');
     // Owner sees both branches
     await expect(
-      page.locator('text=/Alta Cita|Alona|QC|Makati|Branch/i').first()
+      page.locator('text=/Alta Citta|Alona Beach|Tagbilaran|Panglao|Branch/i').first()
     ).toBeVisible({ timeout: 10000 });
   });
 });
@@ -163,8 +163,8 @@ test.describe('Reports — Staff Performance', () => {
 // ─── Branch scoping on reports ────────────────────────────────────────────────
 
 test.describe('Reports — Branch Scoping', () => {
-  test('manager (QC) only sees QC data on sales summary', async ({ page }) => {
-    // Manager Juan (QC) logs in — needs PIN
+  test('manager (Tagbilaran) only sees Tagbilaran data on sales summary', async ({ page }) => {
+    // Manager Juan (Tagbilaran) logs in — needs PIN
     await page.goto('/');
     await page.locator('#username').fill('juan');
     await page.locator('#password').fill('juan');
@@ -178,9 +178,9 @@ test.describe('Reports — Branch Scoping', () => {
 
     await page.goto('/reports/sales-summary');
     await expect(page.locator('body')).not.toContainText('Error');
-    // Should show Alta Cita branch label (not "All Branches")
+    // Should show Alta Citta branch label (not "All Branches")
     await expect(
-      page.locator('text=/Alta Cita|QC/i').first()
+      page.locator('text=/Alta Citta|Tagbilaran/i').first()
     ).toBeVisible({ timeout: 10000 });
   });
 });

@@ -16,10 +16,10 @@ import {
 	stockCountSchema,
 	deviceSchema,
 	kdsTicketSchema,
-	kdsHistorySchema,
 	xReadSchema,
 	auditLogSchema,
-	kitchenAlertSchema
+	kitchenAlertSchema,
+	floorElementSchema
 } from './schemas';
 
 import { dev } from '$app/environment';
@@ -92,7 +92,15 @@ export async function getDb() {
 					schema: tableSchema,
 					migrationStrategies: {
 						1: (d: any) => d, // v0→v1: indexes
-						2: (d: any) => addUpdatedAt(d, 'sessionStartedAt') // v1→v2: +updatedAt
+						2: (d: any) => addUpdatedAt(d, 'sessionStartedAt'), // v1→v2: +updatedAt
+						3: (d: any) => ({  // v2→v3: +style fields
+							...d,
+							color: d.color ?? null,
+							opacity: d.opacity ?? null,
+							borderRadius: d.borderRadius ?? null,
+							rotation: d.rotation ?? null,
+							chairConfig: d.chairConfig ?? null
+						})
 					}
 				},
 				orders: {
@@ -153,7 +161,7 @@ export async function getDb() {
 					migrationStrategies: {
 						1: (d: any) => d,
 						2: (d: any) => d,
-						3: (d: any) => addUpdatedAt(d, 'createdAt') // v2→v3: +updatedAt
+						3: (d: any) => addUpdatedAt(d, 'createdAt'), // v2→v3: +updatedAt
 					}
 				},
 				adjustments: {
@@ -191,14 +199,8 @@ export async function getDb() {
 					migrationStrategies: {
 						1: (d: any) => d,
 						2: (d: any) => d, // v1→v2: nested required
-						3: (d: any) => addUpdatedAt(d, 'createdAt') // v2→v3: +updatedAt
-					}
-				},
-				kds_history: {
-					schema: kdsHistorySchema,
-					migrationStrategies: {
-						1: (d: any) => d, // v0→v1: nested required
-						2: (d: any) => addUpdatedAt(d, 'bumpedAt') // v1→v2: +updatedAt
+						3: (d: any) => addUpdatedAt(d, 'createdAt'), // v2→v3: +updatedAt
+						4: (d: any) => ({ ...d, bumpedAt: null, bumpedBy: null }) // v3→v4: merged kds_history
 					}
 				},
 				x_reads: {
@@ -212,7 +214,14 @@ export async function getDb() {
 				},
 				kitchen_alerts: {
 					schema: kitchenAlertSchema
-				}
+				},
+				floor_elements: {
+					schema: floorElementSchema,
+					migrationStrategies: {
+						1: (d: any) => d,
+						2: (d: any) => ({ ...d, gridSize: null }) // v1→v2: merged floor_canvas
+					}
+				},
 			});
 
 			// Try to dynamically import the seeder and run it only in uninitialized environments

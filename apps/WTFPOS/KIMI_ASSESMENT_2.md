@@ -4,7 +4,7 @@ This document provides a comprehensive assessment of each scenario from USER_SCE
 
 **Assessment Date:** 2026-03-04  
 **Current Architecture:** Mock/in-memory data with Svelte 5 runes, no backend/database yet  
-**Branches Supported:** Quezon City (QC), Makati (MKTI), Central Warehouse (WH-QC)
+**Branches Supported:** Tagbilaran City (TAG), Panglao (PGL), Central Warehouse (WH-TAG)
 
 ---
 
@@ -277,7 +277,7 @@ This document provides a comprehensive assessment of each scenario from USER_SCE
 **Status:** ⚠️ PARTIALLY SUPPORTED
 
 **Notes:**
-- Multiple locations supported (QC, MKTI, WH-QC)
+- Multiple locations supported (TAG, PGL, WH-TAG)
 - **Gap:** No dedicated "Transfer Out" / "Transfer In" workflow
 - **Gap:** No "In Transit" state for inventory
 - Currently would need to manually deduct from one location and add to another
@@ -691,7 +691,7 @@ This document provides a comprehensive assessment of each scenario from USER_SCE
 **Status:** ⚠️ PARTIALLY SUPPORTED
 
 **Notes:**
-- Central warehouse location exists ([`wh-qc`](src/lib/stores/session.svelte.ts:1))
+- Central warehouse location exists ([`wh-tag`](src/lib/stores/session.svelte.ts:1))
 - **Gap:** No formal transfer workflow with "In Transit" state
 - **Gap:** No transit shrinkage tracking
 - Manual adjustment possible but not streamlined

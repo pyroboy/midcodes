@@ -25,17 +25,19 @@
 		onEditClick: (item: InventoryItem, e: MouseEvent) => void;
 		onHover?: (id: string | null) => void;
 		animate?: boolean;
+		readonly?: boolean;
 	}
 
-	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, animate = false }: Props = $props();
+	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, animate = false, readonly = false }: Props = $props();
 </script>
 
 <tr
-	onclick={() => onOpenModal(item)}
+	onclick={readonly ? undefined : () => onOpenModal(item)}
 	onmouseenter={() => onHover?.(item.id)}
 	onmouseleave={() => onHover?.(null)}
 	class={cn(
-		'cursor-pointer transition-colors hover:bg-gray-50',
+		'transition-colors hover:bg-gray-50',
+		readonly ? 'cursor-default' : 'cursor-pointer',
 		item.status === 'critical' ? 'bg-status-red-light/20' : '',
 		hoveredItemId === item.id ? 'bg-accent/5 shadow-[inset_2px_0_0_0_rgba(14,165,233,0.5)]' : ''
 	)}
@@ -72,12 +74,14 @@
 		</span>
 	</td>
 	<td class="px-4 py-3 text-right">
-		<button
-			class="text-gray-400 hover:text-accent transition-colors"
-			onclick={(e) => onEditClick(item, e)}
-			aria-label="Edit Info"
-		>
-			<Edit3 class="w-4 h-4" />
-		</button>
+		{#if !readonly}
+			<button
+				class="text-gray-400 hover:text-accent transition-colors"
+				onclick={(e) => onEditClick(item, e)}
+				aria-label="Edit Info"
+			>
+				<Edit3 class="w-4 h-4" />
+			</button>
+		{/if}
 	</td>
 </tr>

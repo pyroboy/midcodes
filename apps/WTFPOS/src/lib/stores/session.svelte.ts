@@ -10,7 +10,7 @@ const SESSION_KEY = 'wtfpos_session';
 
 export type Role         = 'staff' | 'manager' | 'kitchen' | 'owner' | 'admin';
 export type LocationType = 'retail' | 'warehouse';
-export type LocationId   = 'qc' | 'mkti' | 'wh-qc' | 'all';
+export type LocationId   = 'tag' | 'pgl' | 'wh-tag' | 'all';
 
 /** @deprecated Use LocationId */
 export type BranchId = LocationId;
@@ -25,14 +25,19 @@ export interface Location {
 export interface Branch { id: LocationId; name: string; }
 
 export const LOCATIONS: Location[] = [
-	{ id: 'qc',    name: 'Alta Cita (QC)',       type: 'retail'    },
-	{ id: 'mkti',  name: 'Alona (Makati)',        type: 'retail'    },
-	{ id: 'wh-qc', name: 'QC Central Warehouse', type: 'warehouse' },
-	{ id: 'all',   name: 'All Locations',         type: 'retail'    },
+	{ id: 'tag',    name: 'Alta Citta (Tagbilaran)',       type: 'retail'    },
+	{ id: 'pgl',    name: 'Alona Beach (Panglao)',         type: 'retail'    },
+	{ id: 'wh-tag', name: 'Tagbilaran Central Warehouse',  type: 'warehouse' },
+	{ id: 'all',    name: 'All Locations',                  type: 'retail'    },
 ];
 
 /** @deprecated Use LOCATIONS */
 export const BRANCHES = LOCATIONS;
+
+/** Human-readable short names for locations (eliminates duplication across components) */
+export const LOCATION_SHORT_NAMES: Record<string, string> = {
+	'tag': 'Alta Citta', 'pgl': 'Alona Beach', 'wh-tag': 'Warehouse'
+};
 
 /** Roles that can see cross-location data and the Admin tab */
 export const ELEVATED_ROLES: Role[] = ['owner', 'admin', 'manager'];
@@ -48,12 +53,12 @@ export const ROLE_NAV_ACCESS: Record<Role, string[]> = {
 };
 
 function loadPersistedSession(): { userName: string; role: Role; locationId: LocationId; isLocked: boolean } {
-	if (!browser) return { userName: '', role: 'staff', locationId: 'qc', isLocked: false };
+	if (!browser) return { userName: '', role: 'staff', locationId: 'tag', isLocked: false };
 	try {
 		const raw = localStorage.getItem(SESSION_KEY);
 		if (raw) return JSON.parse(raw);
 	} catch {}
-	return { userName: '', role: 'staff', locationId: 'qc', isLocked: false };
+	return { userName: '', role: 'staff', locationId: 'tag', isLocked: false };
 }
 
 const _persisted = loadPersistedSession();
@@ -89,12 +94,12 @@ export function deriveSessionState(
 ): { resolvedLocationId: LocationId; isLocked: boolean } {
 	const isElevated = ELEVATED_ROLES.includes(role);
 	return {
-		resolvedLocationId: (!isElevated && locationId === 'all') ? 'qc' : locationId,
+		resolvedLocationId: (!isElevated && locationId === 'all') ? 'tag' : locationId,
 		isLocked: !isElevated
 	};
 }
 
-export function setSession(userName: string, role: Role, locationId: LocationId = 'qc') {
+export function setSession(userName: string, role: Role, locationId: LocationId = 'tag') {
 	session.userName = userName;
 	session.role     = role;
 	const { resolvedLocationId, isLocked } = deriveSessionState(role, locationId);
@@ -113,7 +118,7 @@ export function setSession(userName: string, role: Role, locationId: LocationId 
 export function clearSession() {
 	session.userName   = '';
 	session.role       = 'staff';
-	session.locationId = 'qc';
+	session.locationId = 'tag';
 	session.isLocked   = false;
 	if (browser) localStorage.removeItem(SESSION_KEY);
 }

@@ -4,6 +4,19 @@ export default {
 	theme: {
 		extend: {
 			colors: {
+				// shadcn-svelte CSS-var tokens (required for sidebar/sheet components)
+				background: 'var(--background, #ffffff)',
+				foreground: 'var(--foreground, #111827)',
+				sidebar: {
+					DEFAULT:    'var(--sidebar, #ffffff)',
+					foreground: 'var(--sidebar-foreground, #111827)',
+					primary:    'var(--sidebar-primary, #EA580C)',
+					'primary-foreground': 'var(--sidebar-primary-foreground, #ffffff)',
+					accent:     'var(--sidebar-accent, #FFF7ED)',
+					'accent-foreground': 'var(--sidebar-accent-foreground, #EA580C)',
+					border:     'var(--sidebar-border, #E5E7EB)',
+					ring:       'var(--sidebar-ring, #EA580C)',
+				},
 				// Design system from POS DESIGN.pen — LIGHT theme
 				accent: {
 					DEFAULT: '#EA580C', // accent-primary (orange-600)

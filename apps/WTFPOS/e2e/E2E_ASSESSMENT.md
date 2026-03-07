@@ -32,7 +32,7 @@
 | Login as `kitchen` role → goes to `/kitchen/orders` | HIGH | |
 | Login as `manager` role → lands on `/pos` with branch dropdown visible | HIGH | |
 | `staff` role: branch dropdown hidden, locked to assigned branch | HIGH | |
-| Branch switch (QC ↔ Makati) as owner/manager | MEDIUM | Tables/data filter by branch |
+| Branch switch (Tagbilaran ↔ Panglao) as owner/manager | MEDIUM | Tables/data filter by branch |
 | Lock screen (session timeout or manual lock) | MEDIUM | |
 | Already logged-in user navigating to `/` redirects to active route | LOW | |
 
@@ -93,7 +93,7 @@
 | Log Waste: select item, enter qty, reason, submit | HIGH | Core waste tracking |
 | Waste log list: persists after reload | MEDIUM | |
 | Stock Count: enter am10 / pm4 / pm10 values and save | HIGH | Timed count form |
-| Stock Transfer: move stock from QC to Makati | HIGH | Requires owner/manager |
+| Stock Transfer: move stock from Tagbilaran to Panglao | HIGH | Requires owner/manager |
 | Stock levels update after a delivery is received | HIGH | Derived stock calc |
 | Low stock / critical status badge updates after waste log | HIGH | |
 | Branch filter on inventory (owner sees all, staff sees own) | MEDIUM | |
@@ -114,7 +114,7 @@
 | Expenses Monthly: grouped by month | MEDIUM | |
 | Gross Profit: revenue vs COGS calculation visible | MEDIUM | |
 | Net Profit: gross minus expenses | MEDIUM | |
-| Branch Comparison: side-by-side QC vs Makati (owner only) | MEDIUM | Role-gated |
+| Branch Comparison: side-by-side Tagbilaran vs Panglao (owner only) | MEDIUM | Role-gated |
 | X-Read: generate and display X-reading | HIGH | BIR compliance |
 | Voids & Discounts: shows voided orders and discount records | HIGH | Audit trail |
 | Staff Performance: per-user transaction counts | LOW | |

@@ -40,21 +40,26 @@
 		onOpenModal: (item: InventoryItem) => void;
 		onEditClick: (item: InventoryItem, e: MouseEvent) => void;
 		onHover?: (id: string | null) => void;
+		readonly?: boolean;
 	}
 
-	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover }: Props = $props();
+	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, readonly = false }: Props = $props();
 
 	const isHovered = $derived(hoveredItemId === item.id);
 </script>
 
-<button
-	onclick={() => onOpenModal(item)}
+<svelte:element
+	this={readonly ? 'div' : 'button'}
+	role={readonly ? 'img' : 'button'}
+	onclick={readonly ? undefined : () => onOpenModal(item)}
 	onmouseenter={() => onHover?.(item.id)}
 	onmouseleave={() => onHover?.(null)}
-	onfocus={() => onHover?.(item.id)}
-	onblur={() => onHover?.(null)}
+	onfocus={readonly ? undefined : () => onHover?.(item.id)}
+	onblur={readonly ? undefined : () => onHover?.(null)}
+	tabindex={readonly ? -1 : 0}
 	class={cn(
-		'pos-card flex flex-col overflow-hidden text-left transition-all hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-accent/40 active:scale-[0.99]',
+		'pos-card flex flex-col overflow-hidden text-left transition-all',
+		readonly ? 'cursor-default' : 'hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-accent/40 active:scale-[0.99]',
 		getProteinBorderClass(item.proteinType),
 		item.status === 'critical' ? 'ring-1 ring-status-red/30' : '',
 		isHovered ? 'shadow-md -translate-y-0.5 ring-2 ring-accent/30' : ''
@@ -100,16 +105,18 @@
 			<span class="text-gray-400 ml-auto">Min: {item.minLevel.toLocaleString()}</span>
 		</div>
 
-		<div class="mt-2 flex justify-end">
-			<div
-				role="button"
-				tabindex="0"
-				onclick={(e) => onEditClick(item, e)}
-				onkeydown={(e) => e.key === 'Enter' && onEditClick(item, e as any)}
-				class="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
-			>
-				<Edit3 class="w-3 h-3" /> Edit Info
+		{#if !readonly}
+			<div class="mt-2 flex justify-end">
+				<div
+					role="button"
+					tabindex="0"
+					onclick={(e) => onEditClick(item, e)}
+					onkeydown={(e) => e.key === 'Enter' && onEditClick(item, e as any)}
+					class="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+				>
+					<Edit3 class="w-3 h-3" /> Edit Info
+				</div>
 			</div>
-		</div>
+		{/if}
 	</div>
-</button>
+</svelte:element>

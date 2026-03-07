@@ -21,6 +21,13 @@ import { getOrderLabel } from '$lib/stores/pos/label.utils';
 export const REFILL_NOTE = 'refill' as const;
 export const LEFTOVER_PENALTY_ITEM_ID = 'penalty-leftover' as const;
 
+async function updateTableBillTotal(tableId: string | null | undefined, amount: number): Promise<void> {
+	if (!tableId) return;
+	const db = await getDb();
+	const tableDoc = await db.tables.findOne(tableId).exec();
+	if (tableDoc) await tableDoc.incrementalPatch({ billTotal: amount, updatedAt: new Date().toISOString() });
+}
+
 const _orders = createRxStore<Order>('orders', db => db.orders.find());
 
 export const orders = {
@@ -37,7 +44,7 @@ export async function createTakeoutOrder(customerName: string = 'Walk-in'): Prom
 
 	await db.orders.insert({
 		id: orderId,
-		locationId: (session.locationId === 'all' || session.locationId === 'wh-qc') ? 'qc' : session.locationId,
+		locationId: (session.locationId === 'all' || session.locationId === 'wh-tag') ? 'tag' : session.locationId,
 		orderType: 'takeout',
 		customerName,
 		tableId: null,
@@ -92,40 +99,36 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 		return doc;
 	});
 
-	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: totals.total, updatedAt: new Date().toISOString() });
-	}
-
 	const deductQty = item.isWeightBased ? (weight ?? 0) : qty;
-	if (deductQty > 0) {
-		await deductFromStock(item.id, deductQty, order.tableId ?? 'takeout', order.id, item.trackInventory ?? false);
-	}
-
-	// KDS Ticket
-	const ticket = kdsTickets.value.find((t) => t.orderId === orderId);
 	const kdsItem = { id: newItem.id, menuItemName: item.name, quantity: qty, status: 'pending' as const, weight: weight ?? null, category: item.category ?? '', notes: notes ?? '' };
+	const ticket = kdsTickets.value.find((t) => t.orderId === orderId);
 
-	if (ticket) {
-		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
-		if (tDoc) {
-			await tDoc.incrementalModify((doc: any) => {
-				doc.items = [...doc.items, kdsItem];
-				doc.updatedAt = new Date().toISOString();
-				return doc;
-			});
-		}
-	} else {
-		await db.kds_tickets.insert({
-			id: nanoid(),
-			orderId,
-			tableNumber: order.tableNumber,
-			customerName: order.customerName,
-			items: [kdsItem],
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString()
-		});
-	}
+	await Promise.all([
+		updateTableBillTotal(order.tableId, totals.total),
+		deductQty > 0 ? deductFromStock(item.id, deductQty, order.tableId ?? 'takeout', order.id, item.trackInventory ?? false) : Promise.resolve(),
+		(async () => {
+			if (ticket) {
+				const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+				if (tDoc) {
+					await tDoc.incrementalModify((doc: any) => {
+						doc.items = [...doc.items, kdsItem];
+						doc.updatedAt = new Date().toISOString();
+						return doc;
+					});
+				}
+			} else {
+				await db.kds_tickets.insert({
+					id: nanoid(),
+					orderId,
+					tableNumber: order.tableNumber,
+					customerName: order.customerName,
+					items: [kdsItem],
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString()
+				});
+			}
+		})()
+	]);
 
 	const tableLabel = getOrderLabel(order);
 	log.itemCharged(item.name, tableLabel, weight ?? null, qty);
@@ -153,28 +156,23 @@ export async function recalcOrder(
 		return doc;
 	});
 
-	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
-	}
+	await updateTableBillTotal(order.tableId, finalTotal);
 }
 
 export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'write_off') {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.status === 'paid' || order.status === 'cancelled') return;
 
+	// Snapshot items that need stock restoration before modifying
+	const itemsToRestore = order.items.filter(i => i.status !== 'cancelled');
+
 	const db = await getDb();
 	const orderDoc = await db.orders.findOne(orderId).exec();
 	if (orderDoc) {
 		await orderDoc.incrementalModify((doc: Order) => {
-			doc.items = doc.items.map(item => {
-				if (item.status !== 'cancelled') {
-					const restoreQty = item.weight ?? item.quantity;
-					if (restoreQty > 0) restoreStock(item.menuItemId, restoreQty, order.id, doc.locationId);
-					return { ...item, status: 'cancelled' as const };
-				}
-				return item;
-			});
+			doc.items = doc.items.map(item =>
+				item.status !== 'cancelled' ? { ...item, status: 'cancelled' as const } : item
+			);
 			doc.status = 'cancelled';
 			doc.cancelReason = reason;
 			doc.closedAt = new Date().toISOString();
@@ -182,6 +180,12 @@ export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' 
 			doc.updatedAt = new Date().toISOString();
 			return doc;
 		});
+	}
+
+	// Restore stock outside incrementalModify so promises are properly awaited
+	for (const item of itemsToRestore) {
+		const restoreQty = item.weight ?? item.quantity;
+		if (restoreQty > 0) await restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
 	}
 
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
@@ -244,14 +248,12 @@ export async function markItemServed(orderId: string, itemId: string) {
 			});
 
 			if (allServed) {
-				await db.kds_history.insert({
-					...structuredClone(ticket),
+				await tDoc.incrementalPatch({
 					items: snapshotItems,
 					bumpedAt: new Date().toISOString(),
 					bumpedBy: session.userName || 'Kitchen',
 					updatedAt: new Date().toISOString()
 				});
-				await tDoc.remove();
 
 				if (order.orderType === 'takeout' && order.status === 'open') {
 					const oDoc = await db.orders.findOne(orderId).exec();
@@ -285,13 +287,26 @@ export async function rejectOrderItem(orderId: string, itemId: string, reason: s
 		});
 	}
 
-	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
-	}
+	await updateTableBillTotal(order.tableId, finalTotal);
 
 	const restoreQty = item.weight ?? item.quantity;
-	if (restoreQty > 0) restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
+	if (restoreQty > 0) await restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
+
+	// Also update KDS ticket item to cancelled (same pattern as markItemServed)
+	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
+	if (ticket) {
+		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+		if (tDoc) {
+			await tDoc.incrementalModify((doc: any) => {
+				doc.items = doc.items.map((i: any) =>
+					i.id === itemId ? { ...i, status: 'cancelled' } : i
+				);
+				doc.updatedAt = new Date().toISOString();
+				return doc;
+			});
+		}
+	}
+
 	log.kitchenRefusal(item.menuItemName, order.tableNumber, reason);
 }
 
@@ -327,10 +342,7 @@ export async function changePax(orderId: string, newPax: number) {
 		});
 	}
 
-	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
-	}
+	await updateTableBillTotal(order.tableId, finalTotal);
 
 	const tableLabel = getOrderLabel(order);
 	log.paxChanged(tableLabel, oldPax, newPax);
@@ -362,10 +374,7 @@ export async function applyLeftoverPenalty(orderId: string, weightGrams: number,
 		});
 	}
 
-	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
-	}
+	await updateTableBillTotal(order.tableId, finalTotal);
 
 	const label = getOrderLabel(order);
 	log.leftoverPenaltyApplied(label, weightGrams, penalty);
@@ -390,10 +399,7 @@ export async function waiveLeftoverPenalty(orderId: string) {
 		});
 	}
 
-	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
-	}
+	await updateTableBillTotal(order.tableId, finalTotal);
 
 	const label = getOrderLabel(order);
 	log.leftoverPenaltyWaived(label);
@@ -405,11 +411,11 @@ export async function advanceTakeoutStatus(orderId: string): Promise<void> {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.orderType !== 'takeout') return;
 
-	const progression: Record<string, string | null> = {
-		'new': 'preparing',
-		'preparing': 'ready',
-		'ready': 'picked_up',
-		'picked_up': null
+	const progression: Record<TakeoutStatus, TakeoutStatus | null> = {
+		new: 'preparing',
+		preparing: 'ready',
+		ready: 'picked_up',
+		picked_up: null
 	};
 	const current = order.takeoutStatus ?? 'new';
 	const next = progression[current];
@@ -531,8 +537,7 @@ export async function mergeTables(primaryTableId: string, secondaryTableId: stri
 		});
 	}
 
-	const primaryTableDoc = await db.tables.findOne(primaryTableId).exec();
-	if (primaryTableDoc) await primaryTableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
+	await updateTableBillTotal(primaryTableId, finalTotal);
 
 	// Merge KDS tickets
 	const primaryTicket = kdsTickets.value.find(t => t.orderId === primaryOrder.id);
@@ -617,11 +622,7 @@ export async function addRefillRequest(orderId: string, menuItem: MenuItem): Pro
 
 	// Table update and KDS ticket update are independent — run in parallel
 	await Promise.all([
-		(async () => {
-			if (!order.tableId) return;
-			const tableDoc = await db.tables.findOne(order.tableId).exec();
-			if (tableDoc) await tableDoc.incrementalPatch({ billTotal: totals.total, updatedAt: new Date().toISOString() });
-		})(),
+		updateTableBillTotal(order.tableId, totals.total),
 		(async () => {
 			if (ticket) {
 				const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
@@ -728,10 +729,7 @@ export async function changePackage(orderId: string, newPackageId: string) {
 		});
 	}
 
-	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ billTotal: finalTotal, updatedAt: new Date().toISOString() });
-	}
+	await updateTableBillTotal(order.tableId, finalTotal);
 
 	const tableLabel = getOrderLabel(order);
 	const diff = Math.abs(finalTotal - order.total);

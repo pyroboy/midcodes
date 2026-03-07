@@ -41,7 +41,7 @@
 **Score:** ⚠️ PARTIALLY SUPPORTED
 
 **Notes:**
-- Owner can switch between QC and Makati branches via the branch dropdown in [`TopBar.svelte`](src/lib/components/TopBar.svelte:1)
+- Owner can switch between Tagbilaran and Panglao branches via the branch dropdown in [`TopBar.svelte`](src/lib/components/TopBar.svelte:1)
 - "All Branches" mode exists and shows combined data across branches
 - Live table statuses are visible per branch
 - **Gap:** No true real-time synchronization (mock data only, no WebSocket/real-time backend)

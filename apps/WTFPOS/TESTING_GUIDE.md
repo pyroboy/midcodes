@@ -24,13 +24,13 @@ Log in using these credentials. All passwords match the username.
 
 | Username | Password | Role    | Branch            | Destination |
 |----------|----------|---------|-------------------|-------------|
-| `maria`  | `maria`  | Staff   | Alta Cita (QC)    | `/pos`      |
-| `juan`   | `juan`   | Manager | Alta Cita (QC)    | `/pos` + PIN |
-| `pedro`  | `pedro`  | Kitchen | Alta Cita (QC)    | `/kitchen`  |
-| `ana`    | `ana`    | Staff   | Alona (Makati)    | `/pos`      |
-| `carlo`  | `carlo`  | Manager | Alona (Makati)    | `/pos` + PIN |
-| `jose`   | `jose`   | Kitchen | Alona (Makati)    | `/kitchen`  |
-| `noel`   | `noel`   | Staff   | QC Warehouse      | `/stock`    |
+| `maria`  | `maria`  | Staff   | Alta Citta (Tagbilaran)    | `/pos`      |
+| `juan`   | `juan`   | Manager | Alta Citta (Tagbilaran)    | `/pos` + PIN |
+| `pedro`  | `pedro`  | Kitchen | Alta Citta (Tagbilaran)    | `/kitchen`  |
+| `ana`    | `ana`    | Staff   | Alona Beach (Panglao)    | `/pos`      |
+| `carlo`  | `carlo`  | Manager | Alona Beach (Panglao)    | `/pos` + PIN |
+| `jose`   | `jose`   | Kitchen | Alona Beach (Panglao)    | `/kitchen`  |
+| `noel`   | `noel`   | Staff   | Tagbilaran Warehouse      | `/stock`    |
 | `chris`  | `chris`  | Owner   | All Branches      | `/pos`      |
 
 **Manager PIN (for sensitive actions):** `1234`
@@ -76,7 +76,7 @@ Log in using these credentials. All passwords match the username.
 
 ## Module 1 — POS Floor (`/pos`)
 
-**Login as:** `maria` (QC Staff) or `ana` (Makati Staff)
+**Login as:** `maria` (Tagbilaran Staff) or `ana` (Panglao Staff)
 
 ### 1.1 Open a Table
 
@@ -272,7 +272,7 @@ After passing the leftover step (or skipping it):
 
 ## Module 2 — Kitchen Display System (`/kitchen`)
 
-**Login as:** `pedro` (QC Kitchen) or `jose` (Makati Kitchen)
+**Login as:** `pedro` (Tagbilaran Kitchen) or `jose` (Panglao Kitchen)
 
 ### 2.1 Active Orders Queue (`/kitchen/orders`)
 
@@ -358,7 +358,7 @@ A dedicated dark-mode screen for the meat prep station.
 
 ## Module 3 — Stock Management (`/stock`)
 
-**Login as:** `juan` (QC Manager), `carlo` (Makati Manager), `noel` (Warehouse), or `chris` (Owner)
+**Login as:** `juan` (Tagbilaran Manager), `carlo` (Panglao Manager), `noel` (Warehouse), or `chris` (Owner)
 
 ### 3.1 Inventory (`/stock/inventory`)
 
@@ -418,7 +418,7 @@ Scheduled physical counts at 10 AM, 4 PM, 10 PM.
 
 ### 3.5 Stock Transfers (`/stock/transfers`)
 
-Move stock between QC Branch, Makati Branch, and QC Warehouse.
+Move stock between Tagbilaran Branch, Panglao Branch, and Tagbilaran Warehouse.
 
 **3-step wizard:**
 
@@ -502,7 +502,7 @@ All reports are filterable by **date** and **branch** (owner sees all branches).
 
 | Report | What it shows |
 |--------|--------------|
-| **Branch Comparison** | QC vs. Makati side-by-side: sales, pax, avg ticket, waste %, labor |
+| **Branch Comparison** | Tagbilaran vs. Panglao side-by-side: sales, pax, avg ticket, waste %, labor |
 
 ### X-Read Flow
 
@@ -550,7 +550,7 @@ View every system action logged across all branches.
 
 **Filter by:**
 - **Action type:** All, Order, Payment, Stock, Auth, Admin, Expense
-- **Branch:** All, QC, Makati
+- **Branch:** All, Tagbilaran, Panglao
 
 **Log columns:** Time | Type | Description | User | Branch
 
@@ -558,7 +558,7 @@ Sample entries:
 - `🍽 Order — T5 opened with 4 pax, Unli Pork`
 - `💰 Payment — T5 paid ₱1,996 via Cash, change ₱4`
 - `📦 Stock — Samgyupsal received: 5000g from Supplier ABC`
-- `⚙️ Admin — User 'Maria Santos' created as Staff (QC)`
+- `⚙️ Admin — User 'Maria Santos' created as Staff (Tagbilaran)`
 
 ---
 
@@ -566,7 +566,7 @@ Sample entries:
 
 Visual editor for table layout per branch.
 
-1. Select **QC Branch** or **Makati Branch** tab.
+1. Select **Tagbilaran Branch** or **Panglao Branch** tab.
 2. **Drag** table cards to reposition them on the canvas.
 3. Click a table → right sidebar lets you edit:
    - **Label** (e.g., "T1", "VIP-1")
@@ -650,7 +650,7 @@ Configure all menu items available in POS.
 
 ### Flow C — Pax Change with Package Recalculation
 
-**Role:** Manager (juan) | **Branch:** QC
+**Role:** Manager (juan) | **Branch:** Tagbilaran
 
 1. Log in as `juan` (PIN `1234`) → open T2 with **2 pax** and **🔥 Unli Pork & Beef** (₱899 × 2 = ₱1,798).
 2. In the sidebar, note the current total.
@@ -662,7 +662,7 @@ Configure all menu items available in POS.
 
 ### Flow D — Takeout Order Full Flow
 
-**Role:** Staff (maria) | **Branch:** QC
+**Role:** Staff (maria) | **Branch:** Tagbilaran
 
 1. Click **📦 New Takeout** → enter customer name `Gino`.
 2. Select `Gino`'s order in the takeout queue.
@@ -675,7 +675,7 @@ Configure all menu items available in POS.
 
 ### Flow E — Stock Count (10 AM Cycle)
 
-**Role:** Manager or Warehouse Staff (noel) | **Branch:** QC / Warehouse
+**Role:** Manager or Warehouse Staff (noel) | **Branch:** Tagbilaran / Warehouse
 
 1. Log in → navigate to `/stock/counts`.
 2. Click **Start 10 AM Count**.
@@ -691,10 +691,10 @@ Configure all menu items available in POS.
 **Role:** Manager (juan) or Owner (chris)
 
 1. Navigate to `/stock/transfers`.
-2. **Step 1:** Select source = `QC Warehouse`, item = `Samgyupsal`, qty = `2000g`.
-3. **Step 2:** Select destination = `Alta Cita (QC Branch)`.
+2. **Step 1:** Select source = `Tagbilaran Warehouse`, item = `Samgyupsal`, qty = `2000g`.
+3. **Step 2:** Select destination = `Alta Citta (Tagbilaran Branch)`.
 4. **Step 3:** Review summary → add note `Weekly replenishment` → click **Confirm Transfer**.
-5. Check `/stock/inventory` → QC Branch Samgyupsal stock should increase by 2000g.
+5. Check `/stock/inventory` → Tagbilaran Branch Samgyupsal stock should increase by 2000g.
 
 ---
 
@@ -716,7 +716,7 @@ Configure all menu items available in POS.
 **Role:** Owner (chris)
 
 1. Log in as `chris` → navigate to `/reports/branch-comparison`.
-2. Verify that both **Alta Cita (QC)** and **Alona (Makati)** data is shown.
+2. Verify that both **Alta Citta (Tagbilaran)** and **Alona Beach (Panglao)** data is shown.
 3. Compare: Sales, Pax count, Average ticket, Waste %.
 4. Use the branch selector in the TopBar to switch the active branch view.
 
@@ -727,8 +727,8 @@ Configure all menu items available in POS.
 **Role:** Owner (chris)
 
 1. Navigate to `/admin/users` → click **+ Add User**.
-2. Create: Name = `Test Staff`, Username = `testuser`, Role = `staff`, Branch = `mkti`, Password = `test`.
-3. Log out → log in as `testuser` / `test` → verify they land on `/pos` for Makati.
+2. Create: Name = `Test Staff`, Username = `testuser`, Role = `staff`, Branch = `pgl`, Password = `test`.
+3. Log out → log in as `testuser` / `test` → verify they land on `/pos` for Panglao.
 4. Log back in as `chris` → go to `/admin/logs`.
 5. Filter by **Auth** → verify login events for `testuser` appear in the log.
 
@@ -753,7 +753,7 @@ Configure all menu items available in POS.
 - [ ] Login as each of the 8 test accounts and verify the correct destination page
 - [ ] Manager accounts show PIN modal on login (PIN: `1234`)
 - [ ] Staff sees only `/pos`; kitchen sees only `/kitchen`
-- [ ] Owner can switch between QC, Makati, and All branches in the TopBar
+- [ ] Owner can switch between Tagbilaran, Panglao, and All branches in the TopBar
 - [ ] Staff/kitchen cannot switch branches (branch selector hidden)
 
 ### POS Floor

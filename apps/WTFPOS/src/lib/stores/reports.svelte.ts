@@ -4,7 +4,8 @@
  * Import specific derived values here instead of duplicating per page.
  */
 import { orders as allOrders, tables as allTables, menuItems } from '$lib/stores/pos.svelte';
-import { stockItems, deliveries, deductions, getCurrentStock } from '$lib/stores/stock.svelte';
+import { stockItems, deliveries, deductions, wasteEntries, getCurrentStock, getStockStatus } from '$lib/stores/stock.svelte';
+import { PROTEIN_ORDER, type MeatProtein } from '$lib/stores/stock.constants';
 import { session } from '$lib/stores/session.svelte';
 import { log, auditLog, writeLog } from '$lib/stores/audit.svelte';
 import { createRxStore } from '$lib/stores/sync.svelte';
@@ -117,6 +118,163 @@ export function meatVarianceToday() {
 			trend: trend as 'ok' | 'high' | 'low',
 		};
 	});
+}
+
+export type MeatReportPeriod = 'today' | 'yesterday' | 'week';
+
+export const PERIOD_LABELS: Record<MeatReportPeriod, string> = {
+	today: 'Today',
+	yesterday: 'Yesterday',
+	week: 'This Week',
+};
+
+export interface MeatReportRow {
+	id: string;
+	cut: string;
+	locationId: string;
+	proteinType: MeatProtein;
+	opening: number;
+	deliveries: number;
+	/** Grams received via inter-location transfer (subset of deliveries) */
+	transferIn: number;
+	consumed: number;
+	closing: number;
+	variancePct: number;
+	trend: 'ok' | 'high' | 'low';
+	wasteAmount: number;
+	soldGrams: number;
+	soldRevenue: number;
+	stockStatus: 'ok' | 'low' | 'critical';
+}
+
+export interface MeatReport {
+	rows: MeatReportRow[];
+	totalMeatSoldGrams: number;
+	totalPaxServed: number;
+	avgMeatPerHead: number;
+	avgPorkPerHead: number;
+	avgBeefPerHead: number;
+	avgChickenPerHead: number;
+	byProtein: Record<string, {
+		totalStock: number;
+		totalSold: number;
+		totalWaste: number;
+		pctOfTotal: number;
+	}>;
+}
+
+export function getDateBounds(period: MeatReportPeriod): { start: Date; end: Date } {
+	const now = new Date();
+	if (period === 'today') {
+		const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const end = new Date(start.getTime() + 86400000);
+		return { start, end };
+	}
+	if (period === 'yesterday') {
+		const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const start = new Date(end.getTime() - 86400000);
+		return { start, end };
+	}
+	// week: Mon–Sun
+	const day = now.getDay();
+	const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+	const start = new Date(now.getFullYear(), now.getMonth(), diff);
+	const end = new Date(start.getTime() + 7 * 86400000);
+	return { start, end };
+}
+
+export function isInRange(isoDate: string, start: Date, end: Date): boolean {
+	const t = new Date(isoDate).getTime();
+	return t >= start.getTime() && t < end.getTime();
+}
+
+export function meatReport(period: MeatReportPeriod = 'today'): MeatReport {
+	const { start, end } = getDateBounds(period);
+	const locId = session.locationId;
+
+	const meatStockItems = stockItems.value.filter(s =>
+		s.category === 'Meats' && (locId === 'all' || s.locationId === locId)
+	);
+
+	// Period-filtered collections
+	const periodDeductions = deductions.value.filter(d => isInRange(d.timestamp, start, end));
+	const periodWaste = wasteEntries.value.filter(w => isInRange(w.loggedAt, start, end));
+	const periodDeliveries = deliveries.value.filter(d => isInRange(d.receivedAt, start, end));
+
+	// Pax from paid orders in period
+	const paidOrders = (locId === 'all' ? allOrders.value : allOrders.value.filter(o => o.locationId === locId))
+		.filter(o => o.status === 'paid' && isInRange(o.createdAt, start, end));
+	const totalPaxServed = paidOrders.reduce((s, o) => s + (o.pax ?? 0), 0);
+
+	// Price lookup for revenue calc
+	const menuItemMap = new Map(menuItems.value.map(m => [m.id, m]));
+
+	const rows: MeatReportRow[] = meatStockItems.map(s => {
+		const itemDeliveries = periodDeliveries.filter(d => d.stockItemId === s.id);
+		const totalDelivered = itemDeliveries.reduce((t, d) => t + d.qty, 0);
+		const transferIn = itemDeliveries.filter(d => d.supplier.startsWith('Transfer from')).reduce((t, d) => t + d.qty, 0);
+		const totalConsumed = periodDeductions.filter(d => d.stockItemId === s.id).reduce((t, d) => t + d.qty, 0);
+		const wasteAmount = periodWaste.filter(w => w.stockItemId === s.id).reduce((t, w) => t + w.qty, 0);
+		const closing = getCurrentStock(s.id);
+		const available = s.openingStock + totalDelivered;
+		const expectedConsumed = available - closing;
+		const variancePct = available > 0 ? Math.round(((totalConsumed - expectedConsumed) / available) * 100) : 0;
+		const trend = variancePct < -15 ? 'high' : variancePct > 10 ? 'low' : 'ok';
+
+		const menuItem = menuItemMap.get(s.menuItemId);
+		const pricePerGram = menuItem?.pricePerGram ?? 0;
+
+		const stockStatus = getStockStatus(s.id);
+
+		return {
+			id: s.id,
+			cut: s.name,
+			locationId: s.locationId,
+			proteinType: (s.proteinType ?? 'other') as MeatProtein,
+			opening: s.openingStock,
+			deliveries: totalDelivered,
+			transferIn,
+			consumed: totalConsumed,
+			closing,
+			variancePct,
+			trend: trend as 'ok' | 'high' | 'low',
+			wasteAmount,
+			soldGrams: totalConsumed,
+			soldRevenue: totalConsumed * pricePerGram,
+			stockStatus,
+		};
+	});
+
+	const totalMeatSoldGrams = rows.reduce((s, r) => s + r.soldGrams, 0);
+
+	// Per-protein aggregation
+	const byProtein: MeatReport['byProtein'] = {};
+	for (const p of PROTEIN_ORDER) {
+		const pRows = rows.filter(r => r.proteinType === p);
+		const totalSold = pRows.reduce((s, r) => s + r.soldGrams, 0);
+		byProtein[p] = {
+			totalStock: pRows.reduce((s, r) => s + r.closing, 0),
+			totalSold,
+			totalWaste: pRows.reduce((s, r) => s + r.wasteAmount, 0),
+			pctOfTotal: totalMeatSoldGrams > 0 ? Math.round((totalSold / totalMeatSoldGrams) * 100) : 0,
+		};
+	}
+
+	const avgMeatPerHead = totalPaxServed > 0 ? Math.round(totalMeatSoldGrams / totalPaxServed) : 0;
+	const avgPorkPerHead = totalPaxServed > 0 ? Math.round((byProtein['pork']?.totalSold ?? 0) / totalPaxServed) : 0;
+	const avgBeefPerHead = totalPaxServed > 0 ? Math.round((byProtein['beef']?.totalSold ?? 0) / totalPaxServed) : 0;
+	const avgChickenPerHead = totalPaxServed > 0 ? Math.round((byProtein['chicken']?.totalSold ?? 0) / totalPaxServed) : 0;
+
+	return {
+		rows,
+		totalMeatSoldGrams,
+		totalPaxServed,
+		avgMeatPerHead,
+		avgPorkPerHead,
+		avgBeefPerHead,
+		avgChickenPerHead,
+		byProtein,
+	};
 }
 
 export function eodSummary() {

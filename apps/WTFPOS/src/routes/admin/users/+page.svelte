@@ -26,11 +26,11 @@
 
 	let users = $state<UserRecord[]>([
 		{ id: 'u1', displayName: 'Christopher S.',  username: 'owner',   role: 'owner',   branch: 'All',               status: 'active',   lastLogin: 'Today 9:00 AM' },
-		{ id: 'u2', displayName: 'Juan Reyes',      username: 'manager', role: 'manager', branch: 'Alta Cita',       status: 'active',   lastLogin: 'Today 10:15 AM' },
-		{ id: 'u3', displayName: 'Maria Santos',    username: 'staff',   role: 'staff',   branch: 'Alta Cita',       status: 'active',   lastLogin: 'Today 11:00 AM' },
-		{ id: 'u4', displayName: 'Pedro Cruz',      username: 'kitchen', role: 'kitchen', branch: 'Alta Cita',       status: 'active',   lastLogin: 'Today 9:30 AM' },
-		{ id: 'u5', displayName: 'Ana Reyes',       username: 'staff2',  role: 'staff',   branch: 'Alona',            status: 'active',   lastLogin: 'Mar 2, 3:00 PM' },
-		{ id: 'u6', displayName: 'Lito Gutierrez',  username: 'mgr2',    role: 'manager', branch: 'Alona',            status: 'inactive', lastLogin: 'Feb 28, 5:00 PM' }
+		{ id: 'u2', displayName: 'Juan Reyes',      username: 'manager', role: 'manager', branch: 'Alta Citta',       status: 'active',   lastLogin: 'Today 10:15 AM' },
+		{ id: 'u3', displayName: 'Maria Santos',    username: 'staff',   role: 'staff',   branch: 'Alta Citta',       status: 'active',   lastLogin: 'Today 11:00 AM' },
+		{ id: 'u4', displayName: 'Pedro Cruz',      username: 'kitchen', role: 'kitchen', branch: 'Alta Citta',       status: 'active',   lastLogin: 'Today 9:30 AM' },
+		{ id: 'u5', displayName: 'Ana Reyes',       username: 'staff2',  role: 'staff',   branch: 'Alona Beach',      status: 'active',   lastLogin: 'Mar 2, 3:00 PM' },
+		{ id: 'u6', displayName: 'Lito Gutierrez',  username: 'mgr2',    role: 'manager', branch: 'Alona Beach',      status: 'inactive', lastLogin: 'Feb 28, 5:00 PM' }
 	]);
 
 	const roleConfig: Record<Role, { label: string; class: string }> = {
@@ -162,8 +162,8 @@
 					<div class="flex flex-col gap-1.5">
 						<label for="branch" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label>
 						<select id="branch" class="pos-input">
-							<option value="qc">Alta Cita</option>
-							<option value="mkti">Alona</option>
+							<option value="tag">Alta Citta</option>
+							<option value="pgl">Alona Beach</option>
 							<option value="all">All Branches</option>
 						</select>
 					</div>

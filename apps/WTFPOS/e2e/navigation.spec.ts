@@ -15,7 +15,7 @@ async function loginAsOwner(page: Page) {
   await loginAs(page, 'chris', '/pos');
   // Owner has locationId 'all' — wait for the location picker button (not table cards)
   await expect(
-    page.locator('button', { hasText: /All Locations|Alta Cita|Alona/i }).first()
+    page.locator('button', { hasText: /All Locations|Alta Citta|Alona Beach/i }).first()
   ).toBeVisible({ timeout: 15000 });
 }
 
@@ -110,7 +110,7 @@ test.describe('Navigation — Reports routes', () => {
     '/reports/best-sellers',
     '/reports/peak-hours',
     '/reports/eod',
-    '/reports/meat-variance',
+    '/reports/meat-report',
     '/reports/table-sales',
     '/reports/expenses-daily',
     '/reports/expenses-monthly',

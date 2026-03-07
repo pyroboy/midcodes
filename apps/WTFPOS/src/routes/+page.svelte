@@ -12,16 +12,16 @@
 	type Account = { password: string; role: Role; displayName: string; dest: string; requiresPin?: boolean; locationId: LocationId };
 
 	const ACCOUNTS: Record<string, Account> = {
-		// ── Alta Cita · QC ──────────────────────────────────────────────────
-		'maria':  { password: 'maria',  role: 'staff',   displayName: 'Maria Santos',  dest: '/pos',     locationId: 'qc'    },
-		'juan':   { password: 'juan',   role: 'manager', displayName: 'Juan Reyes',    dest: '/pos',     requiresPin: true, locationId: 'qc'    },
-		'pedro':  { password: 'pedro',  role: 'kitchen', displayName: 'Pedro Cruz',    dest: '/kitchen', locationId: 'qc'    },
-		// ── Alona · Makati ──────────────────────────────────────────────────
-		'ana':    { password: 'ana',    role: 'staff',   displayName: 'Ana Lim',       dest: '/pos',     locationId: 'mkti'  },
-		'carlo':  { password: 'carlo',  role: 'manager', displayName: 'Carlo Ramos',   dest: '/pos',     requiresPin: true, locationId: 'mkti'  },
-		'jose':   { password: 'jose',   role: 'kitchen', displayName: 'Jose Santos',   dest: '/kitchen', locationId: 'mkti'  },
-		// ── QC Warehouse ────────────────────────────────────────────────────
-		'noel':   { password: 'noel',   role: 'staff',   displayName: 'Noel Garcia',   dest: '/stock',   locationId: 'wh-qc' },
+		// ── Alta Citta · Tagbilaran ─────────────────────────────────────────
+		'maria':  { password: 'maria',  role: 'staff',   displayName: 'Maria Santos',  dest: '/pos',     locationId: 'tag'    },
+		'juan':   { password: 'juan',   role: 'manager', displayName: 'Juan Reyes',    dest: '/pos',     requiresPin: true, locationId: 'tag'    },
+		'pedro':  { password: 'pedro',  role: 'kitchen', displayName: 'Pedro Cruz',    dest: '/kitchen', locationId: 'tag'    },
+		// ── Alona Beach · Panglao ───────────────────────────────────────────
+		'ana':    { password: 'ana',    role: 'staff',   displayName: 'Ana Lim',       dest: '/pos',     locationId: 'pgl'   },
+		'carlo':  { password: 'carlo',  role: 'manager', displayName: 'Carlo Ramos',   dest: '/pos',     requiresPin: true, locationId: 'pgl'   },
+		'jose':   { password: 'jose',   role: 'kitchen', displayName: 'Jose Santos',   dest: '/kitchen', locationId: 'pgl'   },
+		// ── Tagbilaran Warehouse ─────────────────────────────────────────────
+		'noel':   { password: 'noel',   role: 'staff',   displayName: 'Noel Garcia',   dest: '/stock',   locationId: 'wh-tag' },
 		// ── Management (all-locations) ───────────────────────────────────────
 		'chris':  { password: 'chris',  role: 'owner',   displayName: 'Christopher S', dest: '/pos',     locationId: 'all'   },
 		// ── System Admin ─────────────────────────────────────────────────────────
@@ -37,17 +37,17 @@
 	};
 
 	const locationBadge: Record<LocationId, { label: string; cls: string }> = {
-		'qc':    { label: 'Alta Cita', cls: 'bg-sky-50 text-sky-700 border-sky-200'          },
-		'mkti':  { label: 'Alona',     cls: 'bg-teal-50 text-teal-700 border-teal-200'       },
-		'wh-qc': { label: 'Warehouse', cls: 'bg-amber-50 text-amber-700 border-amber-200'    },
-		'all':   { label: 'All',       cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+		'tag':    { label: 'Alta Citta',   cls: 'bg-sky-50 text-sky-700 border-sky-200'          },
+		'pgl':    { label: 'Alona Beach',  cls: 'bg-teal-50 text-teal-700 border-teal-200'       },
+		'wh-tag': { label: 'Warehouse',    cls: 'bg-amber-50 text-amber-700 border-amber-200'    },
+		'all':    { label: 'All',          cls: 'bg-purple-50 text-purple-700 border-purple-200' },
 	};
 
 	const TEST_GROUPS: { heading: string; usernames: string[] }[] = [
-		{ heading: '🏠 Alta Cita · QC',   usernames: ['maria', 'juan', 'pedro'] },
-		{ heading: '🏠 Alona · Makati',    usernames: ['ana', 'carlo', 'jose']   },
-		{ heading: '🏭 QC Warehouse',      usernames: ['noel']                   },
-		{ heading: '💼 Management',        usernames: ['chris']                  },
+		{ heading: '🏠 Alta Citta · Tagbilaran', usernames: ['maria', 'juan', 'pedro'] },
+		{ heading: '🏠 Alona Beach · Panglao',   usernames: ['ana', 'carlo', 'jose']   },
+		{ heading: '🏭 Tagbilaran Warehouse',     usernames: ['noel']                   },
+		{ heading: '💼 Management',               usernames: ['chris']                  },
 	];
 
 	// ─── Form state ───────────────────────────────────────────────────────────

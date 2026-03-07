@@ -61,9 +61,9 @@ test.describe('Auth — Login', () => {
     await submitLogin(page);
     await page.waitForURL('**/pos', { timeout: 10000 });
     // Owner sees the location picker button in TopBar (MapPin + ChevronDown)
-    // The button shows location name: "All Branches", "Alta Cita", etc.
+    // The button shows location name: "All Locations", "Alta Citta", etc.
     await expect(
-      page.locator('button', { hasText: /All Locations|Alta Cita|Alona \(Makati\)/i }).first()
+      page.locator('button', { hasText: /All Locations|Alta Citta|Alona Beach \(Panglao\)/i }).first()
     ).toBeVisible({ timeout: 15000 });
   });
 
@@ -104,7 +104,7 @@ test.describe('Auth — Login', () => {
 });
 
 test.describe('Auth — Branch Scoping', () => {
-  test('staff (maria, QC) does not see branch selector', async ({ page }) => {
+  test('staff (maria, Tagbilaran) does not see branch selector', async ({ page }) => {
     await fillLogin(page, 'maria', 'maria');
     await submitLogin(page);
     await page.waitForURL('**/pos', { timeout: 10000 });
@@ -118,15 +118,15 @@ test.describe('Auth — Branch Scoping', () => {
     await submitLogin(page);
     await page.waitForURL('**/pos', { timeout: 10000 });
     // Owner's location picker button is visible in TopBar
-    const locBtn = page.locator('button', { hasText: /All Locations|Alta Cita|Alona \(Makati\)/i }).first();
+    const locBtn = page.locator('button', { hasText: /All Locations|Alta Citta|Alona Beach \(Panglao\)/i }).first();
     await expect(locBtn).toBeVisible({ timeout: 15000 });
     // Click it to open the dropdown
     await locBtn.click();
     // Dropdown shows other locations
-    await expect(page.locator('text=Alta Cita (QC)')).toBeVisible({ timeout: 3000 });
-    // Switch to Alta Cita (QC)
-    await page.locator('button', { hasText: 'Alta Cita (QC)' }).last().click();
-    // Now tables from QC should be visible
+    await expect(page.locator('text=Alta Citta (Tagbilaran)')).toBeVisible({ timeout: 3000 });
+    // Switch to Alta Citta (Tagbilaran)
+    await page.locator('button', { hasText: 'Alta Citta (Tagbilaran)' }).last().click();
+    // Now tables from Tagbilaran should be visible
     await expect(page.locator('[aria-label="Table T1"]')).toBeVisible({ timeout: 15000 });
   });
 });

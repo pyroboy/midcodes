@@ -2,7 +2,7 @@
  * POS Tables — Table state and lifecycle (open, close, timers, layout).
  * Does NOT read from orders or KDS — no circular dependencies.
  */
-import type { Table, TableZone, TableStatus } from '$lib/types';
+import type { Table, TableZone, TableStatus, ChairConfig } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { log } from '$lib/stores/audit.svelte';
 import { session, isWarehouseSession } from '$lib/stores/session.svelte';
@@ -27,7 +27,7 @@ function makeTables(): Table[] {
 		updatedAt: new Date().toISOString()
 		}))
 	];
-	return [...gen('qc', 'QC'), ...gen('mkti', 'MK')];
+	return [...gen('tag', 'TAG'), ...gen('pgl', 'PGL')];
 }
 
 export const INITIAL_TABLES = makeTables();
@@ -140,7 +140,7 @@ export async function setTableMaintenance(tableId: string, isMaintenance: boolea
 }
 
 export async function updateTableTimers() {
-	if (!browser || session.locationId === 'wh-qc') return;
+	if (!browser || session.locationId === 'wh-tag') return;
 	const db = await getDb();
 	const SESSION_SECONDS = 2 * 60 * 60; // 2 hours
 
@@ -191,7 +191,7 @@ export async function addTable(locationId: string, label: string, capacity: numb
 	if (!browser) return;
 	const db = await getDb();
 	const number = tables.value.filter(t => t.locationId === locationId).length + 1;
-	const id = `${locationId === 'qc' ? 'QC' : 'MK'}-T${number}-${nanoid(4)}`;
+	const id = `${locationId === 'tag' ? 'TAG' : 'PGL'}-T${number}-${nanoid(4)}`;
 	await db.tables.insert({
 		id, locationId, number, label, zone: 'main', capacity,
 		x, y, width: 112, height: 112,
@@ -207,6 +207,34 @@ export async function deleteTable(tableId: string) {
 	const doc = await db.tables.findOne(tableId).exec();
 	if (doc && doc.status === 'available') {
 		await doc.remove();
+	}
+}
+
+export async function updateTableChairs(tableId: string, chairConfig: ChairConfig | null) {
+	if (!browser) return;
+	const db = await getDb();
+	const doc = await db.tables.findOne(tableId).exec();
+	if (doc) {
+		const plain = chairConfig ? JSON.parse(JSON.stringify(chairConfig)) : null;
+		await doc.incrementalPatch({ chairConfig: plain, updatedAt: new Date().toISOString() });
+	}
+}
+
+export async function updateTableStyle(tableId: string, style: {
+	color?: string | null;
+	opacity?: number | null;
+	borderRadius?: number | null;
+	rotation?: number | null;
+	label?: string;
+	capacity?: number;
+	width?: number;
+	height?: number;
+}) {
+	if (!browser) return;
+	const db = await getDb();
+	const doc = await db.tables.findOne(tableId).exec();
+	if (doc) {
+		await doc.incrementalPatch({ ...JSON.parse(JSON.stringify(style)), updatedAt: new Date().toISOString() });
 	}
 }
 

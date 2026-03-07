@@ -3,7 +3,7 @@ import type { RxJsonSchema } from 'rxdb';
 // ─── Tables ──────────────────────────────────────────────────────────────────
 export const tableSchema: RxJsonSchema<any> = {
 	title: 'table schema',
-	version: 2,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -18,6 +18,20 @@ export const tableSchema: RxJsonSchema<any> = {
 		width: { type: 'number' },
 		height: { type: 'number' },
 		shape: { type: 'string' },
+		color: { type: ['string', 'null'] },
+		opacity: { type: ['number', 'null'] },
+		borderRadius: { type: ['number', 'null'] },
+		borderWidth: { type: ['number', 'null'] },
+		rotation: { type: ['number', 'null'] },
+		chairConfig: {
+			type: ['object', 'null'],
+			properties: {
+				top:    { type: 'object' },
+				bottom: { type: 'object' },
+				left:   { type: 'object' },
+				right:  { type: 'object' }
+			}
+		},
 		status: { type: 'string', maxLength: 50 },
 		sessionStartedAt: { type: ['string', 'null'] },
 		elapsedSeconds: { type: ['number', 'null'] },
@@ -27,6 +41,32 @@ export const tableSchema: RxJsonSchema<any> = {
 	},
 	required: ['id', 'locationId', 'number', 'label', 'zone', 'capacity', 'x', 'y', 'status', 'updatedAt'],
 	indexes: ['locationId', 'status', ['locationId', 'status'], 'updatedAt']
+};
+
+// ─── Floor Elements (includes canvas_config docs) ───────────────────────────
+export const floorElementSchema: RxJsonSchema<any> = {
+	title: 'floor element schema',
+	version: 2,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
+		type: { type: 'string', maxLength: 50 },
+		shape: { type: 'string', maxLength: 20 },
+		x: { type: 'number' },
+		y: { type: 'number' },
+		width: { type: 'number' },
+		height: { type: 'number' },
+		rotation: { type: ['number', 'null'] },
+		color: { type: ['string', 'null'] },
+		opacity: { type: ['number', 'null'] },
+		label: { type: ['string', 'null'] },
+		gridSize: { type: ['number', 'null'] },
+		updatedAt: { type: 'string', maxLength: 30 }
+	},
+	required: ['id', 'locationId', 'type', 'shape', 'x', 'y', 'width', 'height', 'updatedAt'],
+	indexes: ['locationId', 'type', 'updatedAt']
 };
 
 // ─── Order ───────────────────────────────────────────────────────────────────
@@ -335,10 +375,10 @@ export const expenseSchema: RxJsonSchema<any> = {
 	indexes: ['locationId', 'createdAt', ['locationId', 'createdAt'], 'updatedAt']
 };
 
-// ─── KDS History ─────────────────────────────────────────────────────────────
+// ─── KDS Tickets (active + history, distinguished by bumpedAt) ───────────────
 export const kdsTicketSchema: RxJsonSchema<any> = {
 	title: 'kds ticket schema',
-	version: 3,
+	version: 4,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -363,45 +403,12 @@ export const kdsTicketSchema: RxJsonSchema<any> = {
 			}
 		},
 		createdAt: { type: 'string' },
+		bumpedAt: { type: ['string', 'null'] },
+		bumpedBy: { type: ['string', 'null'] },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
 	required: ['id', 'orderId', 'items', 'createdAt', 'updatedAt'],
 	indexes: ['orderId', 'updatedAt']
-};
-
-export const kdsHistorySchema: RxJsonSchema<any> = {
-	title: 'kds history schema',
-	version: 2,
-	primaryKey: 'id',
-	type: 'object',
-	properties: {
-		id: { type: 'string', maxLength: 100 },
-		orderId: { type: 'string' },
-		tableNumber: { type: ['number', 'null'] },
-		customerName: { type: ['string', 'null'] },
-		items: {
-			type: 'array',
-			items: {
-				type: 'object',
-				properties: {
-					id: { type: 'string' },
-					menuItemName: { type: 'string' },
-					quantity: { type: 'number' },
-					status: { type: 'string' },
-					weight: { type: ['number', 'null'] },
-					category: { type: 'string' },
-					notes: { type: 'string' }
-				},
-				required: ['id', 'menuItemName', 'quantity', 'status']
-			}
-		},
-		createdAt: { type: 'string' },
-		bumpedAt: { type: 'string' },
-		bumpedBy: { type: 'string' },
-		updatedAt: { type: 'string', maxLength: 30 }
-	},
-	required: ['id', 'orderId', 'items', 'createdAt', 'bumpedAt', 'bumpedBy', 'updatedAt'],
-	indexes: ['updatedAt']
 };
 
 // ─── X-Read ──────────────────────────────────────────────────────────────────

@@ -53,7 +53,7 @@ export function writeLog(
 		timestamp: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
 		user:   opts.user   ?? (session.userName || 'Staff'),
 		role:   opts.role   ?? session.role,
-		branch: opts.branch ?? (session.locationId === 'qc' ? 'QC' : session.locationId === 'mkti' ? 'MKTI' : session.locationId === 'wh-qc' ? 'WH-QC' : session.locationId.toUpperCase()),
+		branch: opts.branch ?? (session.locationId === 'tag' ? 'TAG' : session.locationId === 'pgl' ? 'PGL' : session.locationId === 'wh-tag' ? 'WH-TAG' : session.locationId.toUpperCase()),
 		action,
 		description,
 		...(opts.meta && { meta: JSON.stringify(opts.meta) }),

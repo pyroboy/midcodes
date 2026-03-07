@@ -193,8 +193,8 @@ test('Scenario 5: Add extras — charge initial order, then add more items later
   await selectPackage(page, 'Unli Beef');
   await chargeItems(page);
 
-  // Re-open AddItemModal via "+ ADD" button in sidebar
-  await page.locator('button', { hasText: '+ ADD' }).click();
+  // Re-open AddItemModal via "+ More" button in sidebar (AYCE dine-in shows "+ More")
+  await page.locator('button', { hasText: '+ More' }).click();
   await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible();
 
   // Add a dish and drinks

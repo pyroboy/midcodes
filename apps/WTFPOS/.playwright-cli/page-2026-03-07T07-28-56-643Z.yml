@@ -1,0 +1,71 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - generic [ref=e118]: W!
+          - generic [ref=e119]:
+            - generic [ref=e120]: WTF! SAMGYUP
+            - generic [ref=e121]: POS System
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - img [ref=e124]
+            - generic [ref=e125]: Alta Citta (Tagbilaran)
+          - generic [ref=e126]: 03:28:56 PM
+      - separator [ref=e127]
+      - list [ref=e131]:
+        - listitem [ref=e132]:
+          - link "Kitchen" [ref=e133] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e134]
+            - generic [ref=e135]: Kitchen
+        - listitem [ref=e136]:
+          - link "Stock" [ref=e137] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e138]
+            - generic [ref=e139]: Stock
+      - generic [ref=e140]:
+        - separator [ref=e141]
+        - generic [ref=e142]:
+          - generic [ref=e143]: P
+          - generic [ref=e144]:
+            - generic [ref=e145]: Pedro Cruz
+            - generic [ref=e146]: kitchen
+        - link "Logout" [ref=e148] [cursor=pointer]:
+          - /url: /
+          - img [ref=e149]
+          - generic [ref=e150]: Logout
+      - button "Toggle Sidebar" [ref=e151]
+    - main [ref=e152]:
+      - generic [ref=e153]:
+        - navigation [ref=e154]:
+          - link "🧾 All Orders" [ref=e155] [cursor=pointer]:
+            - /url: /kitchen/all-orders
+          - link "📋 Order Queue" [ref=e156] [cursor=pointer]:
+            - /url: /kitchen/orders
+          - link "⚖️ Weigh Station" [ref=e157] [cursor=pointer]:
+            - /url: /kitchen/weigh-station
+        - main [ref=e158]:
+          - generic [ref=e159]:
+            - generic [ref=e160]:
+              - heading "Kitchen Queue" [level=1] [ref=e161]
+              - generic [ref=e162]:
+                - button "↩ UNDO LAST" [ref=e163] [cursor=pointer]
+                - button "History 156" [ref=e164] [cursor=pointer]:
+                  - text: History
+                  - generic [ref=e165]: "156"
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - generic [ref=e168]: "0"
+                - generic [ref=e169]: Orders
+              - generic [ref=e170]:
+                - generic [ref=e171]: "0"
+                - generic [ref=e172]: Tables
+              - generic [ref=e173]:
+                - generic [ref=e174]: "0"
+                - generic [ref=e175]: Items
+          - generic [ref=e177]:
+            - generic [ref=e178]: ✅
+            - paragraph [ref=e179]: No pending orders
+            - paragraph [ref=e180]: New orders will appear here automatically
+  - generic [ref=e109]: WTF! Samgyup POS

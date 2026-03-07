@@ -3,10 +3,8 @@
  * Broadcast alerts for kitchen refusals visible on POS screens.
  */
 import { nanoid } from 'nanoid';
-import { log } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
-import { rejectOrderItem, orders, kdsTickets } from '$lib/stores/pos.svelte';
-import { restoreStock } from '$lib/stores/stock.svelte';
+import { rejectOrderItem, orders } from '$lib/stores/pos.svelte';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { getDb } from '$lib/db';
 import { browser } from '$app/environment';
@@ -76,21 +74,8 @@ export async function refuseItem(orderId: string, tableNumber: number | null, it
 		updatedAt: new Date().toISOString(),
 	});
 
-	// Update order item status to cancelled
-	rejectOrderItem(orderId, orderItem.id);
-
-	// Restore stock for the rejected item
-	const menuItem = orderItem.menuItemId;
-	const qty = orderItem.weight ?? orderItem.quantity;
-	restoreStock(menuItem, qty, tableNumber?.toString() ?? 'takeout', orderId);
-
-	// Mark stock as restored
-	const alertDoc = await db.kitchen_alerts.findOne(alertId).exec();
-	if (alertDoc) {
-		await alertDoc.incrementalPatch({ restoredStock: true, updatedAt: new Date().toISOString() });
-	}
-
-	log.kitchenRefusal(itemName, tableNumber, reason);
+	// Update order item status to cancelled (also restores stock + logs refusal)
+	await rejectOrderItem(orderId, orderItem.id, reason);
 }
 
 export async function acknowledgeAlert(alertId: string) {

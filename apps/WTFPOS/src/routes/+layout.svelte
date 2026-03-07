@@ -1,11 +1,21 @@
 <script lang="ts">
 	import '../app.css';
 	import ConnectionStatus from '$lib/components/ConnectionStatus.svelte';
+	import DbHealthBanner from '$lib/components/DbHealthBanner.svelte';
+	import AppSidebar from '$lib/components/AppSidebar.svelte';
+	import MobileTopBar from '$lib/components/MobileTopBar.svelte';
+	import LocationBanner from '$lib/components/stock/LocationBanner.svelte';
+	import { SidebarProvider, SidebarInset } from '$lib/components/ui/sidebar/index.js';
 	import { initConnectionMonitor } from '$lib/stores/connection.svelte';
 	import { initDeviceHeartbeat } from '$lib/stores/device.svelte';
+	import { initDbHealthCheck } from '$lib/stores/db-health.svelte';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
+
+	// Don't show sidebar on the login page
+	const showSidebar = $derived(page.url.pathname !== '/');
 
 	// ─── Dev Error Overlay ────────────────────────────────────────────────────
 	interface CapturedError { message: string; source?: string; stack?: string; type: 'error' | 'rejection' }
@@ -15,6 +25,7 @@
 	onMount(() => {
 		initConnectionMonitor();
 		initDeviceHeartbeat();
+		initDbHealthCheck();
 
 		if (!import.meta.env.DEV) return;
 
@@ -39,7 +50,20 @@
 </script>
 
 <ConnectionStatus />
-{@render children()}
+<DbHealthBanner />
+
+{#if showSidebar}
+	<SidebarProvider>
+		<AppSidebar />
+		<SidebarInset class="min-h-svh overflow-hidden">
+			<MobileTopBar />
+			<LocationBanner />
+			{@render children()}
+		</SidebarInset>
+	</SidebarProvider>
+{:else}
+	{@render children()}
+{/if}
 
 {#if import.meta.env.DEV && devErrors.length > 0}
 	<!-- Dev error badge -->

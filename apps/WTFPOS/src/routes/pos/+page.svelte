@@ -1,9 +1,7 @@
 <script lang="ts">
-    import { tables as allTables, orders as allOrders, openTable, updateTableTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance } from '$lib/stores/pos.svelte';
-    import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
+    import { tables as allTables, orders as allOrders, openTable, updateTableTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance, voidOrder } from '$lib/stores/pos.svelte';
     import { getPendingRejectionsForTable, acknowledgeAlert, type KitchenAlert } from '$lib/stores/alert.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
-    import TopBar from '$lib/components/TopBar.svelte';
     import AlertBanner from '$lib/components/AlertBanner.svelte';
     import TransferTableModal from '$lib/components/pos/TransferTableModal.svelte';
     import PackageChangeModal from '$lib/components/pos/PackageChangeModal.svelte';
@@ -22,6 +20,7 @@
     import PaxChangeModal from '$lib/components/pos/PaxChangeModal.svelte';
     import LeftoverPenaltyModal from '$lib/components/pos/LeftoverPenaltyModal.svelte';
     import MergeTablesModal from '$lib/components/pos/MergeTablesModal.svelte';
+    import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
     import { session } from '$lib/stores/session.svelte';
 
     // ─── Branch-filtered tables/orders ───────────────────────────────────────────
@@ -72,6 +71,7 @@
     let showPaxChange = $state(false);
     let showLeftoverPenalty = $state(false);
     let showMergeModal = $state(false);
+    let showRefill = $state(false);
     let paxModalTable = $state<Table | null>(null);
 
     // ─── Kitchen Rejection Alerts ──────────────────────────────────────────────
@@ -96,8 +96,6 @@
     );
 
     // ─── Handlers ─────────────────────────────────────────────────────────────
-    const isManager = $derived(ELEVATED_ROLES.includes(session.role));
-
     function handleTableClick(table: Table) {
         selectedTakeoutId = null;
         if (table.status === 'maintenance') return; // Can't interact with maintenance tables
@@ -141,10 +139,7 @@
     function handleVoidConfirm(reason: 'mistake' | 'walkout' | 'write_off') {
         const order = currentActiveOrder;
         if (!order) return;
-        
-        import('$lib/stores/pos.svelte').then(({ voidOrder }) => {
-            voidOrder(order.id, reason);
-        });
+        voidOrder(order.id, reason);
         showVoidConfirm = false;
         closeBill();
     }
@@ -188,7 +183,7 @@
 
     // ─── Barcode Scanner ──────────────────────────────────────────────────────
     let barcodeBuffer = $state('');
-    let barcodeTimeout = $state<ReturnType<typeof setTimeout> | undefined>(undefined);
+    let barcodeTimeout: ReturnType<typeof setTimeout> | undefined;
 
     // Cleanup barcode timeout on component destroy
     $effect(() => {
@@ -233,9 +228,8 @@
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
-<div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
+<div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
     <AlertBanner />
-    <TopBar />
 
     {#if session.locationId === 'all'}
         <AllBranchesDashboard allTables={allTables.value} allOrders={allOrders.value} />
@@ -298,6 +292,7 @@
                 table={selectedTable}
                 onclose={closeBill}
                 onadditem={() => showAddItem = true}
+                onrefill={() => showRefill = true}
                 oncheckout={() => {
                     if (currentActiveOrder?.packageId) {
                         showLeftoverPenalty = true;
@@ -377,7 +372,8 @@
             receiptOrder = order;
             const cashPayment = order.payments.find(p => p.method === 'cash');
             receiptChange = cashPayment ? cashPayment.amount - order.total : 0;
-            receiptMethod = order.payments[0]?.method === 'cash' ? 'Cash' : order.payments[0]?.method === 'gcash' ? 'GCash' : 'Card';
+            const m = order.payments[order.payments.length - 1]?.method;
+            receiptMethod = m === 'gcash' ? 'GCash' : m === 'maya' ? 'Maya' : m === 'card' ? 'Card' : 'Cash';
             showReceipt = true;
         } else {
             // If it's unpaid (orphaned), load it into the sidebar for checkout
@@ -427,6 +423,12 @@
         checkoutOrder = currentActiveOrder ?? null;
         showCheckout = true;
     }}
+/>
+
+<RefillPanel
+    isOpen={showRefill}
+    order={currentActiveOrder ?? null}
+    onclose={() => showRefill = false}
 />
 
 {#if showMergeModal && selectedTable}

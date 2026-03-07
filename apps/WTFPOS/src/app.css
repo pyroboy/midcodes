@@ -3,6 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+	:root {
+		--sidebar: #ffffff;
+		--sidebar-foreground: #111827;
+		--sidebar-primary: #EA580C;
+		--sidebar-primary-foreground: #ffffff;
+		--sidebar-accent: #FFF7ED;
+		--sidebar-accent-foreground: #EA580C;
+		--sidebar-border: #E5E7EB;
+		--sidebar-ring: #EA580C;
+	}
+
 	body {
 		@apply bg-surface-secondary text-gray-900 antialiased;
 		font-family: 'Inter', system-ui, sans-serif;

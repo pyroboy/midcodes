@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { cn } from '$lib/utils';
-	import TopBar from '$lib/components/TopBar.svelte';
 	import { session } from '$lib/stores/session.svelte';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
@@ -12,7 +11,7 @@
 		{
 			label: 'Operations',
 			tabs: [
-				{ href: '/reports/meat-variance', label: 'Meat Variance' },
+				{ href: '/reports/meat-report', label: 'Meat Report' },
 				{ href: '/reports/table-sales',   label: 'Table Sales' },
 				{ href: '/reports/voids-discounts',label: 'Voids & Discounts' },
 				{ href: '/reports/x-read',        label: 'X-Read' },
@@ -51,9 +50,7 @@
 	];
 </script>
 
-<div class="flex h-screen flex-col overflow-hidden bg-surface-secondary">
-	<TopBar />
-
+<div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
 	<div class="shrink-0 bg-white border-b border-border px-6 pt-3 pb-0 flex flex-col gap-2">
 		<div class="flex items-center gap-3">
 			<h1 class="text-xl font-bold text-gray-900 tracking-tight shrink-0">Consolidated Reports</h1>
@@ -90,7 +87,9 @@
 		</nav>
 	</div>
 
-	<div class="flex-1 overflow-auto p-6">
-		{@render children()}
+	<div class="flex-1 overflow-auto">
+		<div class="p-6">
+			{@render children()}
+		</div>
 	</div>
 </div>

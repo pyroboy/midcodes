@@ -68,7 +68,7 @@ export async function addExpense(category: string, amount: number, description: 
         }
     }
     
-    const locationId = session.locationId === 'all' ? 'qc' : session.locationId;
+    const locationId = session.locationId === 'all' ? 'tag' : session.locationId;
     console.log('[EXPENSE_DEBUG] Using locationId:', locationId, '(session.locationId:', session.locationId + ')');
     
     const expense: Expense = {

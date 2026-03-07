@@ -61,23 +61,23 @@ describe('ROLE_NAV_ACCESS', () => {
 });
 
 describe('LOCATIONS', () => {
-	it('includes qc, mkti, wh-qc, and all', () => {
+	it('includes tag, pgl, wh-tag, and all', () => {
 		const ids = LOCATIONS.map(l => l.id);
-		expect(ids).toContain('qc');
-		expect(ids).toContain('mkti');
-		expect(ids).toContain('wh-qc');
+		expect(ids).toContain('tag');
+		expect(ids).toContain('pgl');
+		expect(ids).toContain('wh-tag');
 		expect(ids).toContain('all');
 	});
 
-	it('wh-qc is a warehouse type', () => {
-		const wh = LOCATIONS.find(l => l.id === 'wh-qc');
+	it('wh-tag is a warehouse type', () => {
+		const wh = LOCATIONS.find(l => l.id === 'wh-tag');
 		expect(wh?.type).toBe('warehouse');
 	});
 
-	it('retail locations are qc and mkti', () => {
+	it('retail locations are tag and pgl', () => {
 		const retail = LOCATIONS.filter(l => l.type === 'retail').map(l => l.id);
-		expect(retail).toContain('qc');
-		expect(retail).toContain('mkti');
+		expect(retail).toContain('tag');
+		expect(retail).toContain('pgl');
 	});
 
 	it('every location has a name', () => {
@@ -89,21 +89,21 @@ describe('LOCATIONS', () => {
 
 describe('deriveSessionState', () => {
 	it('locks staff to their assigned location', () => {
-		const result = deriveSessionState('staff', 'qc');
+		const result = deriveSessionState('staff', 'tag');
 		expect(result.isLocked).toBe(true);
-		expect(result.resolvedLocationId).toBe('qc');
+		expect(result.resolvedLocationId).toBe('tag');
 	});
 
 	it('locks kitchen to their assigned location', () => {
-		const result = deriveSessionState('kitchen', 'mkti');
+		const result = deriveSessionState('kitchen', 'pgl');
 		expect(result.isLocked).toBe(true);
-		expect(result.resolvedLocationId).toBe('mkti');
+		expect(result.resolvedLocationId).toBe('pgl');
 	});
 
-	it('staff with locationId="all" falls back to qc', () => {
+	it('staff with locationId="all" falls back to tag', () => {
 		const result = deriveSessionState('staff', 'all');
 		expect(result.isLocked).toBe(true);
-		expect(result.resolvedLocationId).toBe('qc');
+		expect(result.resolvedLocationId).toBe('tag');
 	});
 
 	it('owner is not locked and can be set to "all"', () => {
@@ -113,15 +113,15 @@ describe('deriveSessionState', () => {
 	});
 
 	it('admin is not locked', () => {
-		const result = deriveSessionState('admin', 'wh-qc');
+		const result = deriveSessionState('admin', 'wh-tag');
 		expect(result.isLocked).toBe(false);
-		expect(result.resolvedLocationId).toBe('wh-qc');
+		expect(result.resolvedLocationId).toBe('wh-tag');
 	});
 
 	it('manager is not locked and can switch locations freely', () => {
-		const result = deriveSessionState('manager', 'mkti');
+		const result = deriveSessionState('manager', 'pgl');
 		expect(result.isLocked).toBe(false);
-		expect(result.resolvedLocationId).toBe('mkti');
+		expect(result.resolvedLocationId).toBe('pgl');
 	});
 
 	it('manager can be set to "all"', () => {

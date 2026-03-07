@@ -18,13 +18,13 @@ export async function seedHistory(db: RxDatabase) {
     console.log('[RxDB] Generating 7 days of historical POS data...');
 
     const now = new Date();
-    const branches = ['qc', 'mkti'];
+    const branches = ['tag', 'pgl'];
     const orders = [];
     const deductions = [];
     const deliveries = [];
     const expenses = [];
     const xReads = [];
-    const kdsHistory = [];
+    const kdsHistoryTickets = [];
     const auditEntries = [];
 
     // Track stock item IDs for each branch — must match `si-${index}` format from INITIAL_STOCK_ITEMS
@@ -48,7 +48,7 @@ export async function seedHistory(db: RxDatabase) {
         const dateStr = date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 
         for (const branch of branches) {
-            const branchLabel = branch === 'qc' ? 'QC' : 'MKTI';
+            const branchLabel = branch === 'tag' ? 'TAG' : 'PGL';
             let dailyGrossSales = 0;
             let dailyDiscounts = 0;
             let dailyVat = 0;
@@ -243,7 +243,7 @@ export async function seedHistory(db: RxDatabase) {
 
                 // Create KDS history for non-voided orders with items
                 if (!isVoided && items.length > 0) {
-                    kdsHistory.push({
+                    kdsHistoryTickets.push({
                         id: nanoid(),
                         orderId,
                         tableNumber: isTakeout ? null : tableNum,
@@ -546,7 +546,7 @@ export async function seedHistory(db: RxDatabase) {
             role: 'manager',
             action: 'admin',
             description: 'EOD Utility Reading',
-            branch: 'QC',
+            branch: 'TAG',
             meta: JSON.stringify({ electricity, gas }),
         });
     }
@@ -560,7 +560,7 @@ export async function seedHistory(db: RxDatabase) {
         db.deliveries.bulkInsert(clean(deliveries)),
         db.expenses.bulkInsert(clean(expenses)),
         db.x_reads.bulkInsert(clean(xReads)),
-        db.kds_history.bulkInsert(clean(kdsHistory)),
+        db.kds_tickets.bulkInsert(clean(kdsHistoryTickets)),
         db.waste.bulkInsert(clean(wasteEntries)),
     ]);
 
@@ -580,6 +580,6 @@ export async function seedHistory(db: RxDatabase) {
     console.log(`  - ${expenses.length} expenses`);
     console.log(`  - ${wasteEntries.length} waste entries`);
     console.log(`  - ${utilityAuditEntries.length} utility readings (in audit_logs)`);
-    console.log(`  - ${kdsHistory.length} KDS history entries`);
+    console.log(`  - ${kdsHistoryTickets.length} KDS history entries`);
     console.log(`  - ${auditEntries.length} audit log entries`);
 }

@@ -8,7 +8,7 @@ import { session } from '$lib/stores/session.svelte';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { browser } from '$app/environment';
 import { getDb } from '$lib/db';
-import { STOCK_ITEMS_LIST, getProteinType, type StockCategory, type MeatProtein } from '$lib/stores/stock.constants';
+import { STOCK_ITEMS_LIST, getProteinType, DEFAULT_MEAT_EDGES, type StockCategory, type MeatProtein } from '$lib/stores/stock.constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,6 +136,33 @@ export const proteinConfig: Record<MeatProtein, {
 
 export { getProteinType };
 
+// ─── Yield Overrides (manager-editable conversion %) ─────────────────────────
+
+function loadYieldOverrides(): Record<string, number> {
+	if (!browser) return {};
+	try {
+		const raw = localStorage.getItem('wtfpos_yield_overrides');
+		return raw ? JSON.parse(raw) : {};
+	} catch { return {}; }
+}
+
+export const yieldOverrides: Record<string, number> = $state(loadYieldOverrides());
+
+export function getYieldPct(from: string, to: string): number {
+	const key = `${from}->${to}`;
+	if (key in yieldOverrides) return yieldOverrides[key];
+	const edge = DEFAULT_MEAT_EDGES.find(e => e.from === from && e.to === to);
+	return edge?.defaultYieldPct ?? 0;
+}
+
+export function setYieldPct(from: string, to: string, pct: number) {
+	const key = `${from}->${to}`;
+	yieldOverrides[key] = pct;
+	if (browser) {
+		localStorage.setItem('wtfpos_yield_overrides', JSON.stringify(yieldOverrides));
+	}
+}
+
 // ─── Initial Mock Data ────────────────────────────────────────────────────────
 const STOCK_IMAGE_COLORS: Record<StockCategory, { bg: string; fg: string }> = {
 	Meats:  { bg: 'DC2626', fg: 'FFFFFF' },
@@ -176,16 +203,45 @@ function getSiId(menuItemId: string, locationId: string): string {
 	return `si-${index}`;
 }
 
+// Helper for relative timestamps
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
+const now = new Date().toISOString();
+
 export const INITIAL_DELIVERIES: Delivery[] = [
-	{ id: 'd1', stockItemId: getSiId('meat-pork-bone-in', 'qc'), itemName: 'Pork Bone-In',            qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: new Date().toISOString(), usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0], updatedAt: new Date().toISOString() },
-	{ id: 'd2', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: new Date(Date.now() - 3600000).toISOString(), usedQty: 0, depleted: false, batchNo: 'B-242', updatedAt: new Date().toISOString() },
-	{ id: 'd3', stockItemId: getSiId('side-kimchi', 'qc'), itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: new Date(Date.now() - 7200000).toISOString(), usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], updatedAt: new Date().toISOString() },
+	// Original supplier deliveries
+	{ id: 'd1', stockItemId: getSiId('meat-pork-bone-in', 'tag'), itemName: 'Pork Bone-In',            qty: 5000, unit: 'g',        supplier: 'Metro Meat Co.',   notes: '',                    receivedAt: now, usedQty: 0, depleted: false, batchNo: 'B-241', expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0], updatedAt: now },
+	{ id: 'd2', stockItemId: getSiId('drink-soju', 'tag'), itemName: 'Soju (Original)',         qty: 6,    unit: 'bottles',   supplier: 'SM Trading',       notes: '',                    receivedAt: hoursAgo(1), usedQty: 0, depleted: false, batchNo: 'B-242', updatedAt: now },
+	{ id: 'd3', stockItemId: getSiId('side-kimchi', 'tag'), itemName: 'Kimchi',                  qty: 10,   unit: 'portions',  supplier: 'Korean Foods PH',  notes: 'Checked freshness',   receivedAt: hoursAgo(2), usedQty: 5, depleted: false, batchNo: 'B-243', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0], updatedAt: now },
+
+	// ── Transfers: Warehouse → Tagbilaran (today, morning dispatch) ────────────────────
+	{ id: 'trf-tag-1', stockItemId: getSiId('meat-pork-bone-in', 'tag'),   itemName: 'Pork Bone-In',   qty: 8000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 3200, depleted: false, batchNo: 'TRF-A1TAG', updatedAt: now },
+	{ id: 'trf-tag-2', stockItemId: getSiId('meat-pork-bone-out', 'tag'),  itemName: 'Pork Bone-Out',  qty: 6000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 2400, depleted: false, batchNo: 'TRF-A2TAG', updatedAt: now },
+	{ id: 'trf-tag-3', stockItemId: getSiId('meat-beef-bone-in', 'tag'),   itemName: 'Beef Bone-In',   qty: 5000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1800, depleted: false, batchNo: 'TRF-A3TAG', updatedAt: now },
+	{ id: 'trf-tag-4', stockItemId: getSiId('meat-beef-sliced', 'tag'),    itemName: 'Sliced Beef',     qty: 4000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1500, depleted: false, batchNo: 'TRF-A4TAG', updatedAt: now },
+	{ id: 'trf-tag-5', stockItemId: getSiId('meat-chicken-wing', 'tag'),   itemName: 'Chicken Wing',    qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 1200, depleted: false, batchNo: 'TRF-A5TAG', updatedAt: now },
+	{ id: 'trf-tag-6', stockItemId: getSiId('meat-chicken-leg', 'tag'),    itemName: 'Chicken Leg',     qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(6), usedQty: 900,  depleted: false, batchNo: 'TRF-A6TAG', updatedAt: now },
+
+	// ── Transfers: Warehouse → Panglao (today, morning dispatch) ────────────────
+	{ id: 'trf-mk-1', stockItemId: getSiId('meat-pork-bone-in', 'pgl'),  itemName: 'Pork Bone-In',   qty: 7000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 2800, depleted: false, batchNo: 'TRF-B1MK', updatedAt: now },
+	{ id: 'trf-mk-2', stockItemId: getSiId('meat-pork-sliced', 'pgl'),   itemName: 'Sliced Pork',     qty: 5000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 2000, depleted: false, batchNo: 'TRF-B2MK', updatedAt: now },
+	{ id: 'trf-mk-3', stockItemId: getSiId('meat-beef-bone-in', 'pgl'),  itemName: 'Beef Bone-In',   qty: 4000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1600, depleted: false, batchNo: 'TRF-B3MK', updatedAt: now },
+	{ id: 'trf-mk-4', stockItemId: getSiId('meat-beef-bone-out', 'pgl'), itemName: 'Beef Bone-Out',  qty: 3500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1200, depleted: false, batchNo: 'TRF-B4MK', updatedAt: now },
+	{ id: 'trf-mk-5', stockItemId: getSiId('meat-chicken-wing', 'pgl'),  itemName: 'Chicken Wing',    qty: 2500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Morning dispatch',  receivedAt: hoursAgo(5), usedQty: 1000, depleted: false, batchNo: 'TRF-B5MK', updatedAt: now },
+
+	// ── Transfers: Warehouse → Tagbilaran (yesterday, afternoon restock) ───────────────
+	{ id: 'trf-tag-y1', stockItemId: getSiId('meat-pork-sliced', 'tag'),   itemName: 'Sliced Pork',     qty: 4500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 4500, depleted: true,  batchNo: 'TRF-Y1TAG', updatedAt: now },
+	{ id: 'trf-tag-y2', stockItemId: getSiId('meat-beef-bone-out', 'tag'), itemName: 'Beef Bone-Out',  qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 3000, depleted: true,  batchNo: 'TRF-Y2TAG', updatedAt: now },
+	{ id: 'trf-tag-y3', stockItemId: getSiId('meat-chicken-leg', 'tag'),   itemName: 'Chicken Leg',     qty: 2000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Afternoon restock', receivedAt: hoursAgo(28), usedQty: 2000, depleted: true,  batchNo: 'TRF-Y3TAG', updatedAt: now },
+
+	// ── Transfers: Warehouse → Panglao (yesterday) ──────────────────────────────
+	{ id: 'trf-mk-y1', stockItemId: getSiId('meat-pork-bone-out', 'pgl'), itemName: 'Pork Bone-Out', qty: 5500, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Daily dispatch',    receivedAt: hoursAgo(26), usedQty: 5500, depleted: true,  batchNo: 'TRF-Y1MK', updatedAt: now },
+	{ id: 'trf-mk-y2', stockItemId: getSiId('meat-beef-sliced', 'pgl'),  itemName: 'Sliced Beef',     qty: 3000, unit: 'g', supplier: 'Transfer from wh-tag', notes: 'Daily dispatch',    receivedAt: hoursAgo(26), usedQty: 3000, depleted: true,  batchNo: 'TRF-Y2MK', updatedAt: now },
 ];
 
 export const INITIAL_WASTE_ENTRIES: WasteEntry[] = [
-	{ id: 'w1', stockItemId: getSiId('meat-pork-bones', 'qc'),  itemName: 'Pork Bones',            qty: 150, unit: 'g',        reason: 'Trimming (bone/fat)', loggedBy: 'Maria S.', loggedAt: new Date(Date.now() - 14400000).toISOString(), updatedAt: new Date().toISOString() },
-	{ id: 'w2', stockItemId: getSiId('side-rice', 'qc'), itemName: 'Steamed Rice',          qty: 2,   unit: 'portions', reason: 'Overcooked',          loggedBy: 'Pedro C.', loggedAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString() },
-	{ id: 'w3', stockItemId: getSiId('drink-soju', 'qc'), itemName: 'Soju (Original)',       qty: 1,   unit: 'bottles',  reason: 'Unusable (damaged)',  loggedBy: 'Maria S.', loggedAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+	{ id: 'w1', stockItemId: getSiId('meat-pork-bones', 'tag'),  itemName: 'Pork Bones',            qty: 150, unit: 'g',        reason: 'Trimming (bone/fat)', loggedBy: 'Maria S.', loggedAt: new Date(Date.now() - 14400000).toISOString(), updatedAt: new Date().toISOString() },
+	{ id: 'w2', stockItemId: getSiId('side-rice', 'tag'), itemName: 'Steamed Rice',          qty: 2,   unit: 'portions', reason: 'Overcooked',          loggedBy: 'Pedro C.', loggedAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString() },
+	{ id: 'w3', stockItemId: getSiId('drink-soju', 'tag'), itemName: 'Soju (Original)',       qty: 1,   unit: 'bottles',  reason: 'Unusable (damaged)',  loggedBy: 'Maria S.', loggedAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export const INITIAL_DEDUCTIONS: Deduction[] = [];
@@ -200,7 +256,31 @@ export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => (
 	updatedAt: new Date().toISOString(),
 }));
 
-export const INITIAL_ADJUSTMENTS: StockAdjustment[] = [];
+export const INITIAL_ADJUSTMENTS: StockAdjustment[] = [
+	// ── Warehouse deductions for today's Tagbilaran transfers ──────────────────────────
+	{ id: 'adj-trf-tag-1', stockItemId: getSiId('meat-pork-bone-in', 'wh-tag'),  itemName: 'Pork Bone-In (Bulk)',  type: 'deduct', qty: 8000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-2', stockItemId: getSiId('meat-pork-bone-out', 'wh-tag'), itemName: 'Pork Bone-Out (Bulk)', type: 'deduct', qty: 6000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-3', stockItemId: getSiId('meat-beef-bone-in', 'wh-tag'),  itemName: 'Beef Bone-In (Bulk)',  type: 'deduct', qty: 5000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-4', stockItemId: getSiId('meat-beef-sliced', 'wh-tag'),   itemName: 'Sliced Beef (Bulk)',    type: 'deduct', qty: 4000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-5', stockItemId: getSiId('meat-chicken-wing', 'wh-tag'),  itemName: 'Chicken Wing (Bulk)',   type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+	{ id: 'adj-trf-tag-6', stockItemId: getSiId('meat-chicken-leg', 'wh-tag'),   itemName: 'Chicken Leg (Bulk)',    type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Morning dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(6), updatedAt: now },
+
+	// ── Warehouse deductions for today's Panglao transfers ──────────────────────
+	{ id: 'adj-trf-mk-1', stockItemId: getSiId('meat-pork-bone-in', 'wh-tag'),  itemName: 'Pork Bone-In (Bulk)',  type: 'deduct', qty: 7000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-2', stockItemId: getSiId('meat-pork-sliced', 'wh-tag'),   itemName: 'Sliced Pork (Bulk)',    type: 'deduct', qty: 5000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-3', stockItemId: getSiId('meat-beef-bone-in', 'wh-tag'),  itemName: 'Beef Bone-In (Bulk)',  type: 'deduct', qty: 4000, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-4', stockItemId: getSiId('meat-beef-bone-out', 'wh-tag'), itemName: 'Beef Bone-Out (Bulk)', type: 'deduct', qty: 3500, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+	{ id: 'adj-trf-mk-5', stockItemId: getSiId('meat-chicken-wing', 'wh-tag'),  itemName: 'Chicken Wing (Bulk)',   type: 'deduct', qty: 2500, unit: 'g', reason: 'Transfer to pgl — Morning dispatch', loggedBy: 'Noel R.', loggedAt: hoursAgo(5), updatedAt: now },
+
+	// ── Warehouse deductions for yesterday's Tagbilaran transfers ──────────────────────
+	{ id: 'adj-trf-tag-y1', stockItemId: getSiId('meat-pork-sliced', 'wh-tag'),   itemName: 'Sliced Pork (Bulk)',    type: 'deduct', qty: 4500, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
+	{ id: 'adj-trf-tag-y2', stockItemId: getSiId('meat-beef-bone-out', 'wh-tag'), itemName: 'Beef Bone-Out (Bulk)', type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
+	{ id: 'adj-trf-tag-y3', stockItemId: getSiId('meat-chicken-leg', 'wh-tag'),   itemName: 'Chicken Leg (Bulk)',    type: 'deduct', qty: 2000, unit: 'g', reason: 'Transfer to tag — Afternoon restock', loggedBy: 'Noel R.', loggedAt: hoursAgo(28), updatedAt: now },
+
+	// ── Warehouse deductions for yesterday's Panglao transfers ──────────────────
+	{ id: 'adj-trf-mk-y1', stockItemId: getSiId('meat-pork-bone-out', 'wh-tag'), itemName: 'Pork Bone-Out (Bulk)', type: 'deduct', qty: 5500, unit: 'g', reason: 'Transfer to pgl — Daily dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(26), updatedAt: now },
+	{ id: 'adj-trf-mk-y2', stockItemId: getSiId('meat-beef-sliced', 'wh-tag'),   itemName: 'Sliced Beef (Bulk)',    type: 'deduct', qty: 3000, unit: 'g', reason: 'Transfer to pgl — Daily dispatch',  loggedBy: 'Noel R.', loggedAt: hoursAgo(26), updatedAt: now },
+];
 
 // ─── Reactive State (RxDB Stores) ─────────────────────────────────────────────
 
@@ -481,7 +561,7 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
 export async function restoreStock(menuItemId: string, qty: number, orderId: string, locationId?: string) {
 	if (!browser) return;
 	const db = await getDb();
-	const locId = locationId ?? session.locationId ?? 'qc';
+	const locId = locationId ?? session.locationId ?? 'tag';
 	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === locId);
 	if (!item) return;
 
@@ -575,18 +655,18 @@ export function markPeriodDone(period: CountPeriod) {
 // ─── Seed Helpers ─────────────────────────────────────────────────────────────
 
 function getOpeningStock(menuItemId: string, locationId: string): number {
-	if (locationId === 'wh-qc') return 50000; // Large stock for warehouse
+	if (locationId === 'wh-tag') return 50000; // Large stock for warehouse
 	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === locationId);
 	return item ? Math.round(item.minLevel * 1.5) : 0;
 }
 
 function getMorningCount(menuItemId: string): number | null {
-	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId || 'qc'));
+	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId || 'tag'));
 	return item ? Math.round(item.minLevel * 1.45) : null;
 }
 
 function getAfternoonCount(menuItemId: string): number | null {
-	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId || 'qc'));
+	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId || 'tag'));
 	return item ? Math.round(item.minLevel * 0.8) : null;
 }
 

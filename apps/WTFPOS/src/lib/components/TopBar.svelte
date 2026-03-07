@@ -25,13 +25,13 @@
 
 	/** Color scheme per location */
 	const LOCATION_COLORS: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-		'qc':    { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500',    border: 'border-blue-200' },
-		'mkti':  { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  border: 'border-violet-200' },
-		'wh-qc': { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500',   border: 'border-amber-200' },
-		'all':   { bg: 'bg-emerald-50',  text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
+		'tag':    { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500',    border: 'border-blue-200' },
+		'pgl':    { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  border: 'border-violet-200' },
+		'wh-tag': { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500',   border: 'border-amber-200' },
+		'all':    { bg: 'bg-emerald-50',  text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
 	};
 
-	const locColors = $derived(LOCATION_COLORS[session.locationId] ?? LOCATION_COLORS['qc']);
+	const locColors = $derived(LOCATION_COLORS[session.locationId] ?? LOCATION_COLORS['tag']);
 
 	function selectLocation(id: LocationId) {
 		session.locationId = id;
@@ -141,7 +141,7 @@
 				>
 					<MapPin class="w-3.5 h-3.5 flex-shrink-0" />
 					<span class="hidden sm:inline">{currentLoc?.name ?? 'Unknown'}</span>
-					<span class="sm:hidden">{session.locationId === 'wh-qc' ? 'WH' : session.locationId.toUpperCase()}</span>
+					<span class="sm:hidden">{session.locationId === 'wh-tag' ? 'WH' : session.locationId.toUpperCase()}</span>
 					<ChevronDown class="w-3 h-3 opacity-60" />
 				</button>
 			{:else}
@@ -153,7 +153,7 @@
 				>
 					<MapPin class="w-3.5 h-3.5 flex-shrink-0" />
 					<span class="hidden sm:inline">{currentLoc?.name ?? 'Unknown'}</span>
-					<span class="sm:hidden">{session.locationId === 'wh-qc' ? 'WH' : session.locationId.toUpperCase()}</span>
+					<span class="sm:hidden">{session.locationId === 'wh-tag' ? 'WH' : session.locationId.toUpperCase()}</span>
 				</span>
 			{/if}
 
@@ -166,7 +166,7 @@
 				<div class="absolute right-0 top-full z-50 mt-1.5 w-56 rounded-lg border border-border bg-white shadow-lg overflow-hidden">
 					{#each switchableLocations as loc}
 						{@const isActiveLoc = loc.id === session.locationId}
-						{@const lc = LOCATION_COLORS[loc.id] ?? LOCATION_COLORS['qc']}
+						{@const lc = LOCATION_COLORS[loc.id] ?? LOCATION_COLORS['tag']}
 						<button
 							onclick={() => selectLocation(loc.id)}
 							class={cn(
