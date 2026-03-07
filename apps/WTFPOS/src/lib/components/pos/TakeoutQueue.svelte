@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Order } from '$lib/types';
     import { formatPeso, cn } from '$lib/utils';
+    import { session } from '$lib/stores/session.svelte';
 
     interface Props {
         takeoutOrders: Order[];
@@ -56,7 +57,7 @@
                     )}>
                         {tStatus === 'new' ? 'NEW' : tStatus === 'preparing' ? 'PREP' : tStatus === 'ready' ? 'READY' : 'DONE'}
                     </span>
-                    {#if tStatus !== 'picked_up'}
+                    {#if tStatus !== 'picked_up' && session.role !== 'staff'}
                         <button
                             onclick={(e) => { e.stopPropagation(); onadvancestatus(order.id); }}
                             class="mt-1 flex items-center justify-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 transition-colors"

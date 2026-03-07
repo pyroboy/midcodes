@@ -1,0 +1,225 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph [ref=e17]: 03:43:59 PM
+    - separator [ref=e18]
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - link "POS" [ref=e24] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e25]
+          - generic [ref=e29]: POS
+    - generic [ref=e30]:
+      - separator [ref=e31]
+      - generic [ref=e32]:
+        - generic [ref=e33]: M
+        - generic [ref=e34]:
+          - generic [ref=e35]: Maria Santos
+          - generic [ref=e36]: staff
+      - link "Logout" [ref=e38] [cursor=pointer]:
+        - /url: /
+        - img [ref=e39]
+        - generic [ref=e42]: Logout
+    - button "Toggle Sidebar" [ref=e43]
+  - main [ref=e44]:
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - heading "POS" [level=1] [ref=e50]
+            - generic [ref=e51]: 1 occ
+            - generic [ref=e52]: 7 free
+          - generic [ref=e53]:
+            - generic [ref=e54]:
+              - generic [ref=e55]: Available
+              - generic [ref=e57]: Dining (Green)
+              - generic [ref=e59]: Ready / Bill (Orange)
+              - generic [ref=e61]: Pork
+              - generic [ref=e63]: Beef
+              - generic [ref=e65]: P&B
+            - button "📦 New Takeout" [ref=e67] [cursor=pointer]
+            - button "🧾 History 84" [ref=e68] [cursor=pointer]:
+              - text: 🧾 History
+              - generic [ref=e69]: "84"
+        - img [ref=e71]:
+          - button "Table T1" [ref=e74] [cursor=pointer]:
+            - generic: T1
+            - generic: 4p
+          - button "Table T2" [ref=e76] [cursor=pointer]:
+            - generic: P&B
+            - generic: 00:13
+            - generic: T2
+            - generic: 2 pax
+            - generic: ₱998.00
+            - generic: ✓
+          - button "Table T3" [ref=e81] [cursor=pointer]:
+            - generic: T3
+            - generic: 4p
+          - button "Table T4" [ref=e83] [cursor=pointer]:
+            - generic: T4
+            - generic: 4p
+          - button "Table T5" [ref=e85] [cursor=pointer]:
+            - generic: T5
+            - generic: 4p
+          - button "Table T6" [ref=e87] [cursor=pointer]:
+            - generic: T6
+            - generic: 4p
+          - button "Table T7" [ref=e89] [cursor=pointer]:
+            - generic: T7
+            - generic: 2p
+          - button "Table T8" [ref=e91] [cursor=pointer]:
+            - generic: T8
+            - generic: 2p
+      - generic [ref=e93]:
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - generic [ref=e97]: T2
+              - generic [ref=e98]: 2 pax
+              - generic [ref=e99]: 0m
+            - button "✕" [ref=e100] [cursor=pointer]
+          - generic [ref=e101]: Beef + Pork Unlimited
+          - generic [ref=e102]:
+            - button "Refill" [active] [ref=e103] [cursor=pointer]
+            - button "Add Item" [ref=e104] [cursor=pointer]
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - generic [ref=e108]:
+              - generic [ref=e109]: Beef + Pork Unlimited
+              - generic [ref=e110]: ✓ SERVED
+            - generic [ref=e112]:
+              - generic [ref=e113]: ₱998.00
+              - generic [ref=e114]: PKG
+          - generic [ref=e115]:
+            - generic [ref=e117]:
+              - generic [ref=e118]: Samgyupsal
+              - generic [ref=e119]: ✓ SERVED
+            - generic [ref=e121]: FREE
+          - generic [ref=e122]:
+            - generic [ref=e124]:
+              - generic [ref=e125]: Pork Sliced
+              - generic [ref=e126]: ✓ SERVED
+            - generic [ref=e128]: FREE
+          - generic [ref=e129]:
+            - generic [ref=e131]:
+              - generic [ref=e132]: Premium USDA Beef
+              - generic [ref=e133]: ✓ SERVED
+            - generic [ref=e135]: FREE
+          - generic [ref=e136]:
+            - generic [ref=e138]:
+              - generic [ref=e139]: Sliced Beef
+              - generic [ref=e140]: ✓ SERVED
+            - generic [ref=e142]: FREE
+          - generic [ref=e143]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: Kimchi
+              - generic [ref=e147]: ✓ SERVED
+            - generic [ref=e149]: FREE
+          - generic [ref=e150]:
+            - generic [ref=e152]:
+              - generic [ref=e153]: Rice
+              - generic [ref=e154]: ✓ SERVED
+            - generic [ref=e156]: FREE
+          - generic [ref=e157]:
+            - generic [ref=e159]:
+              - generic [ref=e160]: Cheese
+              - generic [ref=e161]: ✓ SERVED
+            - generic [ref=e163]: FREE
+          - generic [ref=e164]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: Lettuce
+              - generic [ref=e168]: ✓ SERVED
+            - generic [ref=e170]: FREE
+          - generic [ref=e171]:
+            - generic [ref=e173]:
+              - generic [ref=e174]: Egg
+              - generic [ref=e175]: ✓ SERVED
+            - generic [ref=e177]: FREE
+          - generic [ref=e178]:
+            - generic [ref=e180]:
+              - generic [ref=e181]: Cucumber
+              - generic [ref=e182]: ✓ SERVED
+            - generic [ref=e184]: FREE
+          - generic [ref=e185]:
+            - generic [ref=e187]:
+              - generic [ref=e188]: Chinese Cabbage
+              - generic [ref=e189]: ✓ SERVED
+            - generic [ref=e191]: FREE
+          - generic [ref=e192]:
+            - generic [ref=e194]:
+              - generic [ref=e195]: Pork Bulgogi
+              - generic [ref=e196]: ✓ SERVED
+            - generic [ref=e198]: FREE
+          - generic [ref=e199]:
+            - generic [ref=e201]:
+              - generic [ref=e202]: Fish Cake
+              - generic [ref=e203]: ✓ SERVED
+            - generic [ref=e205]: FREE
+        - generic [ref=e206]:
+          - generic [ref=e207]:
+            - generic [ref=e208]: BILL
+            - generic [ref=e209]: 14 items
+          - generic [ref=e210]: ₱998.00
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - button "Void" [ref=e213] [cursor=pointer]
+            - button "Checkout" [ref=e214] [cursor=pointer]
+            - button "Print" [ref=e215] [cursor=pointer]
+          - button "More Options" [ref=e216] [cursor=pointer]
+    - generic [ref=e218]:
+      - generic [ref=e219]:
+        - generic [ref=e220]:
+          - heading "Refill" [level=2] [ref=e221]
+          - generic [ref=e222]: Beef + Pork Unlimited
+        - button "✕" [ref=e223] [cursor=pointer]
+      - generic [ref=e224]:
+        - generic [ref=e225]:
+          - paragraph [ref=e226]: Meats
+          - generic [ref=e227]:
+            - button "Premium USDA Beef Premium USDA Beef" [ref=e228] [cursor=pointer]:
+              - img "Premium USDA Beef" [ref=e230]
+              - generic [ref=e232]: Premium USDA Beef
+            - button "Sliced Beef Sliced Beef" [ref=e233] [cursor=pointer]:
+              - img "Sliced Beef" [ref=e235]
+              - generic [ref=e237]: Sliced Beef
+            - button "Pork Sliced Pork Sliced" [ref=e238] [cursor=pointer]:
+              - img "Pork Sliced" [ref=e240]
+              - generic [ref=e242]: Pork Sliced
+            - button "Samgyupsal Samgyupsal" [ref=e243] [cursor=pointer]:
+              - img "Samgyupsal" [ref=e245]
+              - generic [ref=e247]: Samgyupsal
+        - generic [ref=e248]:
+          - paragraph [ref=e249]: Free Sides
+          - generic [ref=e250]:
+            - button "Cheese" [ref=e251] [cursor=pointer]:
+              - generic [ref=e253]: Cheese
+            - button "Chinese Cabbage" [ref=e254] [cursor=pointer]:
+              - generic [ref=e256]: Chinese Cabbage
+            - button "Cucumber" [ref=e257] [cursor=pointer]:
+              - generic [ref=e259]: Cucumber
+            - button "Egg" [ref=e260] [cursor=pointer]:
+              - generic [ref=e262]: Egg
+            - button "Fish Cake" [ref=e263] [cursor=pointer]:
+              - generic [ref=e265]: Fish Cake
+            - button "Kimchi Kimchi" [ref=e266] [cursor=pointer]:
+              - img "Kimchi" [ref=e268]
+              - generic [ref=e270]: Kimchi
+            - button "Lettuce" [ref=e271] [cursor=pointer]:
+              - generic [ref=e273]: Lettuce
+            - button "Pork Bulgogi" [ref=e274] [cursor=pointer]:
+              - generic [ref=e276]: Pork Bulgogi
+            - button "Rice Rice" [ref=e277] [cursor=pointer]:
+              - img "Rice" [ref=e279]
+              - generic [ref=e281]: Rice
+      - button "Done" [ref=e283] [cursor=pointer]
+```

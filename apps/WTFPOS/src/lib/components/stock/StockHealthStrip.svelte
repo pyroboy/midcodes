@@ -45,7 +45,8 @@
 		onclick={() => onFilterClick?.('ok')}
 		class={cn(
 			'flex-1 pos-card relative overflow-hidden px-4 py-3 flex items-center justify-between text-left transition-all',
-			activeFilter === 'ok' ? 'border-status-green bg-status-green-light/30 shadow-sm' : 'hover:border-status-green/30'
+			activeFilter === 'ok' ? 'border-status-green bg-status-green-light/30 shadow-sm' : 'hover:border-status-green/30',
+			okCount === 0 && 'opacity-40'
 		)}
 	>
 		<div class="absolute inset-y-0 left-0 w-1 bg-status-green"></div>
@@ -64,7 +65,8 @@
 		onclick={() => onFilterClick?.('low')}
 		class={cn(
 			'flex-1 pos-card relative overflow-hidden px-4 py-3 flex items-center justify-between text-left transition-all',
-			activeFilter === 'low' ? 'border-status-yellow bg-status-yellow-light/30 shadow-sm' : 'hover:border-status-yellow/30'
+			activeFilter === 'low' ? 'border-status-yellow bg-status-yellow-light/30 shadow-sm' : 'hover:border-status-yellow/30',
+			lowCount === 0 && 'opacity-40'
 		)}
 	>
 		<div class="absolute inset-y-0 left-0 w-1 bg-status-yellow"></div>
@@ -83,7 +85,8 @@
 		onclick={() => onFilterClick?.('critical')}
 		class={cn(
 			'flex-1 pos-card relative overflow-hidden px-4 py-3 flex items-center justify-between text-left transition-all',
-			activeFilter === 'critical' ? 'border-status-red bg-status-red-light/30 shadow-sm' : 'hover:border-status-red/30'
+			activeFilter === 'critical' ? 'border-status-red bg-status-red-light/30 shadow-sm' : 'hover:border-status-red/30',
+			criticalCount === 0 && 'opacity-40'
 		)}
 	>
 		<div class="absolute inset-y-0 left-0 w-1 bg-status-red"></div>

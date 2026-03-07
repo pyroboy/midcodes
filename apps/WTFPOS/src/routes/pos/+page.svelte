@@ -22,6 +22,9 @@
     import MergeTablesModal from '$lib/components/pos/MergeTablesModal.svelte';
     import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
     import { session } from '$lib/stores/session.svelte';
+    import { Info } from 'lucide-svelte';
+
+    let showLegend = $state(false);
 
     // ─── Branch-filtered tables/orders ───────────────────────────────────────────
     const tables = $derived(session.locationId === 'all' ? allTables.value : allTables.value.filter(t => t.locationId === session.locationId));
@@ -244,16 +247,28 @@
                         <span class="badge-green">{free} free</span>
                     </div>
                     <div class="flex items-center gap-4">
-                        <div class="flex items-center gap-3 text-xs font-semibold text-gray-600">
-                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-white border border-gray-300"></span>Available</span>
-                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-emerald-500"></span>Dining (Green)</span>
-                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Ready / Bill (Orange)</span>
-                            {#if maintenance > 0}
-                                <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-gray-400"></span>🔧 Maint ({maintenance})</span>
+                        <div class="relative">
+                            <button
+                                onclick={() => showLegend = !showLegend}
+                                class="flex items-center justify-center rounded-lg border border-border bg-surface p-2 text-gray-500 hover:bg-gray-50 transition-colors"
+                                style="min-height: 40px; min-width: 40px"
+                                aria-label="Toggle color legend"
+                            >
+                                <Info class="h-4 w-4" />
+                            </button>
+                            {#if showLegend}
+                                <div class="absolute right-0 top-full mt-1 z-20 pos-card p-3 shadow-lg flex flex-col gap-2 text-xs font-semibold text-gray-600 min-w-[180px]">
+                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-white border border-gray-300"></span>Available</span>
+                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-emerald-500"></span>Dining (Green)</span>
+                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Ready / Bill (Orange)</span>
+                                    {#if maintenance > 0}
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-gray-400"></span>Maint ({maintenance})</span>
+                                    {/if}
+                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-pink-200 border border-pink-300"></span>Pork</span>
+                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-purple-200 border border-purple-300"></span>Beef</span>
+                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-gradient-to-r from-pink-200 to-purple-200 border border-purple-300"></span>P&amp;B</span>
+                                </div>
                             {/if}
-                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-pink-200 border border-pink-300"></span>Pork</span>
-                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-purple-200 border border-purple-300"></span>Beef</span>
-                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-gradient-to-r from-pink-200 to-purple-200 border border-purple-300"></span>P&amp;B</span>
                         </div>
                         <button
                             onclick={openTakeoutModal}

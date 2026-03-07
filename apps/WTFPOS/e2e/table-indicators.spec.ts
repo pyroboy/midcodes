@@ -76,8 +76,8 @@ test('1 — orange badge appears on table after items are charged', async ({ pag
   await loginAs(page, 'maria');
   await openTableWithPax(page, 'T1', 2);
 
-  // Select Pork Unlimited (adds package + meats to pending list)
-  await page.locator('button', { hasText: 'Pork Unlimited' }).first().click();
+  // Select Pork Unlimited (exact match — avoids hitting "Beef + Pork Unlimited")
+  await page.locator('button', { hasText: /^Pork Unlimited$/ }).first().click();
 
   // Add a drink
   await page.locator('button', { hasText: 'Drinks' }).first().click();
@@ -99,7 +99,7 @@ test('2 — green badge appears after kitchen serves all items', async ({ page }
   await loginAs(page, 'maria');
   await openTableWithPax(page, 'T1', 2);
 
-  await page.locator('button', { hasText: 'Pork Unlimited' }).first().click();
+  await page.locator('button', { hasText: /^Pork Unlimited$/ }).first().click();
   await page.locator('button', { hasText: 'Drinks' }).first().click();
   await page.locator('button', { hasText: 'Iced Tea' }).first().click();
   await page.locator('button', { hasText: 'CHARGE' }).click();
@@ -123,7 +123,7 @@ test('3 — orange badge reappears after refill request on a fully-served table'
   await loginAs(page, 'maria');
   await openTableWithPax(page, 'T2', 2);
 
-  await page.locator('button', { hasText: 'Pork Unlimited' }).first().click();
+  await page.locator('button', { hasText: /^Pork Unlimited$/ }).first().click();
   await page.locator('button', { hasText: 'CHARGE' }).click();
 
   // Kitchen serves all
@@ -141,9 +141,9 @@ test('3 — orange badge reappears after refill request on a fully-served table'
   await page.locator('button', { hasText: 'Refill' }).click();
   await expect(page.locator('h2', { hasText: 'Refill' })).toBeVisible({ timeout: 5_000 });
 
-  // Click the first available meat button in the refill panel
-  // Meats are inside a .grid.grid-cols-3 section under the "Meats" label
-  await page.locator('p:has-text("Meats") + .grid button').first().click();
+  // Click the first meat button inside the RefillPanel grid
+  // (.grid.grid-cols-3 is the meat grid; refill modal is the only overlay open at this point)
+  await page.locator('.grid.grid-cols-3 button').first().click();
 
   // Close refill panel
   await page.locator('button', { hasText: 'Done' }).first().click();
@@ -161,7 +161,7 @@ test('4 — green badge returns after kitchen serves the refill', async ({ page 
   await loginAs(page, 'maria');
   await openTableWithPax(page, 'T3', 2);
 
-  await page.locator('button', { hasText: 'Pork Unlimited' }).first().click();
+  await page.locator('button', { hasText: /^Pork Unlimited$/ }).first().click();
   await page.locator('button', { hasText: 'CHARGE' }).click();
 
   // First round: serve all
@@ -173,7 +173,7 @@ test('4 — green badge returns after kitchen serves the refill', async ({ page 
   await page.locator('[aria-label="Table T3"]').click({ force: true });
   await page.locator('button', { hasText: 'Refill' }).click();
   await expect(page.locator('h2', { hasText: 'Refill' })).toBeVisible();
-  await page.locator('p:has-text("Meats") + .grid button').first().click();
+  await page.locator('.grid.grid-cols-3 button').first().click();
   await page.locator('button', { hasText: 'Done' }).first().click();
 
   // Orange reappears
@@ -194,7 +194,7 @@ test('5 — orange badge persists while meat is at weigh station (pending, no we
   await loginAs(page, 'maria');
   await openTableWithPax(page, 'T4', 2);
 
-  await page.locator('button', { hasText: 'Pork Unlimited' }).first().click();
+  await page.locator('button', { hasText: /^Pork Unlimited$/ }).first().click();
   await page.locator('button', { hasText: 'CHARGE' }).click();
 
   // Orange must appear — meat items are pending (unweighed in weigh station)
@@ -202,8 +202,8 @@ test('5 — orange badge persists while meat is at weigh station (pending, no we
 
   // Verify weigh station shows the pending meat (status=pending, no weight)
   await page.goto('/kitchen/weigh-station');
-  // At least one pending meat row should exist
-  await expect(page.locator('text=T4')).toBeVisible({ timeout: 8_000 });
+  // At least one pending meat row should exist — use exact text to avoid matching order IDs
+  await expect(page.getByText('T4', { exact: true }).first()).toBeVisible({ timeout: 8_000 });
 
   // Back to POS — orange must still be there (meat not served yet)
   await backToPOS(page);

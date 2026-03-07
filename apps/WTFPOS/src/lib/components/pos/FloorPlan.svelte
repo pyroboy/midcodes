@@ -21,8 +21,9 @@
     const PAD = 30;
     const viewBox = $derived(`${-PAD} ${-PAD} ${canvas.width + PAD * 2} ${canvas.height + PAD * 2}`);
 
-    // O(1) order lookup by tableId
-    const orderMap = $derived(new Map(orders.filter(o => o.tableId && o.status !== 'paid' && o.status !== 'cancelled').map(o => [o.tableId!, o])));
+    // O(1) order lookup by order ID — keyed by order ID and resolved via table.currentOrderId
+    // This prevents stale historical orders (pending_payment) from shadowing a freshly opened table.
+    const orderMap = $derived(new Map(orders.filter(o => o.status !== 'paid' && o.status !== 'cancelled').map(o => [o.id, o])));
 
     // ─── Table rendering helpers ─────────────────────────────────────────────
     function tableFill(t: Table, order: Order | undefined): string {
@@ -194,7 +195,7 @@
 
         <!-- Tables — interactive -->
         {#each mainTables as table (table.id)}
-            {@const order = orderMap.get(table.id)}
+            {@const order = table.currentOrderId ? orderMap.get(table.currentOrderId) : undefined}
             {@const W = table.width ?? 112}
             {@const H = table.height ?? 112}
             {@const cx = table.x + W / 2}

@@ -218,7 +218,16 @@
 <!-- ── Header ── -->
 <div class="mb-4 space-y-4">
 	<div class="flex items-center justify-between">
-		<h1 class="text-xl font-bold text-gray-900 no-select">Kitchen Queue</h1>
+		<div class="flex items-center gap-3">
+			<div>
+				<h1 class="text-xl font-bold text-gray-900 no-select">Kitchen Queue</h1>
+				<p class="text-xs text-gray-400 mt-0.5">Active tickets awaiting kitchen action</p>
+			</div>
+			<span class="flex items-center gap-1.5 text-xs font-medium text-status-green">
+				<span class="h-2 w-2 rounded-full bg-status-green animate-pulse"></span>
+				Live
+			</span>
+		</div>
 		<div class="flex items-center gap-3">
 			<button
 				onclick={() => recallLastTicket()}
@@ -260,11 +269,32 @@
 
 <!-- ── Queue ── -->
 {#if activeTickets.length === 0}
-	<div class="flex flex-1 items-center justify-center" style="min-height: 400px">
+	{@const todayServed = kdsTicketHistory.value.length}
+	{@const avgServiceMs = todayServed > 0 ? kdsTicketHistory.value.reduce((sum, t) => {
+		const created = new Date(t.createdAt).getTime();
+		const bumped = t.bumpedAt ? new Date(t.bumpedAt).getTime() : now;
+		return sum + (bumped - created);
+	}, 0) / todayServed : 0}
+	{@const lastCompleted = kdsTicketHistory.value.length > 0 ? kdsTicketHistory.value[0]?.bumpedAt ?? kdsTicketHistory.value[0]?.createdAt : null}
+	<div class="flex flex-1 flex-col items-center justify-center gap-6" style="min-height: 400px">
 		<div class="text-center text-gray-400">
 			<div class="mb-4 text-6xl">&#9989;</div>
 			<p class="text-xl font-bold">No pending orders</p>
 			<p class="text-sm mt-2">New orders will appear here automatically</p>
+		</div>
+		<div class="grid grid-cols-3 gap-4 w-full max-w-md">
+			<div class="pos-card flex flex-col items-center gap-1 px-4 py-3">
+				<span class="text-2xl font-black font-mono text-gray-900">{todayServed}</span>
+				<span class="text-xs font-semibold text-gray-400">Served Today</span>
+			</div>
+			<div class="pos-card flex flex-col items-center gap-1 px-4 py-3">
+				<span class="text-2xl font-black font-mono text-gray-900">{avgServiceMs > 0 ? `${Math.round(avgServiceMs / 60000)}m` : '—'}</span>
+				<span class="text-xs font-semibold text-gray-400">Avg Service</span>
+			</div>
+			<div class="pos-card flex flex-col items-center gap-1 px-4 py-3">
+				<span class="text-2xl font-black font-mono text-gray-900">{lastCompleted ? formatCountdown(Math.floor((now - new Date(lastCompleted).getTime()) / 1000)) : '—'}</span>
+				<span class="text-xs font-semibold text-gray-400">Last Completed</span>
+			</div>
 		</div>
 	</div>
 {:else}

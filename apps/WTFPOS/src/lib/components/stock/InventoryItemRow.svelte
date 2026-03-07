@@ -12,11 +12,17 @@
 		image?: string;
 	}
 
-	const statusConfig: Record<StockStatus, { label: string; badgeClass: string; dotClass: string }> = {
-		ok:       { label: 'Well-Stocked', badgeClass: 'bg-status-green-light text-status-green border-status-green/20',    dotClass: 'bg-status-green' },
-		low:      { label: 'Low Stock',    badgeClass: 'bg-status-yellow-light text-status-yellow border-status-yellow/30', dotClass: 'bg-status-yellow' },
-		critical: { label: 'Critical',     badgeClass: 'bg-status-red-light text-status-red border-status-red/20',          dotClass: 'bg-status-red' },
-	};
+	function getStatusDisplay(status: StockStatus, currentStock: number, minLevel: number): { label: string; badgeClass: string; dotClass: string } {
+		if (status === 'ok' && currentStock <= 2 * minLevel) {
+			return { label: 'Adequate', badgeClass: 'bg-emerald-50 text-emerald-500 border-emerald-200', dotClass: 'bg-emerald-400' };
+		}
+		const configs: Record<StockStatus, { label: string; badgeClass: string; dotClass: string }> = {
+			ok:       { label: 'Well-Stocked', badgeClass: 'bg-status-green-light text-status-green border-status-green/20',    dotClass: 'bg-status-green' },
+			low:      { label: 'Low Stock',    badgeClass: 'bg-status-yellow-light text-status-yellow border-status-yellow/30', dotClass: 'bg-status-yellow' },
+			critical: { label: 'Critical',     badgeClass: 'bg-status-red-light text-status-red border-status-red/20',          dotClass: 'bg-status-red' },
+		};
+		return configs[status];
+	}
 
 	interface Props {
 		item: InventoryItem;
@@ -69,8 +75,9 @@
 		<span class="text-xs text-gray-400">Min: {item.minLevel.toLocaleString()}</span>
 	</td>
 	<td class="px-4 py-3 text-center">
-		<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', statusConfig[item.status].badgeClass)}>
-			{statusConfig[item.status].label}
+		{@const display = getStatusDisplay(item.status, item.currentStock, item.minLevel)}
+		<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', display.badgeClass)}>
+			{display.label}
 		</span>
 	</td>
 	<td class="px-4 py-3 text-right">

@@ -101,6 +101,7 @@
 				</div>
 
 				{#if showCustom}
+					<!-- svelte-ignore a11y_autofocus -->
 					<textarea
 						bind:value={customReason}
 						class="pos-input resize-none text-sm"

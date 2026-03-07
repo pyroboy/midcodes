@@ -2,6 +2,7 @@
 	import type { Table, Order } from '$lib/types';
 	import { formatPeso, formatTimeAgo, cn } from '$lib/utils';
 	import { menuItems, printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus } from '$lib/stores/pos.svelte';
+	import { session } from '$lib/stores/session.svelte';
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
 
 	interface Props {
@@ -132,7 +133,7 @@
 							{tStatus.toUpperCase()}
 						</span>
 					</div>
-					{#if tStatus === 'ready'}
+					{#if tStatus === 'ready' && session.role !== 'staff'}
 						<button
 							onclick={() => advanceTakeoutStatus(order.id)}
 							class="text-[10px] font-semibold text-accent hover:underline"
@@ -283,9 +284,9 @@
 				</div>
 			{:else}
 				<div class="flex gap-2">
-					<button onclick={onvoid} class="btn-danger px-3 text-sm" style="min-height: 44px">Void</button>
-					<button onclick={oncheckout} class="btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white" style="min-height: 44px">Checkout</button>
-					<button onclick={() => printBill(order.id)} class="btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800" style="min-height: 44px">Print</button>
+					<button onclick={onvoid} disabled={activeItemCount === 0} class={cn('btn-danger px-3 text-sm', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
+					<button onclick={oncheckout} disabled={activeItemCount === 0} class={cn('btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Checkout</button>
+					<button onclick={() => printBill(order.id)} disabled={activeItemCount === 0} class={cn('btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Print</button>
 				</div>
 			{/if}
 

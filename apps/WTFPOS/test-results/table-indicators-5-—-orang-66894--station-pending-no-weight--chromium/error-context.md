@@ -1,0 +1,193 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e11]: W!
+          - generic [ref=e12]:
+            - generic [ref=e13]: WTF! SAMGYUP
+            - generic [ref=e14]: POS System
+        - generic [ref=e15]:
+          - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+          - paragraph [ref=e17]: 03:44:25 PM
+      - separator [ref=e18]
+      - list [ref=e22]:
+        - listitem [ref=e23]:
+          - link "POS" [ref=e24] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e25]
+            - generic [ref=e26]: POS
+      - generic [ref=e27]:
+        - separator [ref=e28]
+        - generic [ref=e29]:
+          - generic [ref=e30]: M
+          - generic [ref=e31]:
+            - generic [ref=e32]: Maria Santos
+            - generic [ref=e33]: staff
+        - link "Logout" [ref=e35] [cursor=pointer]:
+          - /url: /
+          - img [ref=e36]
+          - generic [ref=e37]: Logout
+      - button "Toggle Sidebar" [ref=e38]
+    - main [ref=e39]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - heading "POS" [level=1] [ref=e45]
+              - generic [ref=e46]: 1 occ
+              - generic [ref=e47]: 7 free
+            - generic [ref=e48]:
+              - generic [ref=e49]:
+                - generic [ref=e50]: Available
+                - generic [ref=e52]: Dining (Green)
+                - generic [ref=e54]: Ready / Bill (Orange)
+                - generic [ref=e56]: Pork
+                - generic [ref=e58]: Beef
+                - generic [ref=e60]: P&B
+              - button "📦 New Takeout" [ref=e62] [cursor=pointer]
+              - button "🧾 History 83" [ref=e63] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e64]: "83"
+          - img [ref=e66]:
+            - button "Table T1" [ref=e69] [cursor=pointer]:
+              - generic: T1
+              - generic: 4p
+            - button "Table T2" [ref=e71] [cursor=pointer]:
+              - generic: T2
+              - generic: 4p
+            - button "Table T3" [ref=e73] [cursor=pointer]:
+              - generic: T3
+              - generic: 4p
+            - button "Table T4" [ref=e75] [cursor=pointer]:
+              - generic: T4
+              - generic: 4p
+            - button "Table T5" [ref=e77] [cursor=pointer]:
+              - generic: T5
+              - generic: 4p
+            - button "Table T6" [ref=e79] [cursor=pointer]:
+              - generic: T6
+              - generic: 4p
+            - button "Table T7" [ref=e81] [cursor=pointer]:
+              - generic: T7
+              - generic: 2p
+            - button "Table T8" [ref=e83] [cursor=pointer]:
+              - generic: P&B
+              - generic: 00:04
+              - generic: T8
+              - generic: 2 pax
+              - generic: ₱998.00
+              - generic: "14"
+          - generic [ref=e88]:
+            - heading "📦 Takeout Orders 1" [level=2] [ref=e89]:
+              - text: 📦 Takeout Orders
+              - generic [ref=e90]: "1"
+            - generic [ref=e92]:
+              - button "#TO01 Jose ₱1,301.00 6 items" [ref=e93] [cursor=pointer]:
+                - text: "#TO01"
+                - generic [ref=e94]: Jose
+                - text: ₱1,301.00
+                - generic [ref=e95]: 6 items
+              - generic [ref=e96]: PREP
+              - button "→ Mark Ready" [ref=e97] [cursor=pointer]
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - generic [ref=e102]: T8
+                - generic [ref=e103]: 2 pax
+                - generic [ref=e104]: 0m
+              - button "✕" [ref=e105] [cursor=pointer]
+            - generic [ref=e106]: Beef + Pork Unlimited
+            - generic [ref=e107]:
+              - button "Refill" [ref=e108] [cursor=pointer]
+              - button "Add Item" [ref=e109] [cursor=pointer]
+          - generic [ref=e110]:
+            - generic [ref=e111]:
+              - generic [ref=e113]:
+                - generic [ref=e114]: Beef + Pork Unlimited
+                - generic [ref=e115]: REQUESTING
+              - generic [ref=e117]:
+                - generic [ref=e118]: ₱998.00
+                - generic [ref=e119]: PKG
+            - generic [ref=e120]:
+              - generic [ref=e122]:
+                - generic [ref=e123]: Samgyupsal
+                - generic [ref=e124]: WEIGHING
+              - generic [ref=e126]: FREE
+            - generic [ref=e127]:
+              - generic [ref=e129]:
+                - generic [ref=e130]: Pork Sliced
+                - generic [ref=e131]: WEIGHING
+              - generic [ref=e133]: FREE
+            - generic [ref=e134]:
+              - generic [ref=e136]:
+                - generic [ref=e137]: Premium USDA Beef
+                - generic [ref=e138]: WEIGHING
+              - generic [ref=e140]: FREE
+            - generic [ref=e141]:
+              - generic [ref=e143]:
+                - generic [ref=e144]: Sliced Beef
+                - generic [ref=e145]: WEIGHING
+              - generic [ref=e147]: FREE
+            - generic [ref=e148]:
+              - generic [ref=e150]:
+                - generic [ref=e151]: Kimchi
+                - generic [ref=e152]: REQUESTING
+              - generic [ref=e154]: FREE
+            - generic [ref=e155]:
+              - generic [ref=e157]:
+                - generic [ref=e158]: Rice
+                - generic [ref=e159]: REQUESTING
+              - generic [ref=e161]: FREE
+            - generic [ref=e162]:
+              - generic [ref=e164]:
+                - generic [ref=e165]: Cheese
+                - generic [ref=e166]: REQUESTING
+              - generic [ref=e168]: FREE
+            - generic [ref=e169]:
+              - generic [ref=e171]:
+                - generic [ref=e172]: Lettuce
+                - generic [ref=e173]: REQUESTING
+              - generic [ref=e175]: FREE
+            - generic [ref=e176]:
+              - generic [ref=e178]:
+                - generic [ref=e179]: Egg
+                - generic [ref=e180]: REQUESTING
+              - generic [ref=e182]: FREE
+            - generic [ref=e183]:
+              - generic [ref=e185]:
+                - generic [ref=e186]: Cucumber
+                - generic [ref=e187]: REQUESTING
+              - generic [ref=e189]: FREE
+            - generic [ref=e190]:
+              - generic [ref=e192]:
+                - generic [ref=e193]: Chinese Cabbage
+                - generic [ref=e194]: REQUESTING
+              - generic [ref=e196]: FREE
+            - generic [ref=e197]:
+              - generic [ref=e199]:
+                - generic [ref=e200]: Pork Bulgogi
+                - generic [ref=e201]: REQUESTING
+              - generic [ref=e203]: FREE
+            - generic [ref=e204]:
+              - generic [ref=e206]:
+                - generic [ref=e207]: Fish Cake
+                - generic [ref=e208]: REQUESTING
+              - generic [ref=e210]: FREE
+          - generic [ref=e211]:
+            - generic [ref=e212]:
+              - generic [ref=e213]: BILL
+              - generic [ref=e214]: 14 items
+            - generic [ref=e215]: ₱998.00
+          - generic [ref=e216]:
+            - generic [ref=e217]:
+              - button "Void" [ref=e218] [cursor=pointer]
+              - button "Checkout" [ref=e219] [cursor=pointer]
+              - button "Print" [ref=e220] [cursor=pointer]
+            - button "More Options" [ref=e221] [cursor=pointer]
+  - generic [ref=e222]: WTF! Samgyup POS
+```

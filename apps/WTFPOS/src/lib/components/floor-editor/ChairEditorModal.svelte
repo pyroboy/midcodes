@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Table, ChairConfig, ChairSide, ChairType } from '$lib/types';
 	import { floorEditor } from '$lib/stores/floor-editor.svelte';
 	import { updateTableChairs } from '$lib/stores/pos/tables.svelte';
@@ -36,7 +37,7 @@
 	}
 
 	// Initialize from existing chairConfig or defaults
-	let cfg = $state<ChairConfig>(buildConfig(table.chairConfig));
+	let cfg = $state<ChairConfig>(untrack(() => buildConfig(table.chairConfig)));
 
 	let activeSide = $state<'top' | 'bottom' | 'left' | 'right'>('top');
 	const side = $derived(cfg[activeSide]);
@@ -71,8 +72,9 @@
 </script>
 
 <!-- Modal backdrop -->
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
+	role="presentation"
 	class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
 	onclick={(e) => { if (e.target === e.currentTarget) floorEditor.closeChairModal(); }}
 >
@@ -113,7 +115,7 @@
 				<div class="p-5 flex flex-col gap-5">
 					<!-- Chair type -->
 					<div>
-						<label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Chair Type</label>
+						<span class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Chair Type</span>
 						<div class="flex flex-col gap-1.5">
 							{#each CHAIR_TYPES as ct}
 								<button
@@ -153,10 +155,11 @@
 					<!-- Color -->
 					{#if side.type !== 'none'}
 						<div>
-							<label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Chair Color</label>
+							<span class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Chair Color</span>
 							<div class="flex items-center gap-2 flex-wrap">
 								{#each PRESET_COLORS as c}
 									<button
+										aria-label="Chair color {c}"
 										class="w-8 h-8 rounded-full border-2 transition-transform hover:scale-110
 											{side.color === c ? 'border-gray-900 scale-110' : 'border-transparent'}"
 										style="background-color: {c}"

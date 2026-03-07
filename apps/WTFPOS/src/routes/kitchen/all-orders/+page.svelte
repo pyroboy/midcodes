@@ -59,7 +59,7 @@
 	// ── Filters ───────────────────────────────────────────────────────────────
 	type StatusFilter = 'all' | Order['status'];
 	type TimeFilter = 'today' | '1h' | '3h' | 'all';
-	let statusFilter = $state<StatusFilter>('all');
+	let statusFilter = $state<StatusFilter>(session.role === 'kitchen' ? 'open' : 'all');
 	let timeFilter = $state<TimeFilter>('today');
 
 	const startOfToday = $derived.by(() => {
@@ -131,6 +131,21 @@
 		}
 	}
 
+	function waitTimeUrgency(createdAt: string): 'normal' | 'warning' | 'urgent' {
+		const ageMs = now - new Date(createdAt).getTime();
+		if (ageMs > 10 * 60_000) return 'urgent';
+		if (ageMs > 5 * 60_000) return 'warning';
+		return 'normal';
+	}
+
+	function waitTimeClasses(order: Order): string {
+		if (!isActiveOrder(order)) return '';
+		const urgency = waitTimeUrgency(order.createdAt);
+		if (urgency === 'urgent') return 'bg-red-50 border-red-300';
+		if (urgency === 'warning') return 'bg-amber-50 border-amber-300';
+		return '';
+	}
+
 	function cardBorderColor(order: Order): string {
 		if (order.orderType === 'takeout') return 'border-l-4 border-l-purple-400';
 		switch (order.status) {
@@ -195,7 +210,10 @@
 <div class="flex h-full flex-col gap-4">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
-		<h1 class="text-xl font-bold text-gray-900">All Orders</h1>
+		<div>
+			<h1 class="text-xl font-bold text-gray-900">All Orders</h1>
+			<p class="text-xs text-gray-400 mt-0.5">Complete order history — use Queue for active cooking</p>
+		</div>
 		<span class="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600">
 			{filteredOrders.length} orders
 		</span>
@@ -301,7 +319,9 @@
 					class={cn(
 						'flex flex-col text-left rounded-xl border bg-surface overflow-hidden hover:shadow-md transition-all active:scale-[0.98]',
 						cardBorderColor(order),
-						order.status === 'cancelled' && 'opacity-60'
+						order.status === 'cancelled' && 'opacity-60',
+						active && 'ring-2 ring-accent/20 shadow-md',
+						waitTimeClasses(order)
 					)}
 				>
 					<!-- Card Header -->

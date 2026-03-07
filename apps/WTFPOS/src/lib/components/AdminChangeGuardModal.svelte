@@ -114,6 +114,7 @@
 				<label for="manager-pin" class="text-xs font-semibold uppercase tracking-wide text-gray-500">
 					Manager PIN — required to proceed
 				</label>
+				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					id="manager-pin"
 					type="password"

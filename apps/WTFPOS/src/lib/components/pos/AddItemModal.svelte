@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from 'svelte';
     import type { Order, MenuItem, MenuCategory } from '$lib/types';
     import { menuItems, addItemToOrder } from '$lib/stores/pos.svelte';
     import { formatPeso, cn } from '$lib/utils';
@@ -21,7 +22,7 @@
     ];
 
     let activeCategory = $state<MenuCategory>(
-        order.orderType === 'takeout' ? 'sides' : (order.packageId ? 'meats' : 'packages')
+        untrack(() => order.orderType === 'takeout' ? 'sides' : (order.packageId ? 'meats' : 'packages'))
     );
 
     // Pending items staged before pushing to bill

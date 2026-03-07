@@ -27,10 +27,11 @@
 	function gaugeColor(status: StockStatus): string {
 		if (status === 'critical') return 'bg-status-red';
 		if (status === 'low')      return 'bg-status-yellow';
+		if (status === 'ok' && min > 0 && current <= 2 * min) return 'bg-emerald-400';
 		return 'bg-status-green';
 	}
 </script>
 
-<div class={cn('h-1.5 w-full rounded-full bg-gray-100 overflow-hidden', className)}>
+<div class={cn('h-2.5 w-full rounded-full bg-gray-100 overflow-hidden', className)}>
 	<div class={cn('h-full rounded-full', gaugeColor(status))} style="width: {$animatedWidth}%"></div>
 </div>

@@ -27,6 +27,8 @@
 	import InventoryItemCard from './InventoryItemCard.svelte';
 	import InventoryItemRow from './InventoryItemRow.svelte';
 
+	const isReadonly = $derived(session.role === 'kitchen');
+
 	// ─── View / Search / Filter ───────────────────────────────────────────────
 	let viewMode     = $state<'grid' | 'list'>('list');
 	let searchQuery  = $state('');
@@ -229,6 +231,7 @@
 									{hoveredItemId}
 									onOpenModal={openItemModal}
 									onEditClick={openEditModalClick}
+									readonly={isReadonly}
 									onHover={(id) => hoveredItemId = id}
 								/>
 							{/each}
@@ -252,6 +255,7 @@
 								{item}
 								onOpenModal={openItemModal}
 								onEditClick={openEditModalClick}
+								readonly={isReadonly}
 							/>
 						{/each}
 					</div>
@@ -320,6 +324,7 @@
 											{hoveredItemId}
 											onOpenModal={openItemModal}
 											onEditClick={openEditModalClick}
+											readonly={isReadonly}
 											onHover={(id) => hoveredItemId = id}
 											animate={true}
 										/>
@@ -337,6 +342,7 @@
 									{item}
 									onOpenModal={openItemModal}
 									onEditClick={openEditModalClick}
+									readonly={isReadonly}
 								/>
 							{/each}
 						{/if}
