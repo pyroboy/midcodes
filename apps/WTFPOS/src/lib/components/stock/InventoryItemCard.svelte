@@ -52,6 +52,7 @@
 	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, readonly = false }: Props = $props();
 
 	const isHovered = $derived(hoveredItemId === item.id);
+	const display = $derived(getStatusDisplay(item.status, item.currentStock, item.minLevel));
 </script>
 
 <svelte:element
@@ -100,7 +101,6 @@
 
 		<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} class="mt-1" />
 
-		{@const display = getStatusDisplay(item.status, item.currentStock, item.minLevel)}
 		<div class="flex items-center gap-1.5 mt-1 text-xs">
 			<span class={cn('h-2 w-full flex-shrink-0 rounded-full w-2', display.dotClass)}></span>
 			<span class={cn(

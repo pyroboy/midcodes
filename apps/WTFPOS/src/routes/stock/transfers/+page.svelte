@@ -4,6 +4,15 @@
 	import { cn } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import { ArrowRight, CheckCircle, AlertCircle, ChevronLeft, MapPin } from 'lucide-svelte';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+
+	// Clean up ?action=open query param (wizard is the action itself)
+	$effect(() => {
+		if (page.url.searchParams.get('action') === 'open') {
+			goto('/stock/transfers', { replaceState: true, noScroll: true });
+		}
+	});
 
 	// ─── Wizard state ────────────────────────────────────────────────────────────
 	let currentStep = $state<1 | 2 | 3>(1);

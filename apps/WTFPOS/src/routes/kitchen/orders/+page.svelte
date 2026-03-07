@@ -368,6 +368,7 @@
 								{@const isExpanded = expandedItemId === item.id && !isServed}
 								{@const isRefill = item.notes === REFILL_NOTE && !item.weight}
 								<div class="border-b border-border/30 last:border-b-0">
+									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 									<div
 										class={cn(
 											'flex items-center gap-2 px-4 py-2 transition-colors',
@@ -434,6 +435,7 @@
 								{@const isServed = item.status === 'served'}
 								{@const isExpanded = expandedItemId === item.id && !isServed}
 								<div class="border-b border-border/30 last:border-b-0">
+									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 									<div
 										class={cn(
 											'flex items-center gap-2 px-4 py-2 transition-colors',

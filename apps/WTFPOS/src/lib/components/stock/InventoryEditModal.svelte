@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { X } from 'lucide-svelte';
 	import type { StockItem, StockStatus } from '$lib/stores/stock.svelte';
 
@@ -16,10 +17,10 @@
 
 	let { editItem, onClose }: Props = $props();
 
-	let editName      = $state(editItem.name);
-	let editDesc      = $state((editItem as any).description ?? '');
+	let editName      = $state(untrack(() => editItem.name));
+	let editDesc      = $state(untrack(() => (editItem as any).description ?? ''));
 	let editImage     = $state<File | null>(null);
-	let editImageUrl  = $state<string | undefined>((editItem as any).image);
+	let editImageUrl  = $state<string | undefined>(untrack(() => (editItem as any).image));
 
 	async function handleConfirm() {
 		if (!editName.trim()) return;

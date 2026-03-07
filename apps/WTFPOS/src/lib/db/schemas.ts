@@ -378,12 +378,13 @@ export const expenseSchema: RxJsonSchema<any> = {
 // ─── KDS Tickets (active + history, distinguished by bumpedAt) ───────────────
 export const kdsTicketSchema: RxJsonSchema<any> = {
 	title: 'kds ticket schema',
-	version: 4,
+	version: 5,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
 		orderId: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 20 },
 		tableNumber: { type: ['number', 'null'] },
 		customerName: { type: ['string', 'null'] },
 		items: {
@@ -407,18 +408,19 @@ export const kdsTicketSchema: RxJsonSchema<any> = {
 		bumpedBy: { type: ['string', 'null'] },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'orderId', 'items', 'createdAt', 'updatedAt'],
-	indexes: ['orderId', 'updatedAt']
+	required: ['id', 'orderId', 'locationId', 'items', 'createdAt', 'updatedAt'],
+	indexes: ['orderId', 'locationId', 'updatedAt']
 };
 
 // ─── X-Read ──────────────────────────────────────────────────────────────────
 export const xReadSchema: RxJsonSchema<any> = {
 	title: 'x-read schema',
-	version: 1,
+	version: 2,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
 		timestamp: { type: 'string' },
 		grossSales: { type: 'number' },
 		discounts: { type: 'number' },
@@ -433,8 +435,38 @@ export const xReadSchema: RxJsonSchema<any> = {
 		generatedBy: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'timestamp', 'grossSales', 'discounts', 'netSales', 'generatedBy', 'updatedAt'],
-	indexes: ['updatedAt']
+	required: ['id', 'locationId', 'timestamp', 'grossSales', 'discounts', 'netSales', 'generatedBy', 'updatedAt'],
+	indexes: ['updatedAt', 'locationId']
+};
+
+// ─── Z-Read (EOD) ────────────────────────────────────────────────────────────
+export const zReadSchema: RxJsonSchema<any> = {
+	title: 'z-read schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		date: { type: 'string', maxLength: 30 },          // YYYY-MM-DD — the business date closed
+		locationId: { type: 'string', maxLength: 100 },
+		submittedAt: { type: 'string' },
+		submittedBy: { type: 'string' },
+		grossSales: { type: 'number' },
+		discounts: { type: 'number' },
+		netSales: { type: 'number' },
+		vatAmount: { type: 'number' },
+		totalPax: { type: 'number' },
+		cash: { type: 'number' },
+		gcash: { type: 'number' },
+		card: { type: 'number' },
+		cashExpenses: { type: 'number' },
+		openingCash: { type: 'number' },
+		closingActual: { type: 'number' },
+		cashVariance: { type: 'number' },
+		updatedAt: { type: 'string', maxLength: 30 }
+	},
+	required: ['id', 'date', 'locationId', 'submittedAt', 'submittedBy', 'grossSales', 'updatedAt'],
+	indexes: ['date', 'locationId', 'submittedAt', 'updatedAt']
 };
 
 // ─── Audit Log ───────────────────────────────────────────────────────────────

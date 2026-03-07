@@ -28,7 +28,15 @@
 		BarChart3,
 		Settings,
 		LogOut,
+		Receipt,
+		Truck,
+		Moon,
+		Trash2,
+		ClipboardCheck,
+		FileText,
+		ArrowLeftRight,
 	} from 'lucide-svelte';
+	import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
 
 	const allNavItems = [
 		{ href: '/pos',     label: 'POS',     Icon: ShoppingCart },
@@ -114,6 +122,42 @@
 	</SidebarHeader>
 
 	<SidebarSeparator />
+
+	<!-- Quick Actions (manager / owner / admin only) -->
+	{#if ELEVATED_ROLES.includes(session.role)}
+		{@const quickActions = [
+			{ href: '/stock/deliveries', label: 'Receive Delivery', Icon: Truck },
+			{ href: '/reports/expenses-daily', label: 'Log Expense', Icon: Receipt },
+			{ href: '/stock/waste', label: 'Log Waste', Icon: Trash2 },
+			{ href: '/stock/counts', label: 'Stock Count', Icon: ClipboardCheck },
+			{ href: '/reports/x-read', label: 'X-Reading', Icon: FileText },
+			{ href: '/stock/transfers', label: 'Transfer Stock', Icon: ArrowLeftRight },
+			{ href: '/reports/eod', label: 'End of Day', Icon: Moon },
+		]}
+		<div class="px-2 py-1.5 group-data-[collapsible=icon]:px-1">
+			<p class="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400 group-data-[collapsible=icon]:hidden">
+				Quick Actions
+			</p>
+			<div class="flex flex-col gap-1">
+				{#each quickActions as qa}
+					<a
+						href="{qa.href}?action=open"
+						title={qa.label}
+						class={cn(
+							'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors',
+							isActive(qa.href)
+								? 'bg-accent text-white'
+								: 'border border-dashed border-gray-200 bg-white text-gray-600 hover:border-accent/40 hover:bg-accent-light hover:text-accent',
+							'group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-md'
+						)}
+					>
+						<qa.Icon class="h-4 w-4 shrink-0" />
+						<span class="group-data-[collapsible=icon]:hidden">{qa.label}</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<!-- Primary navigation -->
 	<SidebarContent>

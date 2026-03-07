@@ -3,7 +3,7 @@
  */
 import type { PaymentMethod, SubBill } from '$lib/types';
 import { nanoid } from 'nanoid';
-import { log } from '$lib/stores/audit.svelte';
+import { log, writeLog } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
 import { getDb } from '$lib/db';
 import { closeTable, tables } from '$lib/stores/pos/tables.svelte';
@@ -275,4 +275,31 @@ export async function cancelSplit(orderId: string) {
 
 	const label = getOrderLabel(order);
 	log.splitCancelled(label);
+}
+
+// ─── Payment Method Correction (Manager PIN required) ────────────────────────
+
+/**
+ * Corrects the payment method on a closed (paid) order.
+ * Replaces all payments with a single entry for the new method.
+ * Must be PIN-gated in the UI before calling.
+ */
+export async function correctPaymentMethod(orderId: string, newMethod: PaymentMethod): Promise<void> {
+	const order = orders.value.find(o => o.id === orderId && o.status === 'paid');
+	if (!order) return;
+
+	const db = await getDb();
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (!orderDoc) return;
+
+	const prevMethods = order.payments.map(p => p.method).join(', ') || 'unknown';
+	const correctedPayment = { id: nanoid(), method: newMethod, amount: order.total };
+
+	await orderDoc.incrementalPatch({
+		payments: [correctedPayment],
+		updatedAt: new Date().toISOString(),
+	});
+
+	const label = getOrderLabel(order);
+	writeLog('payment', `Payment corrected on ${label}: ${prevMethods} → ${newMethod}`);
 }

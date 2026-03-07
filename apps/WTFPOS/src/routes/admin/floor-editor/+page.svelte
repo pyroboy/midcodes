@@ -425,10 +425,12 @@
 				+ Element ▾
 			</button>
 			{#if showElementMenu}
-				<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 				<div
+					role="menu"
+					tabindex="0"
 					class="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-30 py-1 min-w-40"
 					onclick={() => showElementMenu = false}
+					onkeydown={(e) => e.key === "Escape" && (showElementMenu = false)}
 				>
 					{#each ELEMENT_TYPES as et}
 						<button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-gray-700" onclick={() => addElement(et.type)}>
@@ -651,6 +653,7 @@
 									class="w-7 h-7 rounded-md border-2 transition-transform hover:scale-110
 										{selectedTable.color === c ? 'border-gray-900 scale-110' : 'border-gray-200'}"
 									style="background-color: {c}"
+									aria-label="Table color {c}"
 									onclick={() => floorEditor.patchTable(selectedTable!.id, { color: c })}
 								></button>
 							{/each}

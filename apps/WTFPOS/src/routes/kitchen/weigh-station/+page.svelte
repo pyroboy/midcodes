@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { kdsTickets, orders, dispatchMeatWeight } from '$lib/stores/pos.svelte';
+	import { session } from '$lib/stores/session.svelte';
 	import { formatDisplayId, cn } from '$lib/utils';
 	import YieldCalculatorModal from '$lib/components/kitchen/YieldCalculatorModal.svelte';
 	import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
@@ -79,6 +80,14 @@
 	>([]);
 	let showYieldCalc = $state(false);
 	let inputMode = $state<'manual' | 'scale'>('manual');
+
+	// Reset dispatched log and selection when location changes (e.g. owner switching branch)
+	$effect(() => {
+		void session.locationId;
+		dispatched = [];
+		selectedItem = null;
+		weightInput = '';
+	});
 
 	const btConnected = $derived(btScale.connectionStatus === 'connected');
 	const totalDispatched = $derived(dispatched.reduce((s, d) => s + d.weight, 0));

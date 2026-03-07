@@ -135,9 +135,9 @@
 					<!-- Count (only for individual / diner) -->
 					{#if side.type === 'individual' || side.type === 'diner'}
 						<div>
-							<label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+							<span class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
 								Count {side.type === 'diner' ? '(per booth half)' : ''}
-							</label>
+							</span>
 							<div class="flex items-center gap-3">
 								<button
 									class="w-9 h-9 rounded-lg border border-gray-200 text-lg font-bold text-gray-700 hover:border-accent hover:text-accent"
@@ -177,10 +177,11 @@
 
 						<!-- Opacity -->
 						<div>
-							<label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+							<label for="chair-opacity" class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
 								Opacity — {Math.round((side.opacity ?? 0.85) * 100)}%
 							</label>
 							<input
+								id="chair-opacity"
 								type="range" min="0" max="1" step="0.05"
 								value={side.opacity ?? 0.85}
 								class="w-full accent-accent"

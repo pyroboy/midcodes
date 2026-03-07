@@ -120,6 +120,7 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 				await db.kds_tickets.insert({
 					id: nanoid(),
 					orderId,
+					locationId: order.locationId,
 					tableNumber: order.tableNumber,
 					customerName: order.customerName,
 					items: [kdsItem],
@@ -637,6 +638,7 @@ export async function addRefillRequest(orderId: string, menuItem: MenuItem): Pro
 				await db.kds_tickets.insert({
 					id: nanoid(),
 					orderId,
+					locationId: order.locationId,
 					tableNumber: order.tableNumber,
 					customerName: order.customerName,
 					items: [kdsItem],

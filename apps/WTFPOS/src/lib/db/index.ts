@@ -17,6 +17,7 @@ import {
 	deviceSchema,
 	kdsTicketSchema,
 	xReadSchema,
+	zReadSchema,
 	auditLogSchema,
 	kitchenAlertSchema,
 	floorElementSchema
@@ -200,14 +201,20 @@ export async function getDb() {
 						1: (d: any) => d,
 						2: (d: any) => d, // v1→v2: nested required
 						3: (d: any) => addUpdatedAt(d, 'createdAt'), // v2→v3: +updatedAt
-						4: (d: any) => ({ ...d, bumpedAt: null, bumpedBy: null }) // v3→v4: merged kds_history
+						4: (d: any) => ({ ...d, bumpedAt: null, bumpedBy: null }), // v3→v4: merged kds_history
+						5: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v4→v5: +locationId
 					}
 				},
 				x_reads: {
 					schema: xReadSchema,
 					migrationStrategies: {
-						1: (d: any) => addUpdatedAt(d, 'timestamp') // v0→v1: +updatedAt
+						1: (d: any) => addUpdatedAt(d, 'timestamp'), // v0→v1: +updatedAt
+						2: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v1→v2: +locationId
 					}
+				},
+				z_reads: {
+					schema: zReadSchema
+					// v0 — new collection, no migrations needed
 				},
 				audit_logs: {
 					schema: auditLogSchema

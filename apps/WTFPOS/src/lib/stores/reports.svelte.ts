@@ -58,10 +58,12 @@ export function tableSalesToday() {
 }
 
 export function bestSellersMeat() {
+	const locId = session.locationId;
 	const weightByItem: Record<string, number> = {};
 	for (const ded of deductions.value) {
 		const stockItem = stockItems.value.find(s => s.id === ded.stockItemId);
 		if (!stockItem) continue;
+		if (locId !== 'all' && stockItem.locationId !== locId) continue;
 		const menuItem = menuItems.value.find(m => m.id === stockItem.menuItemId && m.isWeightBased);
 		if (!menuItem) continue;
 		weightByItem[menuItem.id] = (weightByItem[menuItem.id] ?? 0) + ded.qty;
@@ -294,6 +296,7 @@ export function eodSummary() {
 
 export interface XReadSnapshot {
 	id: string;
+	locationId: string;
 	timestamp: string;
 	grossSales: number;
 	discounts: number;
@@ -308,7 +311,16 @@ export interface XReadSnapshot {
 	generatedBy: string;
 }
 
-export const xReadHistory = createRxStore<XReadSnapshot>('x_reads', db => db.x_reads.find().sort({ timestamp: 'desc' }));
+const _xReadHistory = createRxStore<XReadSnapshot>('x_reads', db => db.x_reads.find().sort({ timestamp: 'desc' }));
+
+export const xReadHistory = {
+	get value() {
+		const loc = session.locationId;
+		if (loc === 'all') return _xReadHistory.value;
+		return _xReadHistory.value.filter(xr => xr.locationId === loc);
+	},
+	get initialized() { return _xReadHistory.initialized; }
+};
 
 export async function generateXRead(): Promise<XReadSnapshot> {
 	const summary = eodSummary();
@@ -319,6 +331,7 @@ export async function generateXRead(): Promise<XReadSnapshot> {
 
 	const snapshot: XReadSnapshot = {
 		id: nanoid(),
+		locationId: session.locationId === 'all' ? 'tag' : session.locationId,
 		timestamp: new Date().toISOString(),
 		grossSales: summary.grossSales,
 		discounts: summary.discounts,
@@ -539,6 +552,40 @@ export function netSalesByPeriod(period: 'today' | 'week' | 'month'): number {
 			return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
 		})
 		.reduce((s, o) => s + o.total, 0);
+}
+
+// ─── Z-Read (EOD permanent record) ───────────────────────────────────────────
+
+export interface ZReadSnapshot {
+	id: string;
+	date: string; // YYYY-MM-DD
+	locationId: string;
+	submittedAt: string;
+	submittedBy: string;
+	grossSales: number;
+	discounts: number;
+	netSales: number;
+	vatAmount: number;
+	totalPax: number;
+	cash: number;
+	gcash: number;
+	card: number;
+	cashExpenses: number;
+	openingCash: number;
+	closingActual: number;
+	cashVariance: number;
+	updatedAt: string;
+}
+
+export const zReadHistory = createRxStore<ZReadSnapshot>('z_reads', db => db.z_reads.find().sort({ submittedAt: 'desc' }));
+
+export async function saveZRead(params: Omit<ZReadSnapshot, 'id' | 'updatedAt'>): Promise<ZReadSnapshot> {
+	const now = new Date().toISOString();
+	const snapshot: ZReadSnapshot = { id: nanoid(), updatedAt: now, ...params };
+	const db = await getDb();
+	await db.z_reads.insert(snapshot);
+	writeLog('admin', 'EOD Z-Read submitted', { meta: { date: params.date, netSales: params.netSales } });
+	return snapshot;
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────

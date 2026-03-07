@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
 	import { allExpenses, expenseCategories } from '$lib/stores/expenses.svelte';
+	import { session } from '$lib/stores/session.svelte';
 
 	interface MonthlyRow {
 		category: string;
@@ -27,6 +28,7 @@
 
 	const currentMonthExpenses = $derived(
 		allExpenses.value.filter(e => {
+			if (session.locationId !== 'all' && e.locationId !== session.locationId) return false;
 			const d = new Date(e.createdAt);
 			return d.getMonth() === thisMonth.month && d.getFullYear() === thisMonth.year;
 		})
@@ -34,6 +36,7 @@
 
 	const prevMonthExpenses = $derived(
 		allExpenses.value.filter(e => {
+			if (session.locationId !== 'all' && e.locationId !== session.locationId) return false;
 			const d = new Date(e.createdAt);
 			return d.getMonth() === prevMonth.month && d.getFullYear() === prevMonth.year;
 		})

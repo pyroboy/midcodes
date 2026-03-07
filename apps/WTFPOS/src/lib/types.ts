@@ -207,6 +207,7 @@ export interface KdsTicketItem {
 export interface KdsTicket {
 	id: string;
 	orderId: string;
+	locationId: string;
 	tableNumber: number | null;    // null for takeout orders
 	customerName?: string;         // for takeout orders
 	items: KdsTicketItem[];

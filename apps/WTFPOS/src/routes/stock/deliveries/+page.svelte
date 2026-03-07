@@ -5,6 +5,9 @@
 	import { fade } from 'svelte/transition';
 	import { Plus, X, AlertTriangle, XCircle, Search, Calendar, Package } from 'lucide-svelte';
 	import ProgressRing from '$lib/components/stock/ProgressRing.svelte';
+	import PhotoCapture from '$lib/components/PhotoCapture.svelte';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 
 	// ─── Reactive Lists ──────────────────────────────────────────────────────────
 	let searchQuery = $state('');
@@ -56,6 +59,14 @@
 		stockItems.value.filter(s => isWarehouseSession() || s.locationId === session.locationId)
 	);
 
+	// ─── Auto-open from quick action ─────────────────────────────────────────────
+	$effect(() => {
+		if (page.url.searchParams.get('action') === 'open') {
+			openModal();
+			goto('/stock/deliveries', { replaceState: true, noScroll: true });
+		}
+	});
+
 	// ─── Receive Form ────────────────────────────────────────────────────────────
 	let showModal = $state(false);
 	let formStockItemId = $state('');
@@ -65,6 +76,7 @@
 	let formExpiryDate = $state('');
 	let formNotes = $state('');
 	let formError = $state('');
+	let formPhotos = $state<string[]>([]);
 
 	const parsedQty = $derived(parseFloat(formQty) || 0);
 	const selectedItem = $derived(activeItems.find(s => s.id === formStockItemId));
@@ -78,6 +90,7 @@
 		formExpiryDate = '';
 		formNotes = '';
 		formError = '';
+		formPhotos = [];
 		showModal = true;
 	}
 
@@ -317,6 +330,12 @@
 						<input type="date" bind:value={formExpiryDate} class="pos-input" />
 					</label>
 				</div>
+
+				<PhotoCapture
+					photos={formPhotos}
+					onchange={(p) => (formPhotos = p)}
+					label="Delivery Photos (optional)"
+				/>
 
 				<label class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Notes</span>

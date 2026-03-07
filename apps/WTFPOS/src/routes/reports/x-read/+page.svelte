@@ -3,6 +3,15 @@
 	import { salesSummary, eodSummary, generateXRead, xReadHistory } from '$lib/stores/reports.svelte';
 	import { orders } from '$lib/stores/pos.svelte';
 	import { session } from '$lib/stores/session.svelte';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+
+	// Auto-generate X-Read when arriving from quick action
+	$effect(() => {
+		if (page.url.searchParams.get('action') === 'open') {
+			goto('/reports/x-read', { replaceState: true, noScroll: true });
+		}
+	});
 
 	const summary = $derived(salesSummary());
 	const eod = $derived(eodSummary());

@@ -35,6 +35,7 @@
 	}
 
 	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, animate = false, readonly = false }: Props = $props();
+	const display = $derived(getStatusDisplay(item.status, item.currentStock, item.minLevel));
 </script>
 
 <tr
@@ -75,7 +76,6 @@
 		<span class="text-xs text-gray-400">Min: {item.minLevel.toLocaleString()}</span>
 	</td>
 	<td class="px-4 py-3 text-center">
-		{@const display = getStatusDisplay(item.status, item.currentStock, item.minLevel)}
 		<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', display.badgeClass)}>
 			{display.label}
 		</span>

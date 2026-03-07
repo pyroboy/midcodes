@@ -1,6 +1,8 @@
 <script lang="ts">
-	import type { Order, Table } from '$lib/types';
+	import type { Order, Table, PaymentMethod } from '$lib/types';
 	import { formatPeso, cn } from '$lib/utils';
+	import { correctPaymentMethod } from '$lib/stores/pos/payments.svelte';
+	import ManagerPinModal from '$lib/components/pos/ManagerPinModal.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -16,6 +18,31 @@
 		if (order.orderType === 'takeout') return '';
 		const table = tables.find(t => t.id === order.tableId);
 		return table?.label ?? `T${order.tableNumber}`;
+	}
+
+	// ─── Payment Correction ───────────────────────────────────────────────────
+	let correctingOrderId = $state<string | null>(null);
+	let pendingMethod = $state<PaymentMethod | null>(null);
+	let showCorrectionPin = $state(false);
+
+	const PAYMENT_METHODS: { method: PaymentMethod; label: string }[] = [
+		{ method: 'cash',  label: '💵 Cash' },
+		{ method: 'gcash', label: '📱 GCash' },
+		{ method: 'maya',  label: '🟣 Maya' },
+	];
+
+	function requestCorrection(order: Order, method: PaymentMethod) {
+		correctingOrderId = order.id;
+		pendingMethod = method;
+		showCorrectionPin = true;
+	}
+
+	async function handleCorrectionConfirmed() {
+		if (!correctingOrderId || !pendingMethod) return;
+		showCorrectionPin = false;
+		await correctPaymentMethod(correctingOrderId, pendingMethod);
+		correctingOrderId = null;
+		pendingMethod = null;
 	}
 </script>
 

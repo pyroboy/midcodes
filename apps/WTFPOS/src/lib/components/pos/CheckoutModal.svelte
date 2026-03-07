@@ -62,8 +62,8 @@
     }
 
     function applyDiscount(type: DiscountType) {
-        // Comp and Service Recovery require manager PIN (100% write-offs)
-        if ((type === 'comp' || type === 'service_recovery') && localDiscountType !== type) {
+        // All discount types require manager PIN — SC-13/SC-14 compliance
+        if (type !== 'none' && localDiscountType !== type) {
             pendingDiscountType = type;
             showPinForDiscount = true;
             return;
@@ -395,7 +395,7 @@
 <ManagerPinModal
     isOpen={showPinForDiscount}
     title="Authorize Discount"
-    description="Comp and Service Recovery discounts write off the entire bill. Enter Manager PIN to authorize."
+    description="All discounts require Manager PIN authorization. Enter PIN to apply."
     confirmLabel="Authorize"
     onClose={() => { showPinForDiscount = false; pendingDiscountType = 'none'; }}
     onConfirm={handlePinConfirmed}

@@ -1,0 +1,84 @@
+- generic [ref=e2]:
+  - generic [ref=e300]:
+    - generic [ref=e304]:
+      - generic [ref=e305]:
+        - generic [ref=e306]:
+          - generic [ref=e308]: W!
+          - generic [ref=e309]:
+            - generic [ref=e310]: WTF! SAMGYUP
+            - generic [ref=e311]: POS System
+        - generic [ref=e312]:
+          - paragraph [ref=e313]: Alta Citta (Tagbilaran)
+          - paragraph [ref=e314]: 05:14:17 PM
+      - separator [ref=e315]
+      - list [ref=e319]:
+        - listitem [ref=e320]:
+          - link "Kitchen" [ref=e321] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e322]
+            - generic [ref=e323]: Kitchen
+        - listitem [ref=e324]:
+          - link "Stock" [ref=e325] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e326]
+            - generic [ref=e327]: Stock
+      - generic [ref=e328]:
+        - separator [ref=e329]
+        - generic [ref=e330]:
+          - generic [ref=e331]: P
+          - generic [ref=e332]:
+            - generic [ref=e333]: Pedro Cruz
+            - generic [ref=e334]: kitchen
+        - link "Logout" [ref=e336] [cursor=pointer]:
+          - /url: /
+          - img [ref=e337]
+          - generic [ref=e338]: Logout
+      - button "Toggle Sidebar" [ref=e339]
+    - main [ref=e340]:
+      - generic [ref=e341]:
+        - navigation [ref=e342]:
+          - link "🧾 All Orders" [ref=e343] [cursor=pointer]:
+            - /url: /kitchen/all-orders
+          - link "📋 Order Queue" [ref=e344] [cursor=pointer]:
+            - /url: /kitchen/orders
+          - link "⚖️ Weigh Station" [ref=e345] [cursor=pointer]:
+            - /url: /kitchen/weigh-station
+        - main [ref=e346]:
+          - generic [ref=e347]:
+            - generic [ref=e348]:
+              - generic [ref=e349]:
+                - generic [ref=e350]:
+                  - heading "Kitchen Queue" [level=1] [ref=e351]
+                  - paragraph [ref=e352]: Active tickets awaiting kitchen action
+                - generic [ref=e353]: Live
+              - generic [ref=e355]:
+                - button "↩ UNDO LAST" [ref=e356] [cursor=pointer]
+                - button "History 69" [ref=e357] [cursor=pointer]:
+                  - text: History
+                  - generic [ref=e358]: "69"
+            - generic [ref=e359]:
+              - generic [ref=e360]:
+                - generic [ref=e361]: "0"
+                - generic [ref=e362]: Orders
+              - generic [ref=e363]:
+                - generic [ref=e364]: "0"
+                - generic [ref=e365]: Tables
+              - generic [ref=e366]:
+                - generic [ref=e367]: "0"
+                - generic [ref=e368]: Items
+          - generic [ref=e369]:
+            - generic [ref=e370]:
+              - generic [ref=e371]: ✅
+              - paragraph [ref=e372]: No pending orders
+              - paragraph [ref=e373]: New orders will appear here automatically
+            - generic [ref=e374]:
+              - generic [ref=e375]:
+                - generic [ref=e376]: "69"
+                - generic [ref=e377]: Served Today
+              - generic [ref=e378]:
+                - generic [ref=e379]: 20m
+                - generic [ref=e380]: Avg Service
+              - generic [ref=e381]:
+                - generic [ref=e382]: "-203:-43"
+                - generic [ref=e383]: Last Completed
+  - generic [ref=e109]: WTF! Samgyup POS

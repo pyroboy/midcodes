@@ -246,6 +246,7 @@ export async function seedHistory(db: RxDatabase) {
                     kdsHistoryTickets.push({
                         id: nanoid(),
                         orderId,
+                        locationId: branch,
                         tableNumber: isTakeout ? null : tableNum,
                         customerName: isTakeout ? customerName : undefined,
                         items: items.map(item => ({

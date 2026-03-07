@@ -49,11 +49,11 @@
 		return () => es.close();
 	});
 
-	// Unified order source — SSE aggregate or local RxDB
+	// Unified order source — SSE aggregate or local RxDB (always location-scoped)
 	const sourceOrders = $derived(
 		isAggregateMode
 			? (Object.values(branchOrders).flat() as Order[])
-			: rxOrders.value
+			: rxOrders.value.filter((o) => o.locationId === session.locationId)
 	);
 
 	// ── Filters ───────────────────────────────────────────────────────────────

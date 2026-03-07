@@ -17,12 +17,20 @@ const _kdsHistory = createRxStore<KdsTicket>('kds_tickets_history', db => db.kds
 }));
 
 export const kdsTickets = {
-	get value() { return _kdsActive.value; },
+	get value() {
+		const loc = session.locationId;
+		if (loc === 'all') return _kdsActive.value;
+		return _kdsActive.value.filter(t => t.locationId === loc);
+	},
 	get initialized() { return _kdsActive.initialized; }
 };
 
 export const kdsTicketHistory = {
-	get value() { return _kdsHistory.value; },
+	get value() {
+		const loc = session.locationId;
+		if (loc === 'all') return _kdsHistory.value;
+		return _kdsHistory.value.filter(t => t.locationId === loc);
+	},
 	get initialized() { return _kdsHistory.initialized; }
 };
 

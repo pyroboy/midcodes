@@ -23,6 +23,7 @@
     import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
     import { session } from '$lib/stores/session.svelte';
     import { Info } from 'lucide-svelte';
+    import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
 
     let showLegend = $state(false);
 
@@ -242,6 +243,7 @@
                 <!-- Header -->
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
+                        <SidebarTrigger class="hidden md:flex h-9 w-9 text-gray-500" />
                         <h1 class="text-lg font-bold text-gray-900">POS</h1>
                         <span class="badge-orange">{occupied} occ</span>
                         <span class="badge-green">{free} free</span>

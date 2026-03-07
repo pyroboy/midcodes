@@ -3,6 +3,7 @@
 	import {
 		stockItems, deliveries, receiveDelivery,
 	} from '$lib/stores/stock.svelte';
+	import { session } from '$lib/stores/session.svelte';
 	import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
 	import { btScale } from '$lib/stores/bluetooth-scale.svelte';
 
@@ -25,6 +26,15 @@
 			}
 		}
 	});
+
+	// Branch-scoped items and deliveries
+	const branchStockItems = $derived(
+		stockItems.value.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
+	);
+	const branchStockIds = $derived(new Set(branchStockItems.map(s => s.id)));
+	const branchDeliveries = $derived(
+		deliveries.value.filter(d => branchStockIds.has(d.stockItemId))
+	);
 
 	const selectedItem = $derived(stockItems.value.find(s => s.id === selectedStockId));
 	const canSave = $derived(selectedStockId !== '' && parseFloat(qty) > 0 && supplier.trim() !== '');
@@ -66,7 +76,7 @@
 				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Item *</span>
 				<select bind:value={selectedStockId} class="pos-input">
 					<option value="">Select item…</option>
-					{#each stockItems.value as s}
+					{#each branchStockItems as s}
 						<option value={s.id}>{s.name}</option>
 					{/each}
 				</select>
@@ -136,7 +146,7 @@
 	<!-- Deliveries log -->
 	<div class="flex flex-col gap-3">
 		<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">Today's Deliveries</h2>
-		{#if deliveries.value.length === 0}
+		{#if branchDeliveries.length === 0}
 			<div class="flex flex-1 items-center justify-center rounded-xl border border-border bg-white p-10 text-center text-gray-400">
 				<div>
 					<div class="mb-2 text-3xl">📦</div>
@@ -156,7 +166,7 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-border">
-						{#each deliveries.value as d (d.id)}
+						{#each branchDeliveries as d (d.id)}
 							<tr class="hover:bg-gray-50">
 								<td class="px-4 py-3 font-medium text-gray-900">{d.itemName}</td>
 								<td class="px-4 py-3 text-right font-mono text-gray-700">{d.qty} {d.unit}</td>
