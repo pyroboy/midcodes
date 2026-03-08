@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tables as allTables, orders, mergeTables } from '$lib/stores/pos.svelte';
 	import { session, MANAGER_PIN } from '$lib/stores/session.svelte';
-	import { cn } from '$lib/utils';
+	import { cn, formatPeso } from '$lib/utils';
 	import type { Table } from '$lib/types';
 
 	let {
@@ -189,6 +189,35 @@
 					Merge {primaryTable.label} → {allTables.value.find(t => t.id === selectedTargetId)?.label ?? '?'}
 				</p>
 			</div>
+
+			<!-- P2-5: Pre-merge bill preview -->
+			{#if primaryOrder || targetOrder}
+				{@const primaryActiveItems = primaryOrder?.items.filter(i => i.status !== 'cancelled') ?? []}
+				{@const targetActiveItems = targetOrder?.items.filter(i => i.status !== 'cancelled') ?? []}
+				{@const primarySubtotal = primaryOrder?.total ?? 0}
+				{@const targetSubtotal = targetOrder?.total ?? 0}
+				{@const combinedTotal = primarySubtotal + targetSubtotal}
+				<div class="rounded-lg border border-border bg-surface-secondary p-3 flex flex-col gap-2 text-xs">
+					<p class="font-bold text-gray-500 uppercase tracking-wider text-[10px]">Bill Preview After Merge</p>
+					<div class="flex gap-3">
+						<div class="flex-1">
+							<p class="font-semibold text-gray-700">{primaryTable.label}</p>
+							<p class="text-gray-400">{primaryActiveItems.length} item{primaryActiveItems.length !== 1 ? 's' : ''}</p>
+							<p class="font-mono font-bold text-gray-800">{formatPeso(primarySubtotal)}</p>
+						</div>
+						<div class="flex items-center text-gray-400 font-bold">+</div>
+						<div class="flex-1">
+							<p class="font-semibold text-gray-700">{allTables.value.find(t => t.id === selectedTargetId)?.label ?? '?'}</p>
+							<p class="text-gray-400">{targetActiveItems.length} item{targetActiveItems.length !== 1 ? 's' : ''}</p>
+							<p class="font-mono font-bold text-gray-800">{formatPeso(targetSubtotal)}</p>
+						</div>
+					</div>
+					<div class="flex items-center justify-between border-t border-border pt-2">
+						<span class="font-semibold text-gray-600">Combined Total</span>
+						<span class="font-mono text-sm font-extrabold text-gray-900">{formatPeso(combinedTotal)}</span>
+					</div>
+				</div>
+			{/if}
 
 			<!-- PIN dots -->
 			<div class="flex flex-col gap-2">

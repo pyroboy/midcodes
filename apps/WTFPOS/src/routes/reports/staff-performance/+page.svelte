@@ -47,7 +47,12 @@
 					<td class="px-5 py-4 text-right font-mono font-bold text-gray-900">{formatPeso(row.totalRevenue)}</td>
 					<td class="px-5 py-4 text-right font-mono text-gray-600">{formatPeso(row.avgTicket)}</td>
 					<td class={cn("px-5 py-4 text-right font-mono border-l border-gray-100", row.voidCount > 2 ? 'text-status-red font-bold' : 'text-gray-500 font-semibold')}>
-                        {row.voidCount} {row.voidCount > 2 ? '⚠️' : ''}
+						{#if row.voidCount > 0}
+							{row.voidCount} {row.voidCount > 2 ? '!' : ''}
+						{:else}
+							<!-- TODO: voidCount requires cancelled orders to have closedBy set at void time -->
+							<span class="text-gray-300 font-normal">N/A</span>
+						{/if}
                     </td>
 					<td class="px-5 py-4 text-right font-mono text-gray-500 font-semibold">{row.discountCount}</td>
 				</tr>

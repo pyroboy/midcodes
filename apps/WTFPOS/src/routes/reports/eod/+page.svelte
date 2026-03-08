@@ -4,9 +4,9 @@
 		eodSummary, utilitySettings, getPreviousUtilityReading, saveUtilityReading,
 		zReadHistory, saveZRead
 	} from '$lib/stores/reports.svelte';
-	import { allExpenses } from '$lib/stores/expenses.svelte';
+	import { allExpenses, addExpense } from '$lib/stores/expenses.svelte';
 	import { tables } from '$lib/stores/pos.svelte';
-	import { session } from '$lib/stores/session.svelte';
+	import { session, getCurrentLocation } from '$lib/stores/session.svelte';
 	import { getActiveShift, closeShift } from '$lib/stores/pos/shifts.svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -14,6 +14,8 @@
 	import { X, AlertTriangle, CheckCircle2, History } from 'lucide-svelte';
 
 	let showModal = $state(false);
+	// P1-23: Confirmation state before opening the EOD modal
+	let showEodConfirm = $state(false);
 
 	// Auto-open from quick action
 	$effect(() => {
@@ -75,9 +77,10 @@
 	let isBlindCloseSubmitted = $state(false);
 
 	const payments = $derived([
-		{ label: 'Cash',  amount: summary.cash,  icon: '💵' },
-		{ label: 'Card',  amount: summary.card,  icon: '💳' },
-		{ label: 'GCash', amount: summary.gcash, icon: '📱' },
+		{ label: 'Cash',          amount: summary.cash,  icon: '💵' },
+		{ label: 'GCash',         amount: summary.gcash, icon: '📱' },
+		{ label: 'Maya',          amount: summary.maya,  icon: '🟢' },
+		{ label: 'Credit/Debit',  amount: summary.card,  icon: '💳' },
 	]);
 
 	const salesItems = $derived([
@@ -96,8 +99,15 @@
 
 	// ─── Utilities ─────────────────────────────────────────────────────────────
 	const previousReading = $derived(getPreviousUtilityReading());
-	let currentElec = $state<number | ''>('');
-	let currentGas = $state<number | ''>('');
+	let currentElec  = $state<number | ''>('');
+	let currentGas   = $state<number | ''>('');
+	let currentWater = $state<number | ''>('');
+
+	// P1-1: Editable utility rates (defaults from utilitySettings)
+	let showRateSettings = $state(false);
+	let rateElec  = $state(utilitySettings.electricityPerKwh);
+	let rateGas   = $state(utilitySettings.gasPerKg);
+	let rateWater = $state(utilitySettings.waterPerM3 ?? 50);
 
 	const elecUsed = $derived(
 		typeof currentElec === 'number' && previousReading
@@ -109,10 +119,16 @@
 			? Math.max(0, currentGas - previousReading.gas)
 			: 0
 	);
+	const waterUsed = $derived(
+		typeof currentWater === 'number' && previousReading
+			? Math.max(0, currentWater - (previousReading.water ?? 0))
+			: 0
+	);
 
-	const elecCost = $derived(elecUsed * utilitySettings.electricityPerKwh);
-	const gasCost = $derived(gasUsed * utilitySettings.gasPerKg);
-	const totalUtilCost = $derived(elecCost + gasCost);
+	const elecCost  = $derived(elecUsed  * rateElec);
+	const gasCost   = $derived(gasUsed   * rateGas);
+	const waterCost = $derived(waterUsed * rateWater);
+	const totalUtilCost = $derived(elecCost + gasCost + waterCost);
 
 	let eodSubmitted = $state(false);
 	let submitError = $state('');
@@ -123,8 +139,16 @@
 			return;
 		}
 		submitError = '';
-		if (typeof currentElec === 'number' && typeof currentGas === 'number') {
-			saveUtilityReading(currentElec, currentGas);
+		if (typeof currentElec === 'number' || typeof currentGas === 'number' || typeof currentWater === 'number') {
+			const elec  = typeof currentElec   === 'number' ? currentElec   : (previousReading?.electricity ?? 0);
+			const gas   = typeof currentGas    === 'number' ? currentGas    : (previousReading?.gas         ?? 0);
+			const water = typeof currentWater  === 'number' ? currentWater  : (previousReading?.water       ?? 0);
+			saveUtilityReading(elec, gas, water);
+			// P0-1: Auto-create expense records so utility costs appear in expense reports
+			const paidBy = session.userName || 'Manager';
+			if (elecCost  > 0) await addExpense('Electricity', elecCost,  `EOD Electricity (${elecUsed} kWh × ₱${rateElec}/kWh)`,  paidBy);
+			if (gasCost   > 0) await addExpense('Gas/LPG',     gasCost,   `EOD Gas/LPG (${gasUsed} kg × ₱${rateGas}/kg)`,           paidBy);
+			if (waterCost > 0) await addExpense('Water',        waterCost, `EOD Water (${waterUsed} m³ × ₱${rateWater}/m³)`,          paidBy);
 		}
 		await saveZRead({
 			date: todayKey,
@@ -148,6 +172,17 @@
 		eodSubmitted = true;
 	}
 </script>
+
+<!-- ALL-location guard: EOD must be run per branch -->
+{#if session.locationId === 'all'}
+	<div class="mb-4 flex items-start gap-3 rounded-xl border border-status-red/30 bg-status-red-light px-4 py-3">
+		<AlertTriangle class="w-4 h-4 text-status-red flex-shrink-0 mt-0.5" />
+		<div>
+			<p class="text-sm font-bold text-status-red">Select a Branch First</p>
+			<p class="text-xs text-red-700 mt-0.5">End of Day must be run per branch. You are currently viewing <strong>All Locations</strong>. Use the location switcher above to select Alta Citta or Alona Beach before closing the day.</p>
+		</div>
+	</div>
+{/if}
 
 <!-- Stale-shift warning -->
 {#if !hasYesterdayZRead && zReadHistory.value.length === 0}
@@ -194,9 +229,37 @@
 		</span>
 	</div>
 	{#if !eodSubmitted && !todayZRead}
-		<button onclick={() => (showModal = true)} class="btn-primary flex items-center gap-2 shadow-sm" disabled={openTablesCount > 0}>
-			Start End of Day
-		</button>
+		{#if showEodConfirm}
+			<!-- P1-23: Inline confirmation before opening EOD modal -->
+			<div class="flex items-center gap-3 rounded-lg border border-status-red/20 bg-status-red-light px-4 py-3">
+				<div class="flex-1">
+					<p class="text-sm font-bold text-status-red">
+						Close business day for {session.locationId === 'all' ? 'this branch' : (getCurrentLocation()?.name ?? 'this branch')}?
+					</p>
+					<p class="text-xs text-red-700 mt-0.5">
+						This action cannot be undone. Today's gross: <strong>{formatPeso(summary.grossSales)}</strong>
+					</p>
+				</div>
+				<button
+					onclick={() => { showEodConfirm = false; showModal = true; }}
+					class="btn-danger flex items-center gap-2 text-sm"
+					disabled={openTablesCount > 0 || session.locationId === 'all'}
+				>
+					Close Day
+				</button>
+				<button onclick={() => (showEodConfirm = false)} class="btn-ghost text-sm">
+					Cancel
+				</button>
+			</div>
+		{:else}
+			<button
+				onclick={() => (showEodConfirm = true)}
+				class="btn-primary flex items-center gap-2 shadow-sm"
+				disabled={openTablesCount > 0 || session.locationId === 'all'}
+			>
+				Start End of Day
+			</button>
+		{/if}
 	{/if}
 </div>
 
@@ -392,33 +455,74 @@
 					<p class="text-xs text-gray-500 mt-0.5">Record today's meter readings to estimate daily utility usage.</p>
 				</div>
 
-				<div class="grid grid-cols-2 gap-4">
+				<div class="grid grid-cols-3 gap-3">
 					<div class="flex flex-col gap-1.5">
 						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Electricity (kWh)</span>
 						<input type="number" bind:value={currentElec} class="pos-input font-mono" min="0" disabled={eodSubmitted} placeholder={previousReading ? String(previousReading.electricity) : '0'} />
-						<span class="text-[10px] text-gray-400">Prev: {previousReading ? previousReading.electricity : '0'}</span>
+						<span class="text-[10px] text-gray-400">Prev: {previousReading ? previousReading.electricity : '—'}</span>
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Gas (kg)</span>
 						<input type="number" bind:value={currentGas} class="pos-input font-mono" min="0" disabled={eodSubmitted} placeholder={previousReading ? String(previousReading.gas) : '0'} />
-						<span class="text-[10px] text-gray-400">Prev: {previousReading ? previousReading.gas : '0'}</span>
+						<span class="text-[10px] text-gray-400">Prev: {previousReading ? previousReading.gas : '—'}</span>
+					</div>
+					<div class="flex flex-col gap-1.5">
+						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Water (m³)</span>
+						<input type="number" bind:value={currentWater} class="pos-input font-mono" min="0" disabled={eodSubmitted} placeholder={previousReading ? String(previousReading.water ?? '0') : '0'} />
+						<span class="text-[10px] text-gray-400">Prev: {previousReading ? (previousReading.water ?? '—') : '—'}</span>
 					</div>
 				</div>
 
-				{#if (typeof currentElec === 'number' || typeof currentGas === 'number') && previousReading}
+				<!-- P1-1: Editable utility rates -->
+				<button
+					type="button"
+					onclick={() => (showRateSettings = !showRateSettings)}
+					class="text-[10px] text-gray-400 hover:text-gray-600 self-start underline underline-offset-2"
+				>
+					{showRateSettings ? 'Hide' : 'Edit'} rates (₱{rateElec}/kWh · ₱{rateGas}/kg · ₱{rateWater}/m³)
+				</button>
+				{#if showRateSettings}
+					<div class="grid grid-cols-3 gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+						<div class="flex flex-col gap-1">
+							<span class="text-[10px] font-semibold uppercase text-gray-400">₱ / kWh</span>
+							<input type="number" bind:value={rateElec} class="pos-input text-sm font-mono py-1.5" min="0" step="0.5" />
+						</div>
+						<div class="flex flex-col gap-1">
+							<span class="text-[10px] font-semibold uppercase text-gray-400">₱ / kg gas</span>
+							<input type="number" bind:value={rateGas} class="pos-input text-sm font-mono py-1.5" min="0" step="1" />
+						</div>
+						<div class="flex flex-col gap-1">
+							<span class="text-[10px] font-semibold uppercase text-gray-400">₱ / m³ water</span>
+							<input type="number" bind:value={rateWater} class="pos-input text-sm font-mono py-1.5" min="0" step="1" />
+						</div>
+					</div>
+				{/if}
+
+				{#if (typeof currentElec === 'number' || typeof currentGas === 'number' || typeof currentWater === 'number') && previousReading}
 					<div class="rounded-lg bg-white p-3 border border-gray-100">
+						{#if elecUsed > 0}
 						<div class="flex justify-between text-sm mb-1">
-							<span class="text-gray-500">Electricity ({elecUsed} kWh)</span>
+							<span class="text-gray-500">⚡ Electricity ({elecUsed} kWh)</span>
 							<span class="font-mono text-gray-700">{formatPeso(elecCost)}</span>
 						</div>
+						{/if}
+						{#if gasUsed > 0}
 						<div class="flex justify-between text-sm mb-1">
-							<span class="text-gray-500">Gas ({gasUsed} kg)</span>
+							<span class="text-gray-500">🔥 Gas ({gasUsed} kg)</span>
 							<span class="font-mono text-gray-700">{formatPeso(gasCost)}</span>
 						</div>
+						{/if}
+						{#if waterUsed > 0}
+						<div class="flex justify-between text-sm mb-1">
+							<span class="text-gray-500">💧 Water ({waterUsed} m³)</span>
+							<span class="font-mono text-gray-700">{formatPeso(waterCost)}</span>
+						</div>
+						{/if}
 						<div class="flex justify-between text-sm font-bold border-t border-gray-200 pt-1 mt-1">
 							<span class="text-gray-900">Total Est. Cost</span>
 							<span class="font-mono text-status-red">{formatPeso(totalUtilCost)}</span>
 						</div>
+						<p class="text-[10px] text-gray-400 mt-1">Will auto-log as Expenses on submit.</p>
 					</div>
 				{/if}
 			</div>

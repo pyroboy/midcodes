@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, REFILL_NOTE } from '$lib/stores/pos.svelte';
+	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, recallTicket, REFILL_NOTE } from '$lib/stores/pos.svelte';
 	import type { KdsTicket, KdsTicketItem } from '$lib/types';
 	import { refuseItem } from '$lib/stores/alert.svelte';
-	import { formatCountdown, formatDisplayId, cn } from '$lib/utils';
+	import { formatCountdown, formatTimeAgo, formatDisplayId, cn } from '$lib/utils';
 	import { printKitchenOrder } from '$lib/stores/hardware.svelte';
-	import { TriangleAlert, Check } from 'lucide-svelte';
+	import { TriangleAlert, Check, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { untrack } from 'svelte';
 	import KdsHistoryModal from '$lib/components/kitchen/KdsHistoryModal.svelte';
 	import RefuseReasonModal from '$lib/components/kitchen/RefuseReasonModal.svelte';
@@ -15,6 +15,30 @@
 
 	// Refuse modal
 	let refuseTarget = $state<{ orderId: string; tableNumber: number | null; itemName: string } | null>(null);
+
+	// ── Toast ──
+	interface ToastState {
+		message: string;
+		visible: boolean;
+		undoFn: (() => void) | null;
+	}
+	let toast = $state<ToastState>({ message: '', visible: false, undoFn: null });
+	let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function showToast(message: string, undoFn: (() => void) | null = null) {
+		if (toastTimer) clearTimeout(toastTimer);
+		toast = { message, visible: true, undoFn };
+		toastTimer = setTimeout(() => {
+			toast = { message: '', visible: false, undoFn: null };
+			toastTimer = null;
+		}, 3000);
+	}
+
+	function dismissToast() {
+		if (toastTimer) clearTimeout(toastTimer);
+		toast = { message: '', visible: false, undoFn: null };
+		toastTimer = null;
+	}
 
 	// ── Live Timer ──
 	let now = $state(Date.now());
@@ -176,11 +200,15 @@
 
 	// ── Actions ──
 	function completeAll(ticket: KdsTicket) {
+		const orderId = ticket.orderId;
+		const tableLabel = ticket.tableNumber !== null ? `T${ticket.tableNumber}` : 'Takeout';
 		for (const item of ticket.items) {
 			if (item.status !== 'served' && item.status !== 'cancelled') {
-				markItemServed(ticket.orderId, item.id);
+				markItemServed(orderId, item.id);
 			}
 		}
+		// P0-4: Show undo toast so accidental bumps can be recovered
+		showToast(`✓ ${tableLabel} — All items served`, () => recallTicket(orderId));
 	}
 
 	function toggleExpand(itemId: string) {
@@ -193,7 +221,10 @@
 
 	function handleRefuseConfirm(reason: string) {
 		if (refuseTarget) {
+			const tableNum = refuseTarget.tableNumber;
 			refuseItem(refuseTarget.orderId, refuseTarget.tableNumber, refuseTarget.itemName, reason);
+			const tableLabel = tableNum !== null ? `T${tableNum}` : 'Takeout';
+			showToast(`✓ Return flagged — Alert sent to ${tableLabel}`);
 		}
 		refuseTarget = null;
 	}
@@ -205,7 +236,19 @@
 
 	async function handleSoldOut(menuItemName: string) {
 		const mi = menuItemsByName.get(menuItemName);
-		if (mi) await toggleMenuItemAvailability(mi.id);
+		if (!mi) return;
+		const wasAvailable = mi.available;
+		await toggleMenuItemAvailability(mi.id);
+		if (wasAvailable) {
+			// Item just marked sold out — show undo toast
+			showToast(`${menuItemName} marked sold out — Undo`, async () => {
+				const miNow = menuItemsByName.get(menuItemName);
+				if (miNow) await toggleMenuItemAvailability(miNow.id);
+				dismissToast();
+			});
+		} else {
+			dismissToast();
+		}
 	}
 </script>
 
@@ -295,7 +338,7 @@
 				<span class="text-xs font-semibold text-gray-400">Avg Service</span>
 			</div>
 			<div class="pos-card flex flex-col items-center gap-1 px-4 py-3">
-				<span class="text-2xl font-black font-mono text-gray-900">{lastCompleted ? formatCountdown(Math.floor((now - new Date(lastCompleted).getTime()) / 1000)) : '—'}</span>
+				<span class="text-2xl font-black font-mono text-gray-900">{lastCompleted ? formatTimeAgo(lastCompleted) : '—'}</span>
 				<span class="text-xs font-semibold text-gray-400">Last Completed</span>
 			</div>
 		</div>
@@ -340,11 +383,11 @@
 					<div class="flex items-center gap-2">
 						<button
 							onclick={() => completeAll(ticket)}
-							class="rounded-lg bg-status-green px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-all"
-							style="min-height: 36px"
-							title="Mark all items served"
+							class="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-600 active:scale-95 transition-all hover:bg-gray-50"
+							style="min-height: 32px"
+							title="Quick bump — mark all items served"
 						>
-							✓ Bump
+							Quick Bump
 						</button>
 						<span class="text-sm font-bold text-gray-400 font-mono">{progress.served}/{progress.total}</span>
 						<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
@@ -354,7 +397,7 @@
 				</div>
 
 				<!-- Progress Bar -->
-				<div class="h-1 bg-gray-100">
+				<div class="h-1 bg-gray-100" role="progressbar" aria-valuenow={progress.served} aria-valuemin={0} aria-valuemax={progress.total} aria-label="Order completion progress">
 					<div
 						class="h-full bg-status-green transition-all duration-500"
 						style="width: {progress.pct}%"
@@ -367,10 +410,10 @@
 					{#if grouped.meats.length > 0}
 						<div class="py-2">
 							<div class="flex items-center justify-between px-4 py-1.5">
-								<span class="text-xs font-bold uppercase tracking-wider text-status-red">
+								<span class="text-xs font-bold uppercase tracking-wider text-red-800">
 									&#129385; MEATS
 								</span>
-								<span class="text-xs font-mono font-bold text-status-red/70">
+								<span class="text-xs font-mono font-bold text-red-700">
 									{grouped.meats.filter(i => i.status !== 'served').reduce((s: number, i) => s + (i.weight ?? 0), 0)}g
 								</span>
 							</div>
@@ -389,6 +432,8 @@
 										onclick={() => !isServed && toggleExpand(item.id)}
 										role={isServed ? undefined : 'button'}
 										tabindex={isServed ? -1 : 0}
+										aria-expanded={isServed ? undefined : isExpanded}
+										aria-label={isServed ? undefined : `${isExpanded ? 'Collapse' : 'Expand'} actions for ${item.menuItemName}`}
 									>
 										<div class="flex-1 flex items-center gap-2 min-w-0">
 											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
@@ -421,6 +466,13 @@
 												<Check class="w-5 h-5" strokeWidth={3} />
 											</span>
 										{:else}
+											<span class="shrink-0 text-gray-400">
+												{#if isExpanded}
+													<ChevronUp class="w-4 h-4" />
+												{:else}
+													<ChevronDown class="w-4 h-4" />
+												{/if}
+											</span>
 											<button
 												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
 												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
@@ -459,6 +511,8 @@
 										onclick={() => !isServed && toggleExpand(item.id)}
 										role={isServed ? undefined : 'button'}
 										tabindex={isServed ? -1 : 0}
+										aria-expanded={isServed ? undefined : isExpanded}
+										aria-label={isServed ? undefined : `${isExpanded ? 'Collapse' : 'Expand'} actions for ${item.menuItemName}`}
 									>
 										<div class="flex-1 flex items-center gap-2 min-w-0">
 											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
@@ -483,6 +537,13 @@
 												<Check class="w-5 h-5" strokeWidth={3} />
 											</span>
 										{:else}
+											<span class="shrink-0 text-gray-400">
+												{#if isExpanded}
+													<ChevronUp class="w-4 h-4" />
+												{:else}
+													<ChevronDown class="w-4 h-4" />
+												{/if}
+											</span>
 											<button
 												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
 												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
@@ -521,6 +582,8 @@
 										onclick={() => !isServed && toggleExpand(item.id)}
 										role={isServed ? undefined : 'button'}
 										tabindex={isServed ? -1 : 0}
+										aria-expanded={isServed ? undefined : isExpanded}
+										aria-label={isServed ? undefined : `${isExpanded ? 'Collapse' : 'Expand'} actions for ${item.menuItemName}`}
 									>
 										<div class="flex-1 flex items-center gap-2 min-w-0">
 											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
@@ -535,6 +598,13 @@
 												<Check class="w-5 h-5" strokeWidth={3} />
 											</span>
 										{:else}
+											<span class="shrink-0 text-gray-400">
+												{#if isExpanded}
+													<ChevronUp class="w-4 h-4" />
+												{:else}
+													<ChevronDown class="w-4 h-4" />
+												{/if}
+											</span>
 											<button
 												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
 												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
@@ -576,3 +646,26 @@
 	onConfirm={handleRefuseConfirm}
 	onCancel={() => refuseTarget = null}
 />
+
+<!-- Toast -->
+{#if toast.visible}
+	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 px-5 py-3 shadow-lg text-white text-sm font-medium">
+		<span>{toast.message}</span>
+		{#if toast.undoFn}
+			<button
+				onclick={toast.undoFn}
+				class="rounded-lg bg-white/20 px-3 py-1 text-xs font-bold hover:bg-white/30 transition-colors"
+				style="min-height: 32px"
+			>
+				Undo
+			</button>
+		{/if}
+		<button
+			onclick={dismissToast}
+			class="text-white/60 hover:text-white transition-colors"
+			style="min-height: 32px"
+		>
+			✕
+		</button>
+	</div>
+{/if}

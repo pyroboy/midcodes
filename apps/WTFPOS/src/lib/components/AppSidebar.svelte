@@ -38,6 +38,8 @@
 		ArrowLeftRight,
 	} from 'lucide-svelte';
 	import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
+	import { orders } from '$lib/stores/pos.svelte';
+	import LocationSelectorModal from '$lib/components/stock/LocationSelectorModal.svelte';
 
 	const allNavItems = [
 		{ href: '/pos',     label: 'POS',     Icon: ShoppingCart },
@@ -89,6 +91,33 @@
 	function isActive(href: string) {
 		return page.url.pathname === href || page.url.pathname.startsWith(href + '/');
 	}
+
+	// ─── P1-15 / P2-17: Change Location confirmation state ───────────────────
+	let showLocationConfirm = $state(false);
+	let showLocationModal = $state(false);
+
+	// Count open orders at current branch (P2-17)
+	const openOrderCount = $derived(
+		session.locationId === 'all'
+			? 0
+			: orders.value.filter(o =>
+				o.locationId === session.locationId &&
+				(o.status === 'open' || o.status === 'pending_payment')
+			).length
+	);
+
+	function requestLocationChange() {
+		showLocationConfirm = true;
+	}
+
+	function cancelLocationChange() {
+		showLocationConfirm = false;
+	}
+
+	function confirmLocationSwitch() {
+		showLocationConfirm = false;
+		showLocationModal = true;
+	}
 </script>
 
 <Sidebar collapsible="icon">
@@ -122,6 +151,7 @@
 					</div>
 				</div>
 			{:else}
+				<!-- P2-15: Use short name matching LocationBanner format -->
 				<p class="text-xs font-semibold text-gray-700 truncate text-center">{currentLoc?.name ?? 'Unknown'}</p>
 			{/if}
 			<p class="mt-0.5 font-mono text-[11px] tracking-widest text-gray-400 text-center">{clockTime}</p>
@@ -141,15 +171,22 @@
 			{ href: '/stock/transfers', label: 'Transfer Stock', Icon: ArrowLeftRight },
 			{ href: '/reports/eod', label: 'End of Day', Icon: Moon },
 		]}
-		<div class="px-2 py-1.5 group-data-[collapsible=icon]:px-1">
-			<p class="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400 group-data-[collapsible=icon]:hidden">
-				Quick Actions
-			</p>
-			<div class="flex flex-col gap-1">
+		{@const isAllLocation = session.locationId === 'all'}
+		<!-- P0-7: overflow-hidden prevents quick action elements from extending outside sidebar bounds -->
+		<div class="px-2 py-1.5 group-data-[collapsible=icon]:px-1 overflow-hidden">
+			<div class="mb-1.5 flex items-center justify-between group-data-[collapsible=icon]:hidden">
+				<p class="px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">
+					Quick Actions
+				</p>
+				{#if isAllLocation}
+					<span class="rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-gray-100">Select branch</span>
+				{/if}
+			</div>
+			<div class={cn('flex flex-col gap-1', isAllLocation && 'opacity-50 pointer-events-none')} title={isAllLocation ? 'Select a specific branch to use quick actions' : undefined}>
 				{#each quickActions as qa}
 					<a
 						href="{qa.href}?action=open"
-						title={qa.label}
+						title={isAllLocation ? 'Select a branch first' : qa.label}
 						class={cn(
 							'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors',
 							isActive(qa.href)
@@ -159,7 +196,8 @@
 						)}
 					>
 						<qa.Icon class="h-4 w-4 shrink-0" />
-						<span class="group-data-[collapsible=icon]:hidden">{qa.label}</span>
+						<!-- P1-18: Visible label in expanded mode; sr-only in collapsed mode -->
+						<span class="group-data-[collapsible=icon]:sr-only">{qa.label}</span>
 					</a>
 				{/each}
 			</div>
@@ -210,6 +248,47 @@
 			</div>
 		</div>
 
+		<!-- P1-15: Change Location button with confirmation (elevated roles only) -->
+		{#if ELEVATED_ROLES.includes(session.role)}
+			<div class="px-1 group-data-[collapsible=icon]:hidden">
+				{#if showLocationConfirm}
+					<!-- Inline confirmation panel -->
+					<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 flex flex-col gap-2">
+						<p class="text-xs font-semibold text-amber-800 leading-snug">
+							Switch location? This will change all data views to the new branch.
+						</p>
+						{#if openOrderCount > 0}
+							<p class="text-xs text-amber-700">
+								You have <strong>{openOrderCount}</strong> open {openOrderCount === 1 ? 'table' : 'tables'} at this branch.
+							</p>
+						{/if}
+						<div class="flex gap-2 mt-1">
+							<button
+								onclick={confirmLocationSwitch}
+								class="flex-1 rounded-md bg-amber-600 px-2 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors"
+							>
+								Switch Anyway
+							</button>
+							<button
+								onclick={cancelLocationChange}
+								class="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+							>
+								Cancel
+							</button>
+						</div>
+					</div>
+				{:else}
+					<button
+						onclick={requestLocationChange}
+						class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors border border-dashed border-gray-200"
+					>
+						<ArrowLeftRight class="h-3.5 w-3.5 shrink-0" />
+						<span>Change Location</span>
+					</button>
+				{/if}
+			</div>
+		{/if}
+
 		<!-- Logout -->
 		<div class="px-1 group-data-[collapsible=icon]:px-0">
 			<a
@@ -226,6 +305,10 @@
 
 	<SidebarRail />
 </Sidebar>
+
+{#if showLocationModal}
+	<LocationSelectorModal onClose={() => (showLocationModal = false)} />
+{/if}
 
 <style>
 	@keyframes ticker-up {

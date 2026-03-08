@@ -2,6 +2,6 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	onMount(() => {
-		goto('/reports/meat-report');
+		goto('/reports/x-read');
 	});
 </script>

@@ -94,7 +94,11 @@
 	function verifyPin() {
 		if (pin === MANAGER_PIN) {
 			const acct = ACCOUNTS[username.trim().toLowerCase()];
-			if (acct) writeLog('auth', `Login: ${acct.displayName} (${acct.role}) — PIN verified`);
+			if (acct) {
+				// Ensure session is set with correct role before navigating (P0-6)
+				setSession(acct.displayName, acct.role, acct.locationId);
+				writeLog('auth', `Login: ${acct.displayName} (${acct.role}) — PIN verified`);
+			}
 			showPin = false;
 			goto(pendingDest);
 		} else { pin = ''; pinError = true; }

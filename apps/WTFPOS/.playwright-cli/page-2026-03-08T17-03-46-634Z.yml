@@ -1,0 +1,232 @@
+- generic [ref=e2]:
+  - button "📡" [ref=e122] [cursor=pointer]
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - generic [ref=e123]:
+        - generic "Select a specific branch to use quick actions":
+          - link "Receive Delivery":
+            - /url: /stock/deliveries?action=open
+            - img
+            - generic: Receive Delivery
+          - link "Log Expense":
+            - /url: /reports/expenses-daily?action=open
+            - img
+            - generic: Log Expense
+          - link "Log Waste":
+            - /url: /stock/waste?action=open
+            - img
+            - generic: Log Waste
+          - link "Stock Count":
+            - /url: /stock/counts?action=open
+            - img
+            - generic: Stock Count
+          - link "X-Reading":
+            - /url: /reports/x-read?action=open
+            - img
+            - generic: X-Reading
+          - link "Transfer Stock":
+            - /url: /stock/transfers?action=open
+            - img
+            - generic: Transfer Stock
+          - link "End of Day":
+            - /url: /reports/eod?action=open
+            - img
+            - generic: End of Day
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e19]
+            - generic: POS
+        - listitem [ref=e124]:
+          - link "Kitchen" [ref=e125] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e126]
+            - generic: Kitchen
+        - listitem [ref=e127]:
+          - link "Stock" [ref=e128] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e129]
+            - generic: Stock
+        - listitem [ref=e130]:
+          - link "Reports" [ref=e131] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e132]
+            - generic: Reports
+        - listitem [ref=e133]:
+          - link "Admin" [ref=e134] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e135]
+            - generic: Admin
+      - generic [ref=e23]:
+        - separator [ref=e24]
+        - generic [ref=e26]: C
+        - link "Logout" [ref=e28] [cursor=pointer]:
+          - /url: /
+          - img [ref=e29]
+      - button "Toggle Sidebar" [ref=e32]
+    - main [ref=e33]:
+      - generic [ref=e136]:
+        - generic [ref=e137]:
+          - img [ref=e138]
+          - heading "ALL LOCATIONS" [level=2] [ref=e139]
+        - button "Change Location" [ref=e140] [cursor=pointer]:
+          - img [ref=e141]
+          - text: Change Location
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - heading "Consolidated Reports" [level=1] [ref=e37]
+            - generic [ref=e142]: 🌐 All Branches
+          - navigation [ref=e38]:
+            - generic [ref=e39]:
+              - generic [ref=e40]: Operations
+              - generic [ref=e41]:
+                - link "Meat Report" [ref=e42] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e43] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e44] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e45] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e46] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e47] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e48] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e50]:
+              - generic [ref=e51]: Expenses
+              - generic [ref=e52]:
+                - link "Daily" [ref=e53] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e54] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e56]:
+              - generic [ref=e57]: Revenue & Sales
+              - generic [ref=e58]:
+                - link "Sales Summary" [ref=e59] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e60] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e61] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e63]:
+              - generic [ref=e64]: Profitability
+              - generic [ref=e65]:
+                - link "Gross Profit" [ref=e66] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e67] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e69]:
+              - generic [ref=e70]: Branch
+              - link "Compare" [ref=e72] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e74]:
+          - generic [ref=e75]:
+            - button "Daily" [ref=e76] [cursor=pointer]
+            - button "Weekly" [ref=e77] [cursor=pointer]
+            - generic [ref=e78]: Live
+          - generic [ref=e80]:
+            - generic [ref=e81]:
+              - paragraph [ref=e82]: Gross Sales
+              - paragraph [ref=e83]: ₱145,530.00
+            - generic [ref=e84]:
+              - paragraph [ref=e85]: Net Sales
+              - paragraph [ref=e86]: ₱142,417.00
+            - generic [ref=e87]:
+              - paragraph [ref=e88]: VAT Collected
+              - paragraph [ref=e89]: ₱15,259.00
+            - generic [ref=e90]:
+              - paragraph [ref=e91]: Avg Ticket Size
+              - paragraph [ref=e92]: ₱500.00
+            - generic [ref=e93]:
+              - paragraph [ref=e94]: Total Pax
+              - paragraph [ref=e95]: "285"
+          - table [ref=e102]:
+            - rowgroup [ref=e103]:
+              - row "Period Gross Disc. Net VAT Sales Non-VAT Tax Pax" [ref=e104]:
+                - columnheader "Period" [ref=e105]
+                - columnheader "Gross" [ref=e106]
+                - columnheader "Disc." [ref=e107]
+                - columnheader "Net" [ref=e108]
+                - columnheader "VAT Sales" [ref=e109]
+                - columnheader "Non-VAT" [ref=e110]
+                - columnheader "Tax" [ref=e111]
+                - columnheader "Pax" [ref=e112]
+            - rowgroup [ref=e113]:
+              - row "Mar 9 ₱29,206.00 −₱637.00 ₱28,569.00 ₱25,508.00 ₱3,061.00 ₱3,061.00 59" [ref=e143]:
+                - cell "Mar 9" [ref=e144]
+                - cell "₱29,206.00" [ref=e145]
+                - cell "−₱637.00" [ref=e146]
+                - cell "₱28,569.00" [ref=e147]
+                - cell "₱25,508.00" [ref=e148]
+                - cell "₱3,061.00" [ref=e149]
+                - cell "₱3,061.00" [ref=e150]
+                - cell "59" [ref=e151]
+              - row "Today (live) LIVE ₱9,436.00 — ₱9,436.00 ₱8,425.00 ₱1,011.00 ₱1,011.00 21" [ref=e152]:
+                - cell "Today (live) LIVE" [ref=e153]
+                - cell "₱9,436.00" [ref=e154]
+                - cell "—" [ref=e155]
+                - cell "₱9,436.00" [ref=e156]
+                - cell "₱8,425.00" [ref=e157]
+                - cell "₱1,011.00" [ref=e158]
+                - cell "₱1,011.00" [ref=e159]
+                - cell "21" [ref=e160]
+              - row "Mar 7 ₱25,952.00 −₱489.00 ₱25,463.00 ₱22,735.00 ₱2,728.00 ₱2,728.00 55" [ref=e161]:
+                - cell "Mar 7" [ref=e162]
+                - cell "₱25,952.00" [ref=e163]
+                - cell "−₱489.00" [ref=e164]
+                - cell "₱25,463.00" [ref=e165]
+                - cell "₱22,735.00" [ref=e166]
+                - cell "₱2,728.00" [ref=e167]
+                - cell "₱2,728.00" [ref=e168]
+                - cell "55" [ref=e169]
+              - row "Mar 6 ₱23,996.00 −₱793.00 ₱23,203.00 ₱20,717.00 ₱2,486.00 ₱2,486.00 43" [ref=e170]:
+                - cell "Mar 6" [ref=e171]
+                - cell "₱23,996.00" [ref=e172]
+                - cell "−₱793.00" [ref=e173]
+                - cell "₱23,203.00" [ref=e174]
+                - cell "₱20,717.00" [ref=e175]
+                - cell "₱2,486.00" [ref=e176]
+                - cell "₱2,486.00" [ref=e177]
+                - cell "43" [ref=e178]
+              - row "Mar 5 ₱18,418.00 −₱368.00 ₱18,050.00 ₱16,116.00 ₱1,934.00 ₱1,934.00 41" [ref=e179]:
+                - cell "Mar 5" [ref=e180]
+                - cell "₱18,418.00" [ref=e181]
+                - cell "−₱368.00" [ref=e182]
+                - cell "₱18,050.00" [ref=e183]
+                - cell "₱16,116.00" [ref=e184]
+                - cell "₱1,934.00" [ref=e185]
+                - cell "₱1,934.00" [ref=e186]
+                - cell "41" [ref=e187]
+              - row "Mar 4 ₱18,664.00 −₱400.00 ₱18,264.00 ₱16,307.00 ₱1,957.00 ₱1,957.00 29" [ref=e188]:
+                - cell "Mar 4" [ref=e189]
+                - cell "₱18,664.00" [ref=e190]
+                - cell "−₱400.00" [ref=e191]
+                - cell "₱18,264.00" [ref=e192]
+                - cell "₱16,307.00" [ref=e193]
+                - cell "₱1,957.00" [ref=e194]
+                - cell "₱1,957.00" [ref=e195]
+                - cell "29" [ref=e196]
+              - row "Mar 3 ₱19,858.00 −₱426.00 ₱19,432.00 ₱17,350.00 ₱2,082.00 ₱2,082.00 37" [ref=e197]:
+                - cell "Mar 3" [ref=e198]
+                - cell "₱19,858.00" [ref=e199]
+                - cell "−₱426.00" [ref=e200]
+                - cell "₱19,432.00" [ref=e201]
+                - cell "₱17,350.00" [ref=e202]
+                - cell "₱2,082.00" [ref=e203]
+                - cell "₱2,082.00" [ref=e204]
+                - cell "37" [ref=e205]
+              - row "TOTAL ₱145,530.00 −₱3,113.00 ₱142,417.00 ₱15,259.00 285" [ref=e206]:
+                - cell "TOTAL" [ref=e115]
+                - cell "₱145,530.00" [ref=e207]
+                - cell "−₱3,113.00" [ref=e208]
+                - cell "₱142,417.00" [ref=e209]
+                - cell [ref=e119]
+                - cell "₱15,259.00" [ref=e210]
+                - cell "285" [ref=e211]

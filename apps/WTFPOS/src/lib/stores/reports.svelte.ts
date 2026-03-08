@@ -288,8 +288,9 @@ export function eodSummary() {
 	// Derive payment breakdown from actual order.payments[]
 	const cash   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'cash').reduce((t, p) => t + Math.min(p.amount, o.total), 0), 0);
 	const gcash  = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'gcash').reduce((t, p) => t + p.amount, 0), 0);
+	const maya   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'maya').reduce((t, p) => t + p.amount, 0), 0);
 	const card   = os.reduce((s, o) => s + o.payments.filter(p => p.method === 'card').reduce((t, p) => t + p.amount, 0), 0);
-	return { date: getToday(), grossSales: gross, discounts: disc, netSales: net, vatAmount: vat, cash, card, gcash };
+	return { date: getToday(), grossSales: gross, discounts: disc, netSales: net, vatAmount: vat, cash, card, gcash, maya };
 }
 
 // ─── X-Read Mid-Shift Audit ──────────────────────────────────────────────────
@@ -601,7 +602,8 @@ export async function saveZRead(params: Omit<Reading, 'id' | 'type' | 'updatedAt
 
 export const utilitySettings = $state({
 	electricityPerKwh: 12,
-	gasPerKg: 85
+	gasPerKg: 85,
+	waterPerM3: 50,
 });
 
 export interface UtilityReading {
@@ -609,6 +611,7 @@ export interface UtilityReading {
 	date: string;
 	electricity: number;
 	gas: number;
+	water: number;
 	recordedBy: string;
 }
 
@@ -621,7 +624,7 @@ export const utilityReadings = {
 			.map(e => {
 				try {
 					const meta = JSON.parse(e.meta!);
-					return { id: e.id, date: e.isoTimestamp, electricity: Number(meta.electricity) || 0, gas: Number(meta.gas) || 0, recordedBy: e.user };
+					return { id: e.id, date: e.isoTimestamp, electricity: Number(meta.electricity) || 0, gas: Number(meta.gas) || 0, water: Number(meta.water) || 0, recordedBy: e.user };
 				} catch { return null; }
 			})
 			.filter((r): r is UtilityReading => r !== null);
@@ -634,6 +637,6 @@ export function getPreviousUtilityReading(): UtilityReading | null {
 	return readings[0]; // auditLog is sorted desc, so first match is most recent
 }
 
-export async function saveUtilityReading(electricity: number, gas: number) {
-	writeLog('admin', 'EOD Utility Reading', { meta: { electricity, gas } });
+export async function saveUtilityReading(electricity: number, gas: number, water: number = 0) {
+	writeLog('admin', 'EOD Utility Reading', { meta: { electricity, gas, water } });
 }

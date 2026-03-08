@@ -156,7 +156,7 @@
                         <p class="text-sm text-gray-500">🔥 {order.packageName ?? 'Table'} · {order.pax} pax</p>
                     {/if}
                 </div>
-                <button onclick={tryClose} class="text-gray-400 hover:text-gray-600 p-2" aria-label="Close modal">✕</button>
+                <button onclick={tryClose} class="flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-gray-600" aria-label="Close modal">✕</button>
             </div>
 
             <div class="flex gap-2 border-b border-border bg-surface-secondary px-6 py-3">
@@ -355,9 +355,9 @@
                                     </button>
                                 {/if}
                                 <div class="flex items-center gap-1.5 ml-1">
-                                    <button onclick={() => changeQty(idx, -1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">−</button>
+                                    <button onclick={() => changeQty(idx, -1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">−</button>
                                     <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
-                                    <button onclick={() => changeQty(idx, +1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">+</button>
+                                    <button onclick={() => changeQty(idx, +1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">+</button>
                                 </div>
                             </div>
                         </div>
@@ -385,9 +385,9 @@
                                     </button>
                                 {/if}
                                 <div class="flex items-center gap-1.5 ml-1">
-                                    <button onclick={() => changeQty(idx, -1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">−</button>
+                                    <button onclick={() => changeQty(idx, -1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">−</button>
                                     <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
-                                    <button onclick={() => changeQty(idx, +1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">+</button>
+                                    <button onclick={() => changeQty(idx, +1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">+</button>
                                 </div>
                             </div>
                         </div>

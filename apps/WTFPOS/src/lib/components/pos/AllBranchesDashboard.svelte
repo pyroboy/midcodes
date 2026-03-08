@@ -121,8 +121,9 @@
         {#each branches as branch (branch.id)}
             {@const bTables = allTables.filter(t => t.locationId === branch.id)}
             {@const bOrders = allOrders.filter(o => o.locationId === branch.id && o.status === 'open')}
-            {@const bOcc    = bTables.filter(t => t.status !== 'available').length}
-            {@const bFree   = bTables.filter(t => t.status === 'available').length}
+            {@const activeTableIds = new Set(bOrders.filter(o => o.tableId).map(o => o.tableId!))}
+            {@const bOcc    = bTables.filter(t => t.status !== 'available' || activeTableIds.has(t.id)).length}
+            {@const bFree   = bTables.filter(t => t.status === 'available' && !activeTableIds.has(t.id)).length}
             {@const bSales  = bOrders.reduce((s, o) => s + o.total, 0)}
             {@const canvas  = floorLayout.canvasFor(branch.id)}
             {@const elements = floorLayout.elementsFor(branch.id)}

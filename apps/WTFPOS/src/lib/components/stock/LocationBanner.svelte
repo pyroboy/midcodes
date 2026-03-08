@@ -30,6 +30,7 @@
 		return 'View Only';
 	});
 
+	// Elevated roles can change location; locked roles (staff, kitchen) only see the banner read-only (P1-14)
 	const canChangeLocation = $derived(!session.isLocked && ELEVATED_ROLES.includes(session.role));
 
 	const locationTypeLabel = $derived(
@@ -42,19 +43,21 @@
 		session.locationId === 'all' ? 'bg-emerald-500/20 text-emerald-900' :
 		'bg-gray-500/10 text-gray-700'
 	);
+
+	// Show banner to ALL authenticated users — only show Change Location button to elevated roles
+	const isAuthenticated = $derived(!!session.userName);
 </script>
 
-{#if canChangeLocation}
+{#if isAuthenticated}
 <div class={cn('sticky top-0 z-30 w-full border-b px-4 py-2 sm:px-6 shadow-sm flex items-center justify-between gap-3 transition-colors', colors.bg, colors.border)}>
 	<div class="flex items-center gap-2.5">
 		<MapPin class={cn('h-4 w-4 shrink-0', colors.text)} />
 		<h2 class={cn('text-base font-black tracking-tight', colors.text)}>
 			{currentLocation?.name?.toUpperCase() ?? 'UNKNOWN LOCATION'}
 		</h2>
-
-
 	</div>
 
+	{#if canChangeLocation}
 	<button
 		onclick={() => isModalOpen = true}
 		class="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 active:scale-95"
@@ -62,6 +65,7 @@
 		<ArrowDownUp class="h-4 w-4" />
 		Change Location
 	</button>
+	{/if}
 </div>
 
 {#if isModalOpen}

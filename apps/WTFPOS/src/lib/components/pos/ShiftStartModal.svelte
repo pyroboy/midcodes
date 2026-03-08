@@ -91,5 +91,6 @@
 		</button>
 
 		<p class="text-center text-xs text-gray-400">You can enter ₱0 if no opening float is provided.</p>
+	<p class="text-center text-sm text-gray-500 mt-2">Existing open orders are safe — they will remain open.</p>
 	</div>
 </div>

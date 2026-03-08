@@ -7,20 +7,20 @@ export function cn(...inputs: ClassValue[]) {
 
 /** Format seconds into MM:SS display */
 export function formatCountdown(seconds: number): string {
-	const m = Math.floor(seconds / 60);
-	const s = seconds % 60;
+	const clamped = Math.max(0, seconds);
+	const m = Math.floor(clamped / 60);
+	const s = clamped % 60;
 	return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/** Format a past ISO timestamp as "Xm ago" / "2h 15m ago" / "just now" */
-export function formatTimeAgo(isoTimestamp: string, now?: number): string {
-	const diff = (now ?? Date.now()) - new Date(isoTimestamp).getTime();
-	const minutes = Math.floor(diff / 60000);
-	if (minutes < 1) return 'just now';
-	if (minutes < 60) return `${minutes}m ago`;
-	const hrs = Math.floor(minutes / 60);
-	const rem = minutes % 60;
-	return rem > 0 ? `${hrs}h ${rem}m ago` : `${hrs}h ago`;
+/** Format a past ISO timestamp as "Xm ago" / "2h ago" / "just now" */
+export function formatTimeAgo(isoString: string): string {
+	const diffMs = Date.now() - new Date(isoString).getTime();
+	const diffMin = Math.floor(diffMs / 60000);
+	if (diffMin < 1) return 'just now';
+	if (diffMin < 60) return `${diffMin}m ago`;
+	const diffH = Math.floor(diffMin / 60);
+	return `${diffH}h ago`;
 }
 
 /** Format order/ticket ID as #T{tableNumber}-{XXXX} or #TO-{XXXX} */

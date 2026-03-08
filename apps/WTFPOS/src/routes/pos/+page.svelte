@@ -26,8 +26,17 @@
     import { session, isWarehouseSession } from '$lib/stores/session.svelte';
     import { Info } from 'lucide-svelte';
     import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
+    import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
 
     let showLegend = $state(false);
+
+    // P0-5: Redirect kitchen role away from POS to their intended page
+    onMount(() => {
+        if (session.role === 'kitchen') {
+            goto('/kitchen/orders');
+        }
+    });
 
     // ─── Branch-filtered tables/orders ───────────────────────────────────────────
     const tables = $derived(session.locationId === 'all' ? allTables.value : allTables.value.filter(t => t.locationId === session.locationId));
@@ -116,12 +125,37 @@
 
     // ─── Closed/Orphaned Orders for History ──────────────────────────────────
     const closedOrders = $derived(
-        orders.filter(o => 
-            o.status === 'paid' || 
+        orders.filter(o =>
+            o.status === 'paid' ||
             o.status === 'cancelled' ||
             (o.orderType === 'takeout' && o.takeoutStatus === 'picked_up') ||
             (o.orderType === 'dine-in' && !tables.some(t => t.currentOrderId === o.id))
         ).sort((a, b) => (b.closedAt ?? b.createdAt).localeCompare(a.closedAt ?? a.createdAt))
+    );
+
+    // P1-6: History badge shows today's closed orders only
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const todayMidnightIso = todayMidnight.toISOString();
+    const closedOrdersTodayCount = $derived(
+        closedOrders.filter(o => (o.closedAt ?? o.createdAt) >= todayMidnightIso).length
+    );
+
+    // P1-5: Per-shift sequential takeout counter
+    // Count today's takeout orders to derive the next sequence number
+    const takeoutCountToday = $derived(
+        orders.filter(o =>
+            o.orderType === 'takeout' &&
+            o.createdAt >= todayMidnightIso
+        ).length
+    );
+    const currentTakeoutSeq = $derived(
+        currentActiveOrder?.orderType === 'takeout'
+            ? orders
+                .filter(o => o.orderType === 'takeout' && o.createdAt >= todayMidnightIso)
+                .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                .findIndex(o => o.id === currentActiveOrder?.id) + 1
+            : undefined
     );
 
     // ─── Handlers ─────────────────────────────────────────────────────────────
@@ -150,12 +184,18 @@
         showAddItem = false;
     }
 
-    function confirmPax(pax: number) {
+    async function confirmPax(pax: number) {
         if (paxModalTable) {
-            openTable(paxModalTable.id, pax);
-            selectedTableId = paxModalTable.id;
-            showAddItem = true;
-            paxModalTable = null;
+            const tableId = paxModalTable.id;
+            paxModalTable = null; // clear before await to prevent double-click
+            await openTable(tableId, pax);
+            selectedTableId = tableId;
+            // Only auto-open AddItemModal if the order has no items yet
+            const table = allTables.value.find(t => t.id === tableId);
+            const newOrder = table?.currentOrderId ? allOrders.value.find(o => o.id === table.currentOrderId) : null;
+            if (!newOrder || newOrder.items.length === 0) {
+                showAddItem = true;
+            }
         }
     }
 
@@ -359,7 +399,7 @@
                             class="flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
                             style="min-height: 40px"
                         >
-                            🧾 History {#if closedOrders.length > 0}<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">{closedOrders.length}</span>{/if}
+                            🧾 History {#if closedOrdersTodayCount > 0}<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">{closedOrdersTodayCount}</span>{/if}
                         </button>
                     </div>
                 </div>
@@ -380,8 +420,8 @@
                 />
             </div>
 
-            <OrderSidebar 
-                order={currentActiveOrder} 
+            <OrderSidebar
+                order={currentActiveOrder}
                 table={selectedTable}
                 onclose={closeBill}
                 onadditem={() => showAddItem = true}
@@ -403,6 +443,7 @@
                 oncanceltable={handleCancelTable}
                 {pendingRejections}
                 onacknowledgeRejection={(alertId) => acknowledgeAlert(alertId)}
+                takeoutSeq={currentTakeoutSeq}
             />
         </div>
     {/if}

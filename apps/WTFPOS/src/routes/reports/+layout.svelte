@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { cn } from '$lib/utils';
-	import { session } from '$lib/stores/session.svelte';
+	import { session, getCurrentLocation } from '$lib/stores/session.svelte';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
 
 	let currentRoute = $derived(page.url.pathname);
+	const currentLoc = $derived(getCurrentLocation());
 
 	const tabGroups = [
 		{
@@ -54,10 +55,16 @@
 <div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
 	<div class="shrink-0 bg-white border-b border-border px-6 pt-3 pb-0 flex flex-col gap-2">
 		<div class="flex items-center gap-3">
-			<h1 class="text-xl font-bold text-gray-900 tracking-tight shrink-0">Consolidated Reports</h1>
+			<h1 class="text-xl font-bold text-gray-900 tracking-tight shrink-0">
+				{session.locationId === 'all' ? 'Consolidated Reports' : 'Branch Reports'}
+			</h1>
 			{#if session.locationId === 'all'}
 				<span class="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700">
 					🌐 All Branches
+				</span>
+			{:else}
+				<span class="rounded-full border border-accent/30 bg-accent-light px-2.5 py-0.5 text-xs font-semibold text-accent">
+					📍 {currentLoc?.name ?? 'Branch'}
 				</span>
 			{/if}
 		</div>

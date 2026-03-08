@@ -9,6 +9,16 @@
     }
 
     let { table, onconfirm, oncancel }: Props = $props();
+
+    let customPax = $state('');
+
+    function handleCustomConfirm() {
+        const val = parseInt(customPax);
+        if (!isNaN(val) && val > 0) {
+            customPax = '';
+            onconfirm(val);
+        }
+    }
 </script>
 
 {#if table}
@@ -21,6 +31,26 @@
                         {num}
                     </button>
                 {/each}
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label for="pax-custom-input" class="text-xs font-semibold text-gray-500">Other (type number)</label>
+                <div class="flex gap-2">
+                    <input
+                        id="pax-custom-input"
+                        type="number"
+                        min="1"
+                        bind:value={customPax}
+                        placeholder="e.g. 15"
+                        class="pos-input flex-1"
+                        onkeydown={(e) => { if (e.key === 'Enter') handleCustomConfirm(); }}
+                    />
+                    <button
+                        onclick={handleCustomConfirm}
+                        disabled={!customPax || isNaN(parseInt(customPax)) || parseInt(customPax) < 1}
+                        class="btn-primary px-4 disabled:opacity-40"
+                        style="min-height: 44px"
+                    >OK</button>
+                </div>
             </div>
             <div class="flex gap-2 mt-2">
                 <button class="btn-ghost flex-1" onclick={oncancel}>Cancel</button>

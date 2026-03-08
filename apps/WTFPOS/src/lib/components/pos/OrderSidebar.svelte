@@ -6,6 +6,7 @@
 	import ManagerPinModal from './ManagerPinModal.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
+	import { TriangleAlert } from 'lucide-svelte';
 
 	interface Props {
 		order: Order | undefined;
@@ -23,6 +24,7 @@
 		oncanceltable?: () => void;
 		pendingRejections?: KitchenAlert[];
 		onacknowledgeRejection?: (alertId: string) => void;
+		takeoutSeq?: number;
 	}
 
 	let {
@@ -40,7 +42,8 @@
 		onmerge,
 		oncanceltable,
 		pendingRejections = [],
-		onacknowledgeRejection
+		onacknowledgeRejection,
+		takeoutSeq
 	}: Props = $props();
 
 	let showMoreActions = $state(false);
@@ -63,6 +66,9 @@
 	}
 
 	function takeoutLabel(o: Order) {
+		if (takeoutSeq !== undefined && takeoutSeq > 0) {
+			return `#TO-${String(takeoutSeq).padStart(3, '0')}`;
+		}
 		const timeCode = new Date(o.createdAt).getTime() % 1000;
 		return `#TO${String(timeCode).padStart(3, '0')}`;
 	}
@@ -239,8 +245,7 @@
 			{#if item.status === 'pending' && order}
 				<button
 					onclick={() => handleRemoveItem(item)}
-					class="flex h-5 w-5 items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-status-red transition-colors shrink-0"
-					style="min-height: unset"
+					class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-status-red transition-colors shrink-0"
 					title={isWithinGracePeriod(item.addedAt) ? 'Remove (grace period)' : 'Remove (PIN required)'}
 				>✕</button>
 			{/if}
@@ -294,7 +299,7 @@
 						{/if}
 					{/if}
 				</div>
-				<button onclick={onclose} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>
+				<button onclick={onclose} class="flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-gray-600">✕</button>
 			</div>
 
 			{#if order.orderType === 'takeout'}
@@ -513,8 +518,8 @@
 						</div>
 					</div>
 				{:else}
-					<button onclick={() => confirmCancel = true} class="btn-ghost w-full border border-status-red text-status-red hover:bg-red-50 text-sm font-semibold" style="min-height: 44px">
-						Cancel Table
+					<button onclick={() => confirmCancel = true} class="btn-ghost w-full border border-status-red text-status-red hover:bg-red-50 text-sm font-semibold flex items-center justify-center gap-1.5" style="min-height: 44px">
+						<TriangleAlert class="h-4 w-4" /> Cancel Table
 					</button>
 				{/if}
 			{:else}
@@ -530,9 +535,9 @@
 			<button
 				onclick={() => { showMoreActions = !showMoreActions; }}
 				class="w-full rounded-lg border border-border bg-surface py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all"
-				style="min-height: 36px"
+				style="min-height: 44px"
 			>
-				{showMoreActions ? '▲ Hide' : 'Transfer · Pax · Split · Merge'}
+				{showMoreActions ? '▲ Hide' : 'More ▼'}
 			</button>
 
 			{#if showMoreActions}

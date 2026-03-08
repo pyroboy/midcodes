@@ -3,6 +3,21 @@
 	import { voidsAndDiscountsSummary } from '$lib/stores/reports.svelte';
 
 	const summary = $derived(voidsAndDiscountsSummary());
+
+	// P1-25: Map cancel reason codes to readable labels
+	function reasonLabel(cancelReason: string | undefined | null): string {
+		if (!cancelReason) return 'Mistake';
+		const map: Record<string, string> = {
+			mistake: 'Mistake',
+			walkout: 'Walkout',
+			write_off: 'Write-off',
+		};
+		return map[cancelReason] ?? cancelReason;
+	}
+
+	function formatTime(iso: string) {
+		return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+	}
 </script>
 
 <!-- Live indicator -->
@@ -24,7 +39,7 @@
 					{summary.voids.count} Orders
 				</span>
 			</div>
-			
+
 			<div class="mb-6 flex items-baseline gap-2">
 				<span class="text-3xl font-extrabold text-status-red font-mono">{formatPeso(summary.voids.value)}</span>
 				<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Total Lost</span>
@@ -46,6 +61,53 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- P1-25: Per-order voids detail table with Reason column -->
+		{#if summary.voids.items.length > 0}
+			<div class="rounded-xl border border-border bg-white overflow-hidden">
+				<div class="px-5 py-3 border-b border-border">
+					<h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">Void Detail</h3>
+				</div>
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="border-b border-border bg-gray-50">
+							<th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Order / Table</th>
+							<th class="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</th>
+							<th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Reason</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-border">
+						{#each summary.voids.items as order (order.id)}
+							<tr class="hover:bg-gray-50">
+								<td class="px-4 py-2.5 text-gray-700 font-medium">
+									{order.tableId ?? 'Takeout'}
+								</td>
+								<td class="px-4 py-2.5 text-right font-mono text-status-red">
+									{formatPeso(order.subtotal)}
+								</td>
+								<td class="px-4 py-2.5">
+									<!-- P1-25: Display reason or fallback to em dash -->
+									{#if order.cancelReason}
+										<span class={cn(
+											'rounded-full px-2.5 py-0.5 text-xs font-medium',
+											order.cancelReason === 'walkout' ? 'bg-status-red/10 text-status-red' :
+											order.cancelReason === 'write_off' ? 'bg-status-yellow/10 text-status-yellow' :
+											'bg-gray-100 text-gray-600'
+										)}>
+											{reasonLabel(order.cancelReason)}
+										</span>
+									{:else}
+										<!-- void reason not stored on this record -->
+										<span class="text-gray-400">—</span>
+										<!-- TODO: cancelReason is stored on the order document as order.cancelReason -->
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Discounts Section -->
@@ -57,7 +119,7 @@
 					{summary.discounts.count} Orders
 				</span>
 			</div>
-			
+
 			<div class="mb-6 flex items-baseline gap-2">
 				<span class="text-3xl font-extrabold text-accent font-mono">{formatPeso(summary.discounts.value)}</span>
 				<span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Total Given</span>

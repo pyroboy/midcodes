@@ -45,6 +45,18 @@
 	}
 </script>
 
+<!-- P0-10: Sticky top save bar — visible above fold so staff don't have to scroll to submit -->
+{#if isPending}
+	<div class="sticky top-0 z-20 mb-4 flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent-light px-4 py-2.5 shadow-sm">
+		<p class="text-sm font-semibold text-accent">
+			Enter counts for each item, then tap Save.
+		</p>
+		<button onclick={handleSubmitCount} class="btn-primary text-sm px-5">
+			Save Counts
+		</button>
+	</div>
+{/if}
+
 <!-- Period selector -->
 <div class="mb-5 flex items-center gap-3">
 	{#each countPeriods as p}

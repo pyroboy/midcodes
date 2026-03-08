@@ -358,7 +358,7 @@
 							</span>
 							<span class="text-xs text-gray-500">
 								{#if active}
-									Opened {formatTimeAgo(order.createdAt, now)}
+									Opened {formatTimeAgo(order.createdAt)}
 								{:else}
 									{closedTimeDisplay(order.closedAt)}
 								{/if}
@@ -454,7 +454,7 @@
 					<div class="flex flex-col gap-1">
 						<h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">Timing</h3>
 						<p class="text-sm text-gray-700">
-							Opened {formatTimeAgo(selectedOrder.createdAt, now)}
+							Opened {formatTimeAgo(selectedOrder.createdAt)}
 						</p>
 						{#if selectedOrder.closedAt}
 							<p class="text-sm text-gray-500">

@@ -2,7 +2,7 @@
  * Global Session State — Svelte 5 Runes
  * Holds the currently logged-in user and selected location.
  * Locations can be 'retail' (tables + POS + KDS) or 'warehouse' (inventory only).
- * Session is persisted to localStorage so it survives page reloads.
+ * Session is persisted to sessionStorage (not localStorage) to prevent same-origin tab collision.
  */
 import { browser } from '$app/environment';
 
@@ -58,7 +58,7 @@ export const ROLE_NAV_ACCESS: Record<Role, string[]> = {
 function loadPersistedSession(): { userName: string; role: Role; locationId: LocationId; isLocked: boolean } {
 	if (!browser) return { userName: '', role: 'staff', locationId: 'tag', isLocked: false };
 	try {
-		const raw = localStorage.getItem(SESSION_KEY);
+		const raw = sessionStorage.getItem(SESSION_KEY);
 		if (raw) return JSON.parse(raw);
 	} catch {}
 	return { userName: '', role: 'staff', locationId: 'tag', isLocked: false };
@@ -109,7 +109,7 @@ export function setSession(userName: string, role: Role, locationId: LocationId 
 	session.locationId = resolvedLocationId;
 	session.isLocked   = isLocked;
 	if (browser) {
-		localStorage.setItem(SESSION_KEY, JSON.stringify({
+		sessionStorage.setItem(SESSION_KEY, JSON.stringify({
 			userName: session.userName,
 			role:     session.role,
 			locationId: session.locationId,
@@ -118,10 +118,12 @@ export function setSession(userName: string, role: Role, locationId: LocationId 
 	}
 }
 
+// TODO: P0-8 session expiry warning — requires server-side session timestamps
+
 export function clearSession() {
 	session.userName   = '';
 	session.role       = 'staff';
 	session.locationId = 'tag';
 	session.isLocked   = false;
-	if (browser) localStorage.removeItem(SESSION_KEY);
+	if (browser) sessionStorage.removeItem(SESSION_KEY);
 }

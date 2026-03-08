@@ -5,7 +5,7 @@
 	import { inPeriod } from '$lib/stores/reports.svelte';
 
 	type Period = 'today' | 'week' | 'month';
-	let period = $state<Period>('month');
+	let period = $state<Period>('today');
 
 	const BRANCHES = [
 		{ id: 'tag', name: 'Tagbilaran Branch' },
@@ -65,8 +65,8 @@
 	}
 
 	const compareRows: CompareRow[] = [
-		{ label: 'Gross Revenue',  key: 'grossRevenue',  format: 'peso' },
-		{ label: 'Net Revenue',    key: 'netRevenue',    format: 'peso' },
+		{ label: 'Gross Sales',    key: 'grossRevenue',  format: 'peso' },
+		{ label: 'Net Sales',      key: 'netRevenue',    format: 'peso' },
 		{ label: 'Total Expenses', key: 'totalExpenses', format: 'peso', lowerIsBetter: true },
 		{ label: 'Gross Profit',   key: 'grossProfit',   format: 'peso', highlight: true },
 		{ label: 'Net Profit',     key: 'netProfit',     format: 'peso', highlight: true },
@@ -120,6 +120,21 @@
 		</div>
 	{/each}
 </div>
+
+<!-- Empty state when no data for selected period -->
+{#if branches.every(b => b.grossRevenue === 0)}
+	<div class="mb-5 flex items-start gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5">
+		<div class="text-2xl">📭</div>
+		<div>
+			<p class="font-semibold text-gray-700">No orders found for this period</p>
+			<p class="text-sm text-gray-500 mt-0.5">
+				{period === 'today' ? "No paid orders today yet. Try 'This Week' or 'This Month' to see historical data." :
+				 period === 'week'  ? "No paid orders this week. Try 'This Month' to see more data." :
+				                     "No paid orders this month. Check that orders have been settled (paid status)."}
+			</p>
+		</div>
+	</div>
+{/if}
 
 <!-- Side-by-side comparison table -->
 <div class="overflow-hidden rounded-xl border border-border bg-white">

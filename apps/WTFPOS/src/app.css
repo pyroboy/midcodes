@@ -67,7 +67,12 @@
 	/* Input ------------------------------------------------------------------ */
 	.pos-input {
 		@apply w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm
-		       text-gray-900 placeholder:text-gray-400 outline-none
+		       text-gray-900 placeholder:text-gray-500 outline-none
 		       focus:border-accent focus:ring-2 focus:ring-orange-100 transition-all;
+	}
+
+	/* Explicit placeholder contrast rule — gray-500 (#6B7280) for WCAG AA compliance */
+	.pos-input::placeholder {
+		color: #6B7280;
 	}
 }

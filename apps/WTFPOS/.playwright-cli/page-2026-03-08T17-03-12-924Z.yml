@@ -1,0 +1,171 @@
+- generic [ref=e2]:
+  - button "📡" [ref=e110] [cursor=pointer]
+  - generic [ref=e111]:
+    - generic [ref=e115]:
+      - button "Toggle sidebar" [ref=e118] [cursor=pointer]:
+        - generic [ref=e119]: W!
+      - separator [ref=e120]
+      - generic [ref=e121]:
+        - generic "Select a specific branch to use quick actions":
+          - link "Select a branch first":
+            - /url: /stock/deliveries?action=open
+            - img
+          - link "Select a branch first":
+            - /url: /reports/expenses-daily?action=open
+            - img
+          - link "Select a branch first":
+            - /url: /stock/waste?action=open
+            - img
+          - link "Select a branch first":
+            - /url: /stock/counts?action=open
+            - img
+          - link "Select a branch first":
+            - /url: /reports/x-read?action=open
+            - img
+          - link "Select a branch first":
+            - /url: /stock/transfers?action=open
+            - img
+          - link "Select a branch first":
+            - /url: /reports/eod?action=open
+            - img
+      - list [ref=e125]:
+        - listitem [ref=e126]:
+          - link "POS" [ref=e127] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e128]
+            - generic: POS
+        - listitem [ref=e129]:
+          - link "Kitchen" [ref=e130] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e131]
+            - generic: Kitchen
+        - listitem [ref=e132]:
+          - link "Stock" [ref=e133] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e134]
+            - generic: Stock
+        - listitem [ref=e135]:
+          - link "Reports" [ref=e136] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e137]
+            - generic: Reports
+        - listitem [ref=e138]:
+          - link "Admin" [ref=e139] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e140]
+            - generic: Admin
+      - generic [ref=e141]:
+        - separator [ref=e142]
+        - generic [ref=e144]: C
+        - link "Logout" [ref=e146] [cursor=pointer]:
+          - /url: /
+          - img [ref=e147]
+      - button "Toggle Sidebar" [ref=e148]
+    - main [ref=e149]:
+      - generic [ref=e150]:
+        - generic [ref=e151]:
+          - img [ref=e152]
+          - heading "ALL LOCATIONS" [level=2] [ref=e153]
+        - button "Change Location" [ref=e154] [cursor=pointer]:
+          - img [ref=e155]
+          - text: Change Location
+      - generic [ref=e157]:
+        - generic [ref=e158]:
+          - generic [ref=e163]: ALL BRANCHES — LIVE
+          - generic [ref=e164]: read only · order taking disabled
+        - generic [ref=e165]:
+          - generic [ref=e166]:
+            - generic [ref=e167]:
+              - generic [ref=e168]: Alta Citta
+              - generic [ref=e169]:
+                - generic [ref=e170]: 3 OCC
+                - generic [ref=e171]: 5 FREE
+                - generic [ref=e172]: ₱7,156.00
+            - img [ref=e174]:
+              - generic [ref=e177]:
+                - generic: T1
+                - generic: free
+              - generic [ref=e179]:
+                - generic: T2
+                - generic: free
+              - generic [ref=e181]:
+                - generic: T3
+                - generic: free
+              - generic [ref=e183]:
+                - generic: T4
+                - generic: free
+              - generic [ref=e185]:
+                - generic: T5
+                - generic: free
+              - generic [ref=e187]:
+                - generic: T6
+                - generic: free
+              - generic [ref=e189]:
+                - generic: T7
+                - generic: free
+              - generic [ref=e191]:
+                - generic: T8
+                - generic: free
+            - generic [ref=e193]:
+              - generic [ref=e194]: Active Orders
+              - generic [ref=e195]:
+                - generic [ref=e196]: T7 · Beef Unlimited · 3p
+                - generic [ref=e197]: ₱1,846.00
+              - generic [ref=e198]:
+                - generic [ref=e199]: T3 · Beef Unlimited · 2p
+                - generic [ref=e200]: ₱1,794.00
+              - generic [ref=e201]:
+                - generic [ref=e202]: Maria
+                - generic [ref=e203]: ₱615.00
+              - generic [ref=e204]:
+                - generic [ref=e205]: T4 · Beef Unlimited · 2p
+                - generic [ref=e206]: ₱1,091.00
+              - generic [ref=e207]: +2 more orders
+          - generic [ref=e208]:
+            - generic [ref=e209]:
+              - generic [ref=e210]: Alona Beach
+              - generic [ref=e211]:
+                - generic [ref=e212]: 2 OCC
+                - generic [ref=e213]: 6 FREE
+                - generic [ref=e214]: ₱3,484.00
+            - img [ref=e216]:
+              - generic [ref=e219]:
+                - generic: T1
+                - generic: free
+              - generic [ref=e221]:
+                - generic: T2
+                - generic: free
+              - generic [ref=e223]:
+                - generic: T3
+                - generic: free
+              - generic [ref=e225]:
+                - generic: T4
+                - generic: free
+              - generic [ref=e227]:
+                - generic: T5
+                - generic: free
+              - generic [ref=e229]:
+                - generic: T6
+                - generic: free
+              - generic [ref=e231]:
+                - generic: T7
+                - generic: free
+              - generic [ref=e233]:
+                - generic: T8
+                - generic: free
+            - generic [ref=e235]:
+              - generic [ref=e236]: Active Orders
+              - generic [ref=e237]:
+                - generic [ref=e238]: Jose
+                - generic [ref=e239]: ₱527.00
+              - generic [ref=e240]:
+                - generic [ref=e241]: T2 · Pork Unlimited · 3p
+                - generic [ref=e242]: ₱1,982.00
+              - generic [ref=e243]:
+                - generic [ref=e244]: Juan
+                - generic [ref=e245]: ₱115.00
+              - generic [ref=e246]:
+                - generic [ref=e247]: T8 · · 1p
+                - generic [ref=e248]: ₱338.00
+              - generic [ref=e249]: +1 more orders
+  - generic [ref=e109]: WTF! Samgyup POS

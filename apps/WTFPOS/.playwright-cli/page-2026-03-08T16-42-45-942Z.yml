@@ -1,0 +1,76 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - button "Toggle sidebar" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: W!
+      - separator [ref=e119]
+      - list [ref=e123]:
+        - listitem [ref=e124]:
+          - link "Kitchen" [ref=e125] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e126]
+            - generic: Kitchen
+        - listitem [ref=e127]:
+          - link "Stock" [ref=e128] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e129]
+            - generic: Stock
+      - generic [ref=e130]:
+        - separator [ref=e131]
+        - generic [ref=e133]: P
+        - link "Logout" [ref=e135] [cursor=pointer]:
+          - /url: /
+          - img [ref=e136]
+      - button "Toggle Sidebar" [ref=e137]
+    - main [ref=e138]:
+      - generic [ref=e139]:
+        - navigation [ref=e140]:
+          - link "🧾 All Orders" [ref=e141] [cursor=pointer]:
+            - /url: /kitchen/all-orders
+          - link "📋 Order Queue" [ref=e142] [cursor=pointer]:
+            - /url: /kitchen/orders
+          - link "⚖️ Weigh Station" [ref=e143] [cursor=pointer]:
+            - /url: /kitchen/weigh-station
+        - main [ref=e144]:
+          - generic [ref=e1023]:
+            - generic [ref=e1024]:
+              - generic [ref=e1025]:
+                - heading "All Orders" [level=1] [ref=e1026]
+                - paragraph [ref=e1027]: Complete order history — use Queue for active cooking
+              - generic [ref=e1028]: 1 orders
+            - generic [ref=e1029]:
+              - button "All 12" [ref=e1030] [cursor=pointer]:
+                - text: All
+                - generic [ref=e1031]: "12"
+              - button "Open 1" [ref=e1032] [cursor=pointer]:
+                - text: Open
+                - generic [ref=e1033]: "1"
+              - button "Pending 0" [ref=e1034] [cursor=pointer]:
+                - text: Pending
+                - generic [ref=e1035]: "0"
+              - button "Paid 10" [ref=e1036] [cursor=pointer]:
+                - text: Paid
+                - generic [ref=e1037]: "10"
+              - button "Cancelled 1" [ref=e1038] [cursor=pointer]:
+                - text: Cancelled
+                - generic [ref=e1039]: "1"
+            - generic [ref=e1040]:
+              - button "Today" [ref=e1041] [cursor=pointer]
+              - button "Last Hour" [ref=e1042] [cursor=pointer]
+              - button "Last 3 Hours" [ref=e1043] [cursor=pointer]
+              - button "All Time" [ref=e1044] [cursor=pointer]
+            - button "#T7-WL2G OPEN Table 7 Opened just now 6 items 5 pax Beef Unlimited ₱3,949.00 6/6 served" [ref=e1046] [cursor=pointer]:
+              - generic [ref=e1047]:
+                - generic [ref=e1048]: "#T7-WL2G"
+                - generic [ref=e1050]: OPEN
+              - generic [ref=e1051]:
+                - generic [ref=e1052]:
+                  - generic [ref=e1053]: Table 7
+                  - generic [ref=e1054]: Opened just now
+                - generic [ref=e1055]:
+                  - generic [ref=e1056]: 6 items
+                  - generic [ref=e1057]: 5 pax
+                  - generic [ref=e1058]: Beef Unlimited
+                - generic [ref=e1059]: ₱3,949.00
+                - generic [ref=e1063]: 6/6 served
+  - generic [ref=e109]: WTF! Samgyup POS

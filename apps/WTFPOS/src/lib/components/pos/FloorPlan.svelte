@@ -187,7 +187,7 @@
                     <text
                         x={elCx} y={elCy}
                         text-anchor="middle" dominant-baseline="middle"
-                        font-family="Inter, sans-serif" font-size="11" font-weight="600"
+                        font-family="Inter, sans-serif" font-size="12" font-weight="600"
                         fill={elColor} pointer-events="none"
                     >{elementEmoji(el.type)} {el.label}</text>
                 {/if}
@@ -275,7 +275,7 @@
                         <text
                             x={table.x + 4 + (pkg.length * 7 + 8) / 2} y={table.y + 12}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="8" font-weight="800"
+                            font-family="Inter, sans-serif" font-size="12" font-weight="800"
                             fill={pkgColor(order?.packageId)} pointer-events="none"
                         >{pkg}</text>
                     {/if}
@@ -288,7 +288,7 @@
                         <text
                             x={table.x + W - 6} y={table.y + 14}
                             text-anchor="end" dominant-baseline="middle"
-                            font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700"
+                            font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700"
                             fill={tColor} pointer-events="none"
                         >{timerStr}</text>
                     {/if}
@@ -306,14 +306,14 @@
                         <text
                             x={cx} y={cy + 10}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="10" font-weight="600"
+                            font-family="Inter, sans-serif" font-size="12" font-weight="600"
                             fill="#6b7280" pointer-events="none"
                         >{order?.pax ?? table.capacity} pax</text>
                     {:else}
                         <text
                             x={cx} y={cy + 12}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="10"
+                            font-family="Inter, sans-serif" font-size="12"
                             fill="#9ca3af" pointer-events="none"
                         >cap {table.capacity}</text>
                     {/if}
@@ -323,7 +323,7 @@
                         <text
                             x={cx} y={table.y + H - 8}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700"
+                            font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700"
                             fill="#111827" pointer-events="none"
                         >{formatPeso(table.billTotal)}</text>
                     {/if}
@@ -337,7 +337,7 @@
                         <text
                             x={table.x + 10} y={table.y + H - 9}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="10" font-weight="800"
+                            font-family="Inter, sans-serif" font-size="12" font-weight="800"
                             fill="#ffffff" pointer-events="none"
                         >{unservedCount}</text>
                     {:else if isFullyServed}
@@ -345,7 +345,7 @@
                         <text
                             x={table.x + 10} y={table.y + H - 9}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-size="10" font-weight="bold"
+                            font-size="12" font-weight="bold"
                             fill="#ffffff" pointer-events="none"
                         >✓</text>
                     {/if}
@@ -356,7 +356,7 @@
                         <text
                             x={table.x + W - 15} y={table.y + H - 10}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="8" font-weight="800"
+                            font-family="Inter, sans-serif" font-size="12" font-weight="800"
                             fill="#ffffff" pointer-events="none"
                         >R{refills}</text>
                     {/if}
@@ -370,7 +370,7 @@
                         <text
                             x={table.x + W - 12} y={table.y + 1}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="9" font-weight="800"
+                            font-family="Inter, sans-serif" font-size="12" font-weight="800"
                             fill="#ffffff" pointer-events="none"
                         >⚠ {rejCount}</text>
                     {/if}

@@ -16,12 +16,21 @@
 		drift === null || expected === 0 ? 0 :
 		Math.max(-100, Math.min(100, (drift / maxVisualDrift) * 100))
 	);
+
+	const driftLabel = $derived(
+		drift === null ? 'No count' : drift === 0 ? 'Balanced' : drift > 0 ? `Short ${drift} units` : `Surplus ${Math.abs(drift)} units`
+	);
 </script>
 
-<div class={cn('relative h-2 w-full max-w-[120px] rounded-full bg-gray-100 mx-auto overflow-hidden', className)}>
+<div
+	class={cn('relative h-2 w-full max-w-[120px] rounded-full bg-gray-100 mx-auto overflow-hidden', className)}
+	title={driftLabel}
+	aria-label={driftLabel}
+	role="img"
+>
 	<!-- Center baseline indicator -->
 	<div class="absolute left-1/2 top-0 bottom-0 w-px bg-gray-300 z-10"></div>
-	
+
 	{#if drift !== null && drift !== 0}
 		<!--
 			If drift > 0 (Missing) => Red bar projecting LEFT of center
@@ -36,3 +45,4 @@
 		></div>
 	{/if}
 </div>
+<span class="sr-only">{driftLabel}</span>

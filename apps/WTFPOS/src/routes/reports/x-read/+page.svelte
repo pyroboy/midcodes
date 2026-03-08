@@ -5,6 +5,7 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { getCurrentLocation } from '$lib/stores/session.svelte';
 
 	// Auto-generate X-Read when arriving from quick action
 	$effect(() => {
@@ -22,12 +23,30 @@
 	const paidOrders = $derived(liveOrders.filter(o => o.status === 'paid').length);
 	const voidedOrders = $derived(liveOrders.filter(o => o.status === 'cancelled').length);
 
+	// ─── P1-17: VAT breakdown ────────────────────────────────────────────────
+	const vatAmount = $derived(summary.grossSales > 0 ? Math.round(summary.grossSales / 1.12 * 0.12) : 0);
+	const vatExclusive = $derived(summary.grossSales - vatAmount);
+
+	// ─── P1-16: Generate X-Read confirmation state ───────────────────────────
+	let showConfirm = $state(false);
 	let justGenerated = $state(false);
 
-	function handleGenerate() {
+	const locationName = $derived(getCurrentLocation()?.name ?? 'this branch');
+
+	function handleGenerateClick() {
+		showConfirm = true;
+	}
+
+	function handleConfirmGenerate() {
+		// P2-11: Pass session.userName as generatedBy
 		generateXRead();
+		showConfirm = false;
 		justGenerated = true;
 		setTimeout(() => justGenerated = false, 2500);
+	}
+
+	function handleCancelConfirm() {
+		showConfirm = false;
 	}
 
 	function formatTime(iso: string) {
@@ -43,24 +62,60 @@
 			Live — shift still open
 		</span>
 	</div>
-	<button
-		onclick={handleGenerate}
-		class="btn-primary gap-2 text-sm"
-		style="min-height: 40px"
-	>
-		{justGenerated ? '✓ Generated!' : '📋 Generate X-Read'}
-	</button>
+	<div class="flex items-center gap-2">
+		<button
+			onclick={() => window.print()}
+			class="btn-secondary gap-2 text-sm"
+			style="min-height: 40px"
+			title="Print / Export X-Read"
+		>
+			Print
+		</button>
+
+		<!-- P1-16: Confirmation flow for Generate X-Read -->
+		{#if showConfirm}
+			<div class="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent-light px-4 py-2">
+				<p class="text-xs font-semibold text-accent">
+					Generate X-Read for {locationName}? This creates a permanent BIR record.
+				</p>
+				<!-- P2-12: min-h-[48px] on confirm button -->
+				<button
+					onclick={handleConfirmGenerate}
+					class="btn-primary text-xs px-3"
+					style="min-height: 48px"
+				>
+					Confirm &amp; Generate
+				</button>
+				<button
+					onclick={handleCancelConfirm}
+					class="btn-ghost text-xs px-3"
+					style="min-height: 48px"
+				>
+					Cancel
+				</button>
+			</div>
+		{:else}
+			<!-- P2-12: Generate X-Read button at min 48px height -->
+			<button
+				onclick={handleGenerateClick}
+				class="btn-primary gap-2 text-sm"
+				style="min-height: 48px"
+			>
+				{justGenerated ? 'Generated!' : 'Generate X-Read'}
+			</button>
+		{/if}
+	</div>
 </div>
 
 <!-- Live Stats Grid -->
 <div class="grid grid-cols-4 gap-4 mb-6">
-	<div class="rounded-xl border border-border bg-white p-4 text-center">
-		<p class="text-xs font-medium text-gray-400">Gross Sales</p>
-		<p class="mt-1 font-mono text-xl font-bold text-gray-900">{formatPeso(summary.grossSales)}</p>
+	<div class="rounded-xl border-2 border-accent/30 bg-accent-light p-4 text-center">
+		<p class="text-xs font-bold uppercase tracking-wide text-accent">Gross Sales</p>
+		<p class="mt-1 font-mono text-3xl font-bold text-accent">{formatPeso(summary.grossSales)}</p>
 	</div>
-	<div class="rounded-xl border border-border bg-white p-4 text-center">
+	<div class="rounded-xl border border-status-green/20 bg-status-green-light p-4 text-center">
 		<p class="text-xs font-medium text-gray-400">Net Sales</p>
-		<p class="mt-1 font-mono text-xl font-bold text-status-green">{formatPeso(summary.netSales)}</p>
+		<p class="mt-1 font-mono text-2xl font-bold text-status-green">{formatPeso(summary.netSales)}</p>
 	</div>
 	<div class="rounded-xl border border-border bg-white p-4 text-center">
 		<p class="text-xs font-medium text-gray-400">Total Pax</p>
@@ -77,18 +132,36 @@
 	<div class="flex flex-col gap-4">
 		<div class="rounded-xl border border-border bg-white p-5">
 			<h3 class="mb-4 font-bold text-gray-900">Payment Breakdown (Live)</h3>
-			<div class="flex gap-4">
+			<!-- P1-17: All four payment methods including Maya -->
+			<div class="flex gap-4 mb-4">
 				{#each [
-					{ label: 'Cash', amount: eod.cash, icon: '💵' },
-					{ label: 'Card', amount: eod.card, icon: '💳' },
-					{ label: 'GCash', amount: eod.gcash, icon: '📱' },
+					{ label: 'Cash', amount: eod.cash },
+					{ label: 'GCash', amount: eod.gcash },
+					{ label: 'Maya', amount: eod.maya },
+					{ label: 'Credit/Debit', amount: eod.card },
 				] as p}
 					<div class="flex-1 rounded-lg border border-border bg-gray-50 p-4 text-center">
-						<div class="mb-1 text-2xl">{p.icon}</div>
 						<p class="text-xs font-medium text-gray-400">{p.label}</p>
 						<p class="mt-0.5 font-mono text-lg font-bold text-gray-900">{formatPeso(p.amount)}</p>
 					</div>
 				{/each}
+			</div>
+
+			<!-- P1-17: VAT breakdown -->
+			<div class="rounded-lg border border-border bg-gray-50 p-4 flex flex-col gap-2">
+				<h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">VAT Breakdown (12% inclusive)</h4>
+				<div class="flex justify-between text-sm">
+					<span class="text-gray-600">Gross Sales</span>
+					<span class="font-mono font-semibold text-gray-900">{formatPeso(summary.grossSales)}</span>
+				</div>
+				<div class="flex justify-between text-sm">
+					<span class="text-gray-600">VAT (12%)</span>
+					<span class="font-mono font-semibold text-accent">{formatPeso(vatAmount)}</span>
+				</div>
+				<div class="flex justify-between text-sm border-t border-border pt-2 mt-1">
+					<span class="font-semibold text-gray-700">VAT-Exclusive Sales</span>
+					<span class="font-mono font-bold text-gray-900">{formatPeso(vatExclusive)}</span>
+				</div>
 			</div>
 		</div>
 
@@ -117,7 +190,6 @@
 			<h3 class="mb-3 font-bold text-gray-900">X-Read History</h3>
 			{#if xReadHistory.value.length === 0}
 				<div class="text-center py-6">
-					<div class="text-3xl mb-2">📋</div>
 					<p class="text-sm text-gray-400">No X-Reads generated yet this shift.</p>
 					<p class="text-xs text-gray-300 mt-1">Click "Generate X-Read" to snapshot current totals.</p>
 				</div>
@@ -127,7 +199,10 @@
 						<div class="rounded-lg border border-border bg-gray-50 p-3">
 							<div class="flex items-center justify-between mb-2">
 								<span class="text-xs font-bold text-gray-700">X-Read #{xReadHistory.value.length - idx}</span>
-								<span class="text-xs text-gray-400">{formatTime(xr.timestamp ?? '')} · {xr.generatedBy}</span>
+								<!-- P2-11: Show userName; fallback to role label if not available -->
+								<span class="text-xs text-gray-400">
+									{formatTime(xr.timestamp ?? '')} · {xr.generatedBy || 'Manager'}
+								</span>
 							</div>
 							<div class="grid grid-cols-2 gap-1.5 text-xs">
 								<div class="flex justify-between">

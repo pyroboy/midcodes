@@ -1,0 +1,101 @@
+- generic [ref=e590]:
+  - generic [ref=e591]:
+    - generic [ref=e592]:
+      - generic [ref=e593]: 🔥
+      - heading "WTF! SAMGYUP" [level=1] [ref=e594]
+      - paragraph [ref=e595]: Restaurant POS
+    - generic [ref=e597]:
+      - generic [ref=e598]:
+        - generic [ref=e599]: Username
+        - textbox "Username" [ref=e600]:
+          - /placeholder: e.g. staff
+      - generic [ref=e601]:
+        - generic [ref=e602]: Password
+        - generic [ref=e603]:
+          - textbox "Password" [ref=e604]:
+            - /placeholder: Enter password
+          - button "👁" [ref=e605] [cursor=pointer]
+    - button "LOGIN →" [disabled] [ref=e606] [cursor=pointer]
+    - generic [ref=e607]:
+      - paragraph [ref=e608]: WTF! Samgyupsal POS · v0.1-alpha
+      - button "System Admin" [ref=e609] [cursor=pointer]
+  - generic [ref=e610]:
+    - generic [ref=e611]:
+      - generic [ref=e612]: 🧪 Dev — Test Accounts
+      - generic [ref=e613]: click to login
+    - generic [ref=e614]:
+      - paragraph [ref=e616]: 🏠 Alta Citta · Tagbilaran
+      - generic [ref=e617]:
+        - button "M Maria Santos Staff Alta Citta ›" [ref=e618] [cursor=pointer]:
+          - generic [ref=e619]: M
+          - generic [ref=e620]:
+            - paragraph [ref=e621]: Maria Santos
+            - generic [ref=e622]:
+              - generic [ref=e623]: Staff
+              - generic [ref=e624]: Alta Citta
+          - generic [ref=e625]: ›
+        - button "J Juan Reyes Manager Alta Citta PIN ›" [ref=e626] [cursor=pointer]:
+          - generic [ref=e627]: J
+          - generic [ref=e628]:
+            - paragraph [ref=e629]: Juan Reyes
+            - generic [ref=e630]:
+              - generic [ref=e631]: Manager
+              - generic [ref=e632]: Alta Citta
+              - generic [ref=e633]: PIN
+          - generic [ref=e634]: ›
+        - button "P Pedro Cruz Kitchen Alta Citta ›" [ref=e635] [cursor=pointer]:
+          - generic [ref=e636]: P
+          - generic [ref=e637]:
+            - paragraph [ref=e638]: Pedro Cruz
+            - generic [ref=e639]:
+              - generic [ref=e640]: Kitchen
+              - generic [ref=e641]: Alta Citta
+          - generic [ref=e642]: ›
+    - generic [ref=e643]:
+      - paragraph [ref=e645]: 🏠 Alona Beach · Panglao
+      - generic [ref=e646]:
+        - button "A Ana Lim Staff Alona Beach ›" [ref=e647] [cursor=pointer]:
+          - generic [ref=e648]: A
+          - generic [ref=e649]:
+            - paragraph [ref=e650]: Ana Lim
+            - generic [ref=e651]:
+              - generic [ref=e652]: Staff
+              - generic [ref=e653]: Alona Beach
+          - generic [ref=e654]: ›
+        - button "C Carlo Ramos Manager Alona Beach PIN ›" [ref=e655] [cursor=pointer]:
+          - generic [ref=e656]: C
+          - generic [ref=e657]:
+            - paragraph [ref=e658]: Carlo Ramos
+            - generic [ref=e659]:
+              - generic [ref=e660]: Manager
+              - generic [ref=e661]: Alona Beach
+              - generic [ref=e662]: PIN
+          - generic [ref=e663]: ›
+        - button "J Jose Santos Kitchen Alona Beach ›" [ref=e664] [cursor=pointer]:
+          - generic [ref=e665]: J
+          - generic [ref=e666]:
+            - paragraph [ref=e667]: Jose Santos
+            - generic [ref=e668]:
+              - generic [ref=e669]: Kitchen
+              - generic [ref=e670]: Alona Beach
+          - generic [ref=e671]: ›
+    - generic [ref=e672]:
+      - paragraph [ref=e674]: 🏭 Tagbilaran Warehouse
+      - button "N Noel Garcia Staff Warehouse ›" [ref=e676] [cursor=pointer]:
+        - generic [ref=e677]: "N"
+        - generic [ref=e678]:
+          - paragraph [ref=e679]: Noel Garcia
+          - generic [ref=e680]:
+            - generic [ref=e681]: Staff
+            - generic [ref=e682]: Warehouse
+        - generic [ref=e683]: ›
+    - generic [ref=e684]:
+      - paragraph [ref=e686]: 💼 Management
+      - button "C Christopher S Owner All ›" [ref=e688] [cursor=pointer]:
+        - generic [ref=e689]: C
+        - generic [ref=e690]:
+          - paragraph [ref=e691]: Christopher S
+          - generic [ref=e692]:
+            - generic [ref=e693]: Owner
+            - generic [ref=e694]: All
+        - generic [ref=e695]: ›

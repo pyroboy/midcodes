@@ -81,6 +81,9 @@
 									{/if}
 									{#if order.status === 'cancelled'}
 										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
+										{#if order.cancelReason}
+											<span class="rounded px-1.5 py-0.5 text-[10px] text-gray-400 border border-gray-200 capitalize">{order.cancelReason.replace('_', ' ')}</span>
+										{/if}
 									{:else if order.status === 'paid'}
 										<span class="rounded px-1.5 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">PAID</span>
 									{:else}

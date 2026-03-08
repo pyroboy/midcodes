@@ -18,6 +18,7 @@
     let weightStr = $state('');
     let rate = $state(50); // PHP 50 per 100g
     let showPin = $state(false);
+    let showPolicyTip = $state(false);
 
     $effect(() => {
         if (isOpen) {
@@ -68,8 +69,21 @@
             <button onclick={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center">✕</button>
             
             <div>
-                <h2 class="text-xl font-black text-gray-900">Leftover Check</h2>
-                <p class="text-sm text-gray-500">Weigh any uneaten meat. Leftovers over 100g are charged at <span class="font-semibold text-accent">₱{rate}/100g</span>. Enter 0 if plate is clean.</p>
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xl font-black text-gray-900">Leftover Check</h2>
+                    <button
+                        onclick={() => showPolicyTip = !showPolicyTip}
+                        class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500 hover:bg-gray-200 transition-colors"
+                        style="min-height: unset"
+                        aria-label="Show leftover policy"
+                    >ℹ</button>
+                </div>
+                {#if showPolicyTip}
+                    <p class="mt-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                        AYCE leftover policy: uneaten meat is charged per gram. Enter the total weight of leftover meat.
+                    </p>
+                {/if}
+                <p class="text-sm text-gray-500 mt-1">Weigh any uneaten meat. Leftovers over 100g are charged at <span class="font-semibold text-accent">₱{rate}/100g</span>. Enter 0 if plate is clean.</p>
             </div>
 
             {#if btScale.connectionStatus === 'connected'}

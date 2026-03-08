@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { kdsTicketHistory, recallTicket } from '$lib/stores/pos.svelte';
 	import { cn } from '$lib/utils';
+	import { format, isToday, isYesterday } from 'date-fns';
+	import type { KdsTicket } from '$lib/types';
 
 	interface Props {
 		isOpen: boolean;
@@ -16,6 +18,39 @@
 	function handleRecall(orderId: string) {
 		recallTicket(orderId);
 	}
+
+	function getDateLabel(iso: string): string {
+		const d = new Date(iso);
+		if (isToday(d)) return 'Today';
+		if (isYesterday(d)) return 'Yesterday';
+		return format(d, 'MMM d');
+	}
+
+	function getDayKey(iso: string): string {
+		return new Date(iso).toDateString();
+	}
+
+	// Group tickets by calendar day, sorted newest-first
+	const groupedHistory = $derived.by(() => {
+		const sorted = [...kdsTicketHistory.value].sort((a, b) => {
+			const aTime = a.bumpedAt ?? a.createdAt;
+			const bTime = b.bumpedAt ?? b.createdAt;
+			return new Date(bTime).getTime() - new Date(aTime).getTime();
+		});
+
+		const groups: Array<{ label: string; key: string; tickets: KdsTicket[] }> = [];
+		for (const ticket of sorted) {
+			const ts = ticket.bumpedAt ?? ticket.createdAt;
+			const key = getDayKey(ts);
+			const last = groups[groups.length - 1];
+			if (last && last.key === key) {
+				last.tickets.push(ticket);
+			} else {
+				groups.push({ label: getDateLabel(ts), key, tickets: [ticket] });
+			}
+		}
+		return groups;
+	});
 </script>
 
 {#if isOpen}
@@ -36,37 +71,43 @@
 						<p class="text-sm text-gray-400">No bumped tickets this shift.</p>
 					</div>
 				{:else}
-					<div class="flex flex-col gap-3">
-						{#each kdsTicketHistory.value as entry (entry.orderId + entry.bumpedAt)}
-							<div class="rounded-lg border border-border bg-gray-50 p-4">
-								<div class="flex items-center justify-between mb-2">
-									<div class="flex items-center gap-2">
-										<span class="text-sm font-bold text-gray-900">
-											{entry.tableNumber !== null ? `T${entry.tableNumber}` : entry.customerName ?? 'Takeout'}
-										</span>
-										<span class="text-xs text-gray-400">Bumped {formatTime(entry.bumpedAt!)}</span>
+					<div class="flex flex-col gap-0">
+						{#each groupedHistory as group (group.key)}
+							<div class="text-xs text-gray-400 font-semibold px-3 py-1.5 bg-gray-50 sticky top-0 border-b border-border/50">
+								{group.label}
+							</div>
+							<div class="flex flex-col gap-3 py-3">
+								{#each group.tickets as entry (entry.orderId + entry.bumpedAt)}
+									<div class="rounded-lg border border-border bg-white p-4">
+										<div class="flex items-center justify-between mb-2">
+											<div class="flex items-center gap-2">
+												<span class="text-sm font-bold text-gray-900">
+													{entry.tableNumber !== null ? `T${entry.tableNumber}` : entry.customerName ?? 'Takeout'}
+												</span>
+												<span class="text-xs text-gray-400">Bumped {formatTime(entry.bumpedAt!)}</span>
+											</div>
+											<button
+												onclick={() => handleRecall(entry.orderId)}
+												class="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white hover:bg-accent-dark transition-colors min-h-[44px] min-w-[44px]"
+											>
+												↩ Recall
+											</button>
+										</div>
+										<div class="flex flex-wrap gap-1.5">
+											{#each entry.items as item}
+												<span class={cn(
+													'rounded px-2 py-0.5 text-[10px] font-semibold',
+													item.category === 'meats' ? 'bg-pink-100 text-pink-700' :
+													item.category === 'sides' ? 'bg-green-100 text-green-700' :
+													'bg-blue-100 text-blue-700'
+												)}>
+													{item.quantity}× {item.menuItemName}{item.weight ? ` (${item.weight}g)` : ''}
+												</span>
+											{/each}
+										</div>
+										<div class="mt-1 text-[10px] text-gray-300">by {entry.bumpedBy}</div>
 									</div>
-									<button
-										onclick={() => handleRecall(entry.orderId)}
-										class="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white hover:bg-accent-dark transition-colors"
-										style="min-height: 32px"
-									>
-										↩ Recall
-									</button>
-								</div>
-								<div class="flex flex-wrap gap-1.5">
-									{#each entry.items as item}
-										<span class={cn(
-											'rounded px-2 py-0.5 text-[10px] font-semibold',
-											item.category === 'meats' ? 'bg-pink-100 text-pink-700' :
-											item.category === 'sides' ? 'bg-green-100 text-green-700' :
-											'bg-blue-100 text-blue-700'
-										)}>
-											{item.quantity}× {item.menuItemName}{item.weight ? ` (${item.weight}g)` : ''}
-										</span>
-									{/each}
-								</div>
-								<div class="mt-1 text-[10px] text-gray-300">by {entry.bumpedBy}</div>
+								{/each}
 							</div>
 						{/each}
 					</div>

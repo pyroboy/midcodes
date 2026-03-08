@@ -283,7 +283,7 @@
 	</div>
 	<div class="rounded-xl border border-border bg-white p-4">
 		<p class="text-xs font-medium uppercase tracking-wide text-gray-400">Expense Ratio</p>
-		<p class="mt-1 text-2xl font-bold text-gray-900">{(totalExpenses / current.sales * 100).toFixed(1)}%</p>
+		<p class="mt-1 text-2xl font-bold text-gray-900">{current.sales > 0 ? (totalExpenses / current.sales * 100).toFixed(1) + '%' : '—'}</p>
 	</div>
 </div>
 

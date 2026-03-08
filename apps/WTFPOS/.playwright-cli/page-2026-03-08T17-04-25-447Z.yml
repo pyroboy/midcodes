@@ -1,0 +1,169 @@
+- generic [ref=e2]:
+  - button "📡" [ref=e3] [cursor=pointer]
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - button "Toggle sidebar" [ref=e11] [cursor=pointer]:
+        - generic [ref=e12]: W!
+      - separator [ref=e13]
+      - generic [ref=e231]:
+        - link "Receive Delivery" [ref=e232] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e233]
+          - generic [ref=e234]: Receive Delivery
+        - link "Log Expense" [ref=e235] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e236]
+          - generic [ref=e237]: Log Expense
+        - link "Log Waste" [ref=e238] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e239]
+          - generic [ref=e240]: Log Waste
+        - link "Stock Count" [ref=e241] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e242]
+          - generic [ref=e243]: Stock Count
+        - link "X-Reading" [ref=e244] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e245]
+          - generic [ref=e246]: X-Reading
+        - link "Transfer Stock" [ref=e247] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e248]
+          - generic [ref=e249]: Transfer Stock
+        - link "End of Day" [ref=e250] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e251]
+          - generic [ref=e252]: End of Day
+      - list [ref=e18]:
+        - listitem [ref=e19]:
+          - link "POS" [ref=e20] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e21]
+            - generic: POS
+        - listitem [ref=e25]:
+          - link "Kitchen" [ref=e26] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e27]
+            - generic: Kitchen
+        - listitem [ref=e28]:
+          - link "Stock" [ref=e29] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e30]
+            - generic: Stock
+        - listitem [ref=e31]:
+          - link "Reports" [ref=e32] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e33]
+            - generic: Reports
+        - listitem [ref=e34]:
+          - link "Admin" [ref=e35] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e36]
+            - generic: Admin
+      - generic [ref=e37]:
+        - separator [ref=e38]
+        - generic [ref=e40]: C
+        - link "Logout" [ref=e42] [cursor=pointer]:
+          - /url: /
+          - img [ref=e43]
+      - button "Toggle Sidebar" [ref=e46]
+    - main [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - img [ref=e50]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e253]
+        - button "Change Location" [ref=e52] [cursor=pointer]:
+          - img [ref=e53]
+          - text: Change Location
+      - generic [ref=e54]:
+        - generic [ref=e55]:
+          - heading "Consolidated Reports" [level=1] [ref=e57]
+          - navigation [ref=e59]:
+            - generic [ref=e60]:
+              - generic [ref=e61]: Operations
+              - generic [ref=e62]:
+                - link "Meat Report" [ref=e63] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e64] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e65] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e66] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e67] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e68] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e69] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e71]:
+              - generic [ref=e72]: Expenses
+              - generic [ref=e73]:
+                - link "Daily" [ref=e74] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e75] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e77]:
+              - generic [ref=e78]: Revenue & Sales
+              - generic [ref=e79]:
+                - link "Sales Summary" [ref=e80] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e81] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e82] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e84]:
+              - generic [ref=e85]: Profitability
+              - generic [ref=e86]:
+                - link "Gross Profit" [ref=e87] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e88] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e90]:
+              - generic [ref=e91]: Branch
+              - link "Compare" [ref=e93] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e95]:
+          - button "+ Log New Expense" [ref=e97] [cursor=pointer]:
+            - generic [ref=e98]: +
+            - text: Log New Expense
+          - generic [ref=e99]:
+            - button "Today" [ref=e100] [cursor=pointer]
+            - button "This Week" [ref=e101] [cursor=pointer]
+            - button "This Month" [ref=e102] [cursor=pointer]
+          - generic [ref=e103]:
+            - generic [ref=e104]:
+              - paragraph [ref=e105]: Total Sales
+              - paragraph [ref=e106]: ₱4,612.00
+            - generic [ref=e107]:
+              - paragraph [ref=e108]: Total Expenses
+              - paragraph [ref=e109]: ₱17,667.00
+            - generic [ref=e110]:
+              - paragraph [ref=e111]: Net Cash Flow
+              - paragraph [ref=e112]: "-₱13,055.00"
+            - generic [ref=e113]:
+              - paragraph [ref=e114]: Expense Ratio
+              - paragraph [ref=e115]: 383.1%
+          - table [ref=e117]:
+            - rowgroup [ref=e118]:
+              - row "Category Amount % of Sales Proportion" [ref=e119]:
+                - columnheader "Category" [ref=e120]
+                - columnheader "Amount" [ref=e121]
+                - columnheader "% of Sales" [ref=e122]
+                - columnheader "Proportion" [ref=e123]
+            - rowgroup [ref=e124]:
+              - row "🥩Meat Procurement ₱17,411.00 377.5%" [ref=e254]:
+                - cell "🥩Meat Procurement" [ref=e132]
+                - cell "₱17,411.00" [ref=e255]
+                - cell "377.5%" [ref=e256]
+                - cell [ref=e135]
+              - row "💡Utilities ₱256.00 5.6%" [ref=e257]:
+                - cell "💡Utilities" [ref=e258]
+                - cell "₱256.00" [ref=e259]
+                - cell "5.6%" [ref=e260]
+                - cell [ref=e142]
+              - row "TOTAL ₱17,667.00 383.1%" [ref=e261]:
+                - cell "TOTAL" [ref=e126]
+                - cell "₱17,667.00" [ref=e262]
+                - cell "383.1%" [ref=e263]
+                - cell [ref=e129]

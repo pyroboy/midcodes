@@ -8,6 +8,10 @@ export const expenseCategories = [
 	'Meat Procurement',
 	'Produce & Sides',
 	'Utilities',
+	'Electricity',
+	'Gas/LPG',
+	'Water',
+	'Internet',
 	'Wages',
 	'Rent',
 	'Miscellaneous'

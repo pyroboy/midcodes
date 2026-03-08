@@ -30,8 +30,16 @@
 		if (status === 'ok' && min > 0 && current <= 2 * min) return 'bg-emerald-400';
 		return 'bg-status-green';
 	}
+
+	const pct = $derived(Math.round(widthPct));
 </script>
 
-<div class={cn('h-2.5 w-full rounded-full bg-gray-100 overflow-hidden', className)}>
+<div
+	class={cn('h-2.5 w-full rounded-full bg-gray-100 overflow-hidden', className)}
+	title="{pct}% of max stock ({status})"
+	aria-label="Stock level: {pct}% ({status})"
+	role="img"
+>
 	<div class={cn('h-full rounded-full', gaugeColor(status))} style="width: {$animatedWidth}%"></div>
 </div>
+<span class="sr-only">Stock level {pct}% — {status}</span>

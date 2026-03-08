@@ -1,0 +1,589 @@
+- generic [ref=e2]:
+  - button "📡" [ref=e3] [cursor=pointer]
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - button "Toggle sidebar" [ref=e11] [cursor=pointer]:
+        - generic [ref=e12]: W!
+      - separator [ref=e13]
+      - generic [ref=e14]:
+        - generic "Select a specific branch to use quick actions":
+          - link "Receive Delivery":
+            - /url: /stock/deliveries?action=open
+            - img
+            - generic: Receive Delivery
+          - link "Log Expense":
+            - /url: /reports/expenses-daily?action=open
+            - img
+            - generic: Log Expense
+          - link "Log Waste":
+            - /url: /stock/waste?action=open
+            - img
+            - generic: Log Waste
+          - link "Stock Count":
+            - /url: /stock/counts?action=open
+            - img
+            - generic: Stock Count
+          - link "X-Reading":
+            - /url: /reports/x-read?action=open
+            - img
+            - generic: X-Reading
+          - link "Transfer Stock":
+            - /url: /stock/transfers?action=open
+            - img
+            - generic: Transfer Stock
+          - link "End of Day":
+            - /url: /reports/eod?action=open
+            - img
+            - generic: End of Day
+      - list [ref=e18]:
+        - listitem [ref=e19]:
+          - link "POS" [ref=e20] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e21]
+            - generic: POS
+        - listitem [ref=e25]:
+          - link "Kitchen" [ref=e26] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e27]
+            - generic: Kitchen
+        - listitem [ref=e28]:
+          - link "Stock" [ref=e29] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e30]
+            - generic: Stock
+        - listitem [ref=e31]:
+          - link "Reports" [ref=e32] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e33]
+            - generic: Reports
+        - listitem [ref=e34]:
+          - link "Admin" [ref=e35] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e36]
+            - generic: Admin
+      - generic [ref=e37]:
+        - separator [ref=e38]
+        - generic [ref=e40]: C
+        - link "Logout" [ref=e42] [cursor=pointer]:
+          - /url: /
+          - img [ref=e43]
+      - button "Toggle Sidebar" [ref=e46]
+    - main [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - img [ref=e50]
+          - heading "ALL LOCATIONS" [level=2] [ref=e51]
+        - button "Change Location" [active] [ref=e52] [cursor=pointer]:
+          - img [ref=e53]
+          - text: Change Location
+      - generic [ref=e486]:
+        - button "Close modal" [ref=e487] [cursor=pointer]
+        - generic [ref=e488]:
+          - generic [ref=e489]:
+            - generic [ref=e490]:
+              - heading "Select Your Work Location" [level=2] [ref=e491]
+              - paragraph [ref=e492]: Changing location updates your active inventory context.
+            - button "Close" [ref=e493] [cursor=pointer]:
+              - generic [ref=e494]: Close
+              - img [ref=e495]
+          - generic [ref=e497]:
+            - generic [ref=e498]:
+              - img [ref=e499]
+              - heading "Retail Branches" [level=3] [ref=e500]
+            - generic [ref=e501]:
+              - button "Alta Citta (Tagbilaran) Active Staff 3 Stock Alerts 1" [ref=e502] [cursor=pointer]:
+                - img [ref=e505]
+                - heading "Alta Citta (Tagbilaran)" [level=4] [ref=e506]
+                - separator [ref=e507]
+                - generic [ref=e508]:
+                  - generic [ref=e509]:
+                    - generic [ref=e510]: Active Staff
+                    - generic [ref=e511]: "3"
+                  - generic [ref=e512]:
+                    - generic [ref=e513]: Stock Alerts
+                    - generic [ref=e514]:
+                      - text: "1"
+                      - img [ref=e515]
+              - button "Alona Beach (Panglao) Active Staff 2 Stock Alerts 0" [ref=e516] [cursor=pointer]:
+                - img [ref=e519]
+                - heading "Alona Beach (Panglao)" [level=4] [ref=e520]
+                - separator [ref=e521]
+                - generic [ref=e522]:
+                  - generic [ref=e523]:
+                    - generic [ref=e524]: Active Staff
+                    - generic [ref=e525]: "2"
+                  - generic [ref=e526]:
+                    - generic [ref=e527]: Stock Alerts
+                    - generic [ref=e528]:
+                      - text: "0"
+                      - img [ref=e529]
+            - generic [ref=e530]:
+              - img [ref=e531]
+              - heading "Cross-Branch" [level=3] [ref=e532]
+            - 'button "Current All Locations View: Aggregate across all branches Access: Reports & Comparisons" [ref=e534] [cursor=pointer]':
+              - generic [ref=e535]:
+                - img [ref=e537]
+                - generic [ref=e538]:
+                  - img [ref=e539]
+                  - text: Current
+              - heading "All Locations" [level=4] [ref=e540]
+              - separator [ref=e541]
+              - generic [ref=e542]:
+                - paragraph [ref=e543]:
+                  - strong [ref=e544]: "View:"
+                  - text: Aggregate across all branches
+                - paragraph [ref=e545]:
+                  - strong [ref=e546]: "Access:"
+                  - text: Reports & Comparisons
+            - generic [ref=e547]:
+              - img [ref=e548]
+              - heading "Warehouse" [level=3] [ref=e549]
+            - 'button "Tagbilaran Central Warehouse View: All Branches Access: Full Inventory Control" [ref=e551] [cursor=pointer]':
+              - img [ref=e554]
+              - heading "Tagbilaran Central Warehouse" [level=4] [ref=e555]
+              - separator [ref=e556]
+              - generic [ref=e557]:
+                - paragraph [ref=e558]:
+                  - strong [ref=e559]: "View:"
+                  - text: All Branches
+                - paragraph [ref=e560]:
+                  - strong [ref=e561]: "Access:"
+                  - text: Full Inventory Control
+      - generic [ref=e54]:
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - heading "Consolidated Reports" [level=1] [ref=e57]
+            - generic [ref=e58]: 🌐 All Branches
+          - navigation [ref=e59]:
+            - generic [ref=e60]:
+              - generic [ref=e61]: Operations
+              - generic [ref=e62]:
+                - link "Meat Report" [ref=e63] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e64] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e65] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e66] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e67] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e68] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e69] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e71]:
+              - generic [ref=e72]: Expenses
+              - generic [ref=e73]:
+                - link "Daily" [ref=e74] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e75] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e77]:
+              - generic [ref=e78]: Revenue & Sales
+              - generic [ref=e79]:
+                - link "Sales Summary" [ref=e80] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e81] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e82] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e84]:
+              - generic [ref=e85]: Profitability
+              - generic [ref=e86]:
+                - link "Gross Profit" [ref=e87] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e88] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e90]:
+              - generic [ref=e91]: Branch
+              - link "Compare" [ref=e93] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]:
+              - heading "Mar 9, 2026" [level=2] [ref=e98]
+              - generic [ref=e99]: Live — shift still open
+            - generic [ref=e101]:
+              - button "Print" [ref=e102] [cursor=pointer]
+              - button "Generate X-Read" [ref=e103] [cursor=pointer]
+          - generic [ref=e104]:
+            - generic [ref=e105]:
+              - paragraph [ref=e106]: Gross Sales
+              - paragraph [ref=e107]: ₱145,530.00
+            - generic [ref=e108]:
+              - paragraph [ref=e109]: Net Sales
+              - paragraph [ref=e110]: ₱142,417.00
+            - generic [ref=e111]:
+              - paragraph [ref=e112]: Total Pax
+              - paragraph [ref=e113]: "285"
+            - generic [ref=e114]:
+              - paragraph [ref=e115]: Avg Ticket
+              - paragraph [ref=e116]: ₱500.00
+          - generic [ref=e117]:
+            - generic [ref=e118]:
+              - generic [ref=e119]:
+                - heading "Payment Breakdown (Live)" [level=3] [ref=e120]
+                - generic [ref=e121]:
+                  - generic [ref=e122]:
+                    - paragraph [ref=e123]: Cash
+                    - paragraph [ref=e124]: ₱89,122.00
+                  - generic [ref=e125]:
+                    - paragraph [ref=e126]: GCash
+                    - paragraph [ref=e127]: ₱31,902.00
+                  - generic [ref=e128]:
+                    - paragraph [ref=e129]: Maya
+                    - paragraph [ref=e130]: ₱0.00
+                  - generic [ref=e131]:
+                    - paragraph [ref=e132]: Credit/Debit
+                    - paragraph [ref=e133]: ₱21,393.00
+                - generic [ref=e134]:
+                  - heading "VAT Breakdown (12% inclusive)" [level=4] [ref=e135]
+                  - generic [ref=e136]:
+                    - generic [ref=e137]: Gross Sales
+                    - generic [ref=e138]: ₱145,530.00
+                  - generic [ref=e139]:
+                    - generic [ref=e140]: VAT (12%)
+                    - generic [ref=e141]: ₱15,592.00
+                  - generic [ref=e142]:
+                    - generic [ref=e143]: VAT-Exclusive Sales
+                    - generic [ref=e144]: ₱129,938.00
+              - generic [ref=e145]:
+                - heading "Order Status" [level=3] [ref=e146]
+                - generic [ref=e147]:
+                  - generic [ref=e148]:
+                    - paragraph [ref=e149]: Open
+                    - paragraph [ref=e150]: "27"
+                  - generic [ref=e151]:
+                    - paragraph [ref=e152]: Paid
+                    - paragraph [ref=e153]: "98"
+                  - generic [ref=e154]:
+                    - paragraph [ref=e155]: Voided
+                    - paragraph [ref=e156]: "13"
+            - generic [ref=e157]:
+              - generic [ref=e158]:
+                - heading "X-Read History" [level=3] [ref=e159]
+                - generic [ref=e160]:
+                  - generic [ref=e161]:
+                    - generic [ref=e162]:
+                      - generic [ref=e163]: "X-Read #14"
+                      - generic [ref=e164]: 12:00 AM · Manager
+                    - generic [ref=e165]:
+                      - generic [ref=e166]:
+                        - generic [ref=e167]: Gross
+                        - generic [ref=e168]: ₱12,882.00
+                      - generic [ref=e169]:
+                        - generic [ref=e170]: Net
+                        - generic [ref=e171]: ₱12,882.00
+                      - generic [ref=e172]:
+                        - generic [ref=e173]: Cash
+                        - generic [ref=e174]: ₱9,460.00
+                      - generic [ref=e175]:
+                        - generic [ref=e176]: GCash
+                        - generic [ref=e177]: ₱427.00
+                      - generic [ref=e178]:
+                        - generic [ref=e179]: Pax
+                        - generic [ref=e180]: "28"
+                      - generic [ref=e181]:
+                        - generic [ref=e182]: Voids
+                        - generic [ref=e183]: "2"
+                  - generic [ref=e184]:
+                    - generic [ref=e185]:
+                      - generic [ref=e186]: "X-Read #13"
+                      - generic [ref=e187]: 12:00 AM · Manager
+                    - generic [ref=e188]:
+                      - generic [ref=e189]:
+                        - generic [ref=e190]: Gross
+                        - generic [ref=e191]: ₱16,324.00
+                      - generic [ref=e192]:
+                        - generic [ref=e193]: Net
+                        - generic [ref=e194]: ₱15,687.00
+                      - generic [ref=e195]:
+                        - generic [ref=e196]: Cash
+                        - generic [ref=e197]: ₱7,459.00
+                      - generic [ref=e198]:
+                        - generic [ref=e199]: GCash
+                        - generic [ref=e200]: ₱5,222.00
+                      - generic [ref=e201]:
+                        - generic [ref=e202]: Pax
+                        - generic [ref=e203]: "31"
+                      - generic [ref=e204]:
+                        - generic [ref=e205]: Voids
+                        - generic [ref=e206]: "1"
+                  - generic [ref=e207]:
+                    - generic [ref=e208]:
+                      - generic [ref=e209]: "X-Read #12"
+                      - generic [ref=e210]: 12:00 AM · Manager
+                    - generic [ref=e211]:
+                      - generic [ref=e212]:
+                        - generic [ref=e213]: Gross
+                        - generic [ref=e214]: ₱4,612.00
+                      - generic [ref=e215]:
+                        - generic [ref=e216]: Net
+                        - generic [ref=e217]: ₱4,612.00
+                      - generic [ref=e218]:
+                        - generic [ref=e219]: Cash
+                        - generic [ref=e220]: ₱3,839.00
+                      - generic [ref=e221]:
+                        - generic [ref=e222]: GCash
+                        - generic [ref=e223]: ₱773.00
+                      - generic [ref=e224]:
+                        - generic [ref=e225]: Pax
+                        - generic [ref=e226]: "8"
+                      - generic [ref=e227]:
+                        - generic [ref=e228]: Voids
+                        - generic [ref=e229]: "1"
+                  - generic [ref=e230]:
+                    - generic [ref=e231]:
+                      - generic [ref=e232]: "X-Read #11"
+                      - generic [ref=e233]: 12:00 AM · Manager
+                    - generic [ref=e234]:
+                      - generic [ref=e235]:
+                        - generic [ref=e236]: Gross
+                        - generic [ref=e237]: ₱4,824.00
+                      - generic [ref=e238]:
+                        - generic [ref=e239]: Net
+                        - generic [ref=e240]: ₱4,824.00
+                      - generic [ref=e241]:
+                        - generic [ref=e242]: Cash
+                        - generic [ref=e243]: ₱3,020.00
+                      - generic [ref=e244]:
+                        - generic [ref=e245]: GCash
+                        - generic [ref=e246]: ₱1,804.00
+                      - generic [ref=e247]:
+                        - generic [ref=e248]: Pax
+                        - generic [ref=e249]: "13"
+                      - generic [ref=e250]:
+                        - generic [ref=e251]: Voids
+                        - generic [ref=e252]: "0"
+                  - generic [ref=e253]:
+                    - generic [ref=e254]:
+                      - generic [ref=e255]: "X-Read #10"
+                      - generic [ref=e256]: 12:00 AM · Manager
+                    - generic [ref=e257]:
+                      - generic [ref=e258]:
+                        - generic [ref=e259]: Gross
+                        - generic [ref=e260]: ₱20,156.00
+                      - generic [ref=e261]:
+                        - generic [ref=e262]: Net
+                        - generic [ref=e263]: ₱19,667.00
+                      - generic [ref=e264]:
+                        - generic [ref=e265]: Cash
+                        - generic [ref=e266]: ₱7,942.00
+                      - generic [ref=e267]:
+                        - generic [ref=e268]: GCash
+                        - generic [ref=e269]: ₱8,725.00
+                      - generic [ref=e270]:
+                        - generic [ref=e271]: Pax
+                        - generic [ref=e272]: "40"
+                      - generic [ref=e273]:
+                        - generic [ref=e274]: Voids
+                        - generic [ref=e275]: "0"
+                  - generic [ref=e276]:
+                    - generic [ref=e277]:
+                      - generic [ref=e278]: "X-Read #9"
+                      - generic [ref=e279]: 12:00 AM · Manager
+                    - generic [ref=e280]:
+                      - generic [ref=e281]:
+                        - generic [ref=e282]: Gross
+                        - generic [ref=e283]: ₱5,796.00
+                      - generic [ref=e284]:
+                        - generic [ref=e285]: Net
+                        - generic [ref=e286]: ₱5,796.00
+                      - generic [ref=e287]:
+                        - generic [ref=e288]: Cash
+                        - generic [ref=e289]: ₱4,786.00
+                      - generic [ref=e290]:
+                        - generic [ref=e291]: GCash
+                        - generic [ref=e292]: ₱0.00
+                      - generic [ref=e293]:
+                        - generic [ref=e294]: Pax
+                        - generic [ref=e295]: "15"
+                      - generic [ref=e296]:
+                        - generic [ref=e297]: Voids
+                        - generic [ref=e298]: "1"
+                  - generic [ref=e299]:
+                    - generic [ref=e300]:
+                      - generic [ref=e301]: "X-Read #8"
+                      - generic [ref=e302]: 12:00 AM · Manager
+                    - generic [ref=e303]:
+                      - generic [ref=e304]:
+                        - generic [ref=e305]: Gross
+                        - generic [ref=e306]: ₱8,644.00
+                      - generic [ref=e307]:
+                        - generic [ref=e308]: Net
+                        - generic [ref=e309]: ₱8,644.00
+                      - generic [ref=e310]:
+                        - generic [ref=e311]: Cash
+                        - generic [ref=e312]: ₱8,152.00
+                      - generic [ref=e313]:
+                        - generic [ref=e314]: GCash
+                        - generic [ref=e315]: ₱363.00
+                      - generic [ref=e316]:
+                        - generic [ref=e317]: Pax
+                        - generic [ref=e318]: "14"
+                      - generic [ref=e319]:
+                        - generic [ref=e320]: Voids
+                        - generic [ref=e321]: "1"
+                  - generic [ref=e322]:
+                    - generic [ref=e323]:
+                      - generic [ref=e324]: "X-Read #7"
+                      - generic [ref=e325]: 12:00 AM · Manager
+                    - generic [ref=e326]:
+                      - generic [ref=e327]:
+                        - generic [ref=e328]: Gross
+                        - generic [ref=e329]: ₱15,352.00
+                      - generic [ref=e330]:
+                        - generic [ref=e331]: Net
+                        - generic [ref=e332]: ₱14,559.00
+                      - generic [ref=e333]:
+                        - generic [ref=e334]: Cash
+                        - generic [ref=e335]: ₱11,108.00
+                      - generic [ref=e336]:
+                        - generic [ref=e337]: GCash
+                        - generic [ref=e338]: ₱2,324.00
+                      - generic [ref=e339]:
+                        - generic [ref=e340]: Pax
+                        - generic [ref=e341]: "29"
+                      - generic [ref=e342]:
+                        - generic [ref=e343]: Voids
+                        - generic [ref=e344]: "2"
+                  - generic [ref=e345]:
+                    - generic [ref=e346]:
+                      - generic [ref=e347]: "X-Read #6"
+                      - generic [ref=e348]: 12:00 AM · Manager
+                    - generic [ref=e349]:
+                      - generic [ref=e350]:
+                        - generic [ref=e351]: Gross
+                        - generic [ref=e352]: ₱11,228.00
+                      - generic [ref=e353]:
+                        - generic [ref=e354]: Net
+                        - generic [ref=e355]: ₱10,927.00
+                      - generic [ref=e356]:
+                        - generic [ref=e357]: Cash
+                        - generic [ref=e358]: ₱6,066.00
+                      - generic [ref=e359]:
+                        - generic [ref=e360]: GCash
+                        - generic [ref=e361]: ₱4,861.00
+                      - generic [ref=e362]:
+                        - generic [ref=e363]: Pax
+                        - generic [ref=e364]: "21"
+                      - generic [ref=e365]:
+                        - generic [ref=e366]: Voids
+                        - generic [ref=e367]: "0"
+                  - generic [ref=e368]:
+                    - generic [ref=e369]:
+                      - generic [ref=e370]: "X-Read #5"
+                      - generic [ref=e371]: 12:00 AM · Manager
+                    - generic [ref=e372]:
+                      - generic [ref=e373]:
+                        - generic [ref=e374]: Gross
+                        - generic [ref=e375]: ₱7,190.00
+                      - generic [ref=e376]:
+                        - generic [ref=e377]: Net
+                        - generic [ref=e378]: ₱7,123.00
+                      - generic [ref=e379]:
+                        - generic [ref=e380]: Cash
+                        - generic [ref=e381]: ₱5,762.00
+                      - generic [ref=e382]:
+                        - generic [ref=e383]: GCash
+                        - generic [ref=e384]: ₱1,361.00
+                      - generic [ref=e385]:
+                        - generic [ref=e386]: Pax
+                        - generic [ref=e387]: "20"
+                      - generic [ref=e388]:
+                        - generic [ref=e389]: Voids
+                        - generic [ref=e390]: "0"
+                  - generic [ref=e391]:
+                    - generic [ref=e392]:
+                      - generic [ref=e393]: "X-Read #4"
+                      - generic [ref=e394]: 12:00 AM · Manager
+                    - generic [ref=e395]:
+                      - generic [ref=e396]:
+                        - generic [ref=e397]: Gross
+                        - generic [ref=e398]: ₱8,783.00
+                      - generic [ref=e399]:
+                        - generic [ref=e400]: Net
+                        - generic [ref=e401]: ₱8,575.00
+                      - generic [ref=e402]:
+                        - generic [ref=e403]: Cash
+                        - generic [ref=e404]: ₱5,313.00
+                      - generic [ref=e405]:
+                        - generic [ref=e406]: GCash
+                        - generic [ref=e407]: ₱550.00
+                      - generic [ref=e408]:
+                        - generic [ref=e409]: Pax
+                        - generic [ref=e410]: "15"
+                      - generic [ref=e411]:
+                        - generic [ref=e412]: Voids
+                        - generic [ref=e413]: "0"
+                  - generic [ref=e414]:
+                    - generic [ref=e415]:
+                      - generic [ref=e416]: "X-Read #3"
+                      - generic [ref=e417]: 12:00 AM · Manager
+                    - generic [ref=e418]:
+                      - generic [ref=e419]:
+                        - generic [ref=e420]: Gross
+                        - generic [ref=e421]: ₱9,881.00
+                      - generic [ref=e422]:
+                        - generic [ref=e423]: Net
+                        - generic [ref=e424]: ₱9,689.00
+                      - generic [ref=e425]:
+                        - generic [ref=e426]: Cash
+                        - generic [ref=e427]: ₱3,001.00
+                      - generic [ref=e428]:
+                        - generic [ref=e429]: GCash
+                        - generic [ref=e430]: ₱2,974.00
+                      - generic [ref=e431]:
+                        - generic [ref=e432]: Pax
+                        - generic [ref=e433]: "14"
+                      - generic [ref=e434]:
+                        - generic [ref=e435]: Voids
+                        - generic [ref=e436]: "1"
+                  - generic [ref=e437]:
+                    - generic [ref=e438]:
+                      - generic [ref=e439]: "X-Read #2"
+                      - generic [ref=e440]: 12:00 AM · Manager
+                    - generic [ref=e441]:
+                      - generic [ref=e442]:
+                        - generic [ref=e443]: Gross
+                        - generic [ref=e444]: ₱8,006.00
+                      - generic [ref=e445]:
+                        - generic [ref=e446]: Net
+                        - generic [ref=e447]: ₱8,006.00
+                      - generic [ref=e448]:
+                        - generic [ref=e449]: Cash
+                        - generic [ref=e450]: ₱6,643.00
+                      - generic [ref=e451]:
+                        - generic [ref=e452]: GCash
+                        - generic [ref=e453]: ₱477.00
+                      - generic [ref=e454]:
+                        - generic [ref=e455]: Pax
+                        - generic [ref=e456]: "12"
+                      - generic [ref=e457]:
+                        - generic [ref=e458]: Voids
+                        - generic [ref=e459]: "0"
+                  - generic [ref=e460]:
+                    - generic [ref=e461]:
+                      - generic [ref=e462]: "X-Read #1"
+                      - generic [ref=e463]: 12:00 AM · Manager
+                    - generic [ref=e464]:
+                      - generic [ref=e465]:
+                        - generic [ref=e466]: Gross
+                        - generic [ref=e467]: ₱11,852.00
+                      - generic [ref=e468]:
+                        - generic [ref=e469]: Net
+                        - generic [ref=e470]: ₱11,426.00
+                      - generic [ref=e471]:
+                        - generic [ref=e472]: Cash
+                        - generic [ref=e473]: ₱6,571.00
+                      - generic [ref=e474]:
+                        - generic [ref=e475]: GCash
+                        - generic [ref=e476]: ₱2,041.00
+                      - generic [ref=e477]:
+                        - generic [ref=e478]: Pax
+                        - generic [ref=e479]: "25"
+                      - generic [ref=e480]:
+                        - generic [ref=e481]: Voids
+                        - generic [ref=e482]: "4"
+              - paragraph [ref=e484]: X-Reads do NOT close the shift. Use End of Day report to finalize.
