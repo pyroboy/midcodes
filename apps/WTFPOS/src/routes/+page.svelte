@@ -75,6 +75,9 @@
 
 		setSession(account.displayName, account.role, account.locationId);
 
+		// Collapse sidebar on login
+		document.cookie = 'sidebar:state=false; path=/; max-age=604800';
+
 		if (account.requiresPin) {
 			pendingDest = account.dest;
 			pin = '';

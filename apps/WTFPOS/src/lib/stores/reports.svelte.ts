@@ -593,7 +593,7 @@ export async function saveZRead(params: Omit<Reading, 'id' | 'type' | 'updatedAt
 	const snapshot: Reading = { id: nanoid(), type: 'z-read' as const, updatedAt: now, ...params };
 	const db = await getDb();
 	await db.readings.insert(snapshot);
-	writeLog('admin', 'EOD Z-Read submitted', { meta: { date: params.date, netSales: params.netSales } });
+	writeLog('admin', 'EOD Z-Read submitted', { meta: { date: params.date ?? '', netSales: params.netSales } });
 	return snapshot;
 }
 

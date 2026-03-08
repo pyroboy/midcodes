@@ -1,0 +1,92 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph [ref=e17]: 07:28:40 PM
+    - separator [ref=e18]
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - link "POS" [ref=e24] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e25]
+          - generic [ref=e29]: POS
+    - generic [ref=e30]:
+      - separator [ref=e31]
+      - generic [ref=e32]:
+        - generic [ref=e33]: M
+        - generic [ref=e34]:
+          - generic [ref=e35]: Maria Santos
+          - generic [ref=e36]: staff
+      - link "Logout" [ref=e38] [cursor=pointer]:
+        - /url: /
+        - img [ref=e39]
+        - generic [ref=e42]: Logout
+    - button "Toggle Sidebar" [ref=e43]
+  - main [ref=e44]:
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e48]:
+          - generic [ref=e49]:
+            - button "Toggle Sidebar" [ref=e50] [cursor=pointer]:
+              - img
+              - generic [ref=e51]: Toggle Sidebar
+            - heading "POS" [level=1] [ref=e52]
+            - generic [ref=e53]: 0 occ
+            - generic [ref=e54]: 8 free
+          - generic [ref=e55]:
+            - button "Toggle color legend" [ref=e57] [cursor=pointer]:
+              - img [ref=e58]
+            - button "📦 New Takeout" [ref=e60] [cursor=pointer]
+            - button "🧾 History 68" [ref=e61] [cursor=pointer]:
+              - text: 🧾 History
+              - generic [ref=e62]: "68"
+        - img [ref=e64]:
+          - button "Table T1" [ref=e67] [cursor=pointer]:
+            - generic: T1
+            - generic: 4p
+          - button "Table T2" [ref=e69] [cursor=pointer]:
+            - generic: T2
+            - generic: 4p
+          - button "Table T3" [ref=e71] [cursor=pointer]:
+            - generic: T3
+            - generic: 4p
+          - button "Table T4" [ref=e73] [cursor=pointer]:
+            - generic: T4
+            - generic: 4p
+          - button "Table T5" [ref=e75] [cursor=pointer]:
+            - generic: T5
+            - generic: 4p
+          - button "Table T6" [ref=e77] [cursor=pointer]:
+            - generic: T6
+            - generic: 4p
+          - button "Table T7" [ref=e79] [cursor=pointer]:
+            - generic: T7
+            - generic: 2p
+          - button "Table T8" [ref=e81] [cursor=pointer]:
+            - generic: T8
+            - generic: 2p
+        - generic [ref=e83]:
+          - heading "📦 Takeout Orders 1" [level=2] [ref=e84]:
+            - text: 📦 Takeout Orders
+            - generic [ref=e85]: "1"
+          - generic [ref=e87]:
+            - button "#TO01 Pedro ₱387.00 5 items" [ref=e88] [cursor=pointer]:
+              - text: "#TO01"
+              - generic [ref=e89]: Pedro
+              - text: ₱387.00
+              - generic [ref=e90]: 5 items
+            - generic [ref=e91]: PREP
+      - generic [ref=e93]:
+        - generic [ref=e94]: 🧾
+        - generic [ref=e95]:
+          - generic [ref=e96]: No Table Selected
+          - generic [ref=e97]: Tap an occupied table on the floor plan to view its running bill here.
+        - generic [ref=e98]:
+          - generic [ref=e99]: Green = available — tap to open
+          - generic [ref=e101]: Orange = occupied — tap to view bill

@@ -51,12 +51,8 @@
 		<h2 class={cn('text-base font-black tracking-tight', colors.text)}>
 			{currentLocation?.name?.toUpperCase() ?? 'UNKNOWN LOCATION'}
 		</h2>
-		<span class={cn('rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest', locationTypeBadgeClass)}>
-			{locationTypeLabel}
-		</span>
-		<span class="text-gray-300 hidden sm:inline">|</span>
-		<span class="hidden sm:inline text-xs font-semibold text-gray-900 capitalize">{session.role}</span>
-		<span class="hidden sm:inline text-xs text-gray-500">{accessLevel}</span>
+
+
 	</div>
 
 	<button

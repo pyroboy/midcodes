@@ -21,6 +21,10 @@ import { getOrderLabel } from '$lib/stores/pos/label.utils';
 export const REFILL_NOTE = 'refill' as const;
 export const LEFTOVER_PENALTY_ITEM_ID = 'penalty-leftover' as const;
 
+export function getRefillCount(order: Order | null | undefined): number {
+	return order?.items.filter(i => i.tag === 'FREE' && i.notes === REFILL_NOTE && i.status !== 'cancelled').length ?? 0;
+}
+
 async function updateTableBillTotal(tableId: string | null | undefined, amount: number): Promise<void> {
 	if (!tableId) return;
 	const db = await getDb();

@@ -367,6 +367,7 @@
 								{@const isServed = item.status === 'served'}
 								{@const isExpanded = expandedItemId === item.id && !isServed}
 								{@const isRefill = item.notes === REFILL_NOTE && !item.weight}
+								{@const isWeighed = !!item.weight}
 								<div class="border-b border-border/30 last:border-b-0">
 									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 									<div
@@ -382,22 +383,25 @@
 											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
 												{item.menuItemName}
 											</span>
-											{#if item.weight}
+											{#if isRefill}
+												<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-600 animate-pulse">
+													REFILL
+												</span>
+											{:else if isWeighed}
 												<span class={cn(
 													'shrink-0 rounded-full px-2 py-0.5 text-xs font-mono font-bold',
 													isServed ? 'bg-gray-100 text-gray-400' : 'bg-pink-100 text-pink-700'
 												)}>
 													{item.weight}g
 												</span>
-											{/if}
-											{#if isRefill}
-												<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-600 animate-pulse">
-													REFILL
-												</span>
-											{/if}
-											{#if item.status === 'cooking' && item.weight}
-												<span class="shrink-0 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-bold text-orange-600">
-													ON GRILL
+												{#if !isServed}
+													<span class="shrink-0 rounded-full bg-status-green/10 px-2.5 py-0.5 text-xs font-bold text-status-green">
+														READY
+													</span>
+												{/if}
+											{:else if !isServed}
+												<span class="shrink-0 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-600 animate-pulse">
+													WEIGHING
 												</span>
 											{/if}
 										</div>

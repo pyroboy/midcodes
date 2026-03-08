@@ -144,9 +144,15 @@
                 {/each}
             </div>
 
+            {#if order.orderType === 'takeout'}
+                <p class="px-6 text-[11px] text-gray-400">Packages and meats are dine-in only</p>
+            {/if}
+
             {#if activeCategory === 'sides' || activeCategory === 'packages'}
                 <div class="flex items-center gap-2 bg-status-green-light px-6 py-2.5">
-                    <span class="text-xs font-semibold text-status-green">FREE — inventory tracked</span>
+                    <span class="text-xs font-semibold text-status-green">
+                        {order.orderType === 'takeout' ? 'Complimentary sides' : 'FREE — inventory tracked'}
+                    </span>
                 </div>
             {/if}
 

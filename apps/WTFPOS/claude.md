@@ -495,7 +495,7 @@ All data is persisted in **RxDB v16** using IndexedDB (Dexie) in the browser. Be
 |------------------|----------|--------------|------------------------------------------------|
 | `tables`         | 3        | `id`         | Per-location; holds live session + order state |
 | `floor_elements` | 2        | `id`         | Walls, dividers, furniture for floor editor    |
-| `orders`         | 4        | `id`         | Dine-in + takeout; includes sub-bills          |
+| `orders`         | 6        | `id`         | Dine-in + takeout; includes sub-bills          |
 | `menu_items`     | 1        | `id`         | Global (no locationId) — shared across branches |
 | `stock_items`    | 3        | `id`         | Per-location meat + pantry items               |
 | `deliveries`     | 3        | `id`         | Delivery batches with batch/expiry tracking    |

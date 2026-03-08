@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { cn } from '$lib/utils';
+    import { cn, formatPeso } from '$lib/utils';
     import type { Order } from '$lib/types';
     import ManagerPinModal from './ManagerPinModal.svelte';
     import { changePax } from '$lib/stores/pos.svelte';
@@ -60,6 +60,19 @@
                 </div>
                 <button onclick={inc} class="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-3xl font-bold text-white shadow-xl shadow-orange-500/30 active:scale-95 transition-all select-none">+</button>
             </div>
+
+            {#if order.packageId && newPax !== order.pax}
+                {@const pkgItem = order.items.find(i => i.tag === 'PKG')}
+                {#if pkgItem}
+                    <div class="rounded-xl bg-surface-secondary px-4 py-3 text-center text-sm">
+                        <span class="text-gray-500">{order.packageName} × {newPax} pax = </span>
+                        <span class="font-mono font-bold text-gray-900">{formatPeso(pkgItem.unitPrice * newPax)}</span>
+                        <span class={cn('ml-1 font-semibold', newPax > (order.pax ?? 0) ? 'text-status-green' : 'text-status-red')}>
+                            ({newPax > (order.pax ?? 0) ? '+' : ''}{formatPeso(pkgItem.unitPrice * (newPax - (order.pax ?? 0)))})
+                        </span>
+                    </div>
+                {/if}
+            {/if}
 
             <div class="flex gap-3">
                 <button onclick={onClose} class="btn-ghost flex-1 py-4 text-sm">Cancel</button>

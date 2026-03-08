@@ -109,7 +109,8 @@ export async function getDb() {
 						2: (d: any) => d,
 						3: (d: any) => d, // v2→v3: nested required
 						4: (d: any) => addUpdatedAt(d, 'createdAt'), // v3→v4: +updatedAt
-					5: (d: any) => d  // v4→v5: nullable string fields (schema-only fix)
+						5: (d: any) => d,  // v4→v5: nullable string fields (schema-only fix)
+						6: (d: any) => d   // v5→v6: printStatus string → string|null (schema-only fix)
 					}
 				},
 				menu_items: {

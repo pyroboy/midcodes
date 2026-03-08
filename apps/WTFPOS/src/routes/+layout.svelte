@@ -9,6 +9,7 @@
 	import { initConnectionMonitor } from '$lib/stores/connection.svelte';
 	import { initDeviceHeartbeat } from '$lib/stores/device.svelte';
 	import { initDbHealthCheck } from '$lib/stores/db-health.svelte';
+	import { browser } from '$app/environment';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 
@@ -16,6 +17,9 @@
 
 	// Don't show sidebar on the login page
 	const showSidebar = $derived(page.url.pathname !== '/');
+
+	// Default sidebar collapsed; read cookie for persisted state
+	let sidebarOpen = $state(browser ? document.cookie.match(/sidebar:state=(\w+)/)?.[1] === 'true' : false);
 
 	// ─── Dev Error Overlay ────────────────────────────────────────────────────
 	interface CapturedError { message: string; source?: string; stack?: string; type: 'error' | 'rejection' }
@@ -53,9 +57,9 @@
 <DbHealthBanner />
 
 {#if showSidebar}
-	<SidebarProvider>
+	<SidebarProvider bind:open={sidebarOpen}>
 		<AppSidebar />
-		<SidebarInset class="min-h-svh overflow-hidden">
+		<SidebarInset class="h-svh overflow-hidden">
 			<MobileTopBar />
 			<LocationBanner />
 			{@render children()}

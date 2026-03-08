@@ -154,14 +154,13 @@
     }
 </script>
 
-<div class="flex-1 rounded-xl border border-border bg-surface overflow-hidden">
+<div class="flex-1 min-h-0 rounded-xl border border-border bg-surface overflow-hidden">
     <svg
         width="100%"
         height="100%"
         {viewBox}
         preserveAspectRatio="xMidYMid meet"
         class="block"
-        style="min-height: 400px;"
     >
         <!-- Canvas background -->
         <rect x="0" y="0" width={canvas.width} height={canvas.height} fill="#ffffff" rx="8" />

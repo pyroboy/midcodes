@@ -12,6 +12,7 @@
 		SidebarRail,
 		SidebarSeparator,
 	} from '$lib/components/ui/sidebar/index.js';
+	import { useSidebar } from '$lib/components/ui/sidebar/context.svelte.js';
 	import { page } from '$app/state';
 	import { cn } from '$lib/utils';
 	import {
@@ -83,6 +84,8 @@
 					: 'border-gray-200 bg-gray-50 text-gray-500'
 	);
 
+	const sidebar = useSidebar();
+
 	function isActive(href: string) {
 		return page.url.pathname === href || page.url.pathname.startsWith(href + '/');
 	}
@@ -92,9 +95,13 @@
 	<!-- Brand header -->
 	<SidebarHeader>
 		<div class="flex items-center gap-2 px-1 py-1">
-			<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent">
+			<button
+				onclick={() => sidebar.toggle()}
+				class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent hover:bg-accent-dark transition-colors cursor-pointer focus:outline-none"
+				aria-label="Toggle sidebar"
+			>
 				<span class="text-xs font-extrabold text-white">W!</span>
-			</div>
+			</button>
 			<div class="flex flex-col group-data-[collapsible=icon]:hidden">
 				<span class="text-sm font-extrabold tracking-tight text-gray-900 leading-tight">WTF! SAMGYUP</span>
 				<span class="text-[10px] font-bold uppercase tracking-widest text-accent leading-tight">POS System</span>

@@ -1,0 +1,195 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - generic [ref=e118]: W!
+          - generic [ref=e119]:
+            - generic [ref=e120]: WTF! SAMGYUP
+            - generic [ref=e121]: POS System
+        - generic [ref=e122]:
+          - paragraph [ref=e123]: Alta Citta (Tagbilaran)
+          - paragraph [ref=e124]: 06:40:39 PM
+      - separator [ref=e125]
+      - list [ref=e129]:
+        - listitem [ref=e130]:
+          - link "POS" [ref=e131] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e132]
+            - generic [ref=e133]: POS
+      - generic [ref=e134]:
+        - separator [ref=e135]
+        - generic [ref=e136]:
+          - generic [ref=e137]: M
+          - generic [ref=e138]:
+            - generic [ref=e139]: Maria Santos
+            - generic [ref=e140]: staff
+        - link "Logout" [ref=e142] [cursor=pointer]:
+          - /url: /
+          - img [ref=e143]
+          - generic [ref=e144]: Logout
+      - button "Toggle Sidebar" [ref=e145]
+    - main [ref=e146]:
+      - generic [ref=e148]:
+        - generic [ref=e149]:
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - button "Toggle Sidebar" [ref=e152] [cursor=pointer]:
+                - img
+                - generic [ref=e153]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e154]
+              - generic [ref=e155]: 1 occ
+              - generic [ref=e156]: 7 free
+            - generic [ref=e157]:
+              - button "Toggle color legend" [ref=e159] [cursor=pointer]:
+                - img [ref=e160]
+              - button "📦 New Takeout" [ref=e161] [cursor=pointer]
+              - button "🧾 History 73" [ref=e162] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e163]: "73"
+          - img [ref=e165]:
+            - button "Table T1" [ref=e168] [cursor=pointer]:
+              - generic: P&B
+              - generic: 03:44
+              - generic: T1
+              - generic: 4 pax
+              - generic: ₱1,996.00
+              - generic: "14"
+            - button "Table T2" [ref=e170] [cursor=pointer]:
+              - generic: T2
+              - generic: 4p
+            - button "Table T3" [ref=e172] [cursor=pointer]:
+              - generic: T3
+              - generic: 4p
+            - button "Table T4" [ref=e174] [cursor=pointer]:
+              - generic: T4
+              - generic: 4p
+            - button "Table T5" [ref=e176] [cursor=pointer]:
+              - generic: T5
+              - generic: 4p
+            - button "Table T6" [ref=e178] [cursor=pointer]:
+              - generic: T6
+              - generic: 4p
+            - button "Table T7" [ref=e180] [cursor=pointer]:
+              - generic: T7
+              - generic: 2p
+            - button "Table T8" [ref=e182] [cursor=pointer]:
+              - generic: T8
+              - generic: 2p
+          - generic [ref=e663]:
+            - heading "📦 Takeout Orders 1" [level=2] [ref=e664]:
+              - text: 📦 Takeout Orders
+              - generic [ref=e665]: "1"
+            - generic [ref=e667]:
+              - button "#TO01 Kuya Jun ₱0.00 0 items" [ref=e668] [cursor=pointer]:
+                - text: "#TO01"
+                - generic [ref=e669]: Kuya Jun
+                - text: ₱0.00
+                - generic [ref=e670]: 0 items
+              - generic [ref=e671]: NEW
+        - generic [ref=e184]:
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]:
+                - generic [ref=e672]: TAKEOUT
+                - generic [ref=e673]: Kuya Jun
+              - button "✕" [ref=e220] [cursor=pointer]
+            - generic [ref=e675]:
+              - generic [ref=e676]: "#TO659"
+              - generic [ref=e677]: NEW
+            - button "+ Add Item" [ref=e678] [cursor=pointer]
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - generic [ref=e225]: BILL
+              - generic [ref=e226]: 0 items
+            - generic [ref=e227]: ₱0.00
+          - generic [ref=e228]:
+            - generic [ref=e229]:
+              - button "Void" [disabled]
+              - button "Checkout" [disabled]
+              - button "Print" [disabled]
+            - button "Hide Options" [ref=e595] [cursor=pointer]
+      - generic [ref=e680]:
+        - generic [ref=e681]:
+          - generic [ref=e682]:
+            - generic [ref=e683]:
+              - generic [ref=e684]:
+                - generic [ref=e685]: 📦 TAKEOUT
+                - heading "Add to Takeout" [level=2] [ref=e686]
+              - paragraph [ref=e687]: Kuya Jun
+            - button "Close modal" [ref=e688] [cursor=pointer]: ✕
+          - generic [ref=e689]:
+            - button "🥬 Sides" [ref=e690] [cursor=pointer]:
+              - generic [ref=e691]: 🥬
+              - generic [ref=e692]: Sides
+            - button "🍜 Dishes" [ref=e693] [cursor=pointer]:
+              - generic [ref=e694]: 🍜
+              - generic [ref=e695]: Dishes
+            - button "🥤 Drinks" [ref=e696] [cursor=pointer]:
+              - generic [ref=e697]: 🥤
+              - generic [ref=e698]: Drinks
+          - generic [ref=e700]: FREE — inventory tracked
+          - generic [ref=e702]:
+            - button "Cheese FREE" [ref=e703] [cursor=pointer]:
+              - generic [ref=e704]:
+                - generic [ref=e705]: Cheese
+                - generic [ref=e706]: FREE
+            - button "Chinese Cabbage FREE" [ref=e707] [cursor=pointer]:
+              - generic [ref=e708]:
+                - generic [ref=e709]: Chinese Cabbage
+                - generic [ref=e710]: FREE
+            - button "Cucumber FREE" [ref=e711] [cursor=pointer]:
+              - generic [ref=e712]:
+                - generic [ref=e713]: Cucumber
+                - generic [ref=e714]: FREE
+            - button "Egg FREE" [ref=e715] [cursor=pointer]:
+              - generic [ref=e716]:
+                - generic [ref=e717]: Egg
+                - generic [ref=e718]: FREE
+            - button "Fish Cake FREE" [ref=e719] [cursor=pointer]:
+              - generic [ref=e720]:
+                - generic [ref=e721]: Fish Cake
+                - generic [ref=e722]: FREE
+            - button "Kimchi Kimchi FREE" [ref=e723] [cursor=pointer]:
+              - img "Kimchi" [ref=e725]
+              - generic [ref=e726]:
+                - generic [ref=e727]: Kimchi
+                - generic [ref=e728]: FREE
+            - button "Lettuce FREE" [ref=e729] [cursor=pointer]:
+              - generic [ref=e730]:
+                - generic [ref=e731]: Lettuce
+                - generic [ref=e732]: FREE
+            - button "Pork Bulgogi FREE" [ref=e733] [cursor=pointer]:
+              - generic [ref=e734]:
+                - generic [ref=e735]: Pork Bulgogi
+                - generic [ref=e736]: FREE
+            - button "Rice Rice FREE" [ref=e737] [cursor=pointer]:
+              - img "Rice" [ref=e739]
+              - generic [ref=e740]:
+                - generic [ref=e741]: Rice
+                - generic [ref=e742]: FREE
+            - button "Soup (Filipino) FREE" [ref=e743] [cursor=pointer]:
+              - generic [ref=e744]:
+                - generic [ref=e745]: Soup (Filipino)
+                - generic [ref=e746]: FREE
+            - button "Kimchi Jjigae FREE" [ref=e747] [cursor=pointer]:
+              - generic [ref=e748]:
+                - generic [ref=e749]: Kimchi Jjigae
+                - generic [ref=e750]: FREE
+            - button "Pork Rib Soup FREE" [ref=e751] [cursor=pointer]:
+              - generic [ref=e752]:
+                - generic [ref=e753]: Pork Rib Soup
+                - generic [ref=e754]: FREE
+        - generic [ref=e755]:
+          - generic [ref=e756]:
+            - heading "Pending Items" [level=3] [ref=e757]
+            - paragraph [ref=e758]: Review items before pushing to the bill.
+          - generic [ref=e760]: No items yet
+          - generic [ref=e761]:
+            - generic [ref=e762]:
+              - generic [ref=e763]: PENDING TOTAL
+              - generic [ref=e764]: ₱0.00
+            - generic [ref=e765]:
+              - button "Undo" [ref=e766] [cursor=pointer]
+              - button "⚡ CHARGE (0)" [disabled] [ref=e767]
+  - generic [ref=e109]: WTF! Samgyup POS

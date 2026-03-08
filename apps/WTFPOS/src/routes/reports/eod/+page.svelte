@@ -176,7 +176,7 @@
 		<CheckCircle2 class="w-4 h-4 text-status-green flex-shrink-0" />
 		<div>
 			<p class="text-sm font-bold text-status-green">Z-Read Submitted for {todayZRead.date}</p>
-			<p class="text-xs text-green-700">By {todayZRead.submittedBy} at {new Date(todayZRead.submittedAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</p>
+			<p class="text-xs text-green-700">By {todayZRead.submittedBy} at {new Date(todayZRead.submittedAt ?? '').toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</p>
 		</div>
 	</div>
 {/if}

@@ -12,7 +12,7 @@
         order: Order;
         table: Table | null;
         onclose: () => void;
-        onsuccess: (paidOrder: Order) => void;
+        onsuccess: (paidOrder: Order, change: number, methodLabel: string) => void;
     }
 
     let { order, table, onclose, onsuccess }: Props = $props();
@@ -144,11 +144,15 @@
 
         // Snapshot after checkoutOrder so the payment is included,
         // but before reactive unmount clears the order reference.
-        const snapshot: Order = { ...order, payments: [...order.payments], items: [...order.items] };
+        const snapshot: Order = { ...order, payments: [...order.payments], items: [...order.items], closedAt: order.closedAt ?? new Date().toISOString() };
+
+        // P0-1: Pass actual cash change and method label to receipt
+        const methodLabel = checkoutMethod === 'gcash' ? 'GCash' : checkoutMethod === 'maya' ? 'Maya' : 'Cash';
+        const actualChange = checkoutMethod === 'cash' ? Math.max(0, cashTendered - order.total) : 0;
 
         checkoutError = '';
         checkoutLoading = false;
-        onsuccess(snapshot);
+        onsuccess(snapshot, actualChange, methodLabel);
     }
 </script>
 
@@ -168,7 +172,7 @@
 
         <div class="flex flex-col gap-2 border-b border-border px-6 py-4 bg-surface-secondary">
             <div class="flex justify-between text-sm text-gray-600">
-                <span>Subtotal ({order.items.filter(i => i.status !== 'cancelled').length} items)</span>
+                <span>Subtotal ({order.packageId ? `${order.pax} pax` : `${order.items.filter(i => i.status !== 'cancelled').length} items`})</span>
                 <span class="font-mono font-semibold">{formatPeso(order.subtotal)}</span>
             </div>
             {#if order.discountType !== 'none'}

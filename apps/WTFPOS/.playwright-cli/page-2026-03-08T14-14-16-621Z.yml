@@ -1,0 +1,166 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - button "Toggle sidebar" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: W!
+      - separator [ref=e119]
+      - list [ref=e123]:
+        - listitem [ref=e124]:
+          - link "POS" [ref=e125] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e126]
+            - generic: POS
+      - generic [ref=e127]:
+        - separator [ref=e128]
+        - generic [ref=e130]: M
+        - link "Logout" [ref=e132] [cursor=pointer]:
+          - /url: /
+          - img [ref=e133]
+      - button "Toggle Sidebar" [ref=e134]
+    - main [ref=e135]:
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - button "Toggle Sidebar" [ref=e141] [cursor=pointer]:
+                - img
+                - generic [ref=e142]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e143]
+              - generic [ref=e144]: 0 occ
+              - generic [ref=e145]: 8 free
+            - generic [ref=e146]:
+              - button "Toggle color legend" [ref=e148] [cursor=pointer]:
+                - img [ref=e149]
+              - button "📦 New Takeout" [ref=e150] [cursor=pointer]
+              - button "🧾 History 73" [ref=e745] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e152]: "73"
+          - img [ref=e154]:
+            - button "Table T1" [ref=e157] [cursor=pointer]:
+              - generic: T1
+              - generic: 4p
+            - button "Table T2" [ref=e159] [cursor=pointer]:
+              - generic: T2
+              - generic: 4p
+            - button "Table T3" [ref=e161] [cursor=pointer]:
+              - generic: T3
+              - generic: 4p
+            - button "Table T4" [ref=e163] [cursor=pointer]:
+              - generic: T4
+              - generic: 4p
+            - button "Table T5" [ref=e165] [cursor=pointer]:
+              - generic: T5
+              - generic: 4p
+            - button "Table T6" [ref=e167] [cursor=pointer]:
+              - generic: T6
+              - generic: 4p
+            - button "Table T7" [ref=e169] [cursor=pointer]:
+              - generic: T7
+              - generic: 2p
+            - button "Table T8" [ref=e171] [cursor=pointer]:
+              - generic: T8
+              - generic: 2p
+        - generic [ref=e746]:
+          - generic [ref=e747]: 🧾
+          - generic [ref=e748]:
+            - generic [ref=e749]: No Table Selected
+            - generic [ref=e750]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e751]:
+            - generic [ref=e752]: Green = available — tap to open
+            - generic [ref=e754]: Orange = occupied — tap to view bill
+      - generic [ref=e757]:
+        - generic [ref=e758]:
+          - generic [ref=e759]: ✓
+          - generic [ref=e760]: Payment Successful
+          - generic [ref=e761]: Table 1
+        - generic [ref=e762]:
+          - generic [ref=e763]:
+            - generic [ref=e764]: 4× Beef + Pork Unlimited
+            - generic [ref=e765]: ₱1,996.00
+          - generic [ref=e766]:
+            - generic [ref=e767]: Samgyupsal
+            - generic [ref=e768]: FREE
+          - generic [ref=e769]:
+            - generic [ref=e770]: Pork Sliced
+            - generic [ref=e771]: FREE
+          - generic [ref=e772]:
+            - generic [ref=e773]: Premium USDA Beef
+            - generic [ref=e774]: FREE
+          - generic [ref=e775]:
+            - generic [ref=e776]: Sliced Beef
+            - generic [ref=e777]: FREE
+          - generic [ref=e778]:
+            - generic [ref=e779]: Kimchi
+            - generic [ref=e780]: FREE
+          - generic [ref=e781]:
+            - generic [ref=e782]: Rice
+            - generic [ref=e783]: FREE
+          - generic [ref=e784]:
+            - generic [ref=e785]: Cheese
+            - generic [ref=e786]: FREE
+          - generic [ref=e787]:
+            - generic [ref=e788]: Lettuce
+            - generic [ref=e789]: FREE
+          - generic [ref=e790]:
+            - generic [ref=e791]: Egg
+            - generic [ref=e792]: FREE
+          - generic [ref=e793]:
+            - generic [ref=e794]: Cucumber
+            - generic [ref=e795]: FREE
+          - generic [ref=e796]:
+            - generic [ref=e797]: Chinese Cabbage
+            - generic [ref=e798]: FREE
+          - generic [ref=e799]:
+            - generic [ref=e800]: Pork Bulgogi
+            - generic [ref=e801]: FREE
+          - generic [ref=e802]:
+            - generic [ref=e803]: Fish Cake
+            - generic [ref=e804]: FREE
+          - generic [ref=e805]:
+            - generic [ref=e806]: Premium USDA Beef
+            - generic [ref=e807]: FREE
+          - generic [ref=e808]:
+            - generic [ref=e809]: Samgyupsal
+            - generic [ref=e810]: FREE
+          - generic [ref=e811]:
+            - generic [ref=e812]: Kimchi
+            - generic [ref=e813]: FREE
+          - generic [ref=e814]:
+            - generic [ref=e815]: Rice
+            - generic [ref=e816]: FREE
+          - generic [ref=e817]:
+            - generic [ref=e818]: Premium USDA Beef
+            - generic [ref=e819]: FREE
+          - generic [ref=e820]:
+            - generic [ref=e821]: Samgyupsal
+            - generic [ref=e822]: FREE
+          - generic [ref=e823]:
+            - generic [ref=e824]: Premium USDA Beef
+            - generic [ref=e825]: FREE
+          - generic [ref=e826]:
+            - generic [ref=e827]: Samgyupsal
+            - generic [ref=e828]: FREE
+          - generic [ref=e830]:
+            - generic [ref=e831]: Subtotal
+            - generic [ref=e832]: ₱1,996.00
+          - generic [ref=e833]:
+            - generic [ref=e834]: VAT (inclusive)
+            - generic [ref=e835]: ₱214.00
+          - generic [ref=e836]:
+            - generic [ref=e837]: TOTAL
+            - generic [ref=e838]: ₱1,996.00
+          - generic [ref=e839]:
+            - generic [ref=e840]:
+              - generic [ref=e841]: Paid via
+              - generic [ref=e842]: Cash
+            - generic [ref=e843]:
+              - generic [ref=e844]: Tendered
+              - generic [ref=e845]: ₱1,996.00
+            - generic [ref=e846]:
+              - generic [ref=e847]: Change
+              - generic [ref=e848]: ₱0.00
+        - generic [ref=e849]:
+          - generic [ref=e850]: Invalid Date
+          - generic [ref=e851]: WTF! Samgyupsal — Thank you!
+        - button "Done" [ref=e853] [cursor=pointer]
+  - generic [ref=e109]: WTF! Samgyup POS

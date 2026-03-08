@@ -1,0 +1,181 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - button "Toggle sidebar" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: W!
+      - separator [ref=e119]
+      - list [ref=e123]:
+        - listitem [ref=e124]:
+          - link "POS" [ref=e125] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e126]
+            - generic: POS
+      - generic [ref=e127]:
+        - separator [ref=e128]
+        - generic [ref=e130]: M
+        - link "Logout" [ref=e132] [cursor=pointer]:
+          - /url: /
+          - img [ref=e133]
+      - button "Toggle Sidebar" [ref=e134]
+    - main [ref=e135]:
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - button "Toggle Sidebar" [ref=e141] [cursor=pointer]:
+                - img
+                - generic [ref=e142]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e143]
+              - generic [ref=e144]: 1 occ
+              - generic [ref=e145]: 7 free
+            - generic [ref=e146]:
+              - button "Toggle color legend" [ref=e148] [cursor=pointer]:
+                - img [ref=e149]
+              - button "📦 New Takeout" [ref=e150] [cursor=pointer]
+              - button "🧾 History 72" [ref=e151] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e152]: "72"
+          - img [ref=e154]:
+            - button "Table T1" [ref=e157] [cursor=pointer]:
+              - generic: P&B
+              - generic: 07:45
+              - generic: T1
+              - generic: 4 pax
+              - generic: ₱1,996.00
+              - generic: "22"
+            - button "Table T2" [ref=e159] [cursor=pointer]:
+              - generic: T2
+              - generic: 4p
+            - button "Table T3" [ref=e161] [cursor=pointer]:
+              - generic: T3
+              - generic: 4p
+            - button "Table T4" [ref=e163] [cursor=pointer]:
+              - generic: T4
+              - generic: 4p
+            - button "Table T5" [ref=e165] [cursor=pointer]:
+              - generic: T5
+              - generic: 4p
+            - button "Table T6" [ref=e167] [cursor=pointer]:
+              - generic: T6
+              - generic: 4p
+            - button "Table T7" [ref=e169] [cursor=pointer]:
+              - generic: T7
+              - generic: 2p
+            - button "Table T8" [ref=e171] [cursor=pointer]:
+              - generic: T8
+              - generic: 2p
+        - generic [ref=e173]:
+          - generic [ref=e203]:
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - generic [ref=e206]: T1
+                - button "4 pax ✎" [ref=e207] [cursor=pointer]
+                - generic [ref=e208]: 7m
+              - button "✕" [ref=e209] [cursor=pointer]
+            - generic [ref=e550]: Beef + Pork Unlimited
+            - generic [ref=e641]: 🔄 6 refills
+            - generic [ref=e551]:
+              - button "Refill" [ref=e552] [cursor=pointer]
+              - button "Add Item" [ref=e553] [cursor=pointer]
+          - generic [ref=e211]:
+            - generic [ref=e554]:
+              - generic [ref=e556]:
+                - generic [ref=e557]: Beef + Pork Unlimited
+                - generic [ref=e558]: REQUESTING
+              - generic [ref=e560]:
+                - generic [ref=e561]: ₱1,996.00
+                - generic [ref=e562]: PKG
+            - generic [ref=e563]:
+              - generic [ref=e564]: Meats
+              - generic [ref=e565]:
+                - generic [ref=e566]: Samgyupsal
+                - generic [ref=e567]:
+                  - generic [ref=e569]: WEIGHING
+                  - generic [ref=e650]: WEIGHING
+                  - generic [ref=e656]: WEIGHING
+                  - generic [ref=e662]: WEIGHING
+              - generic [ref=e570]:
+                - generic [ref=e571]: Pork Sliced
+                - generic [ref=e574]: WEIGHING
+              - generic [ref=e575]:
+                - generic [ref=e576]: Premium USDA Beef
+                - generic [ref=e577]:
+                  - generic [ref=e579]: WEIGHING
+                  - generic [ref=e643]: WEIGHING
+                  - generic [ref=e658]: WEIGHING
+                  - generic [ref=e664]: WEIGHING
+              - generic [ref=e580]:
+                - generic [ref=e581]: Sliced Beef
+                - generic [ref=e584]: WEIGHING
+              - generic [ref=e585]: Sides
+              - button "11 requesting ▼ show" [ref=e654] [cursor=pointer]:
+                - generic [ref=e588]: 11 requesting
+                - generic [ref=e589]: ▼ show
+          - generic [ref=e212]:
+            - generic [ref=e213]:
+              - generic [ref=e214]: BILL
+              - generic [ref=e215]: 22 items
+            - generic [ref=e216]: ₱1,996.00
+          - generic [ref=e217]:
+            - generic [ref=e218]:
+              - button "Void" [ref=e590] [cursor=pointer]
+              - button "Checkout" [ref=e591] [cursor=pointer]
+              - button "Print" [ref=e592] [cursor=pointer]
+            - button "Hide Options" [ref=e288] [cursor=pointer]
+            - generic [ref=e289]:
+              - button "Transfer" [ref=e290] [cursor=pointer]
+              - button "Pax" [ref=e291] [cursor=pointer]
+              - button "Change Pkg" [ref=e593] [cursor=pointer]
+              - button "Split Bill" [ref=e594] [cursor=pointer]
+              - button "Merge" [ref=e292] [cursor=pointer]
+      - generic [ref=e692]:
+        - generic [ref=e693]:
+          - generic [ref=e694]:
+            - generic [ref=e695]: Checkout
+            - generic [ref=e696]: T1
+          - button "✕" [ref=e697] [cursor=pointer]
+        - generic [ref=e698]:
+          - generic [ref=e699]:
+            - generic [ref=e700]: Subtotal (22 items)
+            - generic [ref=e701]: ₱1,996.00
+          - generic [ref=e702]:
+            - generic [ref=e703]: VAT (inclusive)
+            - generic [ref=e704]: ₱214.00
+          - generic [ref=e705]:
+            - generic [ref=e706]: TOTAL
+            - generic [ref=e707]: ₱1,996.00
+        - generic [ref=e708]:
+          - generic [ref=e709]: "Discount:"
+          - button "👴 Senior" [ref=e710] [cursor=pointer]
+          - button "♿ PWD" [ref=e711] [cursor=pointer]
+          - button "🎟️ Promo" [ref=e712] [cursor=pointer]
+          - button "💯 Comp" [ref=e713] [cursor=pointer]
+          - button "❤️ Service Rec" [ref=e714] [cursor=pointer]
+        - generic [ref=e715]:
+          - generic [ref=e716]: Payment Method
+          - generic [ref=e717]:
+            - button "💵 Cash" [ref=e718] [cursor=pointer]
+            - button "📱 GCash" [ref=e719] [cursor=pointer]
+            - button "📱 Maya" [ref=e720] [cursor=pointer]
+        - generic [ref=e721]:
+          - generic [ref=e722]:
+            - generic [ref=e723]: Cash Tendered
+            - button "Exact" [ref=e724] [cursor=pointer]
+          - generic [ref=e726]: ₱2,000.00
+          - generic [ref=e727]:
+            - button "₱20" [ref=e728] [cursor=pointer]
+            - button "₱50" [ref=e729] [cursor=pointer]
+            - button "₱100" [ref=e730] [cursor=pointer]
+            - button "₱200" [ref=e731] [cursor=pointer]
+            - button "₱500" [ref=e732] [cursor=pointer]
+            - button "₱1,000" [ref=e733] [cursor=pointer]
+            - button "₱1,500" [ref=e734] [cursor=pointer]
+            - button "₱2,000" [ref=e735] [cursor=pointer]
+          - spinbutton [ref=e736]: "2000"
+          - generic [ref=e740]:
+            - generic [ref=e741]: Change
+            - generic [ref=e742]: ₱4.00
+        - generic [ref=e737]:
+          - button "Cancel" [disabled] [ref=e738] [cursor=pointer]
+          - button "Printing..." [disabled] [ref=e743]: Printing...
+  - generic [ref=e109]: WTF! Samgyup POS

@@ -1,0 +1,154 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - generic [ref=e118]: W!
+          - generic [ref=e119]:
+            - generic [ref=e120]: WTF! SAMGYUP
+            - generic [ref=e121]: POS System
+        - generic [ref=e122]:
+          - paragraph [ref=e123]: Alta Citta (Tagbilaran)
+          - paragraph [ref=e124]: 06:36:57 PM
+      - separator [ref=e125]
+      - list [ref=e129]:
+        - listitem [ref=e130]:
+          - link "POS" [ref=e131] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e132]
+            - generic [ref=e133]: POS
+      - generic [ref=e134]:
+        - separator [ref=e135]
+        - generic [ref=e136]:
+          - generic [ref=e137]: M
+          - generic [ref=e138]:
+            - generic [ref=e139]: Maria Santos
+            - generic [ref=e140]: staff
+        - link "Logout" [ref=e142] [cursor=pointer]:
+          - /url: /
+          - img [ref=e143]
+          - generic [ref=e144]: Logout
+      - button "Toggle Sidebar" [ref=e145]
+    - main [ref=e146]:
+      - generic [ref=e148]:
+        - generic [ref=e149]:
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - button "Toggle Sidebar" [ref=e152] [cursor=pointer]:
+                - img
+                - generic [ref=e153]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e154]
+              - generic [ref=e155]: 1 occ
+              - generic [ref=e156]: 7 free
+            - generic [ref=e157]:
+              - button "Toggle color legend" [ref=e159] [cursor=pointer]:
+                - img [ref=e160]
+              - button "📦 New Takeout" [ref=e161] [cursor=pointer]
+              - button "🧾 History 73" [ref=e162] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e163]: "73"
+          - img [ref=e165]:
+            - button "Table T1" [ref=e168] [cursor=pointer]:
+              - generic: 00:02
+              - generic: T1
+              - generic: 4 pax
+            - button "Table T2" [ref=e170] [cursor=pointer]:
+              - generic: T2
+              - generic: 4p
+            - button "Table T3" [ref=e172] [cursor=pointer]:
+              - generic: T3
+              - generic: 4p
+            - button "Table T4" [ref=e174] [cursor=pointer]:
+              - generic: T4
+              - generic: 4p
+            - button "Table T5" [ref=e176] [cursor=pointer]:
+              - generic: T5
+              - generic: 4p
+            - button "Table T6" [ref=e178] [cursor=pointer]:
+              - generic: T6
+              - generic: 4p
+            - button "Table T7" [ref=e180] [cursor=pointer]:
+              - generic: T7
+              - generic: 2p
+            - button "Table T8" [ref=e182] [cursor=pointer]:
+              - generic: T8
+              - generic: 2p
+        - generic [ref=e184]:
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]:
+                - generic [ref=e217]: T1
+                - generic [ref=e218]: 4 pax
+                - generic [ref=e219]: 0m
+              - button "✕" [ref=e220] [cursor=pointer]
+            - button "+ Add Item" [ref=e221] [cursor=pointer]
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - generic [ref=e225]: BILL
+              - generic [ref=e226]: 0 items
+            - generic [ref=e227]: ₱0.00
+          - generic [ref=e228]:
+            - generic [ref=e229]:
+              - button "Void" [disabled]
+              - button "Checkout" [disabled]
+              - button "Print" [disabled]
+            - button "More Options" [ref=e230] [cursor=pointer]
+      - generic [ref=e232]:
+        - generic [ref=e233]:
+          - generic [ref=e234]:
+            - generic [ref=e235]:
+              - heading "➕ Add to Order" [level=2] [ref=e236]
+              - paragraph [ref=e237]: 🔥 Table · 4 pax
+            - button "Close modal" [ref=e238] [cursor=pointer]: ✕
+          - generic [ref=e239]:
+            - button "🎫 Package" [ref=e240] [cursor=pointer]:
+              - generic [ref=e241]: 🎫
+              - generic [ref=e242]: Package
+            - button "🥩 Meats" [ref=e243] [cursor=pointer]:
+              - generic [ref=e244]: 🥩
+              - generic [ref=e245]: Meats
+            - button "🥬 Sides" [ref=e246] [cursor=pointer]:
+              - generic [ref=e247]: 🥬
+              - generic [ref=e248]: Sides
+            - button "🍜 Dishes" [ref=e249] [cursor=pointer]:
+              - generic [ref=e250]: 🍜
+              - generic [ref=e251]: Dishes
+            - button "🥤 Drinks" [ref=e252] [cursor=pointer]:
+              - generic [ref=e253]: 🥤
+              - generic [ref=e254]: Drinks
+          - generic [ref=e256]: FREE — inventory tracked
+          - generic [ref=e258]:
+            - button "Beef Unlimited Beef Unlimited Unlimited Premium USDA Beef ₱599/pax ✓ Unlimited sides, rice, soup" [ref=e259] [cursor=pointer]:
+              - img "Beef Unlimited" [ref=e261]
+              - generic [ref=e262]:
+                - generic [ref=e264]: Beef Unlimited
+                - paragraph [ref=e265]: Unlimited Premium USDA Beef
+                - paragraph [ref=e266]: ₱599/pax
+                - paragraph [ref=e267]: ✓ Unlimited sides, rice, soup
+            - button "Beef + Pork Unlimited Beef + Pork Unlimited Unlimited Premium USDA Beef + Pork ₱499/pax ✓ Unlimited sides, rice, soup" [ref=e268] [cursor=pointer]:
+              - img "Beef + Pork Unlimited" [ref=e270]
+              - generic [ref=e271]:
+                - generic [ref=e273]: Beef + Pork Unlimited
+                - paragraph [ref=e274]: Unlimited Premium USDA Beef + Pork
+                - paragraph [ref=e275]: ₱499/pax
+                - paragraph [ref=e276]: ✓ Unlimited sides, rice, soup
+            - button "Pork Unlimited Pork Unlimited Unlimited pork samgyupsal grill ₱399/pax ✓ Unlimited sides, rice, soup" [ref=e277] [cursor=pointer]:
+              - img "Pork Unlimited" [ref=e279]
+              - generic [ref=e280]:
+                - generic [ref=e282]: Pork Unlimited
+                - paragraph [ref=e283]: Unlimited pork samgyupsal grill
+                - paragraph [ref=e284]: ₱399/pax
+                - paragraph [ref=e285]: ✓ Unlimited sides, rice, soup
+        - generic [ref=e286]:
+          - generic [ref=e287]:
+            - heading "Pending Items" [level=3] [ref=e288]
+            - paragraph [ref=e289]: Review items before pushing to the bill.
+          - generic [ref=e291]: No items yet
+          - generic [ref=e292]:
+            - generic [ref=e293]:
+              - generic [ref=e294]: PENDING TOTAL
+              - generic [ref=e295]: ₱0.00
+            - generic [ref=e296]:
+              - button "Undo" [ref=e297] [cursor=pointer]
+              - button "⚡ CHARGE (0)" [disabled] [ref=e298]
+  - generic [ref=e109]: WTF! Samgyup POS

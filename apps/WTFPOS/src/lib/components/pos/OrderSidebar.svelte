@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Table, Order } from '$lib/types';
 	import { formatPeso, formatTimeAgo, cn } from '$lib/utils';
-	import { menuItems, printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus } from '$lib/stores/pos.svelte';
+	import { menuItems, printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus, getRefillCount } from '$lib/stores/pos.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
 
@@ -18,6 +18,7 @@
 		onsplit: () => void;
 		onchangepax: () => void;
 		onmerge?: () => void;
+		oncanceltable?: () => void;
 		pendingRejections?: KitchenAlert[];
 		onacknowledgeRejection?: (alertId: string) => void;
 	}
@@ -35,11 +36,13 @@
 		onsplit,
 		onchangepax,
 		onmerge,
+		oncanceltable,
 		pendingRejections = [],
 		onacknowledgeRejection
 	}: Props = $props();
 
 	let showMoreActions = $state(false);
+	let sidesExpanded = $state(false);
 
 	function takeoutLabel(o: Order) {
 		const timeCode = new Date(o.createdAt).getTime() % 1000;
@@ -72,9 +75,121 @@
 	const activeItemCount = $derived(
 		order?.items.filter(i => i.status !== 'cancelled').length ?? 0
 	);
+
+	// P1-2: Refill count badge for at-a-glance confirmation
+	const refillCount = $derived(getRefillCount(order));
+
+	function isMeatItem(item: Order['items'][number]): boolean {
+		return menuItemsById.get(item.menuItemId)?.category === 'meats';
+	}
+
+	// AYCE grouped view — null for non-AYCE orders (falls back to flat list)
+	const groupedItems = $derived.by(() => {
+		if (!order?.packageId) return null;
+
+		// Meats: merge by menuItemId so each cut shows one row with a mini instance log
+		const meatMap = new Map<string, Order['items']>();
+		const liveSides: Order['items'] = [];
+		const pkgItems: Order['items'] = [];
+		const otherItems: Order['items'] = [];
+
+		for (const item of order.items) {
+			if (item.status === 'cancelled') continue;
+			if (item.tag === 'PKG') {
+				pkgItems.push(item);
+			} else if (isMeatItem(item)) {
+				const group = meatMap.get(item.menuItemId) ?? [];
+				group.push(item);
+				meatMap.set(item.menuItemId, group);
+			} else if (item.tag === 'FREE') {
+				liveSides.push(item);
+			} else {
+				otherItems.push(item);
+			}
+		}
+
+		// Preserve first-occurrence order; flag groups with any non-served instance
+		const meatGroups = Array.from(meatMap.values()).map(instances => ({
+			menuItemId: instances[0].menuItemId,
+			menuItemName: instances[0].menuItemName,
+			tag: instances[0].tag as 'FREE' | 'PKG' | null,
+			instances,
+			hasLive: instances.some(i => i.status !== 'served'),
+		}));
+
+		return { meatGroups, liveSides, pkgItems, otherItems };
+	});
+
+	// Fix 4: Flash BILL total when order total changes after pax update
+	let billFlash = $state(false);
+	let prevTotal: number | undefined;
+
+	$effect(() => {
+		const total = order?.total;
+		if (prevTotal !== undefined && total !== undefined && total !== prevTotal) {
+			billFlash = true;
+			setTimeout(() => { billFlash = false; }, 500);
+		}
+		prevTotal = total;
+	});
+
 </script>
 
-<div class="flex w-[380px] shrink-0 flex-col border-l border-border bg-surface overflow-y-auto">
+<!-- Status badge snippet — shared between itemRow and the AYCE meat instance log -->
+{#snippet statusBadge(badge: ReturnType<typeof itemBadge>, isRefill = false)}
+	{#if badge === 'pending'}
+		{#if isRefill}
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">REQUESTING</span>
+		{:else}
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-600">SENT</span>
+		{/if}
+	{:else if badge === 'weighing'}
+		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">WEIGHING</span>
+	{:else if badge === 'cooking'}
+		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">COOKING</span>
+	{:else if badge === 'served'}
+		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
+	{/if}
+{/snippet}
+
+<!-- Shared item row snippet — used in AYCE grouped sections and non-AYCE flat list -->
+{#snippet itemRow(item: Order['items'][number], dimmed = false)}
+	{@const badge = itemBadge(item)}
+	<div class={cn(
+		'flex items-start justify-between py-2.5',
+		item.status === 'cancelled' && 'opacity-40',
+		dimmed && 'opacity-40'
+	)}>
+		<div class="flex flex-col gap-0.5 flex-1 min-w-0 pr-2">
+			<div class="flex items-center gap-1.5 flex-wrap">
+				<span class="text-sm font-medium text-gray-900 truncate">{item.menuItemName}</span>
+				{@render statusBadge(badge, item.tag === 'FREE')}
+				{#if item.weight != null && badge !== 'weighing'}
+					<span class="text-xs text-gray-400">{item.weight}g</span>
+				{/if}
+			</div>
+			{#if item.status === 'cancelled'}
+				<span class="text-xs italic text-status-red">voided</span>
+			{/if}
+		</div>
+		<div class="flex items-center gap-2 shrink-0">
+			{#if item.tag === 'PKG'}
+				<div class="flex flex-col items-end">
+					<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+					<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-accent-light text-accent">PKG</span>
+				</div>
+			{:else if item.tag === 'FREE'}
+				<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">FREE</span>
+			{:else if item.status === 'cancelled'}
+				<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
+			{:else}
+				<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+<div class="flex w-[380px] shrink-0 flex-col border-l border-border bg-surface overflow-hidden">
 	{#if !order}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center select-none">
 			<div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-secondary text-3xl">
@@ -105,9 +220,14 @@
 						<span class="text-lg font-extrabold text-gray-900">{order.customerName ?? 'Walk-in'}</span>
 					{:else}
 						<span class="text-lg font-extrabold text-gray-900">{table?.label}</span>
-						<span class="flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-medium text-gray-600">
-							{order.pax} pax
-						</span>
+						<button
+							onclick={onchangepax}
+							class="flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-accent transition-colors cursor-pointer"
+							style="min-height: unset"
+							title="Change guest count"
+						>
+							{order.pax} pax ✎
+						</button>
 						{#if table?.elapsedSeconds !== null}
 							<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
 								{Math.floor((table?.elapsedSeconds ?? 0) / 60)}m
@@ -123,6 +243,7 @@
 				<div class="flex items-center justify-between rounded-lg bg-orange-50 border border-dashed border-orange-200 px-3 py-1.5">
 					<div class="flex items-center gap-2">
 						<span class="font-mono text-xs font-bold text-accent">{takeoutLabel(order)}</span>
+						<span class="text-xs text-gray-400">{formatTimeAgo(order.createdAt)}</span>
 						<span class={cn(
 							'rounded px-1.5 py-0.5 text-[10px] font-bold text-white',
 							tStatus === 'new' ? 'bg-blue-500' :
@@ -145,6 +266,11 @@
 				</div>
 			{:else if order.packageName}
 				<div class="text-sm font-semibold text-gray-700">{order.packageName}</div>
+				{#if refillCount > 0}
+					<span class="inline-flex items-center gap-1 rounded-full bg-status-green/10 px-2 py-0.5 text-[11px] font-semibold text-status-green">
+						🔄 {refillCount} refill{refillCount === 1 ? '' : 's'}
+					</span>
+				{/if}
 			{/if}
 
 			<!-- Action buttons: REFILL + ADD ITEM for AYCE, or plain ADD for others -->
@@ -209,50 +335,106 @@
 		{/if}
 
 		<!-- ── Items List ── -->
-		<div class="flex-1 divide-y divide-border-light px-4 pt-1">
-			{#each order.items as item (item.id)}
-				{@const badge = itemBadge(item)}
-				<div class={cn('flex items-start justify-between py-2.5', item.status === 'cancelled' && 'opacity-40')}>
-					<div class="flex flex-col gap-0.5 flex-1 min-w-0 pr-2">
-						<div class="flex items-center gap-1.5 flex-wrap">
-							<span class="text-sm font-medium text-gray-900 truncate">{item.menuItemName}</span>
-							{#if badge === 'pending'}
-								{#if order.packageId}
-									<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">REQUESTING</span>
-								{:else}
-									<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-600">SENT</span>
-								{/if}
-							{:else if badge === 'weighing'}
-								<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">WEIGHING</span>
-							{:else if badge === 'cooking'}
-								<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">COOKING</span>
-							{:else if badge === 'served'}
-								<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
-							{/if}
-							{#if item.weight != null && badge !== 'weighing'}
-								<span class="text-xs text-gray-400">{item.weight}g</span>
-							{/if}
-						</div>
-						{#if item.status === 'cancelled'}
-							<span class="text-xs italic text-status-red">voided</span>
-						{/if}
-					</div>
-					<div class="flex items-center gap-2 shrink-0">
-						{#if item.tag === 'PKG'}
-							<div class="flex flex-col items-end">
-								<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
-								<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-accent-light text-accent">PKG</span>
+		<div class="flex-1 overflow-y-auto divide-y divide-border-light px-4 pt-1">
+			{#if groupedItems}
+				<!-- AYCE grouped view -->
+
+				<!-- A: Package line — always first -->
+				{#each groupedItems.pkgItems as item (item.id)}
+					{@render itemRow(item, false)}
+				{/each}
+
+				<!-- B+C: Meats & Sides — indented under package -->
+				{#if groupedItems.meatGroups.length > 0 || groupedItems.liveSides.length > 0}
+					<div class="ml-3 border-l-2 border-orange-200 pl-3">
+
+						<!-- Meats — one row per cut, mini instance log below name -->
+						{#if groupedItems.meatGroups.length > 0}
+							<div class="-mx-3 px-3 py-1.5 bg-orange-50">
+								<span class="text-xs font-bold uppercase tracking-widest text-orange-400">Meats</span>
 							</div>
-						{:else if item.tag === 'FREE'}
-							<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">FREE</span>
-						{:else if item.status === 'cancelled'}
-							<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
-						{:else}
-							<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+							{#each groupedItems.meatGroups as group, i (group.menuItemId)}
+								<div class={cn('flex items-center justify-between py-2.5 gap-2 -mx-3 px-3', i % 2 === 1 && 'bg-gray-50')}>
+									<span class={cn('text-sm font-medium text-gray-900 truncate shrink-0', !group.hasLive && 'opacity-50')}>
+									{group.menuItemName}
+									{#if group.instances.length > 1}
+										<span class="text-xs text-gray-400 font-normal">× {group.instances.length}</span>
+									{/if}
+								</span>
+									<!-- P1-2: Aggregated status badges instead of stacking per instance -->
+									{@const badges = group.instances.map(i => itemBadge(i)).filter(Boolean)}
+									{@const weighing = badges.filter(b => b === 'weighing').length}
+									{@const cooking = badges.filter(b => b === 'cooking').length}
+									{@const served = badges.filter(b => b === 'served').length}
+									{@const pending = badges.filter(b => b === 'pending').length}
+									{@const totalWeight = group.instances.filter(i => i.weight != null).reduce((s, i) => s + (i.weight ?? 0), 0)}
+									<div class="flex items-center gap-1 flex-wrap justify-end">
+										{#if totalWeight > 0}
+											<span class="text-[10px] text-gray-400">{totalWeight}g</span>
+										{/if}
+										{#if served > 0}
+											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">{served > 1 ? `${served}× ` : ''}✓ SERVED</span>
+										{/if}
+										{#if cooking > 0}
+											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">{cooking > 1 ? `${cooking}× ` : ''}COOKING</span>
+										{/if}
+										{#if weighing > 0}
+											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">{weighing > 1 ? `${weighing}× ` : ''}WEIGHING</span>
+										{/if}
+										{#if pending > 0}
+											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">{pending > 1 ? `${pending}× ` : ''}REQUESTING</span>
+										{/if}
+									</div>
+								</div>
+							{/each}
 						{/if}
+
+						<!-- Sides — collapsed by default -->
+						{#if groupedItems.liveSides.length > 0}
+							<div class="-mx-3 px-3 py-1.5 bg-emerald-50">
+								<span class="text-xs font-bold uppercase tracking-widest text-status-green">Sides</span>
+							</div>
+							{@const sidesRequesting = groupedItems.liveSides.filter(i => i.status === 'pending' || i.status === 'cooking').length}
+							{@const sidesServed = groupedItems.liveSides.filter(i => i.status === 'served').length}
+							<button
+								onclick={() => { sidesExpanded = !sidesExpanded; }}
+								class="flex w-full items-center justify-between py-2 text-left"
+								style="min-height: 36px"
+							>
+								<span class="flex items-center gap-2 text-xs">
+									{#if sidesRequesting > 0}
+										<span class="text-amber-600 font-semibold">{sidesRequesting} requesting</span>
+									{/if}
+									{#if sidesServed > 0}
+										<span class="text-status-green font-semibold">{sidesServed} served</span>
+									{/if}
+									{#if sidesRequesting === 0 && sidesServed === 0}
+										<span class="text-gray-400">{groupedItems.liveSides.length} sides</span>
+									{/if}
+								</span>
+								<span class="text-[10px] text-gray-400">{sidesExpanded ? '▲ hide' : '▼ show'}</span>
+							</button>
+							{#if sidesExpanded}
+								{#each groupedItems.liveSides as item (item.id)}
+									{@render itemRow(item, true)}
+								{/each}
+							{/if}
+						{/if}
+
 					</div>
-				</div>
-			{/each}
+				{/if}
+
+				<!-- C: Other charged add-ons (non-AYCE items on this order) -->
+				{#each groupedItems.otherItems as item (item.id)}
+					{@render itemRow(item, false)}
+				{/each}
+
+			{:else}
+				<!-- Non-AYCE flat list — unchanged behaviour, includes cancelled items -->
+				{#each order.items as item (item.id)}
+					{@render itemRow(item, false)}
+				{/each}
+			{/if}
 		</div>
 
 		<!-- ── Meat Stats Bar ── -->
@@ -269,7 +451,7 @@
 				<span class="text-base font-bold text-gray-900">BILL</span>
 				<span class="text-xs text-gray-400">{activeItemCount} items</span>
 			</div>
-			<span class="font-mono text-2xl font-extrabold text-gray-900">{formatPeso(order.total)}</span>
+			<span class={cn('font-mono text-2xl font-extrabold transition-colors duration-300', billFlash ? 'text-accent' : 'text-gray-900')}>{formatPeso(order.total)}</span>
 		</div>
 
 		<!-- ── Primary Actions ── -->
@@ -283,11 +465,18 @@
 					<button onclick={() => confirmHeldPayment(order.id)} class="btn-success flex-1 text-sm bg-cyan-600 hover:bg-cyan-700 text-white" style="min-height: 44px">Confirm Payment</button>
 				</div>
 			{:else}
+				{#if activeItemCount === 0 && oncanceltable}
+				<!-- P0-3: Cancel table button when no items have been added -->
+				<button onclick={oncanceltable} class="btn-ghost w-full border border-status-red text-status-red hover:bg-red-50 text-sm font-semibold" style="min-height: 44px">
+					Cancel Table
+				</button>
+			{:else}
 				<div class="flex gap-2">
 					<button onclick={onvoid} disabled={activeItemCount === 0} class={cn('btn-danger px-3 text-sm', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
 					<button onclick={oncheckout} disabled={activeItemCount === 0} class={cn('btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Checkout</button>
 					<button onclick={() => printBill(order.id)} disabled={activeItemCount === 0} class={cn('btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Print</button>
 				</div>
+			{/if}
 			{/if}
 
 			<!-- More Options (overflow) -->
@@ -302,17 +491,17 @@
 			{#if showMoreActions}
 				<div class="flex gap-2 flex-wrap">
 					{#if order.orderType === 'dine-in' && table}
-						<button onclick={ontransfer} class="btn-secondary flex-1 text-xs" style="min-height: 36px">Transfer</button>
-						<button onclick={onchangepax} class="btn-secondary flex-1 text-xs" style="min-height: 36px">Pax</button>
+						<button onclick={ontransfer} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Transfer</button>
+						<button onclick={onchangepax} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Pax</button>
 					{/if}
 					{#if order.packageId && order.orderType === 'dine-in'}
-						<button onclick={onchangepackage} class="btn-secondary flex-1 text-xs" style="min-height: 36px">Change Pkg</button>
+						<button onclick={onchangepackage} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Change Pkg</button>
 					{/if}
 					{#if activeItemCount > 0}
-						<button onclick={onsplit} class="btn-secondary flex-1 text-xs" style="min-height: 36px">Split Bill</button>
+						<button onclick={onsplit} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Split Bill</button>
 					{/if}
 					{#if order.orderType === 'dine-in' && table && onmerge}
-						<button onclick={onmerge} class="btn-secondary flex-1 text-xs" style="min-height: 36px">Merge</button>
+						<button onclick={onmerge} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Merge</button>
 					{/if}
 				</div>
 			{/if}

@@ -1,0 +1,109 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph [ref=e17]: 07:25:01 PM
+    - separator [ref=e18]
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - link "POS" [ref=e24] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e25]
+          - generic [ref=e29]: POS
+    - generic [ref=e30]:
+      - separator [ref=e31]
+      - generic [ref=e32]:
+        - generic [ref=e33]: M
+        - generic [ref=e34]:
+          - generic [ref=e35]: Maria Santos
+          - generic [ref=e36]: staff
+      - link "Logout" [ref=e38] [cursor=pointer]:
+        - /url: /
+        - img [ref=e39]
+        - generic [ref=e42]: Logout
+    - button "Toggle Sidebar" [ref=e43]
+  - main [ref=e44]:
+    - generic [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - button "Toggle Sidebar" [ref=e50] [cursor=pointer]:
+            - img
+            - generic [ref=e51]: Toggle Sidebar
+          - heading "POS" [level=1] [ref=e52]
+          - generic [ref=e53]: 1 occ
+          - generic [ref=e54]: 7 free
+        - generic [ref=e55]:
+          - button "Toggle color legend" [ref=e57] [cursor=pointer]:
+            - img [ref=e58]
+          - button "📦 New Takeout" [ref=e60] [cursor=pointer]
+          - button "🧾 History 49" [ref=e61] [cursor=pointer]:
+            - text: 🧾 History
+            - generic [ref=e62]: "49"
+      - img [ref=e64]:
+        - button "Table T1" [ref=e67] [cursor=pointer]:
+          - generic: PORK
+          - generic: 02:25
+          - generic: T1
+          - generic: 4 pax
+          - generic: ₱1,596.00
+          - generic: "13"
+        - button "Table T2" [ref=e71] [cursor=pointer]:
+          - generic: T2
+          - generic: 4p
+        - button "Table T3" [ref=e73] [cursor=pointer]:
+          - generic: T3
+          - generic: 4p
+        - button "Table T4" [ref=e75] [cursor=pointer]:
+          - generic: T4
+          - generic: 4p
+        - button "Table T5" [ref=e77] [cursor=pointer]:
+          - generic: T5
+          - generic: 4p
+        - button "Table T6" [ref=e79] [cursor=pointer]:
+          - generic: T6
+          - generic: 4p
+        - button "Table T7" [ref=e81] [cursor=pointer]:
+          - generic: T7
+          - generic: 2p
+        - button "Table T8" [ref=e83] [cursor=pointer]:
+          - generic: T8
+          - generic: 2p
+    - generic [ref=e214]:
+      - generic [ref=e215]:
+        - generic [ref=e216]:
+          - heading "Refill" [level=2] [ref=e217]
+          - generic [ref=e218]: Pork Unlimited
+          - generic [ref=e257]: 🔄 1 refill sent
+        - button "✕" [ref=e219] [cursor=pointer]
+      - generic [ref=e220]:
+        - generic [ref=e221]:
+          - paragraph [ref=e222]: Meats
+          - generic [ref=e223]:
+            - button "Pork Sliced Pork Sliced" [ref=e386] [cursor=pointer]:
+              - img "Pork Sliced" [ref=e226]
+              - generic [ref=e228]: Pork Sliced
+            - button "Samgyupsal Samgyupsal" [ref=e229] [cursor=pointer]:
+              - img "Samgyupsal" [ref=e231]
+              - generic [ref=e233]: Samgyupsal
+        - separator [ref=e234]
+        - generic [ref=e235]:
+          - paragraph [ref=e236]: Free Sides
+          - generic [ref=e237]:
+            - button "Cheese" [ref=e238] [cursor=pointer]
+            - button "Chinese Cabbage" [ref=e239] [cursor=pointer]
+            - button "Cucumber" [ref=e240] [cursor=pointer]
+            - button "Egg" [ref=e241] [cursor=pointer]
+            - button "Fish Cake" [ref=e242] [cursor=pointer]
+            - button "Kimchi" [active] [ref=e243] [cursor=pointer]
+            - button "Lettuce" [ref=e244] [cursor=pointer]
+            - button "Pork Bulgogi" [ref=e245] [cursor=pointer]
+            - button "Rice" [ref=e246] [cursor=pointer]
+      - generic [ref=e247]:
+        - button "Repeat Last — Pork Sliced" [ref=e261] [cursor=pointer]
+        - button "Done" [ref=e248] [cursor=pointer]

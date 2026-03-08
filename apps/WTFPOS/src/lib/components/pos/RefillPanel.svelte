@@ -11,6 +11,10 @@
 
 	let { isOpen, order, onclose }: Props = $props();
 
+	// Transient feedback state
+	let addedItemId = $state<string | null>(null);
+	let repeatConfirmed = $state(false);
+
 	const activePackage = $derived(
 		order?.packageId ? menuItems.value.find(m => m.id === order.packageId) : null
 	);
@@ -45,14 +49,23 @@
 		return result;
 	});
 
+	// P1-3: Refill round counter
+	const refillCount = $derived(
+		order?.items.filter(i => i.tag === 'FREE' && i.notes === REFILL_NOTE && i.status !== 'cancelled').length ?? 0
+	);
+
 	async function requestMeat(meat: MenuItem) {
 		if (!order) return;
 		await addRefillRequest(order.id, meat);
+		addedItemId = meat.id;
+		setTimeout(() => { addedItemId = null; }, 1200);
 	}
 
 	async function requestSide(side: MenuItem) {
 		if (!order) return;
 		await addItemToOrder(order.id, side, 1, undefined, true);
+		addedItemId = side.id;
+		setTimeout(() => { addedItemId = null; }, 1200);
 	}
 
 	async function repeatLastRound() {
@@ -60,6 +73,8 @@
 		for (const meat of lastRoundMeats) {
 			await addRefillRequest(order.id, meat);
 		}
+		repeatConfirmed = true;
+		setTimeout(() => { repeatConfirmed = false; }, 1500);
 	}
 </script>
 
@@ -78,8 +93,12 @@
 				{#if activePackage}
 					<span class="text-[11px] text-gray-500">{activePackage.name}</span>
 				{/if}
+				{#if refillCount > 0}
+					<span class="text-[11px] text-status-green font-semibold">🔄 {refillCount} refill{refillCount === 1 ? '' : 's'} sent</span>
+				{/if}
 			</div>
-			<button onclick={onclose} class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" style="min-height: unset">
+			<!-- P0-3: 44px close button -->
+			<button onclick={onclose} class="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
 				✕
 			</button>
 		</div>
@@ -88,13 +107,15 @@
 		<div class="flex flex-col gap-4 px-4 py-3 max-h-[55vh] overflow-y-auto">
 			{#if refillMeats.length > 0}
 				<div>
-					<p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Meats</p>
+					<!-- P2-1: section label 10px → 12px -->
+					<p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Meats</p>
 					<div class="grid grid-cols-3 gap-2">
 						{#each refillMeats as meat (meat.id)}
+							<!-- P0-1: tap feedback overlay + relative/overflow-hidden -->
 							<button
 								onclick={() => requestMeat(meat)}
 								class={cn(
-									'flex flex-col rounded-lg border border-border bg-surface text-left transition-all active:scale-95 hover:border-accent hover:bg-accent-light overflow-hidden',
+									'relative flex flex-col rounded-lg border border-border bg-surface text-left transition-all active:scale-95 hover:border-accent hover:bg-accent-light overflow-hidden',
 									meat.protein === 'beef' ? '!border-l-red-500 !border-l-[3px]' : '',
 									meat.protein === 'pork' ? '!border-l-orange-500 !border-l-[3px]' : '',
 									meat.protein === 'chicken' ? '!border-l-yellow-500 !border-l-[3px]' : ''
@@ -106,31 +127,46 @@
 									</div>
 								{/if}
 								<div class={cn('px-2 pb-2', meat.image ? 'pt-1' : 'pt-2')}>
-									<span class="text-[11px] font-bold text-gray-900 leading-tight line-clamp-2">{meat.name}</span>
+									<!-- P2-3: meat name 11px → 12px -->
+									<span class="text-xs font-bold text-gray-900 leading-tight line-clamp-2">{meat.name}</span>
 								</div>
+								{#if addedItemId === meat.id}
+									<div class="absolute inset-0 flex items-center justify-center rounded-lg bg-status-green/90 transition-opacity">
+										<span class="text-sm font-black text-white">✓</span>
+									</div>
+								{/if}
 							</button>
 						{/each}
 					</div>
 				</div>
 			{/if}
 
+			<!-- P2-2: visual divider between meats and sides -->
+			{#if refillMeats.length > 0 && freeSides.length > 0}
+				<hr class="border-border" />
+			{/if}
+
 			{#if freeSides.length > 0}
 				<div>
-					<p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Free Sides</p>
-					<div class="grid grid-cols-3 gap-2">
+					<!-- P2-1: section label 10px → 12px -->
+					<p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Free Sides</p>
+					<!-- P1-4 + P2-4: uniform chip layout, no image inconsistency, no green border semantic conflict -->
+					<div class="flex flex-wrap gap-2">
 						{#each freeSides as side (side.id)}
 							<button
 								onclick={() => requestSide(side)}
-								class="flex flex-col rounded-lg border border-status-green/30 bg-status-green-light text-left transition-all active:scale-95 hover:border-status-green overflow-hidden"
+								class={cn(
+									'relative flex items-center rounded-lg border bg-white px-3 text-xs font-bold text-gray-700 transition-all active:scale-95 hover:border-accent hover:text-accent overflow-hidden',
+									addedItemId === side.id
+										? 'border-status-green bg-status-green/10 text-status-green'
+										: 'border-border'
+								)}
+								style="min-height: 44px"
 							>
-								{#if side.image}
-									<div class="w-full h-16 bg-gray-100">
-										<img src={side.image} alt={side.name} class="w-full h-full object-cover" />
-									</div>
+								{side.name}
+								{#if addedItemId === side.id}
+									<span class="ml-1">✓</span>
 								{/if}
-								<div class={cn('px-2 pb-2', side.image ? 'pt-1' : 'pt-2')}>
-									<span class="text-[11px] font-bold text-gray-900 leading-tight line-clamp-2">{side.name}</span>
-								</div>
 							</button>
 						{/each}
 					</div>
@@ -145,18 +181,25 @@
 		<!-- Footer -->
 		<div class="flex flex-col gap-1.5 border-t border-border px-4 py-3">
 			{#if lastRoundMeats.length > 0}
+				<!-- P0-2: repeat confirmation feedback + P1-1: 44px touch target -->
 				<button
 					onclick={repeatLastRound}
-					class="w-full rounded-lg border-2 border-dashed border-accent/40 bg-accent-light py-2.5 text-xs font-bold text-accent hover:bg-accent/10 hover:border-accent active:scale-95 transition-all"
-					style="min-height: 40px"
+					class={cn(
+						'w-full rounded-lg border-2 border-dashed py-2.5 text-xs font-bold transition-all active:scale-95',
+						repeatConfirmed
+							? 'border-status-green/60 bg-status-green/10 text-status-green'
+							: 'border-accent/40 bg-accent-light text-accent hover:bg-accent/10 hover:border-accent'
+					)}
+					style="min-height: 44px"
 				>
-					Repeat Last — {lastRoundMeats.map(m => m.name).join(' + ')}
+					{repeatConfirmed ? '✓ Sent!' : `Repeat Last — ${lastRoundMeats.map(m => m.name).join(' + ')}`}
 				</button>
 			{/if}
+			<!-- P1-1: Done button 36px → 44px -->
 			<button
 				onclick={onclose}
 				class="w-full rounded-lg bg-surface-secondary py-2 text-xs font-semibold text-gray-500 hover:bg-gray-100 transition-colors"
-				style="min-height: 36px"
+				style="min-height: 44px"
 			>
 				Done
 			</button>

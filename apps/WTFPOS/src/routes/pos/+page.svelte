@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { tables as allTables, orders as allOrders, openTable, updateTableTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance, voidOrder } from '$lib/stores/pos.svelte';
+    import { tables as allTables, orders as allOrders, openTable, updateTableTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance, voidOrder, closeTable } from '$lib/stores/pos.svelte';
     import { getPendingRejectionsForTable, acknowledgeAlert, type KitchenAlert } from '$lib/stores/alert.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
     import AlertBanner from '$lib/components/AlertBanner.svelte';
@@ -162,19 +162,20 @@
         closeBill();
     }
 
-    function handleCheckoutSuccess(paidOrder: Order) {
-        receiptOrder = paidOrder;
-        const cashPayment = paidOrder.payments.find(p => p.method === 'cash');
-        receiptChange = cashPayment ? cashPayment.amount - paidOrder.total : 0;
+    // P0-3: Cancel a 0-balance table (opened with pax but no orders)
+    async function handleCancelTable() {
+        if (!currentActiveOrder || !selectedTable) return;
+        const activeItems = currentActiveOrder.items.filter(i => i.status !== 'cancelled');
+        if (activeItems.length > 0) return; // Safety: only cancel truly empty tables
+        await voidOrder(currentActiveOrder.id, 'mistake');
+        closeBill();
+    }
 
-        // Determine payment method from actual payments
-        const primaryPayment = paidOrder.payments[paidOrder.payments.length - 1];
-        receiptMethod = primaryPayment ? 
-            primaryPayment.method === 'gcash' ? 'GCash' :
-            primaryPayment.method === 'maya' ? 'Maya' :
-            primaryPayment.method === 'card' ? 'Card' : 'Cash' 
-            : 'Cash';
-            
+    function handleCheckoutSuccess(paidOrder: Order, change: number, methodLabel: string) {
+        receiptOrder = paidOrder;
+        receiptChange = change;
+        receiptMethod = methodLabel;
+
         showReceipt = true;
         showCheckout = false;
         checkoutOrder = null;
@@ -239,9 +240,9 @@
         <AllBranchesDashboard allTables={allTables.value} allOrders={allOrders.value} />
     {:else}
         <div class="flex flex-1 overflow-hidden">
-            <div class="flex flex-1 flex-col overflow-y-auto p-6 gap-5">
+            <div class="flex flex-1 flex-col overflow-hidden min-h-0 p-6 gap-5">
                 <!-- Header -->
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between shrink-0">
                     <div class="flex items-center gap-3">
                         <SidebarTrigger class="hidden md:flex h-9 w-9 text-gray-500" />
                         <h1 class="text-lg font-bold text-gray-900">POS</h1>
@@ -324,6 +325,7 @@
                 onsplit={() => showSplitBill = true}
                 onchangepax={() => showPaxChange = true}
                 onmerge={() => showMergeModal = true}
+                oncanceltable={handleCancelTable}
                 {pendingRejections}
                 onacknowledgeRejection={(alertId) => acknowledgeAlert(alertId)}
             />

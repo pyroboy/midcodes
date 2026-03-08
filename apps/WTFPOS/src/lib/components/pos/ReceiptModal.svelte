@@ -11,6 +11,16 @@
 	}
 
 	let { isOpen, order, change, method, onClose }: Props = $props();
+
+	// P1-1: Only show paid (non-FREE) items on receipt; collapse package includes
+	const receiptItems = $derived.by(() => {
+		if (!order) return [];
+		const active = order.items.filter(i => i.status !== 'cancelled');
+		const paid = active.filter(i => i.tag !== 'FREE');
+		// Count refills for summary line
+		const refillCount = active.filter(i => i.tag === 'FREE' && i.notes?.includes('REFILL')).length;
+		return { paid, refillCount };
+	});
 </script>
 
 {#if isOpen && order}
@@ -29,19 +39,21 @@
 
 			<!-- Receipt Body -->
 			<div class="flex flex-col gap-2 border-b border-dashed border-gray-300 px-6 py-4 font-mono text-sm">
-				{#each order.items.filter(i => i.status !== 'cancelled') as item}
+				<!-- P1-1: Only show paid items (package line + paid add-ons), hide FREE included items -->
+				{#each receiptItems.paid as item}
 					<div class="flex justify-between">
 						<span class="text-gray-700 truncate max-w-[200px]">
 							{item.quantity > 1 ? `${item.quantity}× ` : ''}{item.menuItemName}
 							{#if item.weight}<span class="text-gray-400"> {item.weight}g</span>{/if}
 						</span>
-						{#if item.tag === 'FREE'}
-							<span class="text-status-green text-xs font-bold">FREE</span>
-						{:else}
-							<span class="text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
-						{/if}
+						<span class="text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
 					</div>
 				{/each}
+				{#if receiptItems.refillCount > 0}
+					<div class="flex justify-between text-gray-400 text-xs italic">
+						<span>Includes {receiptItems.refillCount} refill{receiptItems.refillCount === 1 ? '' : 's'} served</span>
+					</div>
+				{/if}
 
 				<div class="border-t border-dashed border-gray-200 my-1"></div>
 
@@ -69,7 +81,7 @@
 						<span class="text-gray-600">Paid via</span>
 						<span class="font-bold text-gray-900">{method}</span>
 					</div>
-					{#if method === 'Cash'}
+					{#if method === 'Cash' && change > 0}
 						<div class="flex justify-between">
 							<span class="text-gray-600">Tendered</span>
 							<span>{formatPeso(order.total + change)}</span>
@@ -85,7 +97,7 @@
 			<!-- Receipt Footer -->
 			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-3 text-center">
 				<span class="text-[10px] text-gray-400 font-mono">
-					{new Date(order.closedAt ?? '').toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
+					{(order.closedAt ? new Date(order.closedAt) : new Date()).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
 				</span>
 				<span class="text-[10px] text-gray-400 font-mono">WTF! Samgyupsal — Thank you!</span>
 			</div>

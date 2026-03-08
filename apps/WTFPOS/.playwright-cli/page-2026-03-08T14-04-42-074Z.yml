@@ -1,0 +1,87 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - button "Toggle sidebar" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: W!
+      - separator [ref=e119]
+      - list [ref=e123]:
+        - listitem [ref=e124]:
+          - link "POS" [ref=e125] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e126]
+            - generic: POS
+      - generic [ref=e127]:
+        - separator [ref=e128]
+        - generic [ref=e130]: M
+        - link "Logout" [ref=e132] [cursor=pointer]:
+          - /url: /
+          - img [ref=e133]
+      - button "Toggle Sidebar" [ref=e134]
+    - main [ref=e135]:
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - button "Toggle Sidebar" [ref=e141] [cursor=pointer]:
+                - img
+                - generic [ref=e142]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e143]
+              - generic [ref=e144]: 0 occ
+              - generic [ref=e145]: 8 free
+            - generic [ref=e146]:
+              - button "Toggle color legend" [ref=e148] [cursor=pointer]:
+                - img [ref=e149]
+              - button "📦 New Takeout" [ref=e150] [cursor=pointer]
+              - button "🧾 History 72" [ref=e151] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e152]: "72"
+          - img [ref=e154]:
+            - button "Table T1" [active] [ref=e157] [cursor=pointer]:
+              - generic: T1
+              - generic: 4p
+            - button "Table T2" [ref=e159] [cursor=pointer]:
+              - generic: T2
+              - generic: 4p
+            - button "Table T3" [ref=e161] [cursor=pointer]:
+              - generic: T3
+              - generic: 4p
+            - button "Table T4" [ref=e163] [cursor=pointer]:
+              - generic: T4
+              - generic: 4p
+            - button "Table T5" [ref=e165] [cursor=pointer]:
+              - generic: T5
+              - generic: 4p
+            - button "Table T6" [ref=e167] [cursor=pointer]:
+              - generic: T6
+              - generic: 4p
+            - button "Table T7" [ref=e169] [cursor=pointer]:
+              - generic: T7
+              - generic: 2p
+            - button "Table T8" [ref=e171] [cursor=pointer]:
+              - generic: T8
+              - generic: 2p
+        - generic [ref=e174]:
+          - generic [ref=e175]: 🧾
+          - generic [ref=e176]:
+            - generic [ref=e177]: No Table Selected
+            - generic [ref=e178]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e179]:
+            - generic [ref=e180]: Green = available — tap to open
+            - generic [ref=e182]: Orange = occupied — tap to view bill
+      - generic [ref=e185]:
+        - heading "How many guests for T1?" [level=3] [ref=e186]
+        - generic [ref=e187]:
+          - button "1" [ref=e188] [cursor=pointer]
+          - button "2" [ref=e189] [cursor=pointer]
+          - button "3" [ref=e190] [cursor=pointer]
+          - button "4" [ref=e191] [cursor=pointer]
+          - button "5" [ref=e192] [cursor=pointer]
+          - button "6" [ref=e193] [cursor=pointer]
+          - button "7" [ref=e194] [cursor=pointer]
+          - button "8" [ref=e195] [cursor=pointer]
+          - button "9" [ref=e196] [cursor=pointer]
+          - button "10" [ref=e197] [cursor=pointer]
+          - button "11" [ref=e198] [cursor=pointer]
+          - button "12" [ref=e199] [cursor=pointer]
+        - button "Cancel" [ref=e201] [cursor=pointer]
+  - generic [ref=e109]: WTF! Samgyup POS

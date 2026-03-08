@@ -127,7 +127,7 @@
 						<div class="rounded-lg border border-border bg-gray-50 p-3">
 							<div class="flex items-center justify-between mb-2">
 								<span class="text-xs font-bold text-gray-700">X-Read #{xReadHistory.value.length - idx}</span>
-								<span class="text-xs text-gray-400">{formatTime(xr.timestamp)} · {xr.generatedBy}</span>
+								<span class="text-xs text-gray-400">{formatTime(xr.timestamp ?? '')} · {xr.generatedBy}</span>
 							</div>
 							<div class="grid grid-cols-2 gap-1.5 text-xs">
 								<div class="flex justify-between">
@@ -152,7 +152,7 @@
 								</div>
 								<div class="flex justify-between">
 									<span class="text-gray-500">Voids</span>
-									<span class="font-mono {xr.voidCount > 0 ? 'text-status-red font-semibold' : ''}">{xr.voidCount}</span>
+									<span class="font-mono {(xr.voidCount ?? 0) > 0 ? 'text-status-red font-semibold' : ''}">{xr.voidCount}</span>
 								</div>
 							</div>
 						</div>
