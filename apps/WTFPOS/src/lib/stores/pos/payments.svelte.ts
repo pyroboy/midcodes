@@ -14,12 +14,12 @@ import { calculateEqualSplit } from '$lib/stores/pos/payment.utils';
 // ─── Direct Checkout (cash / GCash / Maya) ───────────────────────────────────
 
 /**
- * Finalise a dine-in or takeout order: record payment, mark as paid, and free
- * the table. Used by CheckoutModal instead of direct proxy mutation.
+ * Finalise a dine-in or takeout order: record payment(s), mark as paid, and free
+ * the table. Accepts multiple payment entries for split-tender transactions.
  */
 export async function checkoutOrder(
 	orderId: string,
-	method: 'cash' | 'gcash' | 'maya',
+	payments: { method: string; amount: number }[],
 	tableId: string | null,
 ) {
 	const db = await getDb();
@@ -31,7 +31,7 @@ export async function checkoutOrder(
 		: null;
 
 	await orderDoc.incrementalModify((doc: any) => {
-		doc.payments = [...doc.payments, { method, amount: doc.total }];
+		doc.payments = payments;
 		doc.status = 'paid';
 		doc.closedAt = new Date().toISOString();
 		doc.closedBy = session.userName || 'Staff';
@@ -42,7 +42,9 @@ export async function checkoutOrder(
 	if (tableId) await closeTable(tableId);
 
 	const order = orders.value.find(o => o.id === orderId);
-	const methodLabel = method === 'gcash' ? 'GCash' : method === 'maya' ? 'Maya' : 'Cash';
+	const methodLabel = payments.length === 1
+		? (payments[0].method === 'gcash' ? 'GCash' : payments[0].method === 'maya' ? 'Maya' : 'Cash')
+		: 'Split';
 	const label = getOrderLabel(order, tableId);
 
 	log.tableClosed(label, order?.total ?? 0, methodLabel, capturedElapsed ?? undefined);

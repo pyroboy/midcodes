@@ -14,10 +14,9 @@
 
 	// P1-1: Only show paid (non-FREE) items on receipt; collapse package includes
 	const receiptItems = $derived.by(() => {
-		if (!order) return [];
+		if (!order) return { paid: [] as Order['items'], refillCount: 0 };
 		const active = order.items.filter(i => i.status !== 'cancelled');
 		const paid = active.filter(i => i.tag !== 'FREE');
-		// Count refills for summary line
 		const refillCount = active.filter(i => i.tag === 'FREE' && i.notes?.includes('REFILL')).length;
 		return { paid, refillCount };
 	});

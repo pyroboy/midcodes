@@ -1,0 +1,211 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - button "Toggle sidebar" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: W!
+      - separator [ref=e119]
+      - list [ref=e123]:
+        - listitem [ref=e124]:
+          - link "Kitchen" [ref=e125] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e126]
+            - generic: Kitchen
+        - listitem [ref=e127]:
+          - link "Stock" [ref=e128] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e129]
+            - generic: Stock
+      - generic [ref=e130]:
+        - separator [ref=e131]
+        - generic [ref=e133]: P
+        - link "Logout" [ref=e135] [cursor=pointer]:
+          - /url: /
+          - img [ref=e136]
+      - button "Toggle Sidebar" [ref=e137]
+    - main [ref=e138]:
+      - generic [ref=e139]:
+        - navigation [ref=e140]:
+          - link "🧾 All Orders" [ref=e141] [cursor=pointer]:
+            - /url: /kitchen/all-orders
+          - link "📋 Order Queue" [ref=e142] [cursor=pointer]:
+            - /url: /kitchen/orders
+          - link "⚖️ Weigh Station" [ref=e143] [cursor=pointer]:
+            - /url: /kitchen/weigh-station
+        - main [ref=e144]:
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - generic [ref=e147]:
+                - generic [ref=e148]:
+                  - heading "Kitchen Queue" [level=1] [ref=e149]
+                  - paragraph [ref=e150]: Active tickets awaiting kitchen action
+                - generic [ref=e151]: Live
+              - generic [ref=e153]:
+                - button "↩ UNDO LAST" [ref=e154] [cursor=pointer]
+                - button "History 75" [ref=e155] [cursor=pointer]:
+                  - text: History
+                  - generic [ref=e156]: "75"
+            - generic [ref=e157]:
+              - generic [ref=e158]:
+                - generic [ref=e159]: "3"
+                - generic [ref=e160]: Orders
+              - generic [ref=e161]:
+                - generic [ref=e162]: "2"
+                - generic [ref=e163]: Tables
+              - generic [ref=e164]:
+                - generic [ref=e165]: "28"
+                - generic [ref=e166]: Items
+          - generic [ref=e167]:
+            - generic [ref=e168]:
+              - generic [ref=e169]:
+                - generic [ref=e170]:
+                  - generic [ref=e171]: T1
+                  - generic [ref=e172]: "#T1--001"
+                - generic [ref=e173]:
+                  - generic [ref=e174]: 0/3
+                  - generic [ref=e175]: 09:07
+              - generic [ref=e178]:
+                - generic [ref=e179]:
+                  - generic [ref=e180]: 🥩 MEATS
+                  - generic [ref=e181]: 0g
+                - button "Pork Belly WEIGHING ✓" [ref=e183] [cursor=pointer]:
+                  - generic [ref=e184]:
+                    - generic [ref=e185]: Pork Belly
+                    - generic [ref=e186]: WEIGHING
+                  - button "✓" [ref=e187]
+                - button "Pork Belly WEIGHING ✓" [ref=e189] [cursor=pointer]:
+                  - generic [ref=e190]:
+                    - generic [ref=e191]: Pork Belly
+                    - generic [ref=e192]: WEIGHING
+                  - button "✓" [ref=e193]
+                - generic [ref=e194]:
+                  - button "Beef Brisket WEIGHING ✓" [active] [ref=e195] [cursor=pointer]:
+                    - generic [ref=e196]:
+                      - generic [ref=e197]: Beef Brisket
+                      - generic [ref=e198]: WEIGHING
+                    - button "✓" [ref=e199]
+                  - generic [ref=e370]:
+                    - button "RETURN" [ref=e371] [cursor=pointer]
+                    - button "SOLD OUT" [ref=e372] [cursor=pointer]
+              - button "ALL DONE ✓" [ref=e201] [cursor=pointer]
+            - generic [ref=e202]:
+              - generic [ref=e203]:
+                - generic [ref=e204]:
+                  - generic [ref=e205]: T1
+                  - generic [ref=e206]: "#T1-EAHZ"
+                - generic [ref=e207]:
+                  - generic [ref=e208]: 0/13
+                  - generic [ref=e209]: 08:32
+              - generic [ref=e211]:
+                - generic [ref=e212]:
+                  - generic [ref=e213]:
+                    - generic [ref=e214]: 🥩 MEATS
+                    - generic [ref=e215]: 0g
+                  - button "Samgyupsal WEIGHING ✓" [ref=e217] [cursor=pointer]:
+                    - generic [ref=e218]:
+                      - generic [ref=e219]: Samgyupsal
+                      - generic [ref=e220]: WEIGHING
+                    - button "✓" [ref=e221]
+                  - button "Pork Sliced WEIGHING ✓" [ref=e223] [cursor=pointer]:
+                    - generic [ref=e224]:
+                      - generic [ref=e225]: Pork Sliced
+                      - generic [ref=e226]: WEIGHING
+                    - button "✓" [ref=e227]
+                - generic [ref=e228]:
+                  - generic [ref=e229]: 🍜 DISHES & DRINKS
+                  - button "Kimchi ✓" [ref=e231] [cursor=pointer]:
+                    - generic [ref=e233]: Kimchi
+                    - button "✓" [ref=e234]
+                  - button "Rice ✓" [ref=e236] [cursor=pointer]:
+                    - generic [ref=e238]: Rice
+                    - button "✓" [ref=e239]
+                  - button "Cheese ✓" [ref=e241] [cursor=pointer]:
+                    - generic [ref=e243]: Cheese
+                    - button "✓" [ref=e244]
+                  - button "Lettuce ✓" [ref=e246] [cursor=pointer]:
+                    - generic [ref=e248]: Lettuce
+                    - button "✓" [ref=e249]
+                  - button "Egg ✓" [ref=e251] [cursor=pointer]:
+                    - generic [ref=e253]: Egg
+                    - button "✓" [ref=e254]
+                  - button "Cucumber ✓" [ref=e256] [cursor=pointer]:
+                    - generic [ref=e258]: Cucumber
+                    - button "✓" [ref=e259]
+                  - button "Chinese Cabbage ✓" [ref=e261] [cursor=pointer]:
+                    - generic [ref=e263]: Chinese Cabbage
+                    - button "✓" [ref=e264]
+                  - button "Pork Bulgogi ✓" [ref=e266] [cursor=pointer]:
+                    - generic [ref=e268]: Pork Bulgogi
+                    - button "✓" [ref=e269]
+                  - button "Fish Cake ✓" [ref=e271] [cursor=pointer]:
+                    - generic [ref=e273]: Fish Cake
+                    - button "✓" [ref=e274]
+                  - button "Soju (Original) 2x ✓" [ref=e276] [cursor=pointer]:
+                    - generic [ref=e277]:
+                      - generic [ref=e278]: Soju (Original)
+                      - generic [ref=e279]: 2x
+                    - button "✓" [ref=e280]
+                - generic [ref=e281]:
+                  - generic [ref=e282]: 🎫 SIDE REQUESTS
+                  - generic [ref=e283]:
+                    - generic [ref=e285]: Pork Unlimited
+                    - button "✓" [ref=e286] [cursor=pointer]
+              - button "ALL DONE ✓" [ref=e288] [cursor=pointer]
+            - generic [ref=e289]:
+              - generic [ref=e290]:
+                - generic [ref=e291]:
+                  - generic [ref=e292]: T2
+                  - generic [ref=e293]: "#T2-WWAD"
+                - generic [ref=e294]:
+                  - generic [ref=e295]: 0/12
+                  - generic [ref=e296]: 06:37
+              - generic [ref=e298]:
+                - generic [ref=e299]:
+                  - generic [ref=e300]:
+                    - generic [ref=e301]: 🥩 MEATS
+                    - generic [ref=e302]: 0g
+                  - button "Premium USDA Beef WEIGHING ✓" [ref=e304] [cursor=pointer]:
+                    - generic [ref=e305]:
+                      - generic [ref=e306]: Premium USDA Beef
+                      - generic [ref=e307]: WEIGHING
+                    - button "✓" [ref=e308]
+                  - button "Sliced Beef WEIGHING ✓" [ref=e310] [cursor=pointer]:
+                    - generic [ref=e311]:
+                      - generic [ref=e312]: Sliced Beef
+                      - generic [ref=e313]: WEIGHING
+                    - button "✓" [ref=e314]
+                - generic [ref=e315]:
+                  - generic [ref=e316]: 🍜 DISHES & DRINKS
+                  - button "Kimchi ✓" [ref=e318] [cursor=pointer]:
+                    - generic [ref=e320]: Kimchi
+                    - button "✓" [ref=e321]
+                  - button "Rice ✓" [ref=e323] [cursor=pointer]:
+                    - generic [ref=e325]: Rice
+                    - button "✓" [ref=e326]
+                  - button "Cheese ✓" [ref=e328] [cursor=pointer]:
+                    - generic [ref=e330]: Cheese
+                    - button "✓" [ref=e331]
+                  - button "Lettuce ✓" [ref=e333] [cursor=pointer]:
+                    - generic [ref=e335]: Lettuce
+                    - button "✓" [ref=e336]
+                  - button "Egg ✓" [ref=e338] [cursor=pointer]:
+                    - generic [ref=e340]: Egg
+                    - button "✓" [ref=e341]
+                  - button "Cucumber ✓" [ref=e343] [cursor=pointer]:
+                    - generic [ref=e345]: Cucumber
+                    - button "✓" [ref=e346]
+                  - button "Chinese Cabbage ✓" [ref=e348] [cursor=pointer]:
+                    - generic [ref=e350]: Chinese Cabbage
+                    - button "✓" [ref=e351]
+                  - button "Pork Bulgogi ✓" [ref=e353] [cursor=pointer]:
+                    - generic [ref=e355]: Pork Bulgogi
+                    - button "✓" [ref=e356]
+                  - button "Fish Cake ✓" [ref=e358] [cursor=pointer]:
+                    - generic [ref=e360]: Fish Cake
+                    - button "✓" [ref=e361]
+                - generic [ref=e362]:
+                  - generic [ref=e363]: 🎫 SIDE REQUESTS
+                  - generic [ref=e364]:
+                    - generic [ref=e366]: Beef Unlimited
+                    - button "✓" [ref=e367] [cursor=pointer]
+              - button "ALL DONE ✓" [ref=e369] [cursor=pointer]
+  - generic [ref=e109]: WTF! Samgyup POS

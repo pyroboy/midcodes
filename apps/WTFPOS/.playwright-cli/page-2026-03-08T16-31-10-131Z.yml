@@ -1,0 +1,60 @@
+- generic [ref=e2]:
+  - generic [ref=e231]:
+    - generic [ref=e235]:
+      - button "Toggle sidebar" [ref=e238] [cursor=pointer]:
+        - generic [ref=e239]: W!
+      - separator [ref=e240]
+      - list [ref=e244]:
+        - listitem [ref=e245]:
+          - link "Kitchen" [ref=e246] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e247]
+            - generic: Kitchen
+        - listitem [ref=e248]:
+          - link "Stock" [ref=e249] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e250]
+            - generic: Stock
+      - generic [ref=e251]:
+        - separator [ref=e252]
+        - generic [ref=e254]: P
+        - link "Logout" [ref=e256] [cursor=pointer]:
+          - /url: /
+          - img [ref=e257]
+      - button "Toggle Sidebar" [ref=e258]
+    - main [ref=e259]:
+      - generic [ref=e260]:
+        - navigation [ref=e261]:
+          - link "🧾 All Orders" [ref=e262] [cursor=pointer]:
+            - /url: /kitchen/all-orders
+          - link "📋 Order Queue" [ref=e263] [cursor=pointer]:
+            - /url: /kitchen/orders
+          - link "⚖️ Weigh Station" [ref=e264] [cursor=pointer]:
+            - /url: /kitchen/weigh-station
+        - main [ref=e265]:
+          - generic [ref=e268]: Live
+          - generic [ref=e270]:
+            - generic [ref=e272]:
+              - heading "Kitchen Queue" [level=1] [ref=e273]
+              - paragraph [ref=e274]: Active tickets awaiting kitchen action
+            - generic [ref=e275]:
+              - button "↩ UNDO LAST" [ref=e276] [cursor=pointer]
+              - button "History 56" [ref=e277] [cursor=pointer]:
+                - text: History
+                - generic [ref=e278]: "56"
+          - generic [ref=e279]:
+            - generic [ref=e280]:
+              - generic [ref=e281]: ✅
+              - paragraph [ref=e282]: No pending orders
+              - paragraph [ref=e283]: New orders will appear here automatically
+            - generic [ref=e284]:
+              - generic [ref=e285]:
+                - generic [ref=e286]: "56"
+                - generic [ref=e287]: Served Today
+              - generic [ref=e288]:
+                - generic [ref=e289]: 20m
+                - generic [ref=e290]: Avg Service
+              - generic [ref=e291]:
+                - generic [ref=e292]: "-1209:-51"
+                - generic [ref=e293]: Last Completed
+  - generic [ref=e124]: WTF! Samgyup POS

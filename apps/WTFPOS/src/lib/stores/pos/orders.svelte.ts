@@ -21,6 +21,53 @@ import { getOrderLabel } from '$lib/stores/pos/label.utils';
 export const REFILL_NOTE = 'refill' as const;
 export const LEFTOVER_PENALTY_ITEM_ID = 'penalty-leftover' as const;
 
+/** Returns true if the item is still within the 30-second grace period (no PIN needed to remove) */
+export function isWithinGracePeriod(addedAt: string | undefined): boolean {
+	if (!addedAt) return false;
+	return Date.now() - new Date(addedAt).getTime() < 30_000;
+}
+
+/** Remove a pending item from an order (must be pending status only) */
+export async function removeOrderItem(orderId: string, itemId: string): Promise<void> {
+	if (!browser) return;
+	const db = await getDb();
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (!orderDoc) return;
+
+	const order = orderDoc.toMutableJSON() as Order;
+	const item = order.items.find(i => i.id === itemId);
+	if (!item || item.status !== 'pending') return;
+
+	let finalTotal = 0;
+	await orderDoc.incrementalModify((doc: Order) => {
+		doc.items = doc.items.filter(i => i.id !== itemId);
+		const totals = calculateOrderTotals(doc);
+		Object.assign(doc, totals);
+		finalTotal = totals.total;
+		doc.updatedAt = new Date().toISOString();
+		return doc;
+	});
+
+	await updateTableBillTotal(order.tableId, finalTotal);
+
+	// Restore stock for removed item
+	const restoreQty = item.weight ?? item.quantity;
+	if (restoreQty > 0) await restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
+
+	// Remove from KDS ticket
+	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
+	if (ticket) {
+		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+		if (tDoc) {
+			await tDoc.incrementalModify((doc: any) => {
+				doc.items = doc.items.filter((i: any) => i.id !== itemId);
+				doc.updatedAt = new Date().toISOString();
+				return doc;
+			});
+		}
+	}
+}
+
 export function getRefillCount(order: Order | null | undefined): number {
 	return order?.items.filter(i => i.tag === 'FREE' && i.notes === REFILL_NOTE && i.status !== 'cancelled').length ?? 0;
 }
@@ -89,7 +136,7 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 
 	const { unitPrice, quantity, tag } = deriveOrderItemProps(item, order.pax, qty, weight, forceFree);
 
-	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes: notes ?? '' };
+	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes: notes ?? '', addedAt: new Date().toISOString() };
 
 	let totals!: ReturnType<typeof calculateOrderTotals>;
 	await orderDoc.incrementalModify((doc: Order) => {

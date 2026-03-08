@@ -3,15 +3,17 @@
     import { formatPeso, formatCountdown, cn } from '$lib/utils';
     import { floorLayout } from '$lib/stores/floor-layout.svelte';
     import { session } from '$lib/stores/session.svelte';
+    import { getRefillCount } from '$lib/stores/pos.svelte';
 
     interface Props {
         mainTables: Table[];
         orders: Order[];
         selectedTableId: string | null;
         ontableclick: (table: Table) => void;
+        tableRejectionMap?: Map<string, number>;
     }
 
-    let { mainTables, orders, selectedTableId, ontableclick }: Props = $props();
+    let { mainTables, orders, selectedTableId, ontableclick, tableRejectionMap = new Map() }: Props = $props();
 
     // Floor layout data
     const canvas = $derived(floorLayout.canvasFor(session.locationId));
@@ -64,7 +66,7 @@
     function pkgLabel(packageId: string | undefined | null): string {
         if (packageId === 'pkg-pork') return 'PORK';
         if (packageId === 'pkg-beef') return 'BEEF';
-        if (packageId === 'pkg-combo') return 'P&B';
+        if (packageId === 'pkg-combo') return 'Beef+Pork';
         return '';
     }
 
@@ -206,6 +208,8 @@
             {@const activeItems = order?.items.filter(i => i.status !== 'cancelled') ?? []}
             {@const unservedCount = activeItems.filter(i => i.status !== 'served').length}
             {@const isFullyServed = isOccupied && !!order && activeItems.length > 0 && unservedCount === 0}
+            {@const isAyce = !!order?.packageId}
+            {@const refills = isAyce ? getRefillCount(order) : 0}
             {@const pkg = isOccupied ? pkgLabel(order?.packageId) : ''}
             {@const fill = tableFill(table, order)}
             {@const stroke = tableStroke(table, order)}
@@ -276,9 +280,10 @@
                         >{pkg}</text>
                     {/if}
 
-                    <!-- Timer badge (top-right) -->
+                    <!-- Timer badge (top-right) — short format matching sidebar -->
                     {#if isOccupied && table.elapsedSeconds !== null}
-                        {@const timerStr = formatCountdown(table.elapsedSeconds)}
+                        {@const mins = Math.floor((table.elapsedSeconds ?? 0) / 60)}
+                        {@const timerStr = mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h${mins % 60 > 0 ? `${mins % 60}m` : ''}`}
                         {@const tColor = timerColor(table, order)}
                         <text
                             x={table.x + W - 6} y={table.y + 14}
@@ -310,7 +315,7 @@
                             text-anchor="middle" dominant-baseline="middle"
                             font-family="Inter, sans-serif" font-size="10"
                             fill="#9ca3af" pointer-events="none"
-                        >{table.capacity}p</text>
+                        >cap {table.capacity}</text>
                     {/if}
 
                     <!-- Bill total (bottom) -->
@@ -323,28 +328,51 @@
                         >{formatPeso(table.billTotal)}</text>
                     {/if}
 
-                    <!-- Order status badge (bottom-right) -->
+                    <!-- Unserved count badge (bottom-left) -->
                     {#if isOccupied && !!order && unservedCount > 0}
-                        <!-- Unserved items: animated orange badge with count -->
-                        <circle cx={table.x + W - 10} cy={table.y + H - 10} r="9" fill="#f97316" opacity="0.9">
+                        <circle cx={table.x + 10} cy={table.y + H - 10} r="9" fill="#f97316" opacity="0.9">
                             <animate attributeName="r" values="9;10;9" dur="1.2s" repeatCount="indefinite" />
                             <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1.2s" repeatCount="indefinite" />
                         </circle>
                         <text
-                            x={table.x + W - 10} y={table.y + H - 9}
+                            x={table.x + 10} y={table.y + H - 9}
                             text-anchor="middle" dominant-baseline="middle"
                             font-family="Inter, sans-serif" font-size="10" font-weight="800"
                             fill="#ffffff" pointer-events="none"
                         >{unservedCount}</text>
                     {:else if isFullyServed}
-                        <!-- All served: green checkmark -->
-                        <circle cx={table.x + W - 10} cy={table.y + H - 10} r="9" fill="#10b981" opacity="0.9" />
+                        <circle cx={table.x + 10} cy={table.y + H - 10} r="9" fill="#10b981" opacity="0.9" />
                         <text
-                            x={table.x + W - 10} y={table.y + H - 9}
+                            x={table.x + 10} y={table.y + H - 9}
                             text-anchor="middle" dominant-baseline="middle"
                             font-size="10" font-weight="bold"
                             fill="#ffffff" pointer-events="none"
                         >✓</text>
+                    {/if}
+
+                    <!-- Refill count badge (bottom-right) — AYCE only -->
+                    {#if isAyce && refills > 0}
+                        <rect x={table.x + W - 26} y={table.y + H - 18} width="22" height="14" rx="7" fill="#8b5cf6" opacity="0.9" />
+                        <text
+                            x={table.x + W - 15} y={table.y + H - 10}
+                            text-anchor="middle" dominant-baseline="middle"
+                            font-family="Inter, sans-serif" font-size="8" font-weight="800"
+                            fill="#ffffff" pointer-events="none"
+                        >R{refills}</text>
+                    {/if}
+
+                    <!-- Kitchen rejection alert badge (top-right corner) -->
+                    {#if tableRejectionMap.get(table.id)}
+                        {@const rejCount = tableRejectionMap.get(table.id) ?? 0}
+                        <rect x={table.x + W - 28} y={table.y - 8} width="32" height="16" rx="8" fill="#ef4444">
+                            <animate attributeName="opacity" values="1;0.6;1" dur="1s" repeatCount="indefinite" />
+                        </rect>
+                        <text
+                            x={table.x + W - 12} y={table.y + 1}
+                            text-anchor="middle" dominant-baseline="middle"
+                            font-family="Inter, sans-serif" font-size="9" font-weight="800"
+                            fill="#ffffff" pointer-events="none"
+                        >⚠ {rejCount}</text>
                     {/if}
 
                     <!-- Critical pulse ring -->

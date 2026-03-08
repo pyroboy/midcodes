@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { X, HardDrive } from 'lucide-svelte';
 	import { openCashDrawer } from '$lib/stores/hardware.svelte';
-	import { session } from '$lib/stores/session.svelte';
+	import { session, MANAGER_PIN } from '$lib/stores/session.svelte';
 
 	export let isOpen = false;
 	export let onClose: () => void;
@@ -10,7 +10,6 @@
 	let error = '';
 	let loading = false;
 	let justOpened = false;
-	const MANAGER_PIN = '1234';
 
 	function handleNumber(num: number) {
 		if (pin.length < 4) {

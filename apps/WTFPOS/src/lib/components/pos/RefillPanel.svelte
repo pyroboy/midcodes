@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Order, MenuItem } from '$lib/types';
-	import { menuItems, addItemToOrder, addRefillRequest, REFILL_NOTE } from '$lib/stores/pos.svelte';
+	import { menuItems, addItemToOrder, addRefillRequest, REFILL_NOTE, getRefillCount } from '$lib/stores/pos.svelte';
 	import { cn } from '$lib/utils';
 
 	interface Props {
@@ -50,9 +50,7 @@
 	});
 
 	// P1-3: Refill round counter
-	const refillCount = $derived(
-		order?.items.filter(i => i.tag === 'FREE' && i.notes === REFILL_NOTE && i.status !== 'cancelled').length ?? 0
-	);
+	const refillCount = $derived(getRefillCount(order));
 
 	async function requestMeat(meat: MenuItem) {
 		if (!order) return;

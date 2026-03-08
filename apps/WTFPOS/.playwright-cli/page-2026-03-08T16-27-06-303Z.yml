@@ -1,0 +1,261 @@
+- generic [ref=e2]:
+  - generic [ref=e138]:
+    - generic [ref=e142]:
+      - button "Toggle sidebar" [ref=e145] [cursor=pointer]:
+        - generic [ref=e146]: W!
+      - separator [ref=e147]
+      - generic [ref=e149]:
+        - link "Receive Delivery" [ref=e150] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e151]
+        - link "Log Expense" [ref=e152] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e153]
+        - link "Log Waste" [ref=e154] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e155]
+        - link "Stock Count" [ref=e156] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e157]
+        - link "X-Reading" [ref=e158] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e159]
+        - link "Transfer Stock" [ref=e160] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e161]
+        - link "End of Day" [ref=e162] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e163]
+      - list [ref=e167]:
+        - listitem [ref=e168]:
+          - link "POS" [ref=e169] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e170]
+            - generic: POS
+        - listitem [ref=e171]:
+          - link "Kitchen" [ref=e172] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e173]
+            - generic: Kitchen
+        - listitem [ref=e174]:
+          - link "Stock" [ref=e175] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e176]
+            - generic: Stock
+        - listitem [ref=e177]:
+          - link "Reports" [ref=e178] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e179]
+            - generic: Reports
+      - generic [ref=e180]:
+        - separator [ref=e181]
+        - generic [ref=e183]: J
+        - link "Logout" [ref=e185] [cursor=pointer]:
+          - /url: /
+          - img [ref=e186]
+      - button "Toggle Sidebar" [ref=e187]
+    - main [ref=e188]:
+      - generic [ref=e189]:
+        - generic [ref=e190]:
+          - img [ref=e191]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e192]
+        - button "Change Location" [ref=e193] [cursor=pointer]:
+          - img [ref=e194]
+          - text: Change Location
+      - generic [ref=e279]:
+        - generic [ref=e280]:
+          - heading "Consolidated Reports" [level=1] [ref=e282]
+          - navigation [ref=e283]:
+            - generic [ref=e284]:
+              - generic [ref=e285]: Operations
+              - generic [ref=e286]:
+                - link "Meat Report" [ref=e287] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e288] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e289] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e290] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e291] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e292] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e293] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e295]:
+              - generic [ref=e296]: Expenses
+              - generic [ref=e297]:
+                - link "Daily" [ref=e298] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e299] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e301]:
+              - generic [ref=e302]: Revenue & Sales
+              - generic [ref=e303]:
+                - link "Sales Summary" [ref=e304] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e305] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e306] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e308]:
+              - generic [ref=e309]: Profitability
+              - generic [ref=e310]:
+                - link "Gross Profit" [ref=e311] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e312] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e314]:
+              - generic [ref=e315]: Branch
+              - link "Compare" [ref=e317] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e319]:
+          - generic [ref=e1114]:
+            - button "Today" [ref=e1115] [cursor=pointer]
+            - button "This Week" [ref=e1116] [cursor=pointer]
+          - generic [ref=e1117]:
+            - generic [ref=e1118]:
+              - paragraph [ref=e1119]: Total Guest Covers
+              - paragraph [ref=e1120]: "30"
+            - generic [ref=e1121]:
+              - paragraph [ref=e1122]: Peak Hour
+              - paragraph [ref=e1123]: 12pm (9 pax)
+            - generic [ref=e1124]:
+              - paragraph [ref=e1125]: Avg Table Duration
+              - paragraph [ref=e1126]: 45 min
+          - generic [ref=e1127]:
+            - heading "Guest Cover Heat Map" [level=2] [ref=e1128]
+            - generic [ref=e1129]:
+              - generic [ref=e1130]:
+                - paragraph [ref=e1131]: 10am
+                - generic [ref=e1132]: "0"
+                - paragraph [ref=e1133]: 0 orders
+              - generic [ref=e1134]:
+                - paragraph [ref=e1135]: 11am
+                - generic [ref=e1136]: "1"
+                - paragraph [ref=e1137]: 1 orders
+              - generic [ref=e1138]:
+                - paragraph [ref=e1139]: 12pm
+                - generic [ref=e1140]: "9"
+                - paragraph [ref=e1141]: 2 orders
+              - generic [ref=e1142]:
+                - paragraph [ref=e1143]: 1pm
+                - generic [ref=e1144]: "4"
+                - paragraph [ref=e1145]: 1 orders
+              - generic [ref=e1146]:
+                - paragraph [ref=e1147]: 2pm
+                - generic [ref=e1148]: "2"
+                - paragraph [ref=e1149]: 1 orders
+              - generic [ref=e1150]:
+                - paragraph [ref=e1151]: 3pm
+                - generic [ref=e1152]: "0"
+                - paragraph [ref=e1153]: 0 orders
+              - generic [ref=e1154]:
+                - paragraph [ref=e1155]: 4pm
+                - generic [ref=e1156]: "1"
+                - paragraph [ref=e1157]: 1 orders
+              - generic [ref=e1158]:
+                - paragraph [ref=e1159]: 5pm
+                - generic [ref=e1160]: "4"
+                - paragraph [ref=e1161]: 2 orders
+              - generic [ref=e1162]:
+                - paragraph [ref=e1163]: 6pm
+                - generic [ref=e1164]: "3"
+                - paragraph [ref=e1165]: 1 orders
+              - generic [ref=e1166]:
+                - paragraph [ref=e1167]: 7pm
+                - generic [ref=e1168]: "0"
+                - paragraph [ref=e1169]: 0 orders
+              - generic [ref=e1170]:
+                - paragraph [ref=e1171]: 8pm
+                - generic [ref=e1172]: "0"
+                - paragraph [ref=e1173]: 0 orders
+              - generic [ref=e1174]:
+                - paragraph [ref=e1175]: 9pm
+                - generic [ref=e1176]: "6"
+                - paragraph [ref=e1177]: 1 orders
+              - generic [ref=e1178]:
+                - paragraph [ref=e1179]: 10pm
+                - generic [ref=e1180]: "0"
+                - paragraph [ref=e1181]: 0 orders
+            - generic [ref=e1182]:
+              - generic [ref=e1183]: Low
+              - generic [ref=e1185]: Moderate
+              - generic [ref=e1187]: Busy
+              - generic [ref=e1189]: High
+              - generic [ref=e1191]: Peak
+          - table [ref=e1194]:
+            - rowgroup [ref=e1195]:
+              - row "Hour Pax Orders Load" [ref=e1196]:
+                - columnheader "Hour" [ref=e1197]
+                - columnheader "Pax" [ref=e1198]
+                - columnheader "Orders" [ref=e1199]
+                - columnheader "Load" [ref=e1200]
+            - rowgroup [ref=e1201]:
+              - row "10am 0 0" [ref=e1202]:
+                - cell "10am" [ref=e1203]
+                - cell "0" [ref=e1204]
+                - cell "0" [ref=e1205]
+                - cell [ref=e1206]
+              - row "11am 1 1" [ref=e1208]:
+                - cell "11am" [ref=e1209]
+                - cell "1" [ref=e1210]
+                - cell "1" [ref=e1211]
+                - cell [ref=e1212]
+              - row "12pm 9 2" [ref=e1215]:
+                - cell "12pm" [ref=e1216]
+                - cell "9" [ref=e1217]
+                - cell "2" [ref=e1218]
+                - cell [ref=e1219]
+              - row "1pm 4 1" [ref=e1222]:
+                - cell "1pm" [ref=e1223]
+                - cell "4" [ref=e1224]
+                - cell "1" [ref=e1225]
+                - cell [ref=e1226]
+              - row "2pm 2 1" [ref=e1229]:
+                - cell "2pm" [ref=e1230]
+                - cell "2" [ref=e1231]
+                - cell "1" [ref=e1232]
+                - cell [ref=e1233]
+              - row "3pm 0 0" [ref=e1236]:
+                - cell "3pm" [ref=e1237]
+                - cell "0" [ref=e1238]
+                - cell "0" [ref=e1239]
+                - cell [ref=e1240]
+              - row "4pm 1 1" [ref=e1242]:
+                - cell "4pm" [ref=e1243]
+                - cell "1" [ref=e1244]
+                - cell "1" [ref=e1245]
+                - cell [ref=e1246]
+              - row "5pm 4 2" [ref=e1249]:
+                - cell "5pm" [ref=e1250]
+                - cell "4" [ref=e1251]
+                - cell "2" [ref=e1252]
+                - cell [ref=e1253]
+              - row "6pm 3 1" [ref=e1256]:
+                - cell "6pm" [ref=e1257]
+                - cell "3" [ref=e1258]
+                - cell "1" [ref=e1259]
+                - cell [ref=e1260]
+              - row "7pm 0 0" [ref=e1263]:
+                - cell "7pm" [ref=e1264]
+                - cell "0" [ref=e1265]
+                - cell "0" [ref=e1266]
+                - cell [ref=e1267]
+              - row "8pm 0 0" [ref=e1269]:
+                - cell "8pm" [ref=e1270]
+                - cell "0" [ref=e1271]
+                - cell "0" [ref=e1272]
+                - cell [ref=e1273]
+              - row "9pm 6 1" [ref=e1275]:
+                - cell "9pm" [ref=e1276]
+                - cell "6" [ref=e1277]
+                - cell "1" [ref=e1278]
+                - cell [ref=e1279]
+              - row "10pm 0 0" [ref=e1282]:
+                - cell "10pm" [ref=e1283]
+                - cell "0" [ref=e1284]
+                - cell "0" [ref=e1285]
+                - cell [ref=e1286]
+  - generic [ref=e109]: WTF! Samgyup POS

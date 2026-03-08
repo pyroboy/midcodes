@@ -1,0 +1,383 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - generic [ref=e120]:
+        - link "Receive Delivery" [ref=e121] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e122]
+        - link "Log Expense" [ref=e123] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e124]
+        - link "Log Waste" [ref=e125] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e126]
+        - link "Stock Count" [ref=e127] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e128]
+        - link "X-Reading" [ref=e129] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e130]
+        - link "Transfer Stock" [ref=e131] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e132]
+        - link "End of Day" [ref=e133] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e134]
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e19]
+            - generic: POS
+        - listitem [ref=e135]:
+          - link "Kitchen" [ref=e136] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e137]
+            - generic: Kitchen
+        - listitem [ref=e138]:
+          - link "Stock" [ref=e139] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e140]
+            - generic: Stock
+        - listitem [ref=e141]:
+          - link "Reports" [ref=e142] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e143]
+            - generic: Reports
+      - generic [ref=e23]:
+        - separator [ref=e24]
+        - generic [ref=e26]: J
+        - link "Logout" [ref=e28] [cursor=pointer]:
+          - /url: /
+          - img [ref=e29]
+      - button "Toggle Sidebar" [ref=e32]
+    - main [ref=e33]:
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - img [ref=e146]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e147]
+        - button "Change Location" [ref=e148] [cursor=pointer]:
+          - img [ref=e149]
+          - text: Change Location
+      - generic [ref=e1629]:
+        - generic [ref=e1630]:
+          - heading "Stock Management" [level=1] [ref=e1633]
+          - navigation [ref=e1634]:
+            - link "Inventory" [ref=e1635] [cursor=pointer]:
+              - /url: /stock/inventory
+              - img [ref=e1636]
+              - text: Inventory
+            - link "Deliveries 1" [ref=e1637] [cursor=pointer]:
+              - /url: /stock/deliveries
+              - img [ref=e1638]
+              - text: Deliveries
+              - generic [ref=e1639]: "1"
+            - link "Transfers" [ref=e1640] [cursor=pointer]:
+              - /url: /stock/transfers
+              - img [ref=e1641]
+              - text: Transfers
+            - link "Counts 1" [ref=e1642] [cursor=pointer]:
+              - /url: /stock/counts
+              - img [ref=e1643]
+              - text: Counts
+              - generic [ref=e1644]: "1"
+            - link "Waste Log" [ref=e1645] [cursor=pointer]:
+              - /url: /stock/waste
+              - img [ref=e1646]
+              - text: Waste Log
+        - generic [ref=e3477]:
+          - generic [ref=e3478]:
+            - heading "Expiring Soon (1)" [level=2] [ref=e3479]:
+              - img [ref=e3480]
+              - text: Expiring Soon (1)
+            - generic [ref=e3482]:
+              - generic [ref=e3483]: Kimchi B-243
+              - generic [ref=e3484]: 2d left
+          - generic [ref=e3485]:
+            - generic [ref=e3486]:
+              - heading "Delivery History & Batches" [level=2] [ref=e3487]
+              - paragraph [ref=e3488]: Track incoming stock batches, FIFO usage, and expiry.
+            - button "Receive Delivery" [ref=e3489] [cursor=pointer]:
+              - img [ref=e3490]
+              - text: Receive Delivery
+          - generic [ref=e3491]:
+            - generic [ref=e3492]:
+              - img
+              - textbox "Search item, supplier, or batch..." [ref=e3493]
+            - generic [ref=e3494]:
+              - img [ref=e3495]
+              - combobox [ref=e3496]:
+                - option "All Dates" [selected]
+                - option "Today"
+                - option "Yesterday"
+                - option "Earlier"
+            - generic [ref=e3497]:
+              - img [ref=e3498]
+              - combobox [ref=e3499]:
+                - option "All Items" [selected]
+                - option "Pork Bone-In"
+                - option "Pork Bone-Out"
+                - option "Chicken Wing"
+                - option "Chicken Leg"
+                - option "Kimchi"
+                - option "Steamed Rice"
+                - option "Soju (Original)"
+                - option "Lettuce"
+                - option "Perilla Leaves (Kkaennip)"
+                - option "Garlic (Whole Cloves)"
+                - option "Garlic (Sliced)"
+                - option "Green Onions / Scallions"
+                - option "Sliced Pork"
+                - option "Jalapeño / Green Chilies"
+                - option "White/Yellow Onions"
+                - option "Korean Radish (Mu)"
+                - option "Enoki Mushrooms"
+                - option "Raw Rice (Uncooked)"
+                - option "Salt"
+                - option "Black Pepper (Ground)"
+                - option "Sugar"
+                - option "Cooking Oil"
+                - option "Sesame Seeds (Roasted)"
+                - option "Eggs"
+                - option "Tofu"
+                - option "Dried Seaweed (Gim)"
+                - option "Tteok (Rice Cakes)"
+                - option "Button Mushrooms"
+                - option "Flour"
+                - option "Cornstarch"
+                - option "Vinegar"
+                - option "Dangmyeon (Glass Noodles)"
+                - option "Charcoal"
+                - option "Corn"
+                - option "Baguio Pechay"
+                - option "Squash"
+                - option "Baechu Kimchi"
+                - option "Kkakdugi"
+                - option "Pork Bones"
+                - option "Kongnamul-muchim"
+                - option "Oi Muchim"
+                - option "Pickled White Onions"
+                - option "Pickled Daikon Radish"
+                - option "Eomuk Bokkeum"
+                - option "Japchae"
+                - option "Gamja Jorim"
+                - option "Gyeran-jjim"
+                - option "Pajeon"
+                - option "Gamja Salad"
+                - option "Pork Trimmings"
+                - option "Cheesy Tteokbokki"
+                - option "Gochujang"
+                - option "Doenjang"
+                - option "Gochugaru (Coarse)"
+                - option "Gochugaru (Fine)"
+                - option "Jin-ganjang (Dark Soy Sauce)"
+                - option "Guk-ganjang (Soup Soy Sauce)"
+                - option "Yangjo-ganjang (Brewed Soy)"
+                - option "Toasted Sesame Oil"
+                - option "Mulyeot (Corn/Rice Syrup)"
+                - option "Beef Bone-In"
+                - option "Mirin / Rice Wine"
+                - option "Aekjeot (Fish Sauce)"
+                - option "Dasida (Beef Stock Powder)"
+                - option "Mayonnaise"
+                - option "Ssamjang"
+                - option "Sogeumjang"
+                - option "Cheese Sauce"
+                - option "Wasabi Soy"
+                - option "Original Soju"
+                - option "Flavored Soju - Grapefruit"
+                - option "Beef Bone-Out"
+                - option "Flavored Soju - Green Grape"
+                - option "Flavored Soju - Plum"
+                - option "Flavored Soju - Strawberry"
+                - option "Makgeolli"
+                - option "San Miguel Pilsen"
+                - option "San Miguel Light"
+                - option "Red Horse"
+                - option "Cass"
+                - option "Hite"
+                - option "OB"
+                - option "Sliced Beef"
+                - option "Taedonggang"
+                - option "Coca-Cola"
+                - option "Sprite"
+                - option "Coke Zero"
+                - option "Chilsung Cider"
+                - option "Iced Red Tea"
+                - option "Barley Tea (Boricha)"
+                - option "Lemonade"
+                - option "Beef Bones"
+                - option "Beef Trimmings"
+            - generic [ref=e3500] [cursor=pointer]:
+              - checkbox "Show Depleted" [ref=e3501]
+              - generic [ref=e3502]: Show Depleted
+          - table [ref=e3504]:
+            - rowgroup [ref=e3505]:
+              - row "Time Item / Supplier Qty Batch & Expiry FIFO Usage" [ref=e3506]:
+                - columnheader "Time" [ref=e3507]
+                - columnheader "Item / Supplier" [ref=e3508]
+                - columnheader "Qty" [ref=e3509]
+                - columnheader "Batch & Expiry" [ref=e3510]
+                - columnheader "FIFO Usage" [ref=e3511]
+            - rowgroup [ref=e3512]:
+              - 'row "12:24 AM Pork Bone-In Metro Meat Co. +5000 g B-241 Exp: 2026-03-13 0 5000 left 0 used" [ref=e3513]':
+                - cell "12:24 AM" [ref=e3514]
+                - cell "Pork Bone-In Metro Meat Co." [ref=e3515]:
+                  - generic [ref=e3516]:
+                    - generic [ref=e3517]: Pork Bone-In
+                    - generic [ref=e3518]: Metro Meat Co.
+                - cell "+5000 g" [ref=e3519]
+                - 'cell "B-241 Exp: 2026-03-13" [ref=e3520]':
+                  - generic [ref=e3521]:
+                    - generic [ref=e3522]: B-241
+                    - generic [ref=e3523]: "Exp: 2026-03-13"
+                - cell "0 5000 left 0 used" [ref=e3524]:
+                  - generic [ref=e3525]:
+                    - progressbar [ref=e3526]
+                    - generic [ref=e3529]:
+                      - generic [ref=e3530]:
+                        - strong [ref=e3531]: "5000"
+                        - text: left
+                      - generic [ref=e3532]: 0 used
+              - row "11:24 PM Soju (Original) SM Trading +6 bottles B-242 0 6 left 0 used" [ref=e3533]:
+                - cell "11:24 PM" [ref=e3534]
+                - cell "Soju (Original) SM Trading" [ref=e3535]:
+                  - generic [ref=e3536]:
+                    - generic [ref=e3537]: Soju (Original)
+                    - generic [ref=e3538]: SM Trading
+                - cell "+6 bottles" [ref=e3539]
+                - cell "B-242" [ref=e3540]:
+                  - generic [ref=e3542]: B-242
+                - cell "0 6 left 0 used" [ref=e3543]:
+                  - generic [ref=e3544]:
+                    - progressbar [ref=e3545]
+                    - generic [ref=e3548]:
+                      - generic [ref=e3549]:
+                        - strong [ref=e3550]: "6"
+                        - text: left
+                      - generic [ref=e3551]: 0 used
+              - 'row "10:24 PM Kimchi Korean Foods PH +10 portions B-243 Exp: 2026-03-10 50 5 left 5 used" [ref=e3552]':
+                - cell "10:24 PM" [ref=e3553]
+                - cell "Kimchi Korean Foods PH" [ref=e3554]:
+                  - generic [ref=e3555]:
+                    - generic [ref=e3556]: Kimchi
+                    - generic [ref=e3557]: Korean Foods PH
+                - cell "+10 portions" [ref=e3558]
+                - 'cell "B-243 Exp: 2026-03-10" [ref=e3559]':
+                  - generic [ref=e3560]:
+                    - generic [ref=e3561]: B-243
+                    - generic [ref=e3562]: "Exp: 2026-03-10"
+                - cell "50 5 left 5 used" [ref=e3563]:
+                  - generic [ref=e3564]:
+                    - progressbar [ref=e3565]
+                    - generic [ref=e3568]:
+                      - generic [ref=e3569]:
+                        - strong [ref=e3570]: "5"
+                        - text: left
+                      - generic [ref=e3571]: 5 used
+              - row "06:24 PM Pork Bone-In Transfer from wh-tag +8000 g TRF-A1TAG 40 4800 left 3200 used" [ref=e3572]:
+                - cell "06:24 PM" [ref=e3573]
+                - cell "Pork Bone-In Transfer from wh-tag" [ref=e3574]:
+                  - generic [ref=e3575]:
+                    - generic [ref=e3576]: Pork Bone-In
+                    - generic [ref=e3577]: Transfer from wh-tag
+                - cell "+8000 g" [ref=e3578]
+                - cell "TRF-A1TAG" [ref=e3579]:
+                  - generic [ref=e3581]: TRF-A1TAG
+                - cell "40 4800 left 3200 used" [ref=e3582]:
+                  - generic [ref=e3583]:
+                    - progressbar [ref=e3584]
+                    - generic [ref=e3587]:
+                      - generic [ref=e3588]:
+                        - strong [ref=e3589]: "4800"
+                        - text: left
+                      - generic [ref=e3590]: 3200 used
+              - row "06:24 PM Pork Bone-Out Transfer from wh-tag +6000 g TRF-A2TAG 40 3600 left 2400 used" [ref=e3591]:
+                - cell "06:24 PM" [ref=e3592]
+                - cell "Pork Bone-Out Transfer from wh-tag" [ref=e3593]:
+                  - generic [ref=e3594]:
+                    - generic [ref=e3595]: Pork Bone-Out
+                    - generic [ref=e3596]: Transfer from wh-tag
+                - cell "+6000 g" [ref=e3597]
+                - cell "TRF-A2TAG" [ref=e3598]:
+                  - generic [ref=e3600]: TRF-A2TAG
+                - cell "40 3600 left 2400 used" [ref=e3601]:
+                  - generic [ref=e3602]:
+                    - progressbar [ref=e3603]
+                    - generic [ref=e3606]:
+                      - generic [ref=e3607]:
+                        - strong [ref=e3608]: "3600"
+                        - text: left
+                      - generic [ref=e3609]: 2400 used
+              - row "06:24 PM Beef Bone-In Transfer from wh-tag +5000 g TRF-A3TAG 36 3200 left 1800 used" [ref=e3610]:
+                - cell "06:24 PM" [ref=e3611]
+                - cell "Beef Bone-In Transfer from wh-tag" [ref=e3612]:
+                  - generic [ref=e3613]:
+                    - generic [ref=e3614]: Beef Bone-In
+                    - generic [ref=e3615]: Transfer from wh-tag
+                - cell "+5000 g" [ref=e3616]
+                - cell "TRF-A3TAG" [ref=e3617]:
+                  - generic [ref=e3619]: TRF-A3TAG
+                - cell "36 3200 left 1800 used" [ref=e3620]:
+                  - generic [ref=e3621]:
+                    - progressbar [ref=e3622]
+                    - generic [ref=e3625]:
+                      - generic [ref=e3626]:
+                        - strong [ref=e3627]: "3200"
+                        - text: left
+                      - generic [ref=e3628]: 1800 used
+              - row "06:24 PM Sliced Beef Transfer from wh-tag +4000 g TRF-A4TAG 37.5 2500 left 1500 used" [ref=e3629]:
+                - cell "06:24 PM" [ref=e3630]
+                - cell "Sliced Beef Transfer from wh-tag" [ref=e3631]:
+                  - generic [ref=e3632]:
+                    - generic [ref=e3633]: Sliced Beef
+                    - generic [ref=e3634]: Transfer from wh-tag
+                - cell "+4000 g" [ref=e3635]
+                - cell "TRF-A4TAG" [ref=e3636]:
+                  - generic [ref=e3638]: TRF-A4TAG
+                - cell "37.5 2500 left 1500 used" [ref=e3639]:
+                  - generic [ref=e3640]:
+                    - progressbar [ref=e3641]
+                    - generic [ref=e3644]:
+                      - generic [ref=e3645]:
+                        - strong [ref=e3646]: "2500"
+                        - text: left
+                      - generic [ref=e3647]: 1500 used
+              - row "06:24 PM Chicken Wing Transfer from wh-tag +3000 g TRF-A5TAG 40 1800 left 1200 used" [ref=e3648]:
+                - cell "06:24 PM" [ref=e3649]
+                - cell "Chicken Wing Transfer from wh-tag" [ref=e3650]:
+                  - generic [ref=e3651]:
+                    - generic [ref=e3652]: Chicken Wing
+                    - generic [ref=e3653]: Transfer from wh-tag
+                - cell "+3000 g" [ref=e3654]
+                - cell "TRF-A5TAG" [ref=e3655]:
+                  - generic [ref=e3657]: TRF-A5TAG
+                - cell "40 1800 left 1200 used" [ref=e3658]:
+                  - generic [ref=e3659]:
+                    - progressbar [ref=e3660]
+                    - generic [ref=e3663]:
+                      - generic [ref=e3664]:
+                        - strong [ref=e3665]: "1800"
+                        - text: left
+                      - generic [ref=e3666]: 1200 used
+              - row "06:24 PM Chicken Leg Transfer from wh-tag +3000 g TRF-A6TAG 30 2100 left 900 used" [ref=e3667]:
+                - cell "06:24 PM" [ref=e3668]
+                - cell "Chicken Leg Transfer from wh-tag" [ref=e3669]:
+                  - generic [ref=e3670]:
+                    - generic [ref=e3671]: Chicken Leg
+                    - generic [ref=e3672]: Transfer from wh-tag
+                - cell "+3000 g" [ref=e3673]
+                - cell "TRF-A6TAG" [ref=e3674]:
+                  - generic [ref=e3676]: TRF-A6TAG
+                - cell "30 2100 left 900 used" [ref=e3677]:
+                  - generic [ref=e3678]:
+                    - progressbar [ref=e3679]
+                    - generic [ref=e3682]:
+                      - generic [ref=e3683]:
+                        - strong [ref=e3684]: "2100"
+                        - text: left
+                      - generic [ref=e3685]: 900 used
+  - generic [ref=e207]: WTF! Samgyup POS

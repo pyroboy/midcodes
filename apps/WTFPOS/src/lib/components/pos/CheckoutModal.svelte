@@ -19,10 +19,47 @@
 
     let checkoutLoading = $state(false);
     let checkoutError = $state('');
-    let checkoutMethod = $state<'cash' | 'gcash' | 'maya'>('cash');
-    let cashTendered = $state<number>(0);
     let showPinForDiscount = $state(false);
     let pendingDiscountType = $state<DiscountType>('none');
+
+    // ─── Multi-method payment state ─────────────────────────────────────────
+    type PaymentMethod = 'cash' | 'gcash' | 'maya';
+    interface PaymentEntry { method: PaymentMethod; amount: number }
+    let paymentEntries = $state<PaymentEntry[]>([{ method: 'cash', amount: 0 }]);
+
+    const totalPaid = $derived(paymentEntries.reduce((s, e) => s + (e.amount || 0), 0));
+    const cashEntry = $derived(paymentEntries.find(e => e.method === 'cash'));
+    const cashChange = $derived(cashEntry ? Math.max(0, (cashEntry.amount || 0) - (order.total - (totalPaid - (cashEntry.amount || 0)))) : 0);
+
+    function hasMethod(m: PaymentMethod) { return paymentEntries.some(e => e.method === m); }
+
+    function toggleMethod(m: PaymentMethod) {
+        if (hasMethod(m)) {
+            if (paymentEntries.length > 1) {
+                paymentEntries = paymentEntries.filter(e => e.method !== m);
+            }
+        } else {
+            paymentEntries = [...paymentEntries, { method: m, amount: 0 }];
+        }
+    }
+
+    function setAmount(m: PaymentMethod, val: number) {
+        paymentEntries = paymentEntries.map(e => e.method === m ? { ...e, amount: val } : e);
+    }
+
+    function exactCash() {
+        if (paymentEntries.length === 1) {
+            setAmount(paymentEntries[0].method, order.total);
+        } else {
+            // Fill remaining on cash
+            const otherTotal = paymentEntries.filter(e => e.method !== 'cash').reduce((s, e) => s + (e.amount || 0), 0);
+            setAmount('cash', Math.max(0, order.total - otherTotal));
+        }
+    }
+
+    function selectCashPreset(amount: number) {
+        if (hasMethod('cash')) setAmount('cash', amount);
+    }
 
     // Local discount state — never mutate the RxDB proxy directly.
     // The actual DB value is updated via recalcOrder(); the reactive order prop
@@ -33,21 +70,12 @@
 
     const showScPwdSection = $derived(localDiscountType === 'senior' || localDiscountType === 'pwd');
 
-    const cashChange = $derived(cashTendered - order.total);
     const hasItems = $derived(order.items.filter(i => i.status !== 'cancelled').length > 0);
     const canConfirmCheckout = $derived(
-        hasItems && (checkoutMethod !== 'cash' || cashTendered >= order.total) &&
+        hasItems && totalPaid >= order.total &&
         (!(localDiscountType === 'senior' || localDiscountType === 'pwd') ||
          (discountIdsInput.length === discountPaxInput && discountIdsInput.every(id => id.trim() !== '')))
     );
-
-    function selectCashPreset(amount: number) {
-        cashTendered = amount;
-    }
-
-    function exactCash() {
-        cashTendered = order.total;
-    }
 
     function applyScPwdPax(newPax: number) {
         const validatedPax = Math.max(1, Math.min(newPax, order.pax));
@@ -133,8 +161,19 @@
     async function finalizeCheckout() {
         if (!order) { checkoutLoading = false; return; }
 
+        // Build the payments array (only include entries with amount > 0)
+        const activePayments = paymentEntries
+            .filter(e => (e.amount || 0) > 0)
+            .map(e => ({ method: e.method, amount: e.amount }));
+
+        if (activePayments.length === 0) {
+            checkoutError = 'Enter a payment amount to continue.';
+            checkoutLoading = false;
+            return;
+        }
+
         try {
-            await checkoutOrder(order.id, checkoutMethod, order.tableId ?? null);
+            await checkoutOrder(order.id, activePayments, order.tableId ?? null);
         } catch (err) {
             console.error('[CHECKOUT] finalizeCheckout error:', err);
             checkoutError = err instanceof Error ? err.message : 'Checkout failed';
@@ -142,13 +181,12 @@
             return;
         }
 
-        // Snapshot after checkoutOrder so the payment is included,
-        // but before reactive unmount clears the order reference.
         const snapshot: Order = { ...order, payments: [...order.payments], items: [...order.items], closedAt: order.closedAt ?? new Date().toISOString() };
 
-        // P0-1: Pass actual cash change and method label to receipt
-        const methodLabel = checkoutMethod === 'gcash' ? 'GCash' : checkoutMethod === 'maya' ? 'Maya' : 'Cash';
-        const actualChange = checkoutMethod === 'cash' ? Math.max(0, cashTendered - order.total) : 0;
+        const methodLabel = activePayments.length === 1
+            ? (activePayments[0].method === 'gcash' ? 'GCash' : activePayments[0].method === 'maya' ? 'Maya' : 'Cash')
+            : 'Split';
+        const actualChange = cashEntry ? Math.max(0, cashChange) : 0;
 
         checkoutError = '';
         checkoutLoading = false;
@@ -269,8 +307,12 @@
             </div>
         {/if}
 
+        <!-- Payment method toggles + amount inputs -->
         <div class="flex flex-col gap-3 border-b border-border px-6 py-4">
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Payment Method</span>
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Payment Method</span>
+                <span class="text-xs text-gray-400">Tap to add/remove</span>
+            </div>
             <div class="grid grid-cols-3 gap-2">
                 {#each [
                     { id: 'cash' as const, label: '💵 Cash' },
@@ -278,10 +320,10 @@
                     { id: 'maya' as const, label: '📱 Maya' }
                 ] as method}
                     <button
-                        onclick={() => { checkoutMethod = method.id; if (method.id !== 'cash') cashTendered = 0; }}
+                        onclick={() => toggleMethod(method.id)}
                         class={cn(
                             'flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all active:scale-95',
-                            checkoutMethod === method.id
+                            hasMethod(method.id)
                                 ? 'bg-accent text-white shadow-md'
                                 : 'border border-border bg-surface text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                         )}
@@ -291,61 +333,67 @@
                     </button>
                 {/each}
             </div>
-        </div>
 
-        {#if checkoutMethod === 'cash'}
-            <div class="flex flex-col gap-3 border-b border-border px-6 py-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Cash Tendered</span>
-                    <button onclick={exactCash} class="text-xs font-semibold text-accent hover:underline" style="min-height: unset">Exact</button>
-                </div>
-
-                <div class="flex items-center justify-center rounded-xl bg-surface-secondary border border-border py-3">
-                    <span class={cn(
-                        'font-mono text-3xl font-extrabold',
-                        cashTendered > 0 ? 'text-gray-900' : 'text-gray-300'
-                    )}>
-                        {cashTendered > 0 ? formatPeso(cashTendered) : '₱0.00'}
-                    </span>
-                </div>
-
-                <div class="grid grid-cols-4 gap-2">
-                    {#each [20, 50, 100, 200, 500, 1000, 1500, 2000] as amount}
-                        <button
-                            onclick={() => selectCashPreset(amount)}
-                            class={cn(
-                                'rounded-lg py-2 font-mono text-sm font-bold transition-all active:scale-95',
-                                cashTendered === amount
-                                    ? 'bg-accent text-white'
-                                    : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
-                            )}
-                            style="min-height: 40px"
-                        >
-                            ₱{amount.toLocaleString()}
-                        </button>
-                    {/each}
-                </div>
-
-                <input
-                    type="number"
-                    bind:value={cashTendered}
-                    placeholder="Enter custom amount"
-                    class="pos-input text-center font-mono text-lg"
-                    min="0"
-                />
-
-                {#if cashTendered >= order.total}
-                    <div class="flex items-center justify-between rounded-xl bg-status-green-light border border-status-green/20 px-4 py-3">
-                        <span class="text-sm font-semibold text-status-green">Change</span>
-                        <span class="font-mono text-2xl font-extrabold text-status-green">{formatPeso(cashChange)}</span>
+            <!-- Amount inputs for each active method -->
+            {#each paymentEntries as entry (entry.method)}
+                <div class="flex flex-col gap-2 rounded-xl bg-surface-secondary border border-border p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-gray-600">
+                            {entry.method === 'cash' ? '💵 Cash' : entry.method === 'gcash' ? '📱 GCash' : '📱 Maya'}
+                        </span>
+                        {#if entry.method === 'cash'}
+                            <button onclick={exactCash} class="text-xs font-semibold text-accent hover:underline" style="min-height: unset">Exact</button>
+                        {/if}
                     </div>
-                {:else if cashTendered > 0}
-                    <div class="flex items-center justify-between rounded-xl bg-status-red-light border border-status-red/20 px-4 py-2">
-                        <span class="text-xs font-semibold text-status-red">Short by {formatPeso(order.total - cashTendered)}</span>
-                    </div>
-                {/if}
+                    <input
+                        type="number"
+                        value={entry.amount || 0}
+                        oninput={(e) => setAmount(entry.method, parseFloat((e.target as HTMLInputElement).value) || 0)}
+                        class="pos-input text-center font-mono text-xl font-bold"
+                        min="0"
+                        placeholder="0"
+                    />
+                    {#if entry.method === 'cash'}
+                        <!-- Cash preset buttons -->
+                        <div class="grid grid-cols-4 gap-1.5">
+                            {#each [20, 50, 100, 200, 500, 1000, 1500, 2000] as amount}
+                                <button
+                                    onclick={() => selectCashPreset(amount)}
+                                    class={cn(
+                                        'rounded-lg py-1.5 font-mono text-xs font-bold transition-all active:scale-95',
+                                        entry.amount === amount
+                                            ? 'bg-accent text-white'
+                                            : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
+                                    )}
+                                    style="min-height: 32px"
+                                >
+                                    ₱{amount.toLocaleString()}
+                                </button>
+                            {/each}
+                        </div>
+                    {/if}
+                </div>
+            {/each}
+
+            <!-- Running totals -->
+            <div class="flex items-center justify-between rounded-lg bg-surface px-3 py-2 border border-border">
+                <span class="text-sm font-semibold text-gray-600">Total Paid</span>
+                <span class={cn('font-mono text-lg font-extrabold', totalPaid >= order.total ? 'text-status-green' : 'text-gray-900')}>
+                    {formatPeso(totalPaid)}
+                </span>
             </div>
-        {/if}
+
+            {#if cashEntry && cashEntry.amount > 0 && totalPaid >= order.total}
+                <div class="flex items-center justify-between rounded-xl bg-status-green-light border border-status-green/20 px-4 py-3">
+                    <span class="text-sm font-semibold text-status-green">Cash Change</span>
+                    <span class="font-mono text-2xl font-extrabold text-status-green">{formatPeso(cashChange)}</span>
+                </div>
+            {:else if totalPaid > 0 && totalPaid < order.total}
+                <div class="flex items-center justify-between rounded-xl bg-status-red-light border border-status-red/20 px-4 py-2">
+                    <span class="text-xs font-semibold text-status-red">Short by {formatPeso(order.total - totalPaid)}</span>
+                </div>
+            {/if}
+        </div>
 
         {#if checkoutError}
             <div class="px-6 py-4 mx-6 mt-4 mb-2 bg-red-50 border border-red-200 rounded-xl flex flex-col items-center text-center gap-2">
@@ -368,9 +416,9 @@
                 >
                     Cancel
                 </button>
-                {#if checkoutMethod !== 'cash'}
+                {#if paymentEntries.length === 1 && paymentEntries[0].method !== 'cash'}
                     <button
-                        onclick={() => { holdPayment(order.id, checkoutMethod === 'maya' ? 'maya' : 'gcash'); onclose(); }}
+                        onclick={() => { holdPayment(order.id, paymentEntries[0].method === 'maya' ? 'maya' : 'gcash'); onclose(); }}
                         class="btn-secondary flex-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
                         style="min-height: 48px"
                         disabled={!hasItems || checkoutLoading}

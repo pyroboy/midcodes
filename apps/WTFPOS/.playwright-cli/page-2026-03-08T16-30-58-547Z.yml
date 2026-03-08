@@ -1,0 +1,91 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "Kitchen" [ref=e93] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e19]
+          - generic: Kitchen
+      - listitem [ref=e94]:
+        - link "Stock" [ref=e95] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e96]
+          - generic: Stock
+    - generic [ref=e23]:
+      - separator [ref=e24]
+      - generic [ref=e26]: P
+      - link "Logout" [ref=e28] [cursor=pointer]:
+        - /url: /
+        - img [ref=e29]
+    - button "Toggle Sidebar" [ref=e32]
+  - main [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - heading "Stock Management" [level=1] [ref=e38]
+        - navigation [ref=e39]:
+          - link "Inventory" [ref=e40] [cursor=pointer]:
+            - /url: /stock/inventory
+            - img [ref=e41]
+            - text: Inventory
+          - link "Deliveries 1" [ref=e97] [cursor=pointer]:
+            - /url: /stock/deliveries
+            - img [ref=e46]
+            - text: Deliveries
+            - generic [ref=e98]: "1"
+          - link "Transfers" [ref=e51] [cursor=pointer]:
+            - /url: /stock/transfers
+            - img [ref=e52]
+            - text: Transfers
+          - link "Counts 1" [ref=e55] [cursor=pointer]:
+            - /url: /stock/counts
+            - img [ref=e56]
+            - text: Counts
+            - generic [ref=e60]: "1"
+          - link "Waste Log" [ref=e61] [cursor=pointer]:
+            - /url: /stock/waste
+            - img [ref=e62]
+            - text: Waste Log
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - generic [ref=e67]:
+            - generic [ref=e68]:
+              - img [ref=e69]
+              - paragraph [ref=e72]: Total Waste Today
+            - paragraph [ref=e73]: "1"
+          - generic [ref=e74]:
+            - paragraph [ref=e75]: Top Wasted Item
+            - paragraph [ref=e76]: Soju (Original)
+          - generic [ref=e77]:
+            - paragraph [ref=e78]: Most Common Reason
+            - paragraph [ref=e79]: Unusable (damaged)
+        - generic [ref=e99]:
+          - paragraph [ref=e100]: Waste Breakdown by Reason
+          - 'generic "Unusable (damaged): 1" [ref=e102]'
+          - generic [ref=e104]:
+            - generic [ref=e106]: Unusable (damaged)
+            - generic [ref=e107]: (100%)
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - heading "Today's Waste Log" [level=2] [ref=e82]
+            - paragraph [ref=e83]: Preparation waste only — not unconsumed customer leftovers
+          - button "Log Waste" [ref=e84] [cursor=pointer]:
+            - img [ref=e85]
+            - text: Log Waste
+        - table [ref=e109]:
+          - rowgroup [ref=e110]:
+            - row "Item Qty Reason By Time" [ref=e111]:
+              - columnheader "Item" [ref=e112]
+              - columnheader "Qty" [ref=e113]
+              - columnheader "Reason" [ref=e114]
+              - columnheader "By" [ref=e115]
+              - columnheader "Time" [ref=e116]
+          - rowgroup [ref=e117]:
+            - row "Soju (Original) 1 bottles Unusable (damaged) Maria S. 12:30 AM" [ref=e118]:
+              - cell "Soju (Original)" [ref=e119]
+              - cell "1 bottles" [ref=e120]
+              - cell "Unusable (damaged)" [ref=e121]
+              - cell "Maria S." [ref=e122]
+              - cell "12:30 AM" [ref=e123]

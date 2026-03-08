@@ -1,0 +1,153 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - button "Toggle sidebar" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: W!
+      - separator [ref=e119]
+      - list [ref=e123]:
+        - listitem [ref=e124]:
+          - link "POS" [ref=e125] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e126]
+            - generic: POS
+      - generic [ref=e127]:
+        - separator [ref=e128]
+        - generic [ref=e130]: M
+        - link "Logout" [ref=e132] [cursor=pointer]:
+          - /url: /
+          - img [ref=e133]
+      - button "Toggle Sidebar" [ref=e134]
+    - main [ref=e135]:
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - button "Toggle Sidebar" [ref=e141] [cursor=pointer]:
+                - img
+                - generic [ref=e142]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e143]
+              - generic [ref=e144]: 1 occ
+              - generic [ref=e145]: 7 free
+            - generic [ref=e146]:
+              - button "Toggle color legend" [ref=e148] [cursor=pointer]:
+                - img [ref=e149]
+              - button "📦 New Takeout" [ref=e150] [cursor=pointer]
+              - button "🧾 History 58" [ref=e151] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e152]: "58"
+          - img [ref=e154]:
+            - button "Table T1" [ref=e157] [cursor=pointer]:
+              - generic: 0m
+              - generic: T1
+              - generic: 4 pax
+            - button "Table T2" [ref=e159] [cursor=pointer]:
+              - generic: T2
+              - generic: cap 4
+            - button "Table T3" [ref=e161] [cursor=pointer]:
+              - generic: T3
+              - generic: cap 4
+            - button "Table T4" [ref=e163] [cursor=pointer]:
+              - generic: T4
+              - generic: cap 4
+            - button "Table T5" [ref=e165] [cursor=pointer]:
+              - generic: T5
+              - generic: cap 4
+            - button "Table T6" [ref=e167] [cursor=pointer]:
+              - generic: T6
+              - generic: cap 4
+            - button "Table T7" [ref=e169] [cursor=pointer]:
+              - generic: T7
+              - generic: cap 2
+            - button "Table T8" [ref=e171] [cursor=pointer]:
+              - generic: T8
+              - generic: cap 2
+        - generic [ref=e173]:
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - generic [ref=e225]:
+                - generic [ref=e226]: T1
+                - button "4 pax ✎" [ref=e227] [cursor=pointer]
+                - generic [ref=e228]: 0m
+              - button "✕" [ref=e229] [cursor=pointer]
+            - button "+ Add Item" [ref=e230] [cursor=pointer]
+          - generic [ref=e232]:
+            - generic [ref=e233]:
+              - generic [ref=e234]: BILL
+              - generic [ref=e235]: 0 items
+            - generic [ref=e236]: ₱0.00
+          - generic [ref=e237]:
+            - button "Cancel Table" [ref=e238] [cursor=pointer]
+            - button "More Options" [ref=e239] [cursor=pointer]
+      - generic [ref=e241]:
+        - generic [ref=e242]:
+          - generic [ref=e243]:
+            - generic [ref=e244]:
+              - heading "➕ Add to Order" [level=2] [ref=e245]
+              - paragraph [ref=e246]: 🔥 Table · 4 pax
+            - button "Close modal" [ref=e247] [cursor=pointer]: ✕
+          - generic [ref=e248]:
+            - button "🎫 Package" [ref=e249] [cursor=pointer]:
+              - generic [ref=e250]: 🎫
+              - generic [ref=e251]: Package
+            - button "🥩 Meats" [ref=e252] [cursor=pointer]:
+              - generic [ref=e253]: 🥩
+              - generic [ref=e254]: Meats
+            - button "🥬 Sides" [ref=e255] [cursor=pointer]:
+              - generic [ref=e256]: 🥬
+              - generic [ref=e257]: Sides
+            - button "🍜 Dishes" [ref=e258] [cursor=pointer]:
+              - generic [ref=e259]: 🍜
+              - generic [ref=e260]: Dishes
+            - button "🥤 Drinks" [ref=e261] [cursor=pointer]:
+              - generic [ref=e262]: 🥤
+              - generic [ref=e263]: Drinks
+          - generic [ref=e267]:
+            - button "Premium USDA Beef 🥩 beef Premium USDA Beef tap to enter weight ₱120/100g" [ref=e308] [cursor=pointer]:
+              - img "Premium USDA Beef" [ref=e310]
+              - generic [ref=e311]:
+                - generic [ref=e312]: 🥩 beef
+                - generic [ref=e313]: Premium USDA Beef
+                - generic [ref=e314]: tap to enter weight
+                - generic [ref=e315]: ₱120/100g
+            - button "Sliced Beef 🥩 beef Sliced Beef tap to enter weight ₱110/100g" [ref=e316] [cursor=pointer]:
+              - img "Sliced Beef" [ref=e318]
+              - generic [ref=e319]:
+                - generic [ref=e320]: 🥩 beef
+                - generic [ref=e321]: Sliced Beef
+                - generic [ref=e322]: tap to enter weight
+                - generic [ref=e323]: ₱110/100g
+            - button "Pork Sliced 🐷 pork Pork Sliced tap to enter weight ₱70/100g" [ref=e324] [cursor=pointer]:
+              - img "Pork Sliced" [ref=e326]
+              - generic [ref=e327]:
+                - generic [ref=e328]: 🐷 pork
+                - generic [ref=e329]: Pork Sliced
+                - generic [ref=e330]: tap to enter weight
+                - generic [ref=e331]: ₱70/100g
+            - button "Samgyupsal 🐷 pork Samgyupsal tap to enter weight ₱65/100g" [ref=e332] [cursor=pointer]:
+              - img "Samgyupsal" [ref=e334]
+              - generic [ref=e335]:
+                - generic [ref=e336]: 🐷 pork
+                - generic [ref=e337]: Samgyupsal
+                - generic [ref=e338]: tap to enter weight
+                - generic [ref=e339]: ₱65/100g
+        - generic [ref=e295]:
+          - generic [ref=e296]:
+            - heading "Pending Items" [level=3] [ref=e297]
+            - paragraph [ref=e298]: Review items before pushing to the bill.
+          - generic [ref=e299]:
+            - generic [ref=e341]:
+              - generic [ref=e342]:
+                - generic [ref=e343]: Pork Unlimited
+                - generic [ref=e344]: PKG
+              - generic [ref=e345]: × 4 pax
+            - button "Includes 2 meats, 9 sides ▼ show" [ref=e346] [cursor=pointer]:
+              - generic [ref=e347]: Includes 2 meats, 9 sides
+              - generic [ref=e348]: ▼ show
+          - generic [ref=e301]:
+            - generic [ref=e302]:
+              - generic [ref=e303]: PENDING TOTAL
+              - generic [ref=e304]: ₱1,596.00
+            - generic [ref=e305]:
+              - button "Undo" [ref=e306] [cursor=pointer]
+              - button "⚡ CHARGE (12)" [ref=e349] [cursor=pointer]
+  - generic [ref=e109]: WTF! Samgyup POS

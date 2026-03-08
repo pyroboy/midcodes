@@ -1,0 +1,88 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e19]
+          - generic: POS
+    - generic [ref=e23]:
+      - separator [ref=e24]
+      - generic [ref=e26]: M
+      - link "Logout" [ref=e28] [cursor=pointer]:
+        - /url: /
+        - img [ref=e29]
+    - button "Toggle Sidebar" [ref=e32]
+  - main [ref=e33]:
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - button "Toggle Sidebar" [ref=e39] [cursor=pointer]:
+              - img
+              - generic [ref=e40]: Toggle Sidebar
+            - heading "POS" [level=1] [ref=e41]
+            - generic [ref=e42]: 2 occ
+            - generic [ref=e43]: 6 free
+          - generic [ref=e44]:
+            - button "Toggle color legend" [ref=e46] [cursor=pointer]:
+              - img [ref=e47]
+            - button "📦 New Takeout" [ref=e49] [cursor=pointer]
+            - button "🧾 History 82" [ref=e67] [cursor=pointer]:
+              - text: 🧾 History
+              - generic [ref=e68]: "82"
+        - img [ref=e52]:
+          - button "Table T1" [ref=e69] [cursor=pointer]:
+            - generic: PORK
+            - generic: 3m
+            - generic: T1
+            - generic: 4 pax
+            - generic: ₱1,596.00
+            - generic: "12"
+          - button "Table T2" [ref=e73] [cursor=pointer]:
+            - generic: BEEF
+            - generic: 1m
+            - generic: T2
+            - generic: 2 pax
+            - generic: ₱1,198.00
+            - generic: "12"
+          - button "Table T3" [ref=e77] [cursor=pointer]:
+            - generic: T3
+            - generic: cap 4
+          - button "Table T4" [ref=e79] [cursor=pointer]:
+            - generic: T4
+            - generic: cap 4
+          - button "Table T5" [ref=e81] [cursor=pointer]:
+            - generic: T5
+            - generic: cap 4
+          - button "Table T6" [ref=e83] [cursor=pointer]:
+            - generic: T6
+            - generic: cap 4
+          - button "Table T7" [ref=e85] [cursor=pointer]:
+            - generic: T7
+            - generic: cap 2
+          - button "Table T8" [ref=e87] [cursor=pointer]:
+            - generic: T8
+            - generic: cap 2
+        - generic [ref=e89]:
+          - heading "📦 Takeout Orders 1" [level=2] [ref=e90]:
+            - text: 📦 Takeout Orders
+            - generic [ref=e91]: "1"
+          - generic [ref=e93]:
+            - button "#TO01 Carmen ₱387.00 4 items" [ref=e94] [cursor=pointer]:
+              - text: "#TO01"
+              - generic [ref=e95]: Carmen
+              - text: ₱387.00
+              - generic [ref=e96]: 4 items
+            - generic [ref=e97]: PREP
+      - generic [ref=e56]:
+        - generic [ref=e57]: 🧾
+        - generic [ref=e58]:
+          - generic [ref=e59]: No Table Selected
+          - generic [ref=e60]: Tap an occupied table on the floor plan to view its running bill here.
+        - generic [ref=e61]:
+          - generic [ref=e62]: Green = available — tap to open
+          - generic [ref=e64]: Orange = occupied — tap to view bill

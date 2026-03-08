@@ -2,6 +2,8 @@
 	import type { Table, Order } from '$lib/types';
 	import { formatPeso, formatTimeAgo, cn } from '$lib/utils';
 	import { menuItems, printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus, getRefillCount } from '$lib/stores/pos.svelte';
+	import { isWithinGracePeriod, removeOrderItem } from '$lib/stores/pos/orders.svelte';
+	import ManagerPinModal from './ManagerPinModal.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
 
@@ -43,6 +45,22 @@
 
 	let showMoreActions = $state(false);
 	let sidesExpanded = $state(false);
+	let confirmCancel = $state(false);
+
+	// Grace period item removal state
+	let removePinItemId = $state<string | null>(null);
+	let showRemovePin = $state(false);
+
+	function handleRemoveItem(item: Order['items'][number]) {
+		if (!order) return;
+		if (item.status !== 'pending') return;
+		if (isWithinGracePeriod(item.addedAt)) {
+			removeOrderItem(order.id, item.id);
+		} else {
+			removePinItemId = item.id;
+			showRemovePin = true;
+		}
+	}
 
 	function takeoutLabel(o: Order) {
 		const timeCode = new Date(o.createdAt).getTime() % 1000;
@@ -61,6 +79,18 @@
 		if (item.status === 'served') return 'served';
 		if (item.status === 'pending') return 'pending';
 		return null;
+	}
+
+	// P1-2: Compute aggregated badge counts for a meat group
+	function groupBadgeCounts(instances: Order['items']) {
+		const badges = instances.map(i => itemBadge(i)).filter(Boolean);
+		return {
+			weighing: badges.filter(b => b === 'weighing').length,
+			cooking: badges.filter(b => b === 'cooking').length,
+			served: badges.filter(b => b === 'served').length,
+			pending: badges.filter(b => b === 'pending').length,
+			totalWeight: instances.filter(i => i.weight != null).reduce((s, i) => s + (i.weight ?? 0), 0)
+		};
 	}
 
 	const totalMeatGrams = $derived(
@@ -135,7 +165,7 @@
 
 </script>
 
-<!-- Status badge snippet — shared between itemRow and the AYCE meat instance log -->
+<!-- Status badge snippet — used in itemRow for flat list and AYCE side rows -->
 {#snippet statusBadge(badge: ReturnType<typeof itemBadge>, isRefill = false)}
 	{#if badge === 'pending'}
 		{#if isRefill}
@@ -144,12 +174,33 @@
 			<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-600">SENT</span>
 		{/if}
 	{:else if badge === 'weighing'}
-		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">WEIGHING</span>
+		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">WEIGHING {order?.createdAt ? formatTimeAgo(order.createdAt) : ''}</span>
 	{:else if badge === 'cooking'}
 		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">COOKING</span>
 	{:else if badge === 'served'}
 		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
 	{/if}
+{/snippet}
+
+<!-- P1-2: Aggregated badge counts for AYCE meat groups -->
+{#snippet badgesBlock(counts: ReturnType<typeof groupBadgeCounts>)}
+	<div class="flex items-center gap-1 flex-wrap justify-end">
+		{#if counts.totalWeight > 0}
+			<span class="text-[10px] text-gray-400">{counts.totalWeight}g</span>
+		{/if}
+		{#if counts.served > 0}
+			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">{counts.served > 1 ? `${counts.served}× ` : ''}✓ SERVED</span>
+		{/if}
+		{#if counts.cooking > 0}
+			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">{counts.cooking > 1 ? `${counts.cooking}× ` : ''}COOKING</span>
+		{/if}
+		{#if counts.weighing > 0}
+			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">{counts.weighing > 1 ? `${counts.weighing}× ` : ''}WEIGHING</span>
+		{/if}
+		{#if counts.pending > 0}
+			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">{counts.pending > 1 ? `${counts.pending}× ` : ''}REQUESTING</span>
+		{/if}
+	</div>
 {/snippet}
 
 <!-- Shared item row snippet — used in AYCE grouped sections and non-AYCE flat list -->
@@ -184,6 +235,14 @@
 				<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
 			{:else}
 				<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
+			{/if}
+			{#if item.status === 'pending' && order}
+				<button
+					onclick={() => handleRemoveItem(item)}
+					class="flex h-5 w-5 items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-status-red transition-colors shrink-0"
+					style="min-height: unset"
+					title={isWithinGracePeriod(item.addedAt) ? 'Remove (grace period)' : 'Remove (PIN required)'}
+				>✕</button>
 			{/if}
 		</div>
 	</div>
@@ -278,14 +337,14 @@
 				<div class="flex gap-2">
 					<button
 						onclick={onrefill}
-						class="flex-1 rounded-xl bg-accent text-sm font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
+						class="flex-[2] rounded-xl bg-accent text-sm font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
 						style="min-height: 56px"
 					>
-						Refill
+						🔄 Refill
 					</button>
 					<button
 						onclick={onadditem}
-						class="rounded-xl border-2 border-accent bg-accent-light px-4 text-sm font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
+						class="flex-1 rounded-xl border-2 border-accent bg-accent-light px-4 text-sm font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
 						style="min-height: 56px"
 					>
 						Add Item
@@ -362,29 +421,7 @@
 									{/if}
 								</span>
 									<!-- P1-2: Aggregated status badges instead of stacking per instance -->
-									{@const badges = group.instances.map(i => itemBadge(i)).filter(Boolean)}
-									{@const weighing = badges.filter(b => b === 'weighing').length}
-									{@const cooking = badges.filter(b => b === 'cooking').length}
-									{@const served = badges.filter(b => b === 'served').length}
-									{@const pending = badges.filter(b => b === 'pending').length}
-									{@const totalWeight = group.instances.filter(i => i.weight != null).reduce((s, i) => s + (i.weight ?? 0), 0)}
-									<div class="flex items-center gap-1 flex-wrap justify-end">
-										{#if totalWeight > 0}
-											<span class="text-[10px] text-gray-400">{totalWeight}g</span>
-										{/if}
-										{#if served > 0}
-											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">{served > 1 ? `${served}× ` : ''}✓ SERVED</span>
-										{/if}
-										{#if cooking > 0}
-											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">{cooking > 1 ? `${cooking}× ` : ''}COOKING</span>
-										{/if}
-										{#if weighing > 0}
-											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">{weighing > 1 ? `${weighing}× ` : ''}WEIGHING</span>
-										{/if}
-										{#if pending > 0}
-											<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">{pending > 1 ? `${pending}× ` : ''}REQUESTING</span>
-										{/if}
-									</div>
+									{@render badgesBlock(groupBadgeCounts(group.instances))}
 								</div>
 							{/each}
 						{/if}
@@ -467,9 +504,19 @@
 			{:else}
 				{#if activeItemCount === 0 && oncanceltable}
 				<!-- P0-3: Cancel table button when no items have been added -->
-				<button onclick={oncanceltable} class="btn-ghost w-full border border-status-red text-status-red hover:bg-red-50 text-sm font-semibold" style="min-height: 44px">
-					Cancel Table
-				</button>
+				{#if confirmCancel}
+					<div class="flex flex-col gap-2 rounded-lg border border-status-red bg-red-50 p-3">
+						<p class="text-xs font-semibold text-status-red">Cancel this table? Pax entry will be removed.</p>
+						<div class="flex gap-2">
+							<button onclick={() => confirmCancel = false} class="btn-ghost flex-1 text-xs border border-gray-300" style="min-height: 40px">Keep</button>
+							<button onclick={() => { confirmCancel = false; oncanceltable?.(); }} class="btn-danger flex-1 text-xs" style="min-height: 40px">Yes, Cancel</button>
+						</div>
+					</div>
+				{:else}
+					<button onclick={() => confirmCancel = true} class="btn-ghost w-full border border-status-red text-status-red hover:bg-red-50 text-sm font-semibold" style="min-height: 44px">
+						Cancel Table
+					</button>
+				{/if}
 			{:else}
 				<div class="flex gap-2">
 					<button onclick={onvoid} disabled={activeItemCount === 0} class={cn('btn-danger px-3 text-sm', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
@@ -479,13 +526,13 @@
 			{/if}
 			{/if}
 
-			<!-- More Options (overflow) -->
+			<!-- Table Actions (overflow) -->
 			<button
 				onclick={() => { showMoreActions = !showMoreActions; }}
 				class="w-full rounded-lg border border-border bg-surface py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all"
 				style="min-height: 36px"
 			>
-				{showMoreActions ? 'Hide Options' : 'More Options'}
+				{showMoreActions ? '▲ Hide' : 'Transfer · Pax · Split · Merge'}
 			</button>
 
 			{#if showMoreActions}
@@ -508,3 +555,17 @@
 		</div>
 	{/if}
 </div>
+
+<ManagerPinModal
+	isOpen={showRemovePin}
+	title="Remove Item"
+	description="Grace period has expired. Enter Manager PIN to remove this item."
+	confirmLabel="Remove"
+	confirmClass="btn-danger"
+	onClose={() => { showRemovePin = false; removePinItemId = null; }}
+	onConfirm={() => {
+		if (order && removePinItemId) removeOrderItem(order.id, removePinItemId);
+		showRemovePin = false;
+		removePinItemId = null;
+	}}
+/>

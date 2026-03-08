@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { menuItems, changePackage } from '$lib/stores/pos.svelte';
 	import { formatPeso, cn } from '$lib/utils';
+	import { MANAGER_PIN } from '$lib/stores/session.svelte';
 	import type { Order } from '$lib/types';
 
 	let {
@@ -12,8 +13,6 @@
 		onclose: () => void;
 		onchange: () => void;
 	} = $props();
-
-	const MANAGER_PIN = '1234';
 
 	let step = $state<'select' | 'pin'>('select');
 	let selectedPackageId = $state<string | null>(null);

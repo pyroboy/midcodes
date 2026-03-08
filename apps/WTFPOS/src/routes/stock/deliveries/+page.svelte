@@ -78,6 +78,27 @@
 	let formError = $state('');
 	let formPhotos = $state<string[]>([]);
 
+	// P0-2: Item search filter
+	let formItemSearch = $state('');
+	const filteredFormItems = $derived(
+		formItemSearch.trim()
+			? activeItems.filter(i => i.name.toLowerCase().includes(formItemSearch.toLowerCase()))
+			: activeItems
+	);
+
+	// P0-1: Success toast
+	let successMsg = $state<string | null>(null);
+	let successTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	// P1-2: Recent suppliers derived from delivery history
+	const recentSuppliers = $derived(
+		[...new Set(
+			preFilteredDeliveries
+				.map((d: any) => d.supplier as string)
+				.filter(Boolean)
+		)].slice(0, 5)
+	);
+
 	const parsedQty = $derived(parseFloat(formQty) || 0);
 	const selectedItem = $derived(activeItems.find(s => s.id === formStockItemId));
 	const canSave = $derived(!!formStockItemId && parsedQty > 0 && !!formSupplier.trim());
@@ -91,6 +112,7 @@
 		formNotes = '';
 		formError = '';
 		formPhotos = [];
+		formItemSearch = '';
 		showModal = true;
 	}
 
@@ -103,16 +125,27 @@
 		const item = stockItems.value.find(s => s.id === formStockItemId);
 		if (!item) return;
 
+		const supplierName = formSupplier.trim();
+		const qty = parsedQty;
+		const unit = item.unit;
+		const itemName = item.name;
+
 		await receiveDelivery(
 			item.id,
 			item.name,
 			parsedQty,
 			item.unit,
-			formSupplier.trim(),
+			supplierName,
 			formNotes,
 			formBatchNo || undefined,
 			formExpiryDate || undefined
 		);
+
+		// P0-1: Show success toast
+		if (successTimeout) clearTimeout(successTimeout);
+		successMsg = `✓ ${itemName} +${qty} ${unit} received from ${supplierName}`;
+		successTimeout = setTimeout(() => { successMsg = null; successTimeout = null; }, 3500);
+
 		showModal = false;
 	}
 </script>
@@ -141,10 +174,10 @@
 		</div>
 	{/if}
 
-	<!-- Expiring Soon Alerts (amber) -->
+	<!-- P0-3: Expiring Soon Alerts — always rendered at page top, not gated by form state -->
 	{#if expiringAlerts.length > 0}
 		<div class="pos-card border-amber-300/50 bg-amber-50/60 p-4 flex flex-col gap-3">
-			<h2 class="text-amber-700 font-bold flex items-center gap-2 text-sm">
+			<h2 class="text-amber-800 font-bold flex items-center gap-2 text-sm">
 				<AlertTriangle class="w-4 h-4" /> Expiring Soon ({expiringAlerts.length})
 			</h2>
 			<div class="flex flex-wrap gap-3">
@@ -154,7 +187,7 @@
 							<span class="font-semibold text-gray-900">{alert.itemName}</span>
 							<span class="ml-2 font-mono text-xs text-gray-400">{alert.batchNo ?? 'No Batch'}</span>
 						</div>
-						<span class="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+						<span class="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
 							{alert.daysLeft === 0 ? 'Expires TODAY' : `${alert.daysLeft}d left`}
 						</span>
 					</div>
@@ -254,7 +287,7 @@
 							{:else}
 								<div class="flex items-center justify-center gap-3">
 									<ProgressRing used={d.usedQty ?? 0} total={d.qty} size={28} strokeWidth={4} />
-									<div class="flex flex-col text-[10px] text-gray-500 font-medium">
+									<div class="flex flex-col text-[10px] text-gray-700 font-medium">
 										<span><strong class="text-gray-900">{d.qty - (d.usedQty ?? 0)}</strong> left</span>
 										<span>{d.usedQty ?? 0} used</span>
 									</div>
@@ -276,6 +309,16 @@
 	</div>
 </div>
 
+<!-- P0-1: Success toast -->
+{#if successMsg}
+	<div class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl bg-status-green px-5 py-3.5 text-white shadow-xl" transition:fade={{ duration: 200 }}>
+		<svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+		</svg>
+		<span class="text-sm font-semibold">{successMsg}</span>
+	</div>
+{/if}
+
 <!-- Receive Delivery Modal -->
 {#if showModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
@@ -288,15 +331,22 @@
 			</div>
 
 			<div class="flex flex-col gap-4">
-				<label class="flex flex-col gap-1.5">
+				<!-- P0-2: Searchable item picker -->
+				<div class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item *</span>
+					<input
+						type="text"
+						bind:value={formItemSearch}
+						class="pos-input"
+						placeholder="Search items..."
+					/>
 					<select bind:value={formStockItemId} class="pos-input">
 						<option value="" disabled>Select an item...</option>
-						{#each activeItems as item}
+						{#each filteredFormItems as item}
 							<option value={item.id}>{item.name} ({item.unit})</option>
 						{/each}
 					</select>
-				</label>
+				</div>
 
 				{#if selectedItem}
 					<p class="text-xs text-gray-500 -mt-2 px-1">
@@ -315,10 +365,22 @@
 					</label>
 				</div>
 
-				<label class="flex flex-col gap-1.5">
+				<!-- P1-2: Supplier field with recent supplier chips -->
+				<div class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier *</span>
 					<input type="text" bind:value={formSupplier} class="pos-input" placeholder="e.g. Monterey Meats" />
-				</label>
+					{#if recentSuppliers.length > 0}
+						<div class="flex flex-wrap gap-1.5 mt-0.5">
+							{#each recentSuppliers as supplier}
+								<button
+									type="button"
+									class="px-2.5 py-1 text-xs rounded-full border border-border bg-gray-50 text-gray-700 hover:bg-accent hover:text-white hover:border-accent transition-colors"
+									onclick={() => (formSupplier = supplier)}
+								>{supplier}</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
 
 				<div class="flex gap-4 border-t border-border pt-4">
 					<label class="flex-1 flex flex-col gap-1.5">
@@ -347,11 +409,12 @@
 				<p class="rounded-lg bg-status-red-light border border-status-red/20 px-3 py-2 text-sm font-medium text-status-red">{formError}</p>
 			{/if}
 
-			<div class="flex gap-3 mt-2">
-				<button class="btn-ghost flex-1" onclick={() => (showModal = false)}>Cancel</button>
-				<button class="btn-primary flex-1" onclick={saveDelivery} disabled={!canSave}>
+			<!-- P1-1: Receive Stock is dominant primary; Cancel is ghost text -->
+			<div class="flex flex-col gap-2 mt-2">
+				<button class="btn-primary w-full" onclick={saveDelivery} disabled={!canSave}>
 					Receive Stock
 				</button>
+				<button class="btn-ghost w-full text-gray-500" onclick={() => (showModal = false)}>Cancel</button>
 			</div>
 		</div>
 	</div>

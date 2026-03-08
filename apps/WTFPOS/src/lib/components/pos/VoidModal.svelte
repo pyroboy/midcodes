@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
+	import { MANAGER_PIN } from '$lib/stores/session.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -12,8 +13,6 @@
 	let voidPin = $state('');
 	let voidPinError = $state(false);
 	let voidReason = $state<'mistake' | 'walkout' | 'write_off'>('mistake');
-
-	const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || '1234';
 
 	function handleNumber(num: string) {
 		voidPinError = false;

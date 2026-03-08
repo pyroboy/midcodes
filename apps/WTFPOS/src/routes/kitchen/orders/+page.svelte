@@ -29,12 +29,29 @@
 		return formatCountdown(Math.floor(ageMs(createdAt) / 1000));
 	}
 
-	// ── Active Tickets (sorted oldest-first) ──
-	const activeTickets = $derived(
-		kdsTickets.value
-			.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'))
-			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-	);
+	// ── Active Tickets (merged by orderId, sorted oldest-first) ──
+	const activeTickets = $derived.by(() => {
+		const raw = kdsTickets.value.filter((t) => t.items.some((i) => i.status !== 'served' && i.status !== 'cancelled'));
+		// Merge tickets sharing the same orderId into one virtual ticket
+		const byOrder = new Map<string, KdsTicket>();
+		for (const t of raw) {
+			const existing = byOrder.get(t.orderId);
+			if (existing) {
+				// Merge items into the earliest ticket, keep earliest createdAt
+				const merged: KdsTicket = {
+					...existing,
+					items: [...existing.items, ...t.items],
+					createdAt: existing.createdAt < t.createdAt ? existing.createdAt : t.createdAt,
+					printStatus: existing.printStatus === 'failed' || t.printStatus === 'failed' ? 'failed' : existing.printStatus,
+				};
+				byOrder.set(t.orderId, merged);
+			} else {
+				byOrder.set(t.orderId, { ...t, items: [...t.items] });
+			}
+		}
+		return Array.from(byOrder.values())
+			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+	});
 
 	// ── Stats ──
 	const queueOrders = $derived(activeTickets.length);
@@ -136,7 +153,7 @@
 
 	function timerBadgeClass(level: ReturnType<typeof urgencyLevel>) {
 		if (level === 'critical') return 'bg-status-red text-white';
-		if (level === 'warning')  return 'bg-status-yellow text-white';
+		if (level === 'warning')  return 'bg-status-yellow text-gray-900';
 		return 'bg-gray-100 text-gray-600';
 	}
 
@@ -149,13 +166,12 @@
 		return { served, total, pct };
 	}
 
-	// ── Group Items (served items STAY visible, only cancelled filtered out) ──
+	// ── Group Items (served items STAY visible, only cancelled + packages filtered out) ──
 	function groupItems(items: KdsTicketItem[]) {
-		const notCancelled = (i: KdsTicketItem) => i.status !== 'cancelled';
+		const notCancelled = (i: KdsTicketItem) => i.status !== 'cancelled' && i.category !== 'packages';
 		const meats  = items.filter(i => i.category === 'meats' && notCancelled(i));
 		const dishes = items.filter(i => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && notCancelled(i));
-		const extras = items.filter(i => i.category === 'packages' && notCancelled(i));
-		return { meats, dishes, extras };
+		return { meats, dishes, extras: [] as typeof dishes };
 	}
 
 	// ── Actions ──
@@ -215,6 +231,12 @@
 	</div>
 {/snippet}
 
+<!-- ── Live Indicator (fixed top-right) ── -->
+<div class="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border border-status-green/30 bg-white px-3 py-1.5 shadow-sm">
+	<span class="h-2 w-2 rounded-full bg-status-green animate-pulse"></span>
+	<span class="text-xs font-semibold text-status-green">Live</span>
+</div>
+
 <!-- ── Header ── -->
 <div class="mb-4 space-y-4">
 	<div class="flex items-center justify-between">
@@ -223,10 +245,6 @@
 				<h1 class="text-xl font-bold text-gray-900 no-select">Kitchen Queue</h1>
 				<p class="text-xs text-gray-400 mt-0.5">Active tickets awaiting kitchen action</p>
 			</div>
-			<span class="flex items-center gap-1.5 text-xs font-medium text-status-green">
-				<span class="h-2 w-2 rounded-full bg-status-green animate-pulse"></span>
-				Live
-			</span>
 		</div>
 		<div class="flex items-center gap-3">
 			<button
@@ -250,21 +268,6 @@
 		</div>
 	</div>
 
-	<!-- Stat blocks -->
-	<div class="flex gap-3">
-		<div class="flex items-center gap-3 rounded-xl border border-accent bg-accent-light px-5 py-2.5">
-			<span class="text-2xl font-black font-mono text-accent">{queueOrders}</span>
-			<span class="text-sm font-semibold text-accent/80">Orders</span>
-		</div>
-		<div class="flex items-center gap-3 rounded-xl border border-status-green bg-status-green-light px-5 py-2.5">
-			<span class="text-2xl font-black font-mono text-status-green">{activeTables}</span>
-			<span class="text-sm font-semibold text-status-green/80">Tables</span>
-		</div>
-		<div class="flex items-center gap-3 rounded-xl border border-status-cyan bg-status-cyan-light px-5 py-2.5">
-			<span class="text-2xl font-black font-mono text-status-cyan">{totalItems}</span>
-			<span class="text-sm font-semibold text-status-cyan/80">Items</span>
-		</div>
-	</div>
 </div>
 
 <!-- ── Queue ── -->
@@ -298,7 +301,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+	<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
 		{#each activeTickets as ticket (ticket.orderId)}
 			{@const grouped = groupItems(ticket.items)}
 			{@const progress = ticketProgress(ticket)}
@@ -317,7 +320,7 @@
 							<span class="text-2xl font-black text-gray-900">T{ticket.tableNumber}</span>
 						{:else}
 							<span class="flex items-center gap-2">
-								<span class="rounded-lg bg-status-purple px-2 py-1 text-xs font-bold text-white">TAKEOUT</span>
+								<span class="rounded-lg bg-status-purple px-2 py-1 text-xs font-bold text-white">📦 TAKEOUT</span>
 								<span class="text-lg font-black text-gray-900">{ticket.customerName ?? 'Walk-in'}</span>
 							</span>
 						{/if}
@@ -335,6 +338,14 @@
 					</div>
 
 					<div class="flex items-center gap-2">
+						<button
+							onclick={() => completeAll(ticket)}
+							class="rounded-lg bg-status-green px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-all"
+							style="min-height: 36px"
+							title="Mark all items served"
+						>
+							✓ Bump
+						</button>
 						<span class="text-sm font-bold text-gray-400 font-mono">{progress.served}/{progress.total}</span>
 						<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
 							{timerText(ticket.createdAt)}
@@ -384,7 +395,7 @@
 												{item.menuItemName}
 											</span>
 											{#if isRefill}
-												<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-600 animate-pulse">
+												<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
 													REFILL
 												</span>
 											{:else if isWeighed}
@@ -401,7 +412,7 @@
 												{/if}
 											{:else if !isServed}
 												<span class="shrink-0 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-600 animate-pulse">
-													WEIGHING
+													WEIGHING {timerText(ticket.createdAt)}
 												</span>
 											{/if}
 										</div>
@@ -499,27 +510,42 @@
 							</div>
 							{#each grouped.extras as item (item.id)}
 								{@const isServed = item.status === 'served'}
-								<div class="flex items-center gap-2 px-4 py-2">
-									<div class="flex-1 flex items-center gap-2 min-w-0">
-										<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
-											{item.menuItemName}
-										</span>
-										{#if item.quantity > 1}
-											<span class="shrink-0 text-xs text-gray-400">{item.quantity}x</span>
+								{@const isExpanded = expandedItemId === item.id && !isServed}
+								<div class="border-b border-border/30 last:border-b-0">
+									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+									<div
+										class={cn(
+											'flex items-center gap-2 px-4 py-2 transition-colors',
+											isServed ? 'opacity-50' : 'cursor-pointer active:bg-gray-50'
+										)}
+										onclick={() => !isServed && toggleExpand(item.id)}
+										role={isServed ? undefined : 'button'}
+										tabindex={isServed ? -1 : 0}
+									>
+										<div class="flex-1 flex items-center gap-2 min-w-0">
+											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
+												{item.menuItemName}
+											</span>
+											{#if item.quantity > 1}
+												<span class="shrink-0 text-xs text-gray-400">{item.quantity}x</span>
+											{/if}
+										</div>
+										{#if isServed}
+											<span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-status-green/10 text-status-green">
+												<Check class="w-5 h-5" strokeWidth={3} />
+											</span>
+										{:else}
+											<button
+												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
+												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
+												style="min-height: 48px"
+											>
+												&#10003;
+											</button>
 										{/if}
 									</div>
-									{#if isServed}
-										<span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-status-green/10 text-status-green">
-											<Check class="w-5 h-5" strokeWidth={3} />
-										</span>
-									{:else}
-										<button
-											onclick={() => markItemServed(ticket.orderId, item.id)}
-											class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
-											style="min-height: 48px"
-										>
-											&#10003;
-										</button>
+									{#if isExpanded}
+										{@render itemActions(ticket.orderId, ticket.tableNumber, item.menuItemName)}
 									{/if}
 								</div>
 							{/each}

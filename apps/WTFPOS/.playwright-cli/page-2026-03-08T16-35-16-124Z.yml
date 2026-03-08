@@ -1,0 +1,123 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [active] [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - generic [ref=e14]:
+      - link "Receive Delivery" [ref=e15] [cursor=pointer]:
+        - /url: /stock/deliveries?action=open
+        - img [ref=e16]
+      - link "Log Expense" [ref=e17] [cursor=pointer]:
+        - /url: /reports/expenses-daily?action=open
+        - img [ref=e18]
+      - link "Log Waste" [ref=e19] [cursor=pointer]:
+        - /url: /stock/waste?action=open
+        - img [ref=e20]
+      - link "Stock Count" [ref=e21] [cursor=pointer]:
+        - /url: /stock/counts?action=open
+        - img [ref=e22]
+      - link "X-Reading" [ref=e23] [cursor=pointer]:
+        - /url: /reports/x-read?action=open
+        - img [ref=e24]
+      - link "Transfer Stock" [ref=e25] [cursor=pointer]:
+        - /url: /stock/transfers?action=open
+        - img [ref=e26]
+      - link "End of Day" [ref=e27] [cursor=pointer]:
+        - /url: /reports/eod?action=open
+        - img [ref=e28]
+    - list [ref=e32]:
+      - listitem [ref=e33]:
+        - link "POS" [ref=e34] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e35]
+          - generic: POS
+      - listitem [ref=e39]:
+        - link "Kitchen" [ref=e40] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e41]
+          - generic: Kitchen
+      - listitem [ref=e42]:
+        - link "Stock" [ref=e43] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e44]
+          - generic: Stock
+      - listitem [ref=e45]:
+        - link "Reports" [ref=e46] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e47]
+          - generic: Reports
+    - generic [ref=e48]:
+      - separator [ref=e49]
+      - generic [ref=e51]: J
+      - link "Logout" [ref=e53] [cursor=pointer]:
+        - /url: /
+        - img [ref=e54]
+    - button "Toggle Sidebar" [ref=e57]
+  - main [ref=e58]:
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - img [ref=e61]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e62]
+      - button "Change Location" [ref=e63] [cursor=pointer]:
+        - img [ref=e64]
+        - text: Change Location
+    - generic [ref=e66]:
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - button "Toggle Sidebar" [ref=e70] [cursor=pointer]:
+              - img
+              - generic [ref=e71]: Toggle Sidebar
+            - heading "POS" [level=1] [ref=e72]
+            - generic [ref=e73]: 1 occ
+            - generic [ref=e74]: 7 free
+          - generic [ref=e75]:
+            - button "Toggle color legend" [ref=e77] [cursor=pointer]:
+              - img [ref=e78]
+            - button "📦 New Takeout" [ref=e80] [cursor=pointer]
+            - button "🧾 History 66" [ref=e118] [cursor=pointer]:
+              - text: 🧾 History
+              - generic [ref=e119]: "66"
+        - img [ref=e83]:
+          - button "Table T1" [ref=e120] [cursor=pointer]:
+            - generic: 1m
+            - generic: T1
+            - generic: 2 pax
+          - button "Table T2" [ref=e122] [cursor=pointer]:
+            - generic: T2
+            - generic: cap 4
+          - button "Table T3" [ref=e124] [cursor=pointer]:
+            - generic: T3
+            - generic: cap 4
+          - button "Table T4" [ref=e126] [cursor=pointer]:
+            - generic: T4
+            - generic: cap 4
+          - button "Table T5" [ref=e128] [cursor=pointer]:
+            - generic: T5
+            - generic: cap 4
+          - button "Table T6" [ref=e130] [cursor=pointer]:
+            - generic: T6
+            - generic: cap 4
+          - button "Table T7" [ref=e132] [cursor=pointer]:
+            - generic: T7
+            - generic: cap 2
+          - button "Table T8" [ref=e134] [cursor=pointer]:
+            - generic: T8
+            - generic: cap 2
+      - generic [ref=e86]:
+        - generic [ref=e159]:
+          - generic [ref=e160]:
+            - generic [ref=e161]:
+              - generic [ref=e162]: T1
+              - button "2 pax ✎" [ref=e163] [cursor=pointer]
+              - generic [ref=e164]: 1m
+            - button "✕" [ref=e165] [cursor=pointer]
+          - button "+ Add Item" [ref=e166] [cursor=pointer]
+        - generic [ref=e168]:
+          - generic [ref=e169]:
+            - generic [ref=e170]: BILL
+            - generic [ref=e171]: 0 items
+          - generic [ref=e172]: ₱0.00
+        - generic [ref=e173]:
+          - button "Cancel Table" [ref=e174] [cursor=pointer]
+          - button "Transfer · Pax · Split · Merge" [ref=e175] [cursor=pointer]

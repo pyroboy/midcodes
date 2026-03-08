@@ -1,0 +1,172 @@
+- generic [ref=e2]:
+  - generic [ref=e138]:
+    - generic [ref=e142]:
+      - button "Toggle sidebar" [ref=e145] [cursor=pointer]:
+        - generic [ref=e146]: W!
+      - separator [ref=e147]
+      - generic [ref=e149]:
+        - link "Receive Delivery" [ref=e150] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e151]
+        - link "Log Expense" [ref=e152] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e153]
+        - link "Log Waste" [ref=e154] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e155]
+        - link "Stock Count" [ref=e156] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e157]
+        - link "X-Reading" [ref=e158] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e159]
+        - link "Transfer Stock" [ref=e160] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e161]
+        - link "End of Day" [ref=e162] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e163]
+      - list [ref=e167]:
+        - listitem [ref=e168]:
+          - link "POS" [ref=e169] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e170]
+            - generic: POS
+        - listitem [ref=e171]:
+          - link "Kitchen" [ref=e172] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e173]
+            - generic: Kitchen
+        - listitem [ref=e174]:
+          - link "Stock" [ref=e175] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e176]
+            - generic: Stock
+        - listitem [ref=e177]:
+          - link "Reports" [ref=e178] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e179]
+            - generic: Reports
+      - generic [ref=e180]:
+        - separator [ref=e181]
+        - generic [ref=e183]: J
+        - link "Logout" [ref=e185] [cursor=pointer]:
+          - /url: /
+          - img [ref=e186]
+      - button "Toggle Sidebar" [ref=e187]
+    - main [ref=e188]:
+      - generic [ref=e189]:
+        - generic [ref=e190]:
+          - img [ref=e191]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e192]
+        - button "Change Location" [ref=e193] [cursor=pointer]:
+          - img [ref=e194]
+          - text: Change Location
+      - generic [ref=e279]:
+        - generic [ref=e280]:
+          - heading "Consolidated Reports" [level=1] [ref=e282]
+          - navigation [ref=e283]:
+            - generic [ref=e284]:
+              - generic [ref=e285]: Operations
+              - generic [ref=e286]:
+                - link "Meat Report" [ref=e287] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e288] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e289] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e290] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e291] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e292] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e293] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e295]:
+              - generic [ref=e296]: Expenses
+              - generic [ref=e297]:
+                - link "Daily" [ref=e298] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e299] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e301]:
+              - generic [ref=e302]: Revenue & Sales
+              - generic [ref=e303]:
+                - link "Sales Summary" [ref=e304] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e305] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e306] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e308]:
+              - generic [ref=e309]: Profitability
+              - generic [ref=e310]:
+                - link "Gross Profit" [ref=e311] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e312] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e314]:
+              - generic [ref=e315]: Branch
+              - link "Compare" [ref=e317] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e319]:
+          - generic [ref=e1006]:
+            - button "🥩 Meat Cuts" [ref=e1007] [cursor=pointer]
+            - button "🍚 Add-ons & Drinks" [ref=e1008] [cursor=pointer]
+          - generic [ref=e1009]:
+            - generic [ref=e1010]:
+              - paragraph [ref=e1011]: Total Weighed Out
+              - paragraph [ref=e1012]: 76.4 kg
+            - generic [ref=e1013]:
+              - paragraph [ref=e1014]: Meat Revenue
+              - paragraph [ref=e1015]: ₱65,400.00
+            - generic [ref=e1016]:
+              - paragraph [ref=e1017]: Top Item
+              - paragraph [ref=e1018]: Samgyupsal
+          - table [ref=e1020]:
+            - rowgroup [ref=e1021]:
+              - row "# Meat Cut Weight (g) COGS Revenue Margin" [ref=e1022]:
+                - columnheader "#" [ref=e1023]
+                - columnheader "Meat Cut" [ref=e1024]
+                - columnheader "Weight (g)" [ref=e1025]
+                - columnheader "COGS" [ref=e1026]
+                - columnheader "Revenue" [ref=e1027]
+                - columnheader "Margin" [ref=e1028]
+            - rowgroup [ref=e1029]:
+              - row "1 Samgyupsal 28,400g ₱9,940.00 ₱18,200.00 45.4%" [ref=e1030]:
+                - cell "1" [ref=e1031]
+                - cell "Samgyupsal" [ref=e1032]
+                - cell "28,400g" [ref=e1033]
+                - cell "₱9,940.00" [ref=e1034]
+                - cell "₱18,200.00" [ref=e1035]
+                - cell "45.4%" [ref=e1036]
+              - row "2 Chadolbaegi 18,200g ₱7,644.00 ₱14,800.00 48.4%" [ref=e1037]:
+                - cell "2" [ref=e1038]
+                - cell "Chadolbaegi" [ref=e1039]
+                - cell "18,200g" [ref=e1040]
+                - cell "₱7,644.00" [ref=e1041]
+                - cell "₱14,800.00" [ref=e1042]
+                - cell "48.4%" [ref=e1043]
+              - row "3 US Beef Belly 12,600g ₱7,308.00 ₱16,400.00 55.4%" [ref=e1044]:
+                - cell "3" [ref=e1045]
+                - cell "US Beef Belly" [ref=e1046]
+                - cell "12,600g" [ref=e1047]
+                - cell "₱7,308.00" [ref=e1048]
+                - cell "₱16,400.00" [ref=e1049]
+                - cell "55.4%" [ref=e1050]
+              - row "4 Galbi 9,800g ₱4,704.00 ₱9,200.00 48.9%" [ref=e1051]:
+                - cell "4" [ref=e1052]
+                - cell "Galbi" [ref=e1053]
+                - cell "9,800g" [ref=e1054]
+                - cell "₱4,704.00" [ref=e1055]
+                - cell "₱9,200.00" [ref=e1056]
+                - cell "48.9%" [ref=e1057]
+              - row "5 Woo Samgyup 7,400g ₱2,886.00 ₱6,800.00 57.6%" [ref=e1058]:
+                - cell "5" [ref=e1059]
+                - cell "Woo Samgyup" [ref=e1060]
+                - cell "7,400g" [ref=e1061]
+                - cell "₱2,886.00" [ref=e1062]
+                - cell "₱6,800.00" [ref=e1063]
+                - cell "57.6%" [ref=e1064]
+  - generic [ref=e109]: WTF! Samgyup POS

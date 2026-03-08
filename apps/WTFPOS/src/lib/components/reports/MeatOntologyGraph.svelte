@@ -3,6 +3,7 @@
 	import { MEAT_ONTOLOGY_NODES, DEFAULT_MEAT_EDGES, PROTEIN_ORDER, type MeatProtein, type MeatCutRole } from '$lib/stores/stock.constants';
 	import { getYieldPct, setYieldPct } from '$lib/stores/stock.svelte';
 	import type { MeatReportRow } from '$lib/stores/reports.svelte';
+	import { MANAGER_PIN } from '$lib/stores/session.svelte';
 
 	interface Props {
 		rows: MeatReportRow[];
@@ -106,7 +107,7 @@
 	}
 
 	function confirmEdgeEdit() {
-		if (pinInput !== '1234') {
+		if (pinInput !== MANAGER_PIN) {
 			pinError = true;
 			return;
 		}

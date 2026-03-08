@@ -1,0 +1,152 @@
+- generic [ref=e2]:
+  - button "📡" [ref=e3] [cursor=pointer]
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - button "Toggle sidebar" [ref=e11] [cursor=pointer]:
+        - generic [ref=e12]: W!
+      - separator [ref=e13]
+      - generic [ref=e15]:
+        - link "Receive Delivery" [ref=e16] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e17]
+        - link "Log Expense" [ref=e18] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e19]
+        - link "Log Waste" [ref=e20] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e21]
+        - link "Stock Count" [ref=e22] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e23]
+        - link "X-Reading" [ref=e24] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e25]
+        - link "Transfer Stock" [ref=e26] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e27]
+        - link "End of Day" [ref=e28] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e29]
+      - list [ref=e33]:
+        - listitem [ref=e34]:
+          - link "POS" [ref=e35] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e36]
+            - generic: POS
+        - listitem [ref=e40]:
+          - link "Kitchen" [ref=e41] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e42]
+            - generic: Kitchen
+        - listitem [ref=e43]:
+          - link "Stock" [ref=e44] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e45]
+            - generic: Stock
+        - listitem [ref=e46]:
+          - link "Reports" [ref=e47] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e48]
+            - generic: Reports
+        - listitem [ref=e49]:
+          - link "Admin" [ref=e50] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e51]
+            - generic: Admin
+      - generic [ref=e52]:
+        - separator [ref=e53]
+        - generic [ref=e55]: C
+        - link "Logout" [ref=e57] [cursor=pointer]:
+          - /url: /
+          - img [ref=e58]
+      - button "Toggle Sidebar" [ref=e61]
+    - main [ref=e62]:
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - img [ref=e65]
+          - heading "ALL LOCATIONS" [level=2] [ref=e66]
+        - button "Change Location" [ref=e67] [cursor=pointer]:
+          - img [ref=e68]
+          - text: Change Location
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - generic [ref=e76]: ALL BRANCHES — LIVE
+          - generic [ref=e77]: read only · order taking disabled
+        - generic [ref=e78]:
+          - generic [ref=e79]:
+            - generic [ref=e80]:
+              - generic [ref=e81]: Alta Citta
+              - generic [ref=e82]:
+                - generic [ref=e83]: 0 OCC
+                - generic [ref=e84]: 8 FREE
+                - generic [ref=e85]: ₱4,525.00
+            - img [ref=e87]:
+              - generic [ref=e90]:
+                - generic: T1
+                - generic: free
+              - generic [ref=e92]:
+                - generic: T2
+                - generic: free
+              - generic [ref=e94]:
+                - generic: T3
+                - generic: free
+              - generic [ref=e96]:
+                - generic: T4
+                - generic: free
+              - generic [ref=e98]:
+                - generic: T5
+                - generic: free
+              - generic [ref=e100]:
+                - generic: T6
+                - generic: free
+              - generic [ref=e102]:
+                - generic: T7
+                - generic: free
+              - generic [ref=e104]:
+                - generic: T8
+                - generic: free
+            - generic [ref=e106]:
+              - generic [ref=e107]: Active Orders
+              - generic [ref=e108]:
+                - generic [ref=e109]: T4 · Beef Unlimited · 2p
+                - generic [ref=e110]: ₱1,705.00
+              - generic [ref=e111]:
+                - generic [ref=e112]: T4 · Beef Unlimited · 3p
+                - generic [ref=e113]: ₱2,820.00
+          - generic [ref=e114]:
+            - generic [ref=e115]:
+              - generic [ref=e116]: Alona Beach
+              - generic [ref=e117]:
+                - generic [ref=e118]: 0 OCC
+                - generic [ref=e119]: 8 FREE
+                - generic [ref=e120]: ₱1,705.00
+            - img [ref=e122]:
+              - generic [ref=e125]:
+                - generic: T1
+                - generic: free
+              - generic [ref=e127]:
+                - generic: T2
+                - generic: free
+              - generic [ref=e129]:
+                - generic: T3
+                - generic: free
+              - generic [ref=e131]:
+                - generic: T4
+                - generic: free
+              - generic [ref=e133]:
+                - generic: T5
+                - generic: free
+              - generic [ref=e135]:
+                - generic: T6
+                - generic: free
+              - generic [ref=e137]:
+                - generic: T7
+                - generic: free
+              - generic [ref=e139]:
+                - generic: T8
+                - generic: free
+            - generic [ref=e141]:
+              - generic [ref=e142]: Active Orders
+              - generic [ref=e143]:
+                - generic [ref=e144]: T6 · Beef Unlimited · 2p
+                - generic [ref=e145]: ₱1,705.00

@@ -445,6 +445,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | E2E tests, browser automation, UI interaction | `.claude/skills/playwright-cli/SKILL.md` |
 | UX audit, design review, usability check, layout assessment | `skills/ux-audit/SKILL.md` |
 | Generate role scenarios, implementation assessment, user journeys | `skills/user-scenarios/SKILL.md` |
+| Maturity check, PRD alignment, feature completeness, progress report | `skills/check-maturity/SKILL.md` |
 
 ### By technology keyword
 
@@ -458,6 +459,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | "Bluetooth", "scale", "weight", "GATT", "hardware", "printer" | bluetooth |
 | "UX", "usability", "layout", "design review", "audit", "heuristic", "accessibility check" | ux-audit |
 | "user scenarios", "create scenarios", "generate scenarios", "role journeys", "as manager", "as staff" | user-scenarios |
+| "maturity", "PRD alignment", "how complete", "how mature", "what's missing", "progress report", "readiness" | check-maturity |
 
 ### Skill file locations
 
@@ -469,7 +471,8 @@ skills/
 ├── ably/           SKILL.md + references/ (ABLY_WTFPOS_CHANNELS)
 ├── bluetooth/      SKILL.md + references/ (WEB_BLUETOOTH_GUIDE)
 ├── ux-audit/       SKILL.md + references/ (DESIGN_BIBLE)
-└── user-scenarios/ SKILL.md + references/ (SCENARIO_CONTEXT) + scenarios/ (generated output)
+├── user-scenarios/ SKILL.md + references/ (SCENARIO_CONTEXT) + scenarios/ (generated output)
+└── check-maturity/ SKILL.md + references/ (MATURITY_FRAMEWORK) + reports/ (generated output)
 ```
 
 > **Self-Improvement rule:** When the user corrects something a skill states, update the skill

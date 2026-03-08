@@ -1,0 +1,87 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "Kitchen" [ref=e18] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e19]
+          - generic: Kitchen
+      - listitem [ref=e22]:
+        - link "Stock" [ref=e23] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e24]
+          - generic: Stock
+    - generic [ref=e25]:
+      - separator [ref=e26]
+      - generic [ref=e28]: P
+      - link "Logout" [ref=e30] [cursor=pointer]:
+        - /url: /
+        - img [ref=e31]
+    - button "Toggle Sidebar" [ref=e34]
+  - main [ref=e35]:
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - heading "Stock Management" [level=1] [ref=e40]
+        - navigation [ref=e41]:
+          - link "Inventory" [ref=e42] [cursor=pointer]:
+            - /url: /stock/inventory
+            - img [ref=e43]
+            - text: Inventory
+          - link "Deliveries 1" [ref=e47] [cursor=pointer]:
+            - /url: /stock/deliveries
+            - img [ref=e48]
+            - text: Deliveries
+            - generic [ref=e53]: "1"
+          - link "Transfers" [ref=e54] [cursor=pointer]:
+            - /url: /stock/transfers
+            - img [ref=e55]
+            - text: Transfers
+          - link "Counts 1" [ref=e58] [cursor=pointer]:
+            - /url: /stock/counts
+            - img [ref=e59]
+            - text: Counts
+            - generic [ref=e63]: "1"
+          - link "Waste Log" [ref=e64] [cursor=pointer]:
+            - /url: /stock/waste
+            - img [ref=e65]
+            - text: Waste Log
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - heading "Delivery History & Batches" [level=2] [ref=e72]
+            - paragraph [ref=e73]: Track incoming stock batches, FIFO usage, and expiry.
+          - button "Receive Delivery" [ref=e74] [cursor=pointer]:
+            - img [ref=e75]
+            - text: Receive Delivery
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - img
+            - textbox "Search item, supplier, or batch..." [ref=e78]
+          - generic [ref=e79]:
+            - img [ref=e80]
+            - combobox [ref=e82]:
+              - option "All Dates" [selected]
+              - option "Today"
+              - option "Yesterday"
+              - option "Earlier"
+          - generic [ref=e83]:
+            - img [ref=e84]
+            - combobox [ref=e88]:
+              - option "All Items" [selected]
+          - generic [ref=e89] [cursor=pointer]:
+            - checkbox "Show Depleted" [ref=e90]
+            - generic [ref=e91]: Show Depleted
+        - table [ref=e93]:
+          - rowgroup [ref=e94]:
+            - row "Time Item / Supplier Qty Batch & Expiry FIFO Usage" [ref=e95]:
+              - columnheader "Time" [ref=e96]
+              - columnheader "Item / Supplier" [ref=e97]
+              - columnheader "Qty" [ref=e98]
+              - columnheader "Batch & Expiry" [ref=e99]
+              - columnheader "FIFO Usage" [ref=e100]
+          - rowgroup [ref=e101]:
+            - row "No deliveries found matching the filters." [ref=e102]:
+              - cell "No deliveries found matching the filters." [ref=e103]

@@ -1,0 +1,1723 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - generic [ref=e120]:
+        - link "Receive Delivery" [ref=e121] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e122]
+        - link "Log Expense" [ref=e123] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e124]
+        - link "Log Waste" [ref=e125] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e126]
+        - link "Stock Count" [ref=e127] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e128]
+        - link "X-Reading" [ref=e129] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e130]
+        - link "Transfer Stock" [ref=e131] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e132]
+        - link "End of Day" [ref=e133] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e134]
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e19]
+            - generic: POS
+        - listitem [ref=e135]:
+          - link "Kitchen" [ref=e136] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e137]
+            - generic: Kitchen
+        - listitem [ref=e138]:
+          - link "Stock" [ref=e139] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e140]
+            - generic: Stock
+        - listitem [ref=e141]:
+          - link "Reports" [ref=e142] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e143]
+            - generic: Reports
+      - generic [ref=e23]:
+        - separator [ref=e24]
+        - generic [ref=e26]: J
+        - link "Logout" [ref=e28] [cursor=pointer]:
+          - /url: /
+          - img [ref=e29]
+      - button "Toggle Sidebar" [ref=e32]
+    - main [ref=e33]:
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - img [ref=e146]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e147]
+        - button "Change Location" [ref=e148] [cursor=pointer]:
+          - img [ref=e149]
+          - text: Change Location
+      - generic [ref=e1629]:
+        - generic [ref=e1630]:
+          - heading "Stock Management" [level=1] [ref=e1633]
+          - navigation [ref=e1634]:
+            - link "Inventory" [ref=e1635] [cursor=pointer]:
+              - /url: /stock/inventory
+              - img [ref=e1636]
+              - text: Inventory
+            - link "Deliveries 1" [ref=e1637] [cursor=pointer]:
+              - /url: /stock/deliveries
+              - img [ref=e1638]
+              - text: Deliveries
+              - generic [ref=e1639]: "1"
+            - link "Transfers" [ref=e1640] [cursor=pointer]:
+              - /url: /stock/transfers
+              - img [ref=e1641]
+              - text: Transfers
+            - link "Counts 1" [ref=e1642] [cursor=pointer]:
+              - /url: /stock/counts
+              - img [ref=e1643]
+              - text: Counts
+              - generic [ref=e1644]: "1"
+            - link "Waste Log" [ref=e1645] [cursor=pointer]:
+              - /url: /stock/waste
+              - img [ref=e1646]
+              - text: Waste Log
+        - generic [ref=e1647]:
+          - generic [ref=e1649]:
+            - button "Total Items 93" [ref=e1650] [cursor=pointer]:
+              - generic [ref=e1651]:
+                - img [ref=e1653]
+                - generic [ref=e1654]:
+                  - paragraph [ref=e1655]: Total Items
+                  - paragraph [ref=e1656]: "93"
+            - button "OK 93" [ref=e1657] [cursor=pointer]:
+              - generic [ref=e1659]:
+                - img [ref=e1661]
+                - generic [ref=e1662]:
+                  - paragraph [ref=e1663]: OK
+                  - paragraph [ref=e1664]: "93"
+            - button "Low Stock 0" [ref=e1665] [cursor=pointer]:
+              - generic [ref=e1667]:
+                - img [ref=e1669]
+                - generic [ref=e1670]:
+                  - paragraph [ref=e1671]: Low Stock
+                  - paragraph [ref=e1672]: "0"
+            - button "Critical 0" [ref=e1673] [cursor=pointer]:
+              - generic [ref=e1675]:
+                - img [ref=e1677]
+                - generic [ref=e1678]:
+                  - paragraph [ref=e1679]: Critical
+                  - paragraph [ref=e1680]: "0"
+          - generic [ref=e1681]:
+            - generic [ref=e1682]:
+              - img
+              - textbox "Search items or category…" [ref=e1683]
+            - generic [ref=e1684]:
+              - button "Expand All" [ref=e1685] [cursor=pointer]
+              - button "Collapse All" [ref=e1686] [cursor=pointer]
+            - generic [ref=e1687]:
+              - button "List view" [ref=e1688] [cursor=pointer]:
+                - img [ref=e1689]
+              - button "Grid view" [ref=e1690] [cursor=pointer]:
+                - img [ref=e1691]
+          - table [ref=e1693]:
+            - rowgroup [ref=e1694]:
+              - row "Item ↑ Category Stock Level Current / Min Status" [ref=e1695]:
+                - columnheader [ref=e1696]
+                - columnheader "Item ↑" [ref=e1697] [cursor=pointer]:
+                  - text: Item
+                  - generic [ref=e1698]: ↑
+                - columnheader "Category" [ref=e1699]
+                - columnheader "Stock Level" [ref=e1700]
+                - columnheader "Current / Min" [ref=e1701] [cursor=pointer]: Current / Min
+                - columnheader "Status" [ref=e1702] [cursor=pointer]: Status
+                - columnheader [ref=e1703]
+            - rowgroup [ref=e1704]:
+              - row "Beef (5 items) 27.8k Total Beef Bone-In 9,500 Sliced Beef 8,500 Beef Bone-Out 7,500 + 2 more Variants 5" [ref=e1705]:
+                - cell "Beef (5 items) 27.8k Total Beef Bone-In 9,500 Sliced Beef 8,500 Beef Bone-Out 7,500 + 2 more Variants 5" [ref=e1706]:
+                  - button "Beef (5 items) 27.8k Total Beef Bone-In 9,500 Sliced Beef 8,500 Beef Bone-Out 7,500 + 2 more Variants 5" [ref=e1707] [cursor=pointer]:
+                    - generic [ref=e1709]:
+                      - generic [ref=e1710]: Beef
+                      - generic [ref=e1711]: (5 items)
+                    - generic [ref=e1712]:
+                      - generic [ref=e1714]:
+                        - img [ref=e1715]:
+                          - 'generic "Beef Bone-In: 34%" [ref=e1717]'
+                          - 'generic "Sliced Beef: 31%" [ref=e1718]'
+                          - 'generic "Beef Bone-Out: 27%" [ref=e1719]'
+                          - 'generic "Beef Bones: 5%" [ref=e1720]'
+                          - 'generic "Beef Trimmings: 3%" [ref=e1721]'
+                        - generic:
+                          - generic:
+                            - generic: 27.8k
+                            - generic: Total
+                      - generic [ref=e1722]:
+                        - generic [ref=e1724]: Beef Bone-In
+                        - generic [ref=e1725]: 9,500
+                        - generic [ref=e1727]: Sliced Beef
+                        - generic [ref=e1728]: 8,500
+                        - generic [ref=e1730]: Beef Bone-Out
+                        - generic [ref=e1731]: 7,500
+                        - generic [ref=e1732]: + 2 more
+                    - generic [ref=e1733]:
+                      - generic [ref=e1734]:
+                        - generic [ref=e1735]: Variants
+                        - generic [ref=e1736]: "5"
+                      - img [ref=e1737]
+              - 'row "Beef Bone-In Beef Bone-In Meats 9,500 g Min: 3,000 Well-Stocked 86 Edit Info" [ref=e1738] [cursor=pointer]':
+                - cell "Beef Bone-In" [ref=e1739]:
+                  - img "Beef Bone-In" [ref=e1742]
+                - cell "Beef Bone-In" [ref=e1743]:
+                  - paragraph [ref=e1744]: Beef Bone-In
+                - cell "Meats" [ref=e1745]
+                - cell [ref=e1746]
+                - 'cell "9,500 g Min: 3,000" [ref=e1749]':
+                  - text: 9,500 g
+                  - text: "Min: 3,000"
+                - cell "Well-Stocked" [ref=e1750]
+                - cell "86 Edit Info" [ref=e1751]:
+                  - generic [ref=e1752]:
+                    - button "86" [ref=e1753]
+                    - button "Edit Info" [ref=e1754]:
+                      - img [ref=e1755]
+              - 'row "Beef Bone-Out Beef Bone-Out Meats 7,500 g Min: 3,000 Well-Stocked 86 Edit Info" [ref=e1756] [cursor=pointer]':
+                - cell "Beef Bone-Out" [ref=e1757]:
+                  - img "Beef Bone-Out" [ref=e1760]
+                - cell "Beef Bone-Out" [ref=e1761]:
+                  - paragraph [ref=e1762]: Beef Bone-Out
+                - cell "Meats" [ref=e1763]
+                - cell [ref=e1764]
+                - 'cell "7,500 g Min: 3,000" [ref=e1767]':
+                  - text: 7,500 g
+                  - text: "Min: 3,000"
+                - cell "Well-Stocked" [ref=e1768]
+                - cell "86 Edit Info" [ref=e1769]:
+                  - generic [ref=e1770]:
+                    - button "86" [ref=e1771]
+                    - button "Edit Info" [ref=e1772]:
+                      - img [ref=e1773]
+              - 'row "Beef Bones Beef Bones Meats 1,500 g Min: 1,000 Adequate 86 Edit Info" [ref=e1774] [cursor=pointer]':
+                - cell "Beef Bones" [ref=e1775]:
+                  - img "Beef Bones" [ref=e1778]
+                - cell "Beef Bones" [ref=e1779]:
+                  - paragraph [ref=e1780]: Beef Bones
+                - cell "Meats" [ref=e1781]
+                - cell [ref=e1782]
+                - 'cell "1,500 g Min: 1,000" [ref=e1785]':
+                  - text: 1,500 g
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e1786]
+                - cell "86 Edit Info" [ref=e1787]:
+                  - generic [ref=e1788]:
+                    - button "86" [ref=e1789]
+                    - button "Edit Info" [ref=e1790]:
+                      - img [ref=e1791]
+              - 'row "Beef Trimmings Beef Trimmings Meats 750 g Min: 500 Adequate 86 Edit Info" [ref=e1792] [cursor=pointer]':
+                - cell "Beef Trimmings" [ref=e1793]:
+                  - img "Beef Trimmings" [ref=e1796]
+                - cell "Beef Trimmings" [ref=e1797]:
+                  - paragraph [ref=e1798]: Beef Trimmings
+                - cell "Meats" [ref=e1799]
+                - cell [ref=e1800]
+                - 'cell "750 g Min: 500" [ref=e1803]':
+                  - text: 750 g
+                  - text: "Min: 500"
+                - cell "Adequate" [ref=e1804]
+                - cell "86 Edit Info" [ref=e1805]:
+                  - generic [ref=e1806]:
+                    - button "86" [ref=e1807]
+                    - button "Edit Info" [ref=e1808]:
+                      - img [ref=e1809]
+              - 'row "Sliced Beef Sliced Beef Meats 8,500 g Min: 3,000 Well-Stocked 86 Edit Info" [ref=e1810] [cursor=pointer]':
+                - cell "Sliced Beef" [ref=e1811]:
+                  - img "Sliced Beef" [ref=e1814]
+                - cell "Sliced Beef" [ref=e1815]:
+                  - paragraph [ref=e1816]: Sliced Beef
+                - cell "Meats" [ref=e1817]
+                - cell [ref=e1818]
+                - 'cell "8,500 g Min: 3,000" [ref=e1821]':
+                  - text: 8,500 g
+                  - text: "Min: 3,000"
+                - cell "Well-Stocked" [ref=e1822]
+                - cell "86 Edit Info" [ref=e1823]:
+                  - generic [ref=e1824]:
+                    - button "86" [ref=e1825]
+                    - button "Edit Info" [ref=e1826]:
+                      - img [ref=e1827]
+              - row "Pork (5 items) 50.4k Total Pork Bone-In 20,500 Pork Bone-Out 13,500 Sliced Pork 12,000 + 2 more Variants 5" [ref=e1828]:
+                - cell "Pork (5 items) 50.4k Total Pork Bone-In 20,500 Pork Bone-Out 13,500 Sliced Pork 12,000 + 2 more Variants 5" [ref=e1829]:
+                  - button "Pork (5 items) 50.4k Total Pork Bone-In 20,500 Pork Bone-Out 13,500 Sliced Pork 12,000 + 2 more Variants 5" [ref=e1830] [cursor=pointer]:
+                    - generic [ref=e1832]:
+                      - generic [ref=e1833]: Pork
+                      - generic [ref=e1834]: (5 items)
+                    - generic [ref=e1835]:
+                      - generic [ref=e1837]:
+                        - img [ref=e1838]:
+                          - 'generic "Pork Bone-In: 41%" [ref=e1840]'
+                          - 'generic "Pork Bone-Out: 27%" [ref=e1841]'
+                          - 'generic "Sliced Pork: 24%" [ref=e1842]'
+                          - 'generic "Pork Bones: 6%" [ref=e1843]'
+                          - 'generic "Pork Trimmings: 3%" [ref=e1844]'
+                        - generic:
+                          - generic:
+                            - generic: 50.4k
+                            - generic: Total
+                      - generic [ref=e1845]:
+                        - generic [ref=e1847]: Pork Bone-In
+                        - generic [ref=e1848]: 20,500
+                        - generic [ref=e1850]: Pork Bone-Out
+                        - generic [ref=e1851]: 13,500
+                        - generic [ref=e1853]: Sliced Pork
+                        - generic [ref=e1854]: 12,000
+                        - generic [ref=e1855]: + 2 more
+                    - generic [ref=e1856]:
+                      - generic [ref=e1857]:
+                        - generic [ref=e1858]: Variants
+                        - generic [ref=e1859]: "5"
+                      - img [ref=e1860]
+              - 'row "Pork Bone-In Pork Bone-In Meats 20,500 g Min: 5,000 Well-Stocked 86 Edit Info" [ref=e1861] [cursor=pointer]':
+                - cell "Pork Bone-In" [ref=e1862]:
+                  - img "Pork Bone-In" [ref=e1865]
+                - cell "Pork Bone-In" [ref=e1866]:
+                  - paragraph [ref=e1867]: Pork Bone-In
+                - cell "Meats" [ref=e1868]
+                - cell [ref=e1869]
+                - 'cell "20,500 g Min: 5,000" [ref=e1872]':
+                  - text: 20,500 g
+                  - text: "Min: 5,000"
+                - cell "Well-Stocked" [ref=e1873]
+                - cell "86 Edit Info" [ref=e1874]:
+                  - generic [ref=e1875]:
+                    - button "86" [ref=e1876]
+                    - button "Edit Info" [ref=e1877]:
+                      - img [ref=e1878]
+              - 'row "Pork Bone-Out Pork Bone-Out Meats 13,500 g Min: 5,000 Well-Stocked 86 Edit Info" [ref=e1879] [cursor=pointer]':
+                - cell "Pork Bone-Out" [ref=e1880]:
+                  - img "Pork Bone-Out" [ref=e1883]
+                - cell "Pork Bone-Out" [ref=e1884]:
+                  - paragraph [ref=e1885]: Pork Bone-Out
+                - cell "Meats" [ref=e1886]
+                - cell [ref=e1887]
+                - 'cell "13,500 g Min: 5,000" [ref=e1890]':
+                  - text: 13,500 g
+                  - text: "Min: 5,000"
+                - cell "Well-Stocked" [ref=e1891]
+                - cell "86 Edit Info" [ref=e1892]:
+                  - generic [ref=e1893]:
+                    - button "86" [ref=e1894]
+                    - button "Edit Info" [ref=e1895]:
+                      - img [ref=e1896]
+              - 'row "Pork Bones Pork Bones Meats 2,850 g Min: 2,000 Adequate 86 Edit Info" [ref=e1897] [cursor=pointer]':
+                - cell "Pork Bones" [ref=e1898]:
+                  - img "Pork Bones" [ref=e1901]
+                - cell "Pork Bones" [ref=e1902]:
+                  - paragraph [ref=e1903]: Pork Bones
+                - cell "Meats" [ref=e1904]
+                - cell [ref=e1905]
+                - 'cell "2,850 g Min: 2,000" [ref=e1908]':
+                  - text: 2,850 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e1909]
+                - cell "86 Edit Info" [ref=e1910]:
+                  - generic [ref=e1911]:
+                    - button "86" [ref=e1912]
+                    - button "Edit Info" [ref=e1913]:
+                      - img [ref=e1914]
+              - 'row "Pork Trimmings Pork Trimmings Meats 1,500 g Min: 1,000 Adequate 86 Edit Info" [ref=e1915] [cursor=pointer]':
+                - cell "Pork Trimmings" [ref=e1916]:
+                  - img "Pork Trimmings" [ref=e1919]
+                - cell "Pork Trimmings" [ref=e1920]:
+                  - paragraph [ref=e1921]: Pork Trimmings
+                - cell "Meats" [ref=e1922]
+                - cell [ref=e1923]
+                - 'cell "1,500 g Min: 1,000" [ref=e1926]':
+                  - text: 1,500 g
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e1927]
+                - cell "86 Edit Info" [ref=e1928]:
+                  - generic [ref=e1929]:
+                    - button "86" [ref=e1930]
+                    - button "Edit Info" [ref=e1931]:
+                      - img [ref=e1932]
+              - 'row "Sliced Pork Sliced Pork Meats 12,000 g Min: 5,000 Well-Stocked 86 Edit Info" [ref=e1933] [cursor=pointer]':
+                - cell "Sliced Pork" [ref=e1934]:
+                  - img "Sliced Pork" [ref=e1937]
+                - cell "Sliced Pork" [ref=e1938]:
+                  - paragraph [ref=e1939]: Sliced Pork
+                - cell "Meats" [ref=e1940]
+                - cell [ref=e1941]
+                - 'cell "12,000 g Min: 5,000" [ref=e1944]':
+                  - text: 12,000 g
+                  - text: "Min: 5,000"
+                - cell "Well-Stocked" [ref=e1945]
+                - cell "86 Edit Info" [ref=e1946]:
+                  - generic [ref=e1947]:
+                    - button "86" [ref=e1948]
+                    - button "Edit Info" [ref=e1949]:
+                      - img [ref=e1950]
+              - row "Chicken (2 items) 14.0k Total Chicken Leg 8,000 Chicken Wing 6,000 Variants 2" [ref=e1951]:
+                - cell "Chicken (2 items) 14.0k Total Chicken Leg 8,000 Chicken Wing 6,000 Variants 2" [ref=e1952]:
+                  - button "Chicken (2 items) 14.0k Total Chicken Leg 8,000 Chicken Wing 6,000 Variants 2" [ref=e1953] [cursor=pointer]:
+                    - generic [ref=e1955]:
+                      - generic [ref=e1956]: Chicken
+                      - generic [ref=e1957]: (2 items)
+                    - generic [ref=e1958]:
+                      - generic [ref=e1960]:
+                        - img [ref=e1961]:
+                          - 'generic "Chicken Leg: 57%" [ref=e1963]'
+                          - 'generic "Chicken Wing: 43%" [ref=e1964]'
+                        - generic:
+                          - generic:
+                            - generic: 14.0k
+                            - generic: Total
+                      - generic [ref=e1965]:
+                        - generic [ref=e1967]: Chicken Leg
+                        - generic [ref=e1968]: 8,000
+                        - generic [ref=e1970]: Chicken Wing
+                        - generic [ref=e1971]: 6,000
+                    - generic [ref=e1972]:
+                      - generic [ref=e1973]:
+                        - generic [ref=e1974]: Variants
+                        - generic [ref=e1975]: "2"
+                      - img [ref=e1976]
+              - 'row "Chicken Leg Chicken Leg Meats 8,000 g Min: 2,000 Well-Stocked 86 Edit Info" [ref=e1977] [cursor=pointer]':
+                - cell "Chicken Leg" [ref=e1978]:
+                  - img "Chicken Leg" [ref=e1981]
+                - cell "Chicken Leg" [ref=e1982]:
+                  - paragraph [ref=e1983]: Chicken Leg
+                - cell "Meats" [ref=e1984]
+                - cell [ref=e1985]
+                - 'cell "8,000 g Min: 2,000" [ref=e1988]':
+                  - text: 8,000 g
+                  - text: "Min: 2,000"
+                - cell "Well-Stocked" [ref=e1989]
+                - cell "86 Edit Info" [ref=e1990]:
+                  - generic [ref=e1991]:
+                    - button "86" [ref=e1992]
+                    - button "Edit Info" [ref=e1993]:
+                      - img [ref=e1994]
+              - 'row "Chicken Wing Chicken Wing Meats 6,000 g Min: 2,000 Well-Stocked 86 Edit Info" [ref=e1995] [cursor=pointer]':
+                - cell "Chicken Wing" [ref=e1996]:
+                  - img "Chicken Wing" [ref=e1999]
+                - cell "Chicken Wing" [ref=e2000]:
+                  - paragraph [ref=e2001]: Chicken Wing
+                - cell "Meats" [ref=e2002]
+                - cell [ref=e2003]
+                - 'cell "6,000 g Min: 2,000" [ref=e2006]':
+                  - text: 6,000 g
+                  - text: "Min: 2,000"
+                - cell "Well-Stocked" [ref=e2007]
+                - cell "86 Edit Info" [ref=e2008]:
+                  - generic [ref=e2009]:
+                    - button "86" [ref=e2010]
+                    - button "Edit Info" [ref=e2011]:
+                      - img [ref=e2012]
+              - row "Drinks" [ref=e2013]:
+                - cell "Drinks" [ref=e2014]
+              - 'row "Barley Tea (Boricha) Barley Tea (Boricha) Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2015] [cursor=pointer]':
+                - cell "Barley Tea (Boricha)" [ref=e2016]:
+                  - img "Barley Tea (Boricha)" [ref=e2019]
+                - cell "Barley Tea (Boricha)" [ref=e2020]:
+                  - paragraph [ref=e2021]: Barley Tea (Boricha)
+                - cell "Drinks" [ref=e2022]
+                - cell [ref=e2023]
+                - 'cell "36 bottles Min: 24" [ref=e2026]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2027]
+                - cell "86 Edit Info" [ref=e2028]:
+                  - generic [ref=e2029]:
+                    - button "86" [ref=e2030]
+                    - button "Edit Info" [ref=e2031]:
+                      - img [ref=e2032]
+              - 'row "Cass Cass Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2033] [cursor=pointer]':
+                - cell "Cass" [ref=e2034]:
+                  - img "Cass" [ref=e2037]
+                - cell "Cass" [ref=e2038]:
+                  - paragraph [ref=e2039]: Cass
+                - cell "Drinks" [ref=e2040]
+                - cell [ref=e2041]
+                - 'cell "36 bottles Min: 24" [ref=e2044]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2045]
+                - cell "86 Edit Info" [ref=e2046]:
+                  - generic [ref=e2047]:
+                    - button "86" [ref=e2048]
+                    - button "Edit Info" [ref=e2049]:
+                      - img [ref=e2050]
+              - 'row "Chilsung Cider Chilsung Cider Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2051] [cursor=pointer]':
+                - cell "Chilsung Cider" [ref=e2052]:
+                  - img "Chilsung Cider" [ref=e2055]
+                - cell "Chilsung Cider" [ref=e2056]:
+                  - paragraph [ref=e2057]: Chilsung Cider
+                - cell "Drinks" [ref=e2058]
+                - cell [ref=e2059]
+                - 'cell "36 bottles Min: 24" [ref=e2062]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2063]
+                - cell "86 Edit Info" [ref=e2064]:
+                  - generic [ref=e2065]:
+                    - button "86" [ref=e2066]
+                    - button "Edit Info" [ref=e2067]:
+                      - img [ref=e2068]
+              - 'row "Coca-Cola Coca-Cola Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2069] [cursor=pointer]':
+                - cell "Coca-Cola" [ref=e2070]:
+                  - img "Coca-Cola" [ref=e2073]
+                - cell "Coca-Cola" [ref=e2074]:
+                  - paragraph [ref=e2075]: Coca-Cola
+                - cell "Drinks" [ref=e2076]
+                - cell [ref=e2077]
+                - 'cell "36 bottles Min: 24" [ref=e2080]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2081]
+                - cell "86 Edit Info" [ref=e2082]:
+                  - generic [ref=e2083]:
+                    - button "86" [ref=e2084]
+                    - button "Edit Info" [ref=e2085]:
+                      - img [ref=e2086]
+              - 'row "Coke Zero Coke Zero Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2087] [cursor=pointer]':
+                - cell "Coke Zero" [ref=e2088]:
+                  - img "Coke Zero" [ref=e2091]
+                - cell "Coke Zero" [ref=e2092]:
+                  - paragraph [ref=e2093]: Coke Zero
+                - cell "Drinks" [ref=e2094]
+                - cell [ref=e2095]
+                - 'cell "36 bottles Min: 24" [ref=e2098]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2099]
+                - cell "86 Edit Info" [ref=e2100]:
+                  - generic [ref=e2101]:
+                    - button "86" [ref=e2102]
+                    - button "Edit Info" [ref=e2103]:
+                      - img [ref=e2104]
+              - 'row "Flavored Soju - Grapefruit Flavored Soju - Grapefruit Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2105] [cursor=pointer]':
+                - cell "Flavored Soju - Grapefruit" [ref=e2106]:
+                  - img "Flavored Soju - Grapefruit" [ref=e2109]
+                - cell "Flavored Soju - Grapefruit" [ref=e2110]:
+                  - paragraph [ref=e2111]: Flavored Soju - Grapefruit
+                - cell "Drinks" [ref=e2112]
+                - cell [ref=e2113]
+                - 'cell "36 bottles Min: 24" [ref=e2116]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2117]
+                - cell "86 Edit Info" [ref=e2118]:
+                  - generic [ref=e2119]:
+                    - button "86" [ref=e2120]
+                    - button "Edit Info" [ref=e2121]:
+                      - img [ref=e2122]
+              - 'row "Flavored Soju - Green Grape Flavored Soju - Green Grape Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2123] [cursor=pointer]':
+                - cell "Flavored Soju - Green Grape" [ref=e2124]:
+                  - img "Flavored Soju - Green Grape" [ref=e2127]
+                - cell "Flavored Soju - Green Grape" [ref=e2128]:
+                  - paragraph [ref=e2129]: Flavored Soju - Green Grape
+                - cell "Drinks" [ref=e2130]
+                - cell [ref=e2131]
+                - 'cell "36 bottles Min: 24" [ref=e2134]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2135]
+                - cell "86 Edit Info" [ref=e2136]:
+                  - generic [ref=e2137]:
+                    - button "86" [ref=e2138]
+                    - button "Edit Info" [ref=e2139]:
+                      - img [ref=e2140]
+              - 'row "Flavored Soju - Plum Flavored Soju - Plum Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2141] [cursor=pointer]':
+                - cell "Flavored Soju - Plum" [ref=e2142]:
+                  - img "Flavored Soju - Plum" [ref=e2145]
+                - cell "Flavored Soju - Plum" [ref=e2146]:
+                  - paragraph [ref=e2147]: Flavored Soju - Plum
+                - cell "Drinks" [ref=e2148]
+                - cell [ref=e2149]
+                - 'cell "36 bottles Min: 24" [ref=e2152]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2153]
+                - cell "86 Edit Info" [ref=e2154]:
+                  - generic [ref=e2155]:
+                    - button "86" [ref=e2156]
+                    - button "Edit Info" [ref=e2157]:
+                      - img [ref=e2158]
+              - 'row "Flavored Soju - Strawberry Flavored Soju - Strawberry Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2159] [cursor=pointer]':
+                - cell "Flavored Soju - Strawberry" [ref=e2160]:
+                  - img "Flavored Soju - Strawberry" [ref=e2163]
+                - cell "Flavored Soju - Strawberry" [ref=e2164]:
+                  - paragraph [ref=e2165]: Flavored Soju - Strawberry
+                - cell "Drinks" [ref=e2166]
+                - cell [ref=e2167]
+                - 'cell "36 bottles Min: 24" [ref=e2170]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2171]
+                - cell "86 Edit Info" [ref=e2172]:
+                  - generic [ref=e2173]:
+                    - button "86" [ref=e2174]
+                    - button "Edit Info" [ref=e2175]:
+                      - img [ref=e2176]
+              - 'row "Hite Hite Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2177] [cursor=pointer]':
+                - cell "Hite" [ref=e2178]:
+                  - img "Hite" [ref=e2181]
+                - cell "Hite" [ref=e2182]:
+                  - paragraph [ref=e2183]: Hite
+                - cell "Drinks" [ref=e2184]
+                - cell [ref=e2185]
+                - 'cell "36 bottles Min: 24" [ref=e2188]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2189]
+                - cell "86 Edit Info" [ref=e2190]:
+                  - generic [ref=e2191]:
+                    - button "86" [ref=e2192]
+                    - button "Edit Info" [ref=e2193]:
+                      - img [ref=e2194]
+              - 'row "Iced Red Tea Iced Red Tea Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2195] [cursor=pointer]':
+                - cell "Iced Red Tea" [ref=e2196]:
+                  - img "Iced Red Tea" [ref=e2199]
+                - cell "Iced Red Tea" [ref=e2200]:
+                  - paragraph [ref=e2201]: Iced Red Tea
+                - cell "Drinks" [ref=e2202]
+                - cell [ref=e2203]
+                - 'cell "36 bottles Min: 24" [ref=e2206]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2207]
+                - cell "86 Edit Info" [ref=e2208]:
+                  - generic [ref=e2209]:
+                    - button "86" [ref=e2210]
+                    - button "Edit Info" [ref=e2211]:
+                      - img [ref=e2212]
+              - 'row "Lemonade Lemonade Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2213] [cursor=pointer]':
+                - cell "Lemonade" [ref=e2214]:
+                  - img "Lemonade" [ref=e2217]
+                - cell "Lemonade" [ref=e2218]:
+                  - paragraph [ref=e2219]: Lemonade
+                - cell "Drinks" [ref=e2220]
+                - cell [ref=e2221]
+                - 'cell "36 bottles Min: 24" [ref=e2224]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2225]
+                - cell "86 Edit Info" [ref=e2226]:
+                  - generic [ref=e2227]:
+                    - button "86" [ref=e2228]
+                    - button "Edit Info" [ref=e2229]:
+                      - img [ref=e2230]
+              - 'row "Makgeolli Makgeolli Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2231] [cursor=pointer]':
+                - cell "Makgeolli" [ref=e2232]:
+                  - img "Makgeolli" [ref=e2235]
+                - cell "Makgeolli" [ref=e2236]:
+                  - paragraph [ref=e2237]: Makgeolli
+                - cell "Drinks" [ref=e2238]
+                - cell [ref=e2239]
+                - 'cell "36 bottles Min: 24" [ref=e2242]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2243]
+                - cell "86 Edit Info" [ref=e2244]:
+                  - generic [ref=e2245]:
+                    - button "86" [ref=e2246]
+                    - button "Edit Info" [ref=e2247]:
+                      - img [ref=e2248]
+              - 'row "OB OB Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2249] [cursor=pointer]':
+                - cell "OB" [ref=e2250]:
+                  - img "OB" [ref=e2253]
+                - cell "OB" [ref=e2254]:
+                  - paragraph [ref=e2255]: OB
+                - cell "Drinks" [ref=e2256]
+                - cell [ref=e2257]
+                - 'cell "36 bottles Min: 24" [ref=e2260]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2261]
+                - cell "86 Edit Info" [ref=e2262]:
+                  - generic [ref=e2263]:
+                    - button "86" [ref=e2264]
+                    - button "Edit Info" [ref=e2265]:
+                      - img [ref=e2266]
+              - 'row "Original Soju Original Soju Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2267] [cursor=pointer]':
+                - cell "Original Soju" [ref=e2268]:
+                  - img "Original Soju" [ref=e2271]
+                - cell "Original Soju" [ref=e2272]:
+                  - paragraph [ref=e2273]: Original Soju
+                - cell "Drinks" [ref=e2274]
+                - cell [ref=e2275]
+                - 'cell "36 bottles Min: 24" [ref=e2278]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2279]
+                - cell "86 Edit Info" [ref=e2280]:
+                  - generic [ref=e2281]:
+                    - button "86" [ref=e2282]
+                    - button "Edit Info" [ref=e2283]:
+                      - img [ref=e2284]
+              - 'row "Red Horse Red Horse Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2285] [cursor=pointer]':
+                - cell "Red Horse" [ref=e2286]:
+                  - img "Red Horse" [ref=e2289]
+                - cell "Red Horse" [ref=e2290]:
+                  - paragraph [ref=e2291]: Red Horse
+                - cell "Drinks" [ref=e2292]
+                - cell [ref=e2293]
+                - 'cell "36 bottles Min: 24" [ref=e2296]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2297]
+                - cell "86 Edit Info" [ref=e2298]:
+                  - generic [ref=e2299]:
+                    - button "86" [ref=e2300]
+                    - button "Edit Info" [ref=e2301]:
+                      - img [ref=e2302]
+              - 'row "San Miguel Light San Miguel Light Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2303] [cursor=pointer]':
+                - cell "San Miguel Light" [ref=e2304]:
+                  - img "San Miguel Light" [ref=e2307]
+                - cell "San Miguel Light" [ref=e2308]:
+                  - paragraph [ref=e2309]: San Miguel Light
+                - cell "Drinks" [ref=e2310]
+                - cell [ref=e2311]
+                - 'cell "36 bottles Min: 24" [ref=e2314]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2315]
+                - cell "86 Edit Info" [ref=e2316]:
+                  - generic [ref=e2317]:
+                    - button "86" [ref=e2318]
+                    - button "Edit Info" [ref=e2319]:
+                      - img [ref=e2320]
+              - 'row "San Miguel Pilsen San Miguel Pilsen Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2321] [cursor=pointer]':
+                - cell "San Miguel Pilsen" [ref=e2322]:
+                  - img "San Miguel Pilsen" [ref=e2325]
+                - cell "San Miguel Pilsen" [ref=e2326]:
+                  - paragraph [ref=e2327]: San Miguel Pilsen
+                - cell "Drinks" [ref=e2328]
+                - cell [ref=e2329]
+                - 'cell "36 bottles Min: 24" [ref=e2332]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2333]
+                - cell "86 Edit Info" [ref=e2334]:
+                  - generic [ref=e2335]:
+                    - button "86" [ref=e2336]
+                    - button "Edit Info" [ref=e2337]:
+                      - img [ref=e2338]
+              - 'row "Soju (Original) Soju (Original) Drinks 23 bottles Min: 12 Adequate 86 Edit Info" [ref=e2339] [cursor=pointer]':
+                - cell "Soju (Original)" [ref=e2340]:
+                  - img "Soju (Original)" [ref=e2343]
+                - cell "Soju (Original)" [ref=e2344]:
+                  - paragraph [ref=e2345]: Soju (Original)
+                - cell "Drinks" [ref=e2346]
+                - cell [ref=e2347]
+                - 'cell "23 bottles Min: 12" [ref=e2350]':
+                  - text: 23 bottles
+                  - text: "Min: 12"
+                - cell "Adequate" [ref=e2351]
+                - cell "86 Edit Info" [ref=e2352]:
+                  - generic [ref=e2353]:
+                    - button "86" [ref=e2354]
+                    - button "Edit Info" [ref=e2355]:
+                      - img [ref=e2356]
+              - 'row "Sprite Sprite Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2357] [cursor=pointer]':
+                - cell "Sprite" [ref=e2358]:
+                  - img "Sprite" [ref=e2361]
+                - cell "Sprite" [ref=e2362]:
+                  - paragraph [ref=e2363]: Sprite
+                - cell "Drinks" [ref=e2364]
+                - cell [ref=e2365]
+                - 'cell "36 bottles Min: 24" [ref=e2368]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2369]
+                - cell "86 Edit Info" [ref=e2370]:
+                  - generic [ref=e2371]:
+                    - button "86" [ref=e2372]
+                    - button "Edit Info" [ref=e2373]:
+                      - img [ref=e2374]
+              - 'row "Taedonggang Taedonggang Drinks 36 bottles Min: 24 Adequate 86 Edit Info" [ref=e2375] [cursor=pointer]':
+                - cell "Taedonggang" [ref=e2376]:
+                  - img "Taedonggang" [ref=e2379]
+                - cell "Taedonggang" [ref=e2380]:
+                  - paragraph [ref=e2381]: Taedonggang
+                - cell "Drinks" [ref=e2382]
+                - cell [ref=e2383]
+                - 'cell "36 bottles Min: 24" [ref=e2386]':
+                  - text: 36 bottles
+                  - text: "Min: 24"
+                - cell "Adequate" [ref=e2387]
+                - cell "86 Edit Info" [ref=e2388]:
+                  - generic [ref=e2389]:
+                    - button "86" [ref=e2390]
+                    - button "Edit Info" [ref=e2391]:
+                      - img [ref=e2392]
+              - row "Pantry" [ref=e2393]:
+                - cell "Pantry" [ref=e2394]
+              - 'row "Black Pepper (Ground) Black Pepper (Ground) Pantry 750 g Min: 500 Adequate 86 Edit Info" [ref=e2395] [cursor=pointer]':
+                - cell "Black Pepper (Ground)" [ref=e2396]:
+                  - img "Black Pepper (Ground)" [ref=e2399]
+                - cell "Black Pepper (Ground)" [ref=e2400]:
+                  - paragraph [ref=e2401]: Black Pepper (Ground)
+                - cell "Pantry" [ref=e2402]
+                - cell [ref=e2403]
+                - 'cell "750 g Min: 500" [ref=e2406]':
+                  - text: 750 g
+                  - text: "Min: 500"
+                - cell "Adequate" [ref=e2407]
+                - cell "86 Edit Info" [ref=e2408]:
+                  - generic [ref=e2409]:
+                    - button "86" [ref=e2410]
+                    - button "Edit Info" [ref=e2411]:
+                      - img [ref=e2412]
+              - 'row "Charcoal Charcoal Pantry 30 kg Min: 20 Adequate 86 Edit Info" [ref=e2413] [cursor=pointer]':
+                - cell "Charcoal" [ref=e2414]:
+                  - img "Charcoal" [ref=e2417]
+                - cell "Charcoal" [ref=e2418]:
+                  - paragraph [ref=e2419]: Charcoal
+                - cell "Pantry" [ref=e2420]
+                - cell [ref=e2421]
+                - 'cell "30 kg Min: 20" [ref=e2424]':
+                  - text: 30 kg
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e2425]
+                - cell "86 Edit Info" [ref=e2426]:
+                  - generic [ref=e2427]:
+                    - button "86" [ref=e2428]
+                    - button "Edit Info" [ref=e2429]:
+                      - img [ref=e2430]
+              - 'row "Cooking Oil Cooking Oil Pantry 7,500 ml Min: 5,000 Adequate 86 Edit Info" [ref=e2431] [cursor=pointer]':
+                - cell "Cooking Oil" [ref=e2432]:
+                  - img "Cooking Oil" [ref=e2435]
+                - cell "Cooking Oil" [ref=e2436]:
+                  - paragraph [ref=e2437]: Cooking Oil
+                - cell "Pantry" [ref=e2438]
+                - cell [ref=e2439]
+                - 'cell "7,500 ml Min: 5,000" [ref=e2442]':
+                  - text: 7,500 ml
+                  - text: "Min: 5,000"
+                - cell "Adequate" [ref=e2443]
+                - cell "86 Edit Info" [ref=e2444]:
+                  - generic [ref=e2445]:
+                    - button "86" [ref=e2446]
+                    - button "Edit Info" [ref=e2447]:
+                      - img [ref=e2448]
+              - 'row "Cornstarch Cornstarch Pantry 1,500 g Min: 1,000 Adequate 86 Edit Info" [ref=e2449] [cursor=pointer]':
+                - cell "Cornstarch" [ref=e2450]:
+                  - img "Cornstarch" [ref=e2453]
+                - cell "Cornstarch" [ref=e2454]:
+                  - paragraph [ref=e2455]: Cornstarch
+                - cell "Pantry" [ref=e2456]
+                - cell [ref=e2457]
+                - 'cell "1,500 g Min: 1,000" [ref=e2460]':
+                  - text: 1,500 g
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e2461]
+                - cell "86 Edit Info" [ref=e2462]:
+                  - generic [ref=e2463]:
+                    - button "86" [ref=e2464]
+                    - button "Edit Info" [ref=e2465]:
+                      - img [ref=e2466]
+              - 'row "Dangmyeon (Glass Noodles) Dangmyeon (Glass Noodles) Pantry 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2467] [cursor=pointer]':
+                - cell "Dangmyeon (Glass Noodles)" [ref=e2468]:
+                  - img "Dangmyeon (Glass Noodles)" [ref=e2471]
+                - cell "Dangmyeon (Glass Noodles)" [ref=e2472]:
+                  - paragraph [ref=e2473]: Dangmyeon (Glass Noodles)
+                - cell "Pantry" [ref=e2474]
+                - cell [ref=e2475]
+                - 'cell "3,000 g Min: 2,000" [ref=e2478]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2479]
+                - cell "86 Edit Info" [ref=e2480]:
+                  - generic [ref=e2481]:
+                    - button "86" [ref=e2482]
+                    - button "Edit Info" [ref=e2483]:
+                      - img [ref=e2484]
+              - 'row "Dried Seaweed (Gim) Dried Seaweed (Gim) Pantry 30 packs Min: 20 Adequate 86 Edit Info" [ref=e2485] [cursor=pointer]':
+                - cell "Dried Seaweed (Gim)" [ref=e2486]:
+                  - img "Dried Seaweed (Gim)" [ref=e2489]
+                - cell "Dried Seaweed (Gim)" [ref=e2490]:
+                  - paragraph [ref=e2491]: Dried Seaweed (Gim)
+                - cell "Pantry" [ref=e2492]
+                - cell [ref=e2493]
+                - 'cell "30 packs Min: 20" [ref=e2496]':
+                  - text: 30 packs
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e2497]
+                - cell "86 Edit Info" [ref=e2498]:
+                  - generic [ref=e2499]:
+                    - button "86" [ref=e2500]
+                    - button "Edit Info" [ref=e2501]:
+                      - img [ref=e2502]
+              - 'row "Eggs Eggs Pantry 90 pcs Min: 60 Adequate 86 Edit Info" [ref=e2503] [cursor=pointer]':
+                - cell "Eggs" [ref=e2504]:
+                  - img "Eggs" [ref=e2507]
+                - cell "Eggs" [ref=e2508]:
+                  - paragraph [ref=e2509]: Eggs
+                - cell "Pantry" [ref=e2510]
+                - cell [ref=e2511]
+                - 'cell "90 pcs Min: 60" [ref=e2514]':
+                  - text: 90 pcs
+                  - text: "Min: 60"
+                - cell "Adequate" [ref=e2515]
+                - cell "86 Edit Info" [ref=e2516]:
+                  - generic [ref=e2517]:
+                    - button "86" [ref=e2518]
+                    - button "Edit Info" [ref=e2519]:
+                      - img [ref=e2520]
+              - 'row "Flour Flour Pantry 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2521] [cursor=pointer]':
+                - cell "Flour" [ref=e2522]:
+                  - img "Flour" [ref=e2525]
+                - cell "Flour" [ref=e2526]:
+                  - paragraph [ref=e2527]: Flour
+                - cell "Pantry" [ref=e2528]
+                - cell [ref=e2529]
+                - 'cell "3,000 g Min: 2,000" [ref=e2532]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2533]
+                - cell "86 Edit Info" [ref=e2534]:
+                  - generic [ref=e2535]:
+                    - button "86" [ref=e2536]
+                    - button "Edit Info" [ref=e2537]:
+                      - img [ref=e2538]
+              - 'row "Raw Rice (Uncooked) Raw Rice (Uncooked) Pantry 38 kg Min: 25 Adequate 86 Edit Info" [ref=e2539] [cursor=pointer]':
+                - cell "Raw Rice (Uncooked)" [ref=e2540]:
+                  - img "Raw Rice (Uncooked)" [ref=e2543]
+                - cell "Raw Rice (Uncooked)" [ref=e2544]:
+                  - paragraph [ref=e2545]: Raw Rice (Uncooked)
+                - cell "Pantry" [ref=e2546]
+                - cell [ref=e2547]
+                - 'cell "38 kg Min: 25" [ref=e2550]':
+                  - text: 38 kg
+                  - text: "Min: 25"
+                - cell "Adequate" [ref=e2551]
+                - cell "86 Edit Info" [ref=e2552]:
+                  - generic [ref=e2553]:
+                    - button "86" [ref=e2554]
+                    - button "Edit Info" [ref=e2555]:
+                      - img [ref=e2556]
+              - 'row "Salt Salt Pantry 4,500 g Min: 3,000 Adequate 86 Edit Info" [ref=e2557] [cursor=pointer]':
+                - cell "Salt" [ref=e2558]:
+                  - img "Salt" [ref=e2561]
+                - cell "Salt" [ref=e2562]:
+                  - paragraph [ref=e2563]: Salt
+                - cell "Pantry" [ref=e2564]
+                - cell [ref=e2565]
+                - 'cell "4,500 g Min: 3,000" [ref=e2568]':
+                  - text: 4,500 g
+                  - text: "Min: 3,000"
+                - cell "Adequate" [ref=e2569]
+                - cell "86 Edit Info" [ref=e2570]:
+                  - generic [ref=e2571]:
+                    - button "86" [ref=e2572]
+                    - button "Edit Info" [ref=e2573]:
+                      - img [ref=e2574]
+              - 'row "Sesame Seeds (Roasted) Sesame Seeds (Roasted) Pantry 1,500 g Min: 1,000 Adequate 86 Edit Info" [ref=e2575] [cursor=pointer]':
+                - cell "Sesame Seeds (Roasted)" [ref=e2576]:
+                  - img "Sesame Seeds (Roasted)" [ref=e2579]
+                - cell "Sesame Seeds (Roasted)" [ref=e2580]:
+                  - paragraph [ref=e2581]: Sesame Seeds (Roasted)
+                - cell "Pantry" [ref=e2582]
+                - cell [ref=e2583]
+                - 'cell "1,500 g Min: 1,000" [ref=e2586]':
+                  - text: 1,500 g
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e2587]
+                - cell "86 Edit Info" [ref=e2588]:
+                  - generic [ref=e2589]:
+                    - button "86" [ref=e2590]
+                    - button "Edit Info" [ref=e2591]:
+                      - img [ref=e2592]
+              - 'row "Sugar Sugar Pantry 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2593] [cursor=pointer]':
+                - cell "Sugar" [ref=e2594]:
+                  - img "Sugar" [ref=e2597]
+                - cell "Sugar" [ref=e2598]:
+                  - paragraph [ref=e2599]: Sugar
+                - cell "Pantry" [ref=e2600]
+                - cell [ref=e2601]
+                - 'cell "3,000 g Min: 2,000" [ref=e2604]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2605]
+                - cell "86 Edit Info" [ref=e2606]:
+                  - generic [ref=e2607]:
+                    - button "86" [ref=e2608]
+                    - button "Edit Info" [ref=e2609]:
+                      - img [ref=e2610]
+              - 'row "Tofu Tofu Pantry 15 blocks Min: 10 Adequate 86 Edit Info" [ref=e2611] [cursor=pointer]':
+                - cell "Tofu" [ref=e2612]:
+                  - img "Tofu" [ref=e2615]
+                - cell "Tofu" [ref=e2616]:
+                  - paragraph [ref=e2617]: Tofu
+                - cell "Pantry" [ref=e2618]
+                - cell [ref=e2619]
+                - 'cell "15 blocks Min: 10" [ref=e2622]':
+                  - text: 15 blocks
+                  - text: "Min: 10"
+                - cell "Adequate" [ref=e2623]
+                - cell "86 Edit Info" [ref=e2624]:
+                  - generic [ref=e2625]:
+                    - button "86" [ref=e2626]
+                    - button "Edit Info" [ref=e2627]:
+                      - img [ref=e2628]
+              - 'row "Tteok (Rice Cakes) Tteok (Rice Cakes) Pantry 4,500 g Min: 3,000 Adequate 86 Edit Info" [ref=e2629] [cursor=pointer]':
+                - cell "Tteok (Rice Cakes)" [ref=e2630]:
+                  - img "Tteok (Rice Cakes)" [ref=e2633]
+                - cell "Tteok (Rice Cakes)" [ref=e2634]:
+                  - paragraph [ref=e2635]: Tteok (Rice Cakes)
+                - cell "Pantry" [ref=e2636]
+                - cell [ref=e2637]
+                - 'cell "4,500 g Min: 3,000" [ref=e2640]':
+                  - text: 4,500 g
+                  - text: "Min: 3,000"
+                - cell "Adequate" [ref=e2641]
+                - cell "86 Edit Info" [ref=e2642]:
+                  - generic [ref=e2643]:
+                    - button "86" [ref=e2644]
+                    - button "Edit Info" [ref=e2645]:
+                      - img [ref=e2646]
+              - 'row "Vinegar Vinegar Pantry 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e2647] [cursor=pointer]':
+                - cell "Vinegar" [ref=e2648]:
+                  - img "Vinegar" [ref=e2651]
+                - cell "Vinegar" [ref=e2652]:
+                  - paragraph [ref=e2653]: Vinegar
+                - cell "Pantry" [ref=e2654]
+                - cell [ref=e2655]
+                - 'cell "3,000 ml Min: 2,000" [ref=e2658]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2659]
+                - cell "86 Edit Info" [ref=e2660]:
+                  - generic [ref=e2661]:
+                    - button "86" [ref=e2662]
+                    - button "Edit Info" [ref=e2663]:
+                      - img [ref=e2664]
+              - row "Sides" [ref=e2665]:
+                - cell "Sides" [ref=e2666]
+              - 'row "Aekjeot (Fish Sauce) Aekjeot (Fish Sauce) Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e2667] [cursor=pointer]':
+                - cell "Aekjeot (Fish Sauce)" [ref=e2668]:
+                  - img "Aekjeot (Fish Sauce)" [ref=e2671]
+                - cell "Aekjeot (Fish Sauce)" [ref=e2672]:
+                  - paragraph [ref=e2673]: Aekjeot (Fish Sauce)
+                - cell "Sides" [ref=e2674]
+                - cell [ref=e2675]
+                - 'cell "3,000 ml Min: 2,000" [ref=e2678]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2679]
+                - cell "86 Edit Info" [ref=e2680]:
+                  - generic [ref=e2681]:
+                    - button "86" [ref=e2682]
+                    - button "Edit Info" [ref=e2683]:
+                      - img [ref=e2684]
+              - 'row "Baechu Kimchi Baechu Kimchi Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e2685] [cursor=pointer]':
+                - cell "Baechu Kimchi" [ref=e2686]:
+                  - img "Baechu Kimchi" [ref=e2689]
+                - cell "Baechu Kimchi" [ref=e2690]:
+                  - paragraph [ref=e2691]: Baechu Kimchi
+                - cell "Sides" [ref=e2692]
+                - cell [ref=e2693]
+                - 'cell "30 portions Min: 20" [ref=e2696]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e2697]
+                - cell "86 Edit Info" [ref=e2698]:
+                  - generic [ref=e2699]:
+                    - button "86" [ref=e2700]
+                    - button "Edit Info" [ref=e2701]:
+                      - img [ref=e2702]
+              - 'row "Baguio Pechay Baguio Pechay Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2703] [cursor=pointer]':
+                - cell "Baguio Pechay" [ref=e2704]:
+                  - img "Baguio Pechay" [ref=e2707]
+                - cell "Baguio Pechay" [ref=e2708]:
+                  - paragraph [ref=e2709]: Baguio Pechay
+                - cell "Sides" [ref=e2710]
+                - cell [ref=e2711]
+                - 'cell "3,000 g Min: 2,000" [ref=e2714]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2715]
+                - cell "86 Edit Info" [ref=e2716]:
+                  - generic [ref=e2717]:
+                    - button "86" [ref=e2718]
+                    - button "Edit Info" [ref=e2719]:
+                      - img [ref=e2720]
+              - 'row "Button Mushrooms Button Mushrooms Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2721] [cursor=pointer]':
+                - cell "Button Mushrooms" [ref=e2722]:
+                  - img "Button Mushrooms" [ref=e2725]
+                - cell "Button Mushrooms" [ref=e2726]:
+                  - paragraph [ref=e2727]: Button Mushrooms
+                - cell "Sides" [ref=e2728]
+                - cell [ref=e2729]
+                - 'cell "3,000 g Min: 2,000" [ref=e2732]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2733]
+                - cell "86 Edit Info" [ref=e2734]:
+                  - generic [ref=e2735]:
+                    - button "86" [ref=e2736]
+                    - button "Edit Info" [ref=e2737]:
+                      - img [ref=e2738]
+              - 'row "Cheese Sauce Cheese Sauce Sides 1,500 ml Min: 1,000 Adequate 86 Edit Info" [ref=e2739] [cursor=pointer]':
+                - cell "Cheese Sauce" [ref=e2740]:
+                  - img "Cheese Sauce" [ref=e2743]
+                - cell "Cheese Sauce" [ref=e2744]:
+                  - paragraph [ref=e2745]: Cheese Sauce
+                - cell "Sides" [ref=e2746]
+                - cell [ref=e2747]
+                - 'cell "1,500 ml Min: 1,000" [ref=e2750]':
+                  - text: 1,500 ml
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e2751]
+                - cell "86 Edit Info" [ref=e2752]:
+                  - generic [ref=e2753]:
+                    - button "86" [ref=e2754]
+                    - button "Edit Info" [ref=e2755]:
+                      - img [ref=e2756]
+              - 'row "Cheesy Tteokbokki Cheesy Tteokbokki Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e2757] [cursor=pointer]':
+                - cell "Cheesy Tteokbokki" [ref=e2758]:
+                  - img "Cheesy Tteokbokki" [ref=e2761]
+                - cell "Cheesy Tteokbokki" [ref=e2762]:
+                  - paragraph [ref=e2763]: Cheesy Tteokbokki
+                - cell "Sides" [ref=e2764]
+                - cell [ref=e2765]
+                - 'cell "30 portions Min: 20" [ref=e2768]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e2769]
+                - cell "86 Edit Info" [ref=e2770]:
+                  - generic [ref=e2771]:
+                    - button "86" [ref=e2772]
+                    - button "Edit Info" [ref=e2773]:
+                      - img [ref=e2774]
+              - 'row "Corn Corn Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2775] [cursor=pointer]':
+                - cell "Corn" [ref=e2776]:
+                  - img "Corn" [ref=e2779]
+                - cell "Corn" [ref=e2780]:
+                  - paragraph [ref=e2781]: Corn
+                - cell "Sides" [ref=e2782]
+                - cell [ref=e2783]
+                - 'cell "3,000 g Min: 2,000" [ref=e2786]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2787]
+                - cell "86 Edit Info" [ref=e2788]:
+                  - generic [ref=e2789]:
+                    - button "86" [ref=e2790]
+                    - button "Edit Info" [ref=e2791]:
+                      - img [ref=e2792]
+              - 'row "Dasida (Beef Stock Powder) Dasida (Beef Stock Powder) Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e2793] [cursor=pointer]':
+                - cell "Dasida (Beef Stock Powder)" [ref=e2794]:
+                  - img "Dasida (Beef Stock Powder)" [ref=e2797]
+                - cell "Dasida (Beef Stock Powder)" [ref=e2798]:
+                  - paragraph [ref=e2799]: Dasida (Beef Stock Powder)
+                - cell "Sides" [ref=e2800]
+                - cell [ref=e2801]
+                - 'cell "3,000 ml Min: 2,000" [ref=e2804]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2805]
+                - cell "86 Edit Info" [ref=e2806]:
+                  - generic [ref=e2807]:
+                    - button "86" [ref=e2808]
+                    - button "Edit Info" [ref=e2809]:
+                      - img [ref=e2810]
+              - 'row "Doenjang Doenjang Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2811] [cursor=pointer]':
+                - cell "Doenjang" [ref=e2812]:
+                  - img "Doenjang" [ref=e2815]
+                - cell "Doenjang" [ref=e2816]:
+                  - paragraph [ref=e2817]: Doenjang
+                - cell "Sides" [ref=e2818]
+                - cell [ref=e2819]
+                - 'cell "3,000 g Min: 2,000" [ref=e2822]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2823]
+                - cell "86 Edit Info" [ref=e2824]:
+                  - generic [ref=e2825]:
+                    - button "86" [ref=e2826]
+                    - button "Edit Info" [ref=e2827]:
+                      - img [ref=e2828]
+              - 'row "Enoki Mushrooms Enoki Mushrooms Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2829] [cursor=pointer]':
+                - cell "Enoki Mushrooms" [ref=e2830]:
+                  - img "Enoki Mushrooms" [ref=e2833]
+                - cell "Enoki Mushrooms" [ref=e2834]:
+                  - paragraph [ref=e2835]: Enoki Mushrooms
+                - cell "Sides" [ref=e2836]
+                - cell [ref=e2837]
+                - 'cell "3,000 g Min: 2,000" [ref=e2840]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2841]
+                - cell "86 Edit Info" [ref=e2842]:
+                  - generic [ref=e2843]:
+                    - button "86" [ref=e2844]
+                    - button "Edit Info" [ref=e2845]:
+                      - img [ref=e2846]
+              - 'row "Eomuk Bokkeum Eomuk Bokkeum Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e2847] [cursor=pointer]':
+                - cell "Eomuk Bokkeum" [ref=e2848]:
+                  - img "Eomuk Bokkeum" [ref=e2851]
+                - cell "Eomuk Bokkeum" [ref=e2852]:
+                  - paragraph [ref=e2853]: Eomuk Bokkeum
+                - cell "Sides" [ref=e2854]
+                - cell [ref=e2855]
+                - 'cell "30 portions Min: 20" [ref=e2858]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e2859]
+                - cell "86 Edit Info" [ref=e2860]:
+                  - generic [ref=e2861]:
+                    - button "86" [ref=e2862]
+                    - button "Edit Info" [ref=e2863]:
+                      - img [ref=e2864]
+              - 'row "Gamja Jorim Gamja Jorim Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e2865] [cursor=pointer]':
+                - cell "Gamja Jorim" [ref=e2866]:
+                  - img "Gamja Jorim" [ref=e2869]
+                - cell "Gamja Jorim" [ref=e2870]:
+                  - paragraph [ref=e2871]: Gamja Jorim
+                - cell "Sides" [ref=e2872]
+                - cell [ref=e2873]
+                - 'cell "30 portions Min: 20" [ref=e2876]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e2877]
+                - cell "86 Edit Info" [ref=e2878]:
+                  - generic [ref=e2879]:
+                    - button "86" [ref=e2880]
+                    - button "Edit Info" [ref=e2881]:
+                      - img [ref=e2882]
+              - 'row "Gamja Salad Gamja Salad Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e2883] [cursor=pointer]':
+                - cell "Gamja Salad" [ref=e2884]:
+                  - img "Gamja Salad" [ref=e2887]
+                - cell "Gamja Salad" [ref=e2888]:
+                  - paragraph [ref=e2889]: Gamja Salad
+                - cell "Sides" [ref=e2890]
+                - cell [ref=e2891]
+                - 'cell "30 portions Min: 20" [ref=e2894]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e2895]
+                - cell "86 Edit Info" [ref=e2896]:
+                  - generic [ref=e2897]:
+                    - button "86" [ref=e2898]
+                    - button "Edit Info" [ref=e2899]:
+                      - img [ref=e2900]
+              - 'row "Garlic (Sliced) Garlic (Sliced) Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2901] [cursor=pointer]':
+                - cell "Garlic (Sliced)" [ref=e2902]:
+                  - img "Garlic (Sliced)" [ref=e2905]
+                - cell "Garlic (Sliced)" [ref=e2906]:
+                  - paragraph [ref=e2907]: Garlic (Sliced)
+                - cell "Sides" [ref=e2908]
+                - cell [ref=e2909]
+                - 'cell "3,000 g Min: 2,000" [ref=e2912]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2913]
+                - cell "86 Edit Info" [ref=e2914]:
+                  - generic [ref=e2915]:
+                    - button "86" [ref=e2916]
+                    - button "Edit Info" [ref=e2917]:
+                      - img [ref=e2918]
+              - 'row "Garlic (Whole Cloves) Garlic (Whole Cloves) Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2919] [cursor=pointer]':
+                - cell "Garlic (Whole Cloves)" [ref=e2920]:
+                  - img "Garlic (Whole Cloves)" [ref=e2923]
+                - cell "Garlic (Whole Cloves)" [ref=e2924]:
+                  - paragraph [ref=e2925]: Garlic (Whole Cloves)
+                - cell "Sides" [ref=e2926]
+                - cell [ref=e2927]
+                - 'cell "3,000 g Min: 2,000" [ref=e2930]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2931]
+                - cell "86 Edit Info" [ref=e2932]:
+                  - generic [ref=e2933]:
+                    - button "86" [ref=e2934]
+                    - button "Edit Info" [ref=e2935]:
+                      - img [ref=e2936]
+              - 'row "Gochugaru (Coarse) Gochugaru (Coarse) Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2937] [cursor=pointer]':
+                - cell "Gochugaru (Coarse)" [ref=e2938]:
+                  - img "Gochugaru (Coarse)" [ref=e2941]
+                - cell "Gochugaru (Coarse)" [ref=e2942]:
+                  - paragraph [ref=e2943]: Gochugaru (Coarse)
+                - cell "Sides" [ref=e2944]
+                - cell [ref=e2945]
+                - 'cell "3,000 g Min: 2,000" [ref=e2948]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2949]
+                - cell "86 Edit Info" [ref=e2950]:
+                  - generic [ref=e2951]:
+                    - button "86" [ref=e2952]
+                    - button "Edit Info" [ref=e2953]:
+                      - img [ref=e2954]
+              - 'row "Gochugaru (Fine) Gochugaru (Fine) Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2955] [cursor=pointer]':
+                - cell "Gochugaru (Fine)" [ref=e2956]:
+                  - img "Gochugaru (Fine)" [ref=e2959]
+                - cell "Gochugaru (Fine)" [ref=e2960]:
+                  - paragraph [ref=e2961]: Gochugaru (Fine)
+                - cell "Sides" [ref=e2962]
+                - cell [ref=e2963]
+                - 'cell "3,000 g Min: 2,000" [ref=e2966]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2967]
+                - cell "86 Edit Info" [ref=e2968]:
+                  - generic [ref=e2969]:
+                    - button "86" [ref=e2970]
+                    - button "Edit Info" [ref=e2971]:
+                      - img [ref=e2972]
+              - 'row "Gochujang Gochujang Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2973] [cursor=pointer]':
+                - cell "Gochujang" [ref=e2974]:
+                  - img "Gochujang" [ref=e2977]
+                - cell "Gochujang" [ref=e2978]:
+                  - paragraph [ref=e2979]: Gochujang
+                - cell "Sides" [ref=e2980]
+                - cell [ref=e2981]
+                - 'cell "3,000 g Min: 2,000" [ref=e2984]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e2985]
+                - cell "86 Edit Info" [ref=e2986]:
+                  - generic [ref=e2987]:
+                    - button "86" [ref=e2988]
+                    - button "Edit Info" [ref=e2989]:
+                      - img [ref=e2990]
+              - 'row "Green Onions / Scallions Green Onions / Scallions Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e2991] [cursor=pointer]':
+                - cell "Green Onions / Scallions" [ref=e2992]:
+                  - img "Green Onions / Scallions" [ref=e2995]
+                - cell "Green Onions / Scallions" [ref=e2996]:
+                  - paragraph [ref=e2997]: Green Onions / Scallions
+                - cell "Sides" [ref=e2998]
+                - cell [ref=e2999]
+                - 'cell "3,000 g Min: 2,000" [ref=e3002]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3003]
+                - cell "86 Edit Info" [ref=e3004]:
+                  - generic [ref=e3005]:
+                    - button "86" [ref=e3006]
+                    - button "Edit Info" [ref=e3007]:
+                      - img [ref=e3008]
+              - 'row "Guk-ganjang (Soup Soy Sauce) Guk-ganjang (Soup Soy Sauce) Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e3009] [cursor=pointer]':
+                - cell "Guk-ganjang (Soup Soy Sauce)" [ref=e3010]:
+                  - img "Guk-ganjang (Soup Soy Sauce)" [ref=e3013]
+                - cell "Guk-ganjang (Soup Soy Sauce)" [ref=e3014]:
+                  - paragraph [ref=e3015]: Guk-ganjang (Soup Soy Sauce)
+                - cell "Sides" [ref=e3016]
+                - cell [ref=e3017]
+                - 'cell "3,000 ml Min: 2,000" [ref=e3020]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3021]
+                - cell "86 Edit Info" [ref=e3022]:
+                  - generic [ref=e3023]:
+                    - button "86" [ref=e3024]
+                    - button "Edit Info" [ref=e3025]:
+                      - img [ref=e3026]
+              - 'row "Gyeran-jjim Gyeran-jjim Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3027] [cursor=pointer]':
+                - cell "Gyeran-jjim" [ref=e3028]:
+                  - img "Gyeran-jjim" [ref=e3031]
+                - cell "Gyeran-jjim" [ref=e3032]:
+                  - paragraph [ref=e3033]: Gyeran-jjim
+                - cell "Sides" [ref=e3034]
+                - cell [ref=e3035]
+                - 'cell "30 portions Min: 20" [ref=e3038]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3039]
+                - cell "86 Edit Info" [ref=e3040]:
+                  - generic [ref=e3041]:
+                    - button "86" [ref=e3042]
+                    - button "Edit Info" [ref=e3043]:
+                      - img [ref=e3044]
+              - 'row "Jalapeño / Green Chilies Jalapeño / Green Chilies Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e3045] [cursor=pointer]':
+                - cell "Jalapeño / Green Chilies" [ref=e3046]:
+                  - img "Jalapeño / Green Chilies" [ref=e3049]
+                - cell "Jalapeño / Green Chilies" [ref=e3050]:
+                  - paragraph [ref=e3051]: Jalapeño / Green Chilies
+                - cell "Sides" [ref=e3052]
+                - cell [ref=e3053]
+                - 'cell "3,000 g Min: 2,000" [ref=e3056]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3057]
+                - cell "86 Edit Info" [ref=e3058]:
+                  - generic [ref=e3059]:
+                    - button "86" [ref=e3060]
+                    - button "Edit Info" [ref=e3061]:
+                      - img [ref=e3062]
+              - 'row "Japchae Japchae Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3063] [cursor=pointer]':
+                - cell "Japchae" [ref=e3064]:
+                  - img "Japchae" [ref=e3067]
+                - cell "Japchae" [ref=e3068]:
+                  - paragraph [ref=e3069]: Japchae
+                - cell "Sides" [ref=e3070]
+                - cell [ref=e3071]
+                - 'cell "30 portions Min: 20" [ref=e3074]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3075]
+                - cell "86 Edit Info" [ref=e3076]:
+                  - generic [ref=e3077]:
+                    - button "86" [ref=e3078]
+                    - button "Edit Info" [ref=e3079]:
+                      - img [ref=e3080]
+              - 'row "Jin-ganjang (Dark Soy Sauce) Jin-ganjang (Dark Soy Sauce) Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e3081] [cursor=pointer]':
+                - cell "Jin-ganjang (Dark Soy Sauce)" [ref=e3082]:
+                  - img "Jin-ganjang (Dark Soy Sauce)" [ref=e3085]
+                - cell "Jin-ganjang (Dark Soy Sauce)" [ref=e3086]:
+                  - paragraph [ref=e3087]: Jin-ganjang (Dark Soy Sauce)
+                - cell "Sides" [ref=e3088]
+                - cell [ref=e3089]
+                - 'cell "3,000 ml Min: 2,000" [ref=e3092]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3093]
+                - cell "86 Edit Info" [ref=e3094]:
+                  - generic [ref=e3095]:
+                    - button "86" [ref=e3096]
+                    - button "Edit Info" [ref=e3097]:
+                      - img [ref=e3098]
+              - 'row "Kimchi Kimchi Sides 25 portions Min: 10 Well-Stocked 86 Edit Info" [ref=e3099] [cursor=pointer]':
+                - cell "Kimchi" [ref=e3100]:
+                  - img "Kimchi" [ref=e3103]
+                - cell "Kimchi" [ref=e3104]:
+                  - paragraph [ref=e3105]: Kimchi
+                - cell "Sides" [ref=e3106]
+                - cell [ref=e3107]
+                - 'cell "25 portions Min: 10" [ref=e3110]':
+                  - text: 25 portions
+                  - text: "Min: 10"
+                - cell "Well-Stocked" [ref=e3111]
+                - cell "86 Edit Info" [ref=e3112]:
+                  - generic [ref=e3113]:
+                    - button "86" [ref=e3114]
+                    - button "Edit Info" [ref=e3115]:
+                      - img [ref=e3116]
+              - 'row "Kkakdugi Kkakdugi Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3117] [cursor=pointer]':
+                - cell "Kkakdugi" [ref=e3118]:
+                  - img "Kkakdugi" [ref=e3121]
+                - cell "Kkakdugi" [ref=e3122]:
+                  - paragraph [ref=e3123]: Kkakdugi
+                - cell "Sides" [ref=e3124]
+                - cell [ref=e3125]
+                - 'cell "30 portions Min: 20" [ref=e3128]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3129]
+                - cell "86 Edit Info" [ref=e3130]:
+                  - generic [ref=e3131]:
+                    - button "86" [ref=e3132]
+                    - button "Edit Info" [ref=e3133]:
+                      - img [ref=e3134]
+              - 'row "Kongnamul-muchim Kongnamul-muchim Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3135] [cursor=pointer]':
+                - cell "Kongnamul-muchim" [ref=e3136]:
+                  - img "Kongnamul-muchim" [ref=e3139]
+                - cell "Kongnamul-muchim" [ref=e3140]:
+                  - paragraph [ref=e3141]: Kongnamul-muchim
+                - cell "Sides" [ref=e3142]
+                - cell [ref=e3143]
+                - 'cell "30 portions Min: 20" [ref=e3146]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3147]
+                - cell "86 Edit Info" [ref=e3148]:
+                  - generic [ref=e3149]:
+                    - button "86" [ref=e3150]
+                    - button "Edit Info" [ref=e3151]:
+                      - img [ref=e3152]
+              - 'row "Korean Radish (Mu) Korean Radish (Mu) Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e3153] [cursor=pointer]':
+                - cell "Korean Radish (Mu)" [ref=e3154]:
+                  - img "Korean Radish (Mu)" [ref=e3157]
+                - cell "Korean Radish (Mu)" [ref=e3158]:
+                  - paragraph [ref=e3159]: Korean Radish (Mu)
+                - cell "Sides" [ref=e3160]
+                - cell [ref=e3161]
+                - 'cell "3,000 g Min: 2,000" [ref=e3164]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3165]
+                - cell "86 Edit Info" [ref=e3166]:
+                  - generic [ref=e3167]:
+                    - button "86" [ref=e3168]
+                    - button "Edit Info" [ref=e3169]:
+                      - img [ref=e3170]
+              - 'row "Lettuce Lettuce Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e3171] [cursor=pointer]':
+                - cell "Lettuce" [ref=e3172]:
+                  - img "Lettuce" [ref=e3175]
+                - cell "Lettuce" [ref=e3176]:
+                  - paragraph [ref=e3177]: Lettuce
+                - cell "Sides" [ref=e3178]
+                - cell [ref=e3179]
+                - 'cell "3,000 g Min: 2,000" [ref=e3182]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3183]
+                - cell "86 Edit Info" [ref=e3184]:
+                  - generic [ref=e3185]:
+                    - button "86" [ref=e3186]
+                    - button "Edit Info" [ref=e3187]:
+                      - img [ref=e3188]
+              - 'row "Mayonnaise Mayonnaise Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e3189] [cursor=pointer]':
+                - cell "Mayonnaise" [ref=e3190]:
+                  - img "Mayonnaise" [ref=e3193]
+                - cell "Mayonnaise" [ref=e3194]:
+                  - paragraph [ref=e3195]: Mayonnaise
+                - cell "Sides" [ref=e3196]
+                - cell [ref=e3197]
+                - 'cell "3,000 ml Min: 2,000" [ref=e3200]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3201]
+                - cell "86 Edit Info" [ref=e3202]:
+                  - generic [ref=e3203]:
+                    - button "86" [ref=e3204]
+                    - button "Edit Info" [ref=e3205]:
+                      - img [ref=e3206]
+              - 'row "Mirin / Rice Wine Mirin / Rice Wine Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e3207] [cursor=pointer]':
+                - cell "Mirin / Rice Wine" [ref=e3208]:
+                  - img "Mirin / Rice Wine" [ref=e3211]
+                - cell "Mirin / Rice Wine" [ref=e3212]:
+                  - paragraph [ref=e3213]: Mirin / Rice Wine
+                - cell "Sides" [ref=e3214]
+                - cell [ref=e3215]
+                - 'cell "3,000 ml Min: 2,000" [ref=e3218]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3219]
+                - cell "86 Edit Info" [ref=e3220]:
+                  - generic [ref=e3221]:
+                    - button "86" [ref=e3222]
+                    - button "Edit Info" [ref=e3223]:
+                      - img [ref=e3224]
+              - 'row "Mulyeot (Corn/Rice Syrup) Mulyeot (Corn/Rice Syrup) Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e3225] [cursor=pointer]':
+                - cell "Mulyeot (Corn/Rice Syrup)" [ref=e3226]:
+                  - img "Mulyeot (Corn/Rice Syrup)" [ref=e3229]
+                - cell "Mulyeot (Corn/Rice Syrup)" [ref=e3230]:
+                  - paragraph [ref=e3231]: Mulyeot (Corn/Rice Syrup)
+                - cell "Sides" [ref=e3232]
+                - cell [ref=e3233]
+                - 'cell "3,000 ml Min: 2,000" [ref=e3236]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3237]
+                - cell "86 Edit Info" [ref=e3238]:
+                  - generic [ref=e3239]:
+                    - button "86" [ref=e3240]
+                    - button "Edit Info" [ref=e3241]:
+                      - img [ref=e3242]
+              - 'row "Oi Muchim Oi Muchim Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3243] [cursor=pointer]':
+                - cell "Oi Muchim" [ref=e3244]:
+                  - img "Oi Muchim" [ref=e3247]
+                - cell "Oi Muchim" [ref=e3248]:
+                  - paragraph [ref=e3249]: Oi Muchim
+                - cell "Sides" [ref=e3250]
+                - cell [ref=e3251]
+                - 'cell "30 portions Min: 20" [ref=e3254]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3255]
+                - cell "86 Edit Info" [ref=e3256]:
+                  - generic [ref=e3257]:
+                    - button "86" [ref=e3258]
+                    - button "Edit Info" [ref=e3259]:
+                      - img [ref=e3260]
+              - 'row "Pajeon Pajeon Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3261] [cursor=pointer]':
+                - cell "Pajeon" [ref=e3262]:
+                  - img "Pajeon" [ref=e3265]
+                - cell "Pajeon" [ref=e3266]:
+                  - paragraph [ref=e3267]: Pajeon
+                - cell "Sides" [ref=e3268]
+                - cell [ref=e3269]
+                - 'cell "30 portions Min: 20" [ref=e3272]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3273]
+                - cell "86 Edit Info" [ref=e3274]:
+                  - generic [ref=e3275]:
+                    - button "86" [ref=e3276]
+                    - button "Edit Info" [ref=e3277]:
+                      - img [ref=e3278]
+              - 'row "Perilla Leaves (Kkaennip) Perilla Leaves (Kkaennip) Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e3279] [cursor=pointer]':
+                - cell "Perilla Leaves (Kkaennip)" [ref=e3280]:
+                  - img "Perilla Leaves (Kkaennip)" [ref=e3283]
+                - cell "Perilla Leaves (Kkaennip)" [ref=e3284]:
+                  - paragraph [ref=e3285]: Perilla Leaves (Kkaennip)
+                - cell "Sides" [ref=e3286]
+                - cell [ref=e3287]
+                - 'cell "3,000 g Min: 2,000" [ref=e3290]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3291]
+                - cell "86 Edit Info" [ref=e3292]:
+                  - generic [ref=e3293]:
+                    - button "86" [ref=e3294]
+                    - button "Edit Info" [ref=e3295]:
+                      - img [ref=e3296]
+              - 'row "Pickled Daikon Radish Pickled Daikon Radish Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3297] [cursor=pointer]':
+                - cell "Pickled Daikon Radish" [ref=e3298]:
+                  - img "Pickled Daikon Radish" [ref=e3301]
+                - cell "Pickled Daikon Radish" [ref=e3302]:
+                  - paragraph [ref=e3303]: Pickled Daikon Radish
+                - cell "Sides" [ref=e3304]
+                - cell [ref=e3305]
+                - 'cell "30 portions Min: 20" [ref=e3308]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3309]
+                - cell "86 Edit Info" [ref=e3310]:
+                  - generic [ref=e3311]:
+                    - button "86" [ref=e3312]
+                    - button "Edit Info" [ref=e3313]:
+                      - img [ref=e3314]
+              - 'row "Pickled White Onions Pickled White Onions Sides 30 portions Min: 20 Adequate 86 Edit Info" [ref=e3315] [cursor=pointer]':
+                - cell "Pickled White Onions" [ref=e3316]:
+                  - img "Pickled White Onions" [ref=e3319]
+                - cell "Pickled White Onions" [ref=e3320]:
+                  - paragraph [ref=e3321]: Pickled White Onions
+                - cell "Sides" [ref=e3322]
+                - cell [ref=e3323]
+                - 'cell "30 portions Min: 20" [ref=e3326]':
+                  - text: 30 portions
+                  - text: "Min: 20"
+                - cell "Adequate" [ref=e3327]
+                - cell "86 Edit Info" [ref=e3328]:
+                  - generic [ref=e3329]:
+                    - button "86" [ref=e3330]
+                    - button "Edit Info" [ref=e3331]:
+                      - img [ref=e3332]
+              - 'row "Sogeumjang Sogeumjang Sides 1,500 ml Min: 1,000 Adequate 86 Edit Info" [ref=e3333] [cursor=pointer]':
+                - cell "Sogeumjang" [ref=e3334]:
+                  - img "Sogeumjang" [ref=e3337]
+                - cell "Sogeumjang" [ref=e3338]:
+                  - paragraph [ref=e3339]: Sogeumjang
+                - cell "Sides" [ref=e3340]
+                - cell [ref=e3341]
+                - 'cell "1,500 ml Min: 1,000" [ref=e3344]':
+                  - text: 1,500 ml
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e3345]
+                - cell "86 Edit Info" [ref=e3346]:
+                  - generic [ref=e3347]:
+                    - button "86" [ref=e3348]
+                    - button "Edit Info" [ref=e3349]:
+                      - img [ref=e3350]
+              - 'row "Squash Squash Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e3351] [cursor=pointer]':
+                - cell "Squash" [ref=e3352]:
+                  - img "Squash" [ref=e3355]
+                - cell "Squash" [ref=e3356]:
+                  - paragraph [ref=e3357]: Squash
+                - cell "Sides" [ref=e3358]
+                - cell [ref=e3359]
+                - 'cell "3,000 g Min: 2,000" [ref=e3362]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3363]
+                - cell "86 Edit Info" [ref=e3364]:
+                  - generic [ref=e3365]:
+                    - button "86" [ref=e3366]
+                    - button "Edit Info" [ref=e3367]:
+                      - img [ref=e3368]
+              - 'row "Ssamjang Ssamjang Sides 1,500 ml Min: 1,000 Adequate 86 Edit Info" [ref=e3369] [cursor=pointer]':
+                - cell "Ssamjang" [ref=e3370]:
+                  - img "Ssamjang" [ref=e3373]
+                - cell "Ssamjang" [ref=e3374]:
+                  - paragraph [ref=e3375]: Ssamjang
+                - cell "Sides" [ref=e3376]
+                - cell [ref=e3377]
+                - 'cell "1,500 ml Min: 1,000" [ref=e3380]':
+                  - text: 1,500 ml
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e3381]
+                - cell "86 Edit Info" [ref=e3382]:
+                  - generic [ref=e3383]:
+                    - button "86" [ref=e3384]
+                    - button "Edit Info" [ref=e3385]:
+                      - img [ref=e3386]
+              - 'row "Steamed Rice Steamed Rice Sides 21 portions Min: 15 Adequate 86 Edit Info" [ref=e3387] [cursor=pointer]':
+                - cell "Steamed Rice" [ref=e3388]:
+                  - img "Steamed Rice" [ref=e3391]
+                - cell "Steamed Rice" [ref=e3392]:
+                  - paragraph [ref=e3393]: Steamed Rice
+                - cell "Sides" [ref=e3394]
+                - cell [ref=e3395]
+                - 'cell "21 portions Min: 15" [ref=e3398]':
+                  - text: 21 portions
+                  - text: "Min: 15"
+                - cell "Adequate" [ref=e3399]
+                - cell "86 Edit Info" [ref=e3400]:
+                  - generic [ref=e3401]:
+                    - button "86" [ref=e3402]
+                    - button "Edit Info" [ref=e3403]:
+                      - img [ref=e3404]
+              - 'row "Toasted Sesame Oil Toasted Sesame Oil Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e3405] [cursor=pointer]':
+                - cell "Toasted Sesame Oil" [ref=e3406]:
+                  - img "Toasted Sesame Oil" [ref=e3409]
+                - cell "Toasted Sesame Oil" [ref=e3410]:
+                  - paragraph [ref=e3411]: Toasted Sesame Oil
+                - cell "Sides" [ref=e3412]
+                - cell [ref=e3413]
+                - 'cell "3,000 ml Min: 2,000" [ref=e3416]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3417]
+                - cell "86 Edit Info" [ref=e3418]:
+                  - generic [ref=e3419]:
+                    - button "86" [ref=e3420]
+                    - button "Edit Info" [ref=e3421]:
+                      - img [ref=e3422]
+              - 'row "Wasabi Soy Wasabi Soy Sides 1,500 ml Min: 1,000 Adequate 86 Edit Info" [ref=e3423] [cursor=pointer]':
+                - cell "Wasabi Soy" [ref=e3424]:
+                  - img "Wasabi Soy" [ref=e3427]
+                - cell "Wasabi Soy" [ref=e3428]:
+                  - paragraph [ref=e3429]: Wasabi Soy
+                - cell "Sides" [ref=e3430]
+                - cell [ref=e3431]
+                - 'cell "1,500 ml Min: 1,000" [ref=e3434]':
+                  - text: 1,500 ml
+                  - text: "Min: 1,000"
+                - cell "Adequate" [ref=e3435]
+                - cell "86 Edit Info" [ref=e3436]:
+                  - generic [ref=e3437]:
+                    - button "86" [ref=e3438]
+                    - button "Edit Info" [ref=e3439]:
+                      - img [ref=e3440]
+              - 'row "White/Yellow Onions White/Yellow Onions Sides 3,000 g Min: 2,000 Adequate 86 Edit Info" [ref=e3441] [cursor=pointer]':
+                - cell "White/Yellow Onions" [ref=e3442]:
+                  - img "White/Yellow Onions" [ref=e3445]
+                - cell "White/Yellow Onions" [ref=e3446]:
+                  - paragraph [ref=e3447]: White/Yellow Onions
+                - cell "Sides" [ref=e3448]
+                - cell [ref=e3449]
+                - 'cell "3,000 g Min: 2,000" [ref=e3452]':
+                  - text: 3,000 g
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3453]
+                - cell "86 Edit Info" [ref=e3454]:
+                  - generic [ref=e3455]:
+                    - button "86" [ref=e3456]
+                    - button "Edit Info" [ref=e3457]:
+                      - img [ref=e3458]
+              - 'row "Yangjo-ganjang (Brewed Soy) Yangjo-ganjang (Brewed Soy) Sides 3,000 ml Min: 2,000 Adequate 86 Edit Info" [ref=e3459] [cursor=pointer]':
+                - cell "Yangjo-ganjang (Brewed Soy)" [ref=e3460]:
+                  - img "Yangjo-ganjang (Brewed Soy)" [ref=e3463]
+                - cell "Yangjo-ganjang (Brewed Soy)" [ref=e3464]:
+                  - paragraph [ref=e3465]: Yangjo-ganjang (Brewed Soy)
+                - cell "Sides" [ref=e3466]
+                - cell [ref=e3467]
+                - 'cell "3,000 ml Min: 2,000" [ref=e3470]':
+                  - text: 3,000 ml
+                  - text: "Min: 2,000"
+                - cell "Adequate" [ref=e3471]
+                - cell "86 Edit Info" [ref=e3472]:
+                  - generic [ref=e3473]:
+                    - button "86" [ref=e3474]
+                    - button "Edit Info" [ref=e3475]:
+                      - img [ref=e3476]
+  - generic [ref=e207]: WTF! Samgyup POS

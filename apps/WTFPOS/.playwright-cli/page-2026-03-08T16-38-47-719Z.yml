@@ -1,0 +1,160 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - generic [ref=e14]:
+        - link "Receive Delivery" [ref=e15] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e16]
+        - link "Log Expense" [ref=e17] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e18]
+        - link "Log Waste" [ref=e19] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e20]
+        - link "Stock Count" [ref=e21] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e22]
+        - link "X-Reading" [ref=e23] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e24]
+        - link "Transfer Stock" [ref=e25] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e26]
+        - link "End of Day" [ref=e27] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e28]
+      - list [ref=e32]:
+        - listitem [ref=e33]:
+          - link "POS" [ref=e34] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e35]
+            - generic: POS
+        - listitem [ref=e39]:
+          - link "Kitchen" [ref=e40] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e41]
+            - generic: Kitchen
+        - listitem [ref=e42]:
+          - link "Stock" [ref=e43] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e44]
+            - generic: Stock
+        - listitem [ref=e45]:
+          - link "Reports" [ref=e46] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e47]
+            - generic: Reports
+      - generic [ref=e48]:
+        - separator [ref=e49]
+        - generic [ref=e51]: J
+        - link "Logout" [ref=e53] [cursor=pointer]:
+          - /url: /
+          - img [ref=e54]
+      - button "Toggle Sidebar" [ref=e57]
+    - main [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - img [ref=e61]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e62]
+        - button "Change Location" [ref=e63] [cursor=pointer]:
+          - img [ref=e64]
+          - text: Change Location
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - heading "Consolidated Reports" [level=1] [ref=e68]
+          - navigation [ref=e69]:
+            - generic [ref=e70]:
+              - generic [ref=e71]: Operations
+              - generic [ref=e72]:
+                - link "Meat Report" [ref=e73] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e74] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e75] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e76] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e77] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e78] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e79] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e81]:
+              - generic [ref=e82]: Expenses
+              - generic [ref=e83]:
+                - link "Daily" [ref=e84] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e85] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e87]:
+              - generic [ref=e88]: Revenue & Sales
+              - generic [ref=e89]:
+                - link "Sales Summary" [ref=e90] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e91] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e92] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e94]:
+              - generic [ref=e95]: Profitability
+              - generic [ref=e96]:
+                - link "Gross Profit" [ref=e97] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e98] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e100]:
+              - generic [ref=e101]: Branch
+              - link "Compare" [ref=e103] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e105]:
+          - generic [ref=e322]:
+            - generic [ref=e323]:
+              - paragraph [ref=e324]: Total This Month
+              - paragraph [ref=e325]: ₱37,797.00
+            - generic [ref=e326]:
+              - paragraph [ref=e327]: Total Last Month
+              - paragraph [ref=e328]: ₱0.00
+            - generic [ref=e329]:
+              - paragraph [ref=e330]: Month-over-Month
+              - paragraph [ref=e331]: 0.0%
+            - generic [ref=e332]:
+              - paragraph [ref=e333]: Cost Spikes
+              - paragraph [ref=e334]: "0"
+          - table [ref=e336]:
+            - rowgroup [ref=e337]:
+              - row "Category This Month Last Month Change % Status" [ref=e338]:
+                - columnheader "Category" [ref=e339]
+                - columnheader "This Month" [ref=e340]
+                - columnheader "Last Month" [ref=e341]
+                - columnheader "Change %" [ref=e342]
+                - columnheader "Status" [ref=e343]
+            - rowgroup [ref=e344]:
+              - row "📦Labor Budget ₱709.00 ₱0.00 0.0% Stable" [ref=e345]:
+                - cell "📦Labor Budget" [ref=e346]
+                - cell "₱709.00" [ref=e347]
+                - cell "₱0.00" [ref=e348]
+                - cell "0.0%" [ref=e349]
+                - cell "Stable" [ref=e350]
+              - row "📦Petty Cash ₱407.00 ₱0.00 0.0% Stable" [ref=e351]:
+                - cell "📦Petty Cash" [ref=e352]
+                - cell "₱407.00" [ref=e353]
+                - cell "₱0.00" [ref=e354]
+                - cell "0.0%" [ref=e355]
+                - cell "Stable" [ref=e356]
+              - row "🥩Meat Procurement ₱36,681.00 ₱0.00 0.0% Stable" [ref=e357]:
+                - cell "🥩Meat Procurement" [ref=e358]
+                - cell "₱36,681.00" [ref=e359]
+                - cell "₱0.00" [ref=e360]
+                - cell "0.0%" [ref=e361]
+                - cell "Stable" [ref=e362]
+              - row "TOTAL ₱37,797.00 ₱0.00 0.0%" [ref=e363]:
+                - cell "TOTAL" [ref=e364]
+                - cell "₱37,797.00" [ref=e365]
+                - cell "₱0.00" [ref=e366]
+                - cell "0.0%" [ref=e367]
+                - cell [ref=e368]
+  - generic [ref=e321]: WTF! Samgyup POS

@@ -1,0 +1,64 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e19]
+          - generic: POS
+    - generic [ref=e23]:
+      - separator [ref=e24]
+      - generic [ref=e26]: U
+      - link "Logout" [ref=e28] [cursor=pointer]:
+        - /url: /
+        - img [ref=e29]
+    - button "Toggle Sidebar" [ref=e32]
+  - main [ref=e33]:
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - button "Toggle Sidebar" [ref=e39] [cursor=pointer]:
+              - img
+              - generic [ref=e40]: Toggle Sidebar
+            - heading "POS" [level=1] [ref=e41]
+            - generic [ref=e42]: 0 occ
+            - generic [ref=e43]: 0 free
+          - generic [ref=e44]:
+            - button "Toggle color legend" [ref=e46] [cursor=pointer]:
+              - img [ref=e47]
+            - button "📦 New Takeout" [ref=e49] [cursor=pointer]
+            - button "🧾 History" [ref=e50] [cursor=pointer]
+        - img [ref=e52]
+      - generic [ref=e56]:
+        - generic [ref=e57]: 🧾
+        - generic [ref=e58]:
+          - generic [ref=e59]: No Table Selected
+          - generic [ref=e60]: Tap an occupied table on the floor plan to view its running bill here.
+        - generic [ref=e61]:
+          - generic [ref=e62]: Green = available — tap to open
+          - generic [ref=e64]: Orange = occupied — tap to view bill
+    - generic [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]: 🏦
+        - heading "Start Your Shift" [level=2] [ref=e70]
+        - paragraph [ref=e71]:
+          - text: Declare your opening cash float before accessing the POS.
+          - generic [ref=e72]:
+            - text: Logged as
+            - strong
+      - generic [ref=e73]:
+        - generic [ref=e74]: Quick Select
+        - generic [ref=e75]:
+          - button "₱1,000" [ref=e76] [cursor=pointer]
+          - button "₱2,000" [ref=e77] [cursor=pointer]
+          - button "₱3,000" [ref=e78] [cursor=pointer]
+          - button "₱5,000" [ref=e79] [cursor=pointer]
+      - generic [ref=e80]:
+        - generic [ref=e81]: Opening Cash Float (₱)
+        - spinbutton [ref=e82]: "0"
+      - button "Start Shift →" [ref=e83] [cursor=pointer]
+      - paragraph [ref=e84]: You can enter ₱0 if no opening float is provided.

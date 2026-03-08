@@ -2,6 +2,8 @@
 	import SubNav from '$lib/components/SubNav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { startKitchenPush } from '$lib/stores/kitchen-push';
+	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import type { Snippet } from 'svelte';
 
 	const { children }: { children: Snippet } = $props();
@@ -16,6 +18,11 @@
 					{ href: '/kitchen/weigh-station', label: '⚖️ Weigh Station' }
 				]
 	);
+
+	// P0-1: Staff role is not allowed on kitchen pages — redirect to POS.
+	$effect(() => {
+		if (browser && session.role === 'staff') goto('/pos');
+	});
 
 	// Push active orders to local server whenever RxDB changes.
 	// Re-runs when locationId changes (reactive dependency via session read).

@@ -1,0 +1,123 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e19]
+          - generic: POS
+    - generic [ref=e23]:
+      - separator [ref=e24]
+      - generic [ref=e26]: U
+      - link "Logout" [ref=e28] [cursor=pointer]:
+        - /url: /
+        - img [ref=e29]
+    - button "Toggle Sidebar" [ref=e32]
+  - main [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - heading "Consolidated Reports" [level=1] [ref=e37]
+        - navigation [ref=e38]:
+          - generic [ref=e39]:
+            - generic [ref=e40]: Operations
+            - generic [ref=e41]:
+              - link "Meat Report" [ref=e42] [cursor=pointer]:
+                - /url: /reports/meat-report
+              - link "Stock Variance" [ref=e43] [cursor=pointer]:
+                - /url: /reports/stock-variance
+              - link "Table Sales" [ref=e44] [cursor=pointer]:
+                - /url: /reports/table-sales
+              - link "Voids & Discounts" [ref=e45] [cursor=pointer]:
+                - /url: /reports/voids-discounts
+              - link "X-Read" [ref=e46] [cursor=pointer]:
+                - /url: /reports/x-read
+              - link "End of Day" [ref=e47] [cursor=pointer]:
+                - /url: /reports/eod
+              - link "Staff Perf." [ref=e48] [cursor=pointer]:
+                - /url: /reports/staff-performance
+          - generic [ref=e50]:
+            - generic [ref=e51]: Expenses
+            - generic [ref=e52]:
+              - link "Daily" [ref=e53] [cursor=pointer]:
+                - /url: /reports/expenses-daily
+              - link "Monthly" [ref=e54] [cursor=pointer]:
+                - /url: /reports/expenses-monthly
+          - generic [ref=e56]:
+            - generic [ref=e57]: Revenue & Sales
+            - generic [ref=e58]:
+              - link "Sales Summary" [ref=e59] [cursor=pointer]:
+                - /url: /reports/sales-summary
+              - link "Best Sellers" [ref=e60] [cursor=pointer]:
+                - /url: /reports/best-sellers
+              - link "Peak Hours" [ref=e61] [cursor=pointer]:
+                - /url: /reports/peak-hours
+          - generic [ref=e63]:
+            - generic [ref=e64]: Profitability
+            - generic [ref=e65]:
+              - link "Gross Profit" [ref=e66] [cursor=pointer]:
+                - /url: /reports/profit-gross
+              - link "Net Profit" [ref=e67] [cursor=pointer]:
+                - /url: /reports/profit-net
+          - generic [ref=e69]:
+            - generic [ref=e70]: Branch
+            - link "Compare" [ref=e72] [cursor=pointer]:
+              - /url: /reports/branch-comparison
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - heading "Mar 9, 2026" [level=2] [ref=e77]
+            - generic [ref=e78]: Live — shift still open
+          - button "📋 Generate X-Read" [ref=e80] [cursor=pointer]
+        - generic [ref=e81]:
+          - generic [ref=e82]:
+            - paragraph [ref=e83]: Gross Sales
+            - paragraph [ref=e84]: ₱0.00
+          - generic [ref=e85]:
+            - paragraph [ref=e86]: Net Sales
+            - paragraph [ref=e87]: ₱0.00
+          - generic [ref=e88]:
+            - paragraph [ref=e89]: Total Pax
+            - paragraph [ref=e90]: "0"
+          - generic [ref=e91]:
+            - paragraph [ref=e92]: Avg Ticket
+            - paragraph [ref=e93]: ₱0.00
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - heading "Payment Breakdown (Live)" [level=3] [ref=e97]
+              - generic [ref=e98]:
+                - generic [ref=e99]:
+                  - generic [ref=e100]: 💵
+                  - paragraph [ref=e101]: Cash
+                  - paragraph [ref=e102]: ₱0.00
+                - generic [ref=e103]:
+                  - generic [ref=e104]: 💳
+                  - paragraph [ref=e105]: Card
+                  - paragraph [ref=e106]: ₱0.00
+                - generic [ref=e107]:
+                  - generic [ref=e108]: 📱
+                  - paragraph [ref=e109]: GCash
+                  - paragraph [ref=e110]: ₱0.00
+            - generic [ref=e111]:
+              - heading "Order Status" [level=3] [ref=e112]
+              - generic [ref=e113]:
+                - generic [ref=e114]:
+                  - paragraph [ref=e115]: Open
+                  - paragraph [ref=e116]: "0"
+                - generic [ref=e117]:
+                  - paragraph [ref=e118]: Paid
+                  - paragraph [ref=e119]: "0"
+                - generic [ref=e120]:
+                  - paragraph [ref=e121]: Voided
+                  - paragraph [ref=e122]: "0"
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - heading "X-Read History" [level=3] [ref=e125]
+              - generic [ref=e126]:
+                - generic [ref=e127]: 📋
+                - paragraph [ref=e128]: No X-Reads generated yet this shift.
+                - paragraph [ref=e129]: Click "Generate X-Read" to snapshot current totals.
+            - paragraph [ref=e131]: X-Reads do NOT close the shift. Use End of Day report to finalize.

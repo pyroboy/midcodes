@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { cn } from '$lib/utils';
-	import { setSession } from '$lib/stores/session.svelte';
+	import { setSession, MANAGER_PIN } from '$lib/stores/session.svelte';
 	import type { Role } from '$lib/stores/session.svelte';
 	import { writeLog } from '$lib/stores/audit.svelte';
 
@@ -61,8 +61,6 @@
 	let pin         = $state('');
 	let pinError    = $state(false);
 	let pendingDest = $state('');
-	// TODO: Move to environment variable or secure config
-	const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || '1234';
 
 	// ─── Login logic ──────────────────────────────────────────────────────────
 	function login() {

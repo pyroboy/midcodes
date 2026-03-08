@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tables as allTables, transferTable } from '$lib/stores/pos.svelte';
-	import { session } from '$lib/stores/session.svelte';
+	import { session, MANAGER_PIN } from '$lib/stores/session.svelte';
 	import { cn } from '$lib/utils';
 	import type { Table } from '$lib/types';
 
@@ -13,8 +13,6 @@
 		onclose: () => void;
 		ontransfer: (newTableId: string) => void;
 	} = $props();
-
-	const MANAGER_PIN = '1234';
 
 	let step = $state<'select' | 'pin'>('select');
 	let selectedTargetId = $state<string | null>(null);

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { tables as allTables, orders as allOrders, openTable, updateTableTimers, menuItems as menuItemsStore, addItemToOrder, createTakeoutOrder, advanceTakeoutStatus, setTableMaintenance, voidOrder, closeTable } from '$lib/stores/pos.svelte';
-    import { getPendingRejectionsForTable, acknowledgeAlert, type KitchenAlert } from '$lib/stores/alert.svelte';
+    import { getPendingRejectionsForTable, acknowledgeAlert, getUnacknowledgedAlerts, type KitchenAlert } from '$lib/stores/alert.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
     import AlertBanner from '$lib/components/AlertBanner.svelte';
     import TransferTableModal from '$lib/components/pos/TransferTableModal.svelte';
@@ -21,7 +21,9 @@
     import LeftoverPenaltyModal from '$lib/components/pos/LeftoverPenaltyModal.svelte';
     import MergeTablesModal from '$lib/components/pos/MergeTablesModal.svelte';
     import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
-    import { session } from '$lib/stores/session.svelte';
+    import ShiftStartModal from '$lib/components/pos/ShiftStartModal.svelte';
+    import { getActiveShift } from '$lib/stores/pos/shifts.svelte';
+    import { session, isWarehouseSession } from '$lib/stores/session.svelte';
     import { Info } from 'lucide-svelte';
     import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
 
@@ -83,11 +85,34 @@
         getPendingRejectionsForTable(selectedTableId)
     );
 
+    // Map of tableId → unacknowledged rejection count (for floor plan badges)
+    const tableRejectionMap = $derived.by(() => {
+        const unacked = getUnacknowledgedAlerts();
+        const map = new Map<string, number>();
+        for (const alert of unacked) {
+            const order = orders.find(o => o.id === alert.orderId && o.status === 'open');
+            if (order?.tableId) {
+                map.set(order.tableId, (map.get(order.tableId) ?? 0) + 1);
+            }
+        }
+        return map;
+    });
+
     // ─── Receipt State ────────────────────────────────────────────────────────
     let showReceipt = $state(false);
     let receiptOrder = $state<Order | null>(null);
     let receiptChange = $state(0);
     let receiptMethod = $state('');
+
+    // ─── Kitchen Charge Toast ────────────────────────────────────────────────
+    let kitchenToastCount = $state(0);
+    let kitchenToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function handleCharged(count: number) {
+        kitchenToastCount = count;
+        if (kitchenToastTimer) clearTimeout(kitchenToastTimer);
+        kitchenToastTimer = setTimeout(() => { kitchenToastCount = 0; }, 2500);
+    }
 
     // ─── Closed/Orphaned Orders for History ──────────────────────────────────
     const closedOrders = $derived(
@@ -260,16 +285,65 @@
                                 <Info class="h-4 w-4" />
                             </button>
                             {#if showLegend}
-                                <div class="absolute right-0 top-full mt-1 z-20 pos-card p-3 shadow-lg flex flex-col gap-2 text-xs font-semibold text-gray-600 min-w-[180px]">
-                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-white border border-gray-300"></span>Available</span>
-                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-emerald-500"></span>Dining (Green)</span>
-                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Ready / Bill (Orange)</span>
-                                    {#if maintenance > 0}
-                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-gray-400"></span>Maint ({maintenance})</span>
-                                    {/if}
-                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-pink-200 border border-pink-300"></span>Pork</span>
-                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-purple-200 border border-purple-300"></span>Beef</span>
-                                    <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-gradient-to-r from-pink-200 to-purple-200 border border-purple-300"></span>P&amp;B</span>
+                                <div class="absolute right-0 top-full mt-1 z-20 pos-card p-4 shadow-lg min-w-[340px]">
+                                    <!-- Illustrated table diagram -->
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Table Card Guide</p>
+                                    <div class="flex gap-4 items-start mb-4">
+                                        <svg width="130" height="110" viewBox="0 0 130 110" class="shrink-0">
+                                            <!-- Table body -->
+                                            <rect x="5" y="5" width="120" height="100" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2" />
+                                            <!-- Package badge (top-left) -->
+                                            <rect x="9" y="9" width="48" height="14" rx="7" fill="#7c3aed" opacity="0.15" />
+                                            <text x="33" y="16" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="7" font-weight="800" fill="#7c3aed">Beef+Pork</text>
+                                            <!-- Timer (top-right) -->
+                                            <text x="119" y="18" text-anchor="end" dominant-baseline="middle" font-family="monospace" font-size="8" font-weight="700" fill="#10b981">25m</text>
+                                            <!-- Table name (center) -->
+                                            <text x="65" y="46" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="15" font-weight="800" fill="#111827">T1</text>
+                                            <!-- Pax (below name) -->
+                                            <text x="65" y="60" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="9" font-weight="600" fill="#6b7280">4 pax</text>
+                                            <!-- Bill total (bottom-center) -->
+                                            <text x="65" y="92" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="9" font-weight="700" fill="#111827">P1,996.00</text>
+                                            <!-- Unserved badge (bottom-left) -->
+                                            <circle cx="15" cy="95" r="8" fill="#f97316" opacity="0.9" />
+                                            <text x="15" y="96" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="8" font-weight="800" fill="#ffffff">5</text>
+                                            <!-- Refill badge (bottom-right) -->
+                                            <rect x="99" y="88" width="20" height="12" rx="6" fill="#8b5cf6" opacity="0.9" />
+                                            <text x="109" y="95" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="7" font-weight="800" fill="#ffffff">R3</text>
+                                        </svg>
+                                        <div class="flex flex-col gap-1.5 text-[11px] text-gray-600 pt-0.5">
+                                            <span><b class="text-purple-600">Beef+Pork</b> — package type</span>
+                                            <span><b class="text-emerald-600">25m</b> — time since seated</span>
+                                            <span><b class="text-gray-900">T1</b> — table name</span>
+                                            <span><b class="text-gray-500">4 pax</b> — guests seated</span>
+                                            <span><b class="text-gray-900">P1,996</b> — running bill</span>
+                                            <span><span class="inline-block h-3 w-3 rounded-full bg-orange-500 align-middle"></span> <b>5</b> — unserved items</span>
+                                            <span><span class="inline-block h-3 w-5 rounded-full bg-purple-500 align-middle text-[8px] text-white font-bold text-center leading-3">R3</span> — refills (AYCE)</span>
+                                        </div>
+                                    </div>
+                                    <!-- Color legend -->
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Border Colors</p>
+                                    <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs font-semibold text-gray-600">
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-white border border-gray-300"></span>Available</span>
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-emerald-500"></span>Dining</span>
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-orange-500"></span>Ready / Bill</span>
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-red-500"></span>Overtime</span>
+                                        {#if maintenance > 0}
+                                            <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-gray-400"></span>Maintenance</span>
+                                        {/if}
+                                    </div>
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-3 mb-2">Package Fill</p>
+                                    <div class="grid grid-cols-3 gap-x-3 gap-y-1.5 text-xs font-semibold text-gray-600">
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-pink-200 border border-pink-300"></span>Pork</span>
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-purple-200 border border-purple-300"></span>Beef</span>
+                                        <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-amber-100 border border-amber-300"></span>Beef+Pork</span>
+                                    </div>
+                                    <!-- Badge meanings -->
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-3 mb-2">Badges</p>
+                                    <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-gray-600">
+                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white">5</span>Unserved items</span>
+                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">✓</span>All served</span>
+                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-6 items-center justify-center rounded-full bg-purple-500 text-[8px] font-bold text-white">R3</span>Refill count</span>
+                                    </div>
                                 </div>
                             {/if}
                         </div>
@@ -290,11 +364,12 @@
                     </div>
                 </div>
 
-                <FloorPlan 
-                    {mainTables} 
+                <FloorPlan
+                    {mainTables}
                     {orders}
-                    {selectedTableId} 
-                    ontableclick={handleTableClick} 
+                    {selectedTableId}
+                    ontableclick={handleTableClick}
+                    {tableRejectionMap}
                 />
 
                 <TakeoutQueue 
@@ -337,7 +412,18 @@
     <AddItemModal 
         order={currentActiveOrder} 
         onclose={() => showAddItem = false}
+        oncharged={handleCharged}
     />
+{/if}
+
+<!-- P1-1: Sent to Kitchen toast -->
+{#if kitchenToastCount > 0}
+    <div class="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 pointer-events-none">
+        <div class="flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <span class="text-status-green text-lg">✓</span>
+            <span class="text-sm font-semibold">{kitchenToastCount} item{kitchenToastCount !== 1 ? 's' : ''} sent to kitchen</span>
+        </div>
+    </div>
 {/if}
 
 {#if showCheckout && checkoutOrder}
@@ -459,4 +545,8 @@
             selectedTableId = targetTableId;
         }}
     />
+{/if}
+
+{#if !isWarehouseSession() && session.locationId !== 'all' && !getActiveShift()}
+    <ShiftStartModal />
 {/if}

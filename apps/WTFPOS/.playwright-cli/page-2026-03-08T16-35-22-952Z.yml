@@ -1,0 +1,97 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - generic [ref=e68]:
+      - link "Receive Delivery" [ref=e69] [cursor=pointer]:
+        - /url: /stock/deliveries?action=open
+        - img [ref=e70]
+      - link "Log Expense" [ref=e71] [cursor=pointer]:
+        - /url: /reports/expenses-daily?action=open
+        - img [ref=e72]
+      - link "Log Waste" [ref=e73] [cursor=pointer]:
+        - /url: /stock/waste?action=open
+        - img [ref=e74]
+      - link "Stock Count" [ref=e75] [cursor=pointer]:
+        - /url: /stock/counts?action=open
+        - img [ref=e76]
+      - link "X-Reading" [ref=e77] [cursor=pointer]:
+        - /url: /reports/x-read?action=open
+        - img [ref=e78]
+      - link "Transfer Stock" [ref=e79] [cursor=pointer]:
+        - /url: /stock/transfers?action=open
+        - img [ref=e80]
+      - link "End of Day" [ref=e81] [cursor=pointer]:
+        - /url: /reports/eod?action=open
+        - img [ref=e82]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e19]
+          - generic: POS
+      - listitem [ref=e83]:
+        - link "Kitchen" [ref=e84] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e85]
+          - generic: Kitchen
+      - listitem [ref=e86]:
+        - link "Stock" [ref=e87] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e88]
+          - generic: Stock
+      - listitem [ref=e89]:
+        - link "Reports" [ref=e90] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e91]
+          - generic: Reports
+    - generic [ref=e23]:
+      - separator [ref=e24]
+      - generic [ref=e26]: J
+      - link "Logout" [ref=e28] [cursor=pointer]:
+        - /url: /
+        - img [ref=e29]
+    - button "Toggle Sidebar" [ref=e32]
+  - main [ref=e33]:
+    - generic [ref=e92]:
+      - generic [ref=e93]:
+        - img [ref=e94]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e95]
+      - button "Change Location" [ref=e96] [cursor=pointer]:
+        - img [ref=e97]
+        - text: Change Location
+    - generic [ref=e34]:
+      - navigation [ref=e35]:
+        - link "🧾 All Orders" [ref=e36] [cursor=pointer]:
+          - /url: /kitchen/all-orders
+        - link "📋 Order Queue" [ref=e37] [cursor=pointer]:
+          - /url: /kitchen/orders
+        - link "⚖️ Weigh Station" [ref=e38] [cursor=pointer]:
+          - /url: /kitchen/weigh-station
+      - main [ref=e39]:
+        - generic [ref=e42]: Live
+        - generic [ref=e44]:
+          - generic [ref=e46]:
+            - heading "Kitchen Queue" [level=1] [ref=e47]
+            - paragraph [ref=e48]: Active tickets awaiting kitchen action
+          - generic [ref=e49]:
+            - button "↩ UNDO LAST" [ref=e50] [cursor=pointer]
+            - button "History 59" [ref=e98] [cursor=pointer]:
+              - text: History
+              - generic [ref=e99]: "59"
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - generic [ref=e54]: ✅
+            - paragraph [ref=e55]: No pending orders
+            - paragraph [ref=e56]: New orders will appear here automatically
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - generic [ref=e59]: "59"
+              - generic [ref=e60]: Served Today
+            - generic [ref=e61]:
+              - generic [ref=e62]: 20m
+              - generic [ref=e63]: Avg Service
+            - generic [ref=e64]:
+              - generic [ref=e65]: "-1157:-38"
+              - generic [ref=e66]: Last Completed

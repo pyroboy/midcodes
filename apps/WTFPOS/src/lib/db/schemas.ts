@@ -72,7 +72,7 @@ export const floorElementSchema: RxJsonSchema<any> = {
 // ─── Order ───────────────────────────────────────────────────────────────────
 export const orderSchema: RxJsonSchema<any> = {
 	title: 'order schema',
-	version: 6,
+	version: 7,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -99,7 +99,8 @@ export const orderSchema: RxJsonSchema<any> = {
 					status: { type: 'string' },
 					sentAt: { type: ['string', 'null'] },
 					tag: { type: ['string', 'null'] },
-					notes: { type: 'string' }
+					notes: { type: 'string' },
+					addedAt: { type: 'string' }
 				},
 				required: ['id', 'menuItemId', 'menuItemName', 'quantity', 'unitPrice', 'status']
 			}
@@ -458,6 +459,27 @@ export const auditLogSchema: RxJsonSchema<any> = {
 	},
 	required: ['id', 'isoTimestamp', 'timestamp', 'user', 'role', 'action', 'description', 'branch', 'updatedAt'],
 	indexes: ['isoTimestamp', 'action', 'updatedAt']
+};
+
+// ─── Shift (Cash Float / Opening Drawer) ─────────────────────────────────────
+export const shiftsSchema: RxJsonSchema<any> = {
+	title: 'shifts schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id:           { type: 'string', maxLength: 100 },
+		locationId:   { type: 'string', maxLength: 100 },
+		cashierName:  { type: 'string' },
+		openingFloat: { type: 'number' },
+		startedAt:    { type: 'string', maxLength: 30 },
+		endedAt:      { type: ['string', 'null'] },
+		closingCash:  { type: ['number', 'null'] },
+		status:       { type: 'string', maxLength: 10 },
+		updatedAt:    { type: 'string', maxLength: 30 }
+	},
+	required: ['id', 'locationId', 'cashierName', 'openingFloat', 'startedAt', 'status', 'updatedAt'],
+	indexes: ['locationId', 'status', ['locationId', 'status'], 'updatedAt']
 };
 
 // ─── Kitchen Alert ───────────────────────────────────────────────────────────

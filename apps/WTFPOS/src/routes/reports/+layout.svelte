@@ -11,7 +11,8 @@
 		{
 			label: 'Operations',
 			tabs: [
-				{ href: '/reports/meat-report', label: 'Meat Report' },
+				{ href: '/reports/meat-report',      label: 'Meat Report' },
+				{ href: '/reports/stock-variance',   label: 'Stock Variance' },
 				{ href: '/reports/table-sales',   label: 'Table Sales' },
 				{ href: '/reports/voids-discounts',label: 'Voids & Discounts' },
 				{ href: '/reports/x-read',        label: 'X-Read' },

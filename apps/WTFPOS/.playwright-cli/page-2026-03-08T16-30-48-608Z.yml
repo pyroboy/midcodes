@@ -1,0 +1,1110 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "Kitchen" [ref=e113] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e19]
+            - generic: Kitchen
+        - listitem [ref=e114]:
+          - link "Stock" [ref=e115] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e116]
+            - generic: Stock
+      - generic [ref=e23]:
+        - separator [ref=e24]
+        - generic [ref=e26]: P
+        - link "Logout" [ref=e28] [cursor=pointer]:
+          - /url: /
+          - img [ref=e29]
+      - button "Toggle Sidebar" [ref=e32]
+    - main [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - heading "Stock Management" [level=1] [ref=e38]
+          - navigation [ref=e39]:
+            - link "Inventory" [ref=e40] [cursor=pointer]:
+              - /url: /stock/inventory
+              - img [ref=e41]
+              - text: Inventory
+            - link "Deliveries 1" [ref=e117] [cursor=pointer]:
+              - /url: /stock/deliveries
+              - img [ref=e46]
+              - text: Deliveries
+              - generic [ref=e118]: "1"
+            - link "Transfers" [ref=e51] [cursor=pointer]:
+              - /url: /stock/transfers
+              - img [ref=e52]
+              - text: Transfers
+            - link "Counts 1" [ref=e55] [cursor=pointer]:
+              - /url: /stock/counts
+              - img [ref=e56]
+              - text: Counts
+              - generic [ref=e60]: "1"
+            - link "Waste Log" [ref=e61] [cursor=pointer]:
+              - /url: /stock/waste
+              - img [ref=e62]
+              - text: Waste Log
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - button "Morning 10:00 AM" [ref=e67] [cursor=pointer]:
+              - img [ref=e68]
+              - generic [ref=e71]:
+                - paragraph [ref=e72]: Morning
+                - paragraph [ref=e73]: 10:00 AM
+              - img [ref=e74]
+            - button "Afternoon 4:00 PM" [ref=e77] [cursor=pointer]:
+              - img [ref=e78]
+              - generic [ref=e81]:
+                - paragraph [ref=e82]: Afternoon
+                - paragraph [ref=e83]: 4:00 PM
+              - img [ref=e84]
+            - button "Evening 10:00 PM Pending" [ref=e87] [cursor=pointer]:
+              - img [ref=e88]
+              - generic [ref=e91]:
+                - paragraph [ref=e92]: Evening
+                - paragraph [ref=e93]: 10:00 PM
+              - generic [ref=e94]: Pending
+          - generic [ref=e95]:
+            - img [ref=e96]
+            - paragraph [ref=e98]:
+              - text: Count not yet started. Enter actual counts below, then tap
+              - strong [ref=e99]: Submit Count
+              - text: to lock in this session.
+          - table [ref=e101]:
+            - rowgroup [ref=e102]:
+              - row "Item Expected Counted Shortage / Surplus" [ref=e103]:
+                - columnheader "Item" [ref=e104]
+                - columnheader "Expected" [ref=e105]
+                - columnheader "Counted" [ref=e106]
+                - columnheader "Shortage / Surplus" [ref=e107]
+            - rowgroup [ref=e108]:
+              - row "Pork Bone-In 20,500 g —" [ref=e119]:
+                - cell "Pork Bone-In" [ref=e120]
+                - cell "20,500 g" [ref=e121]
+                - cell [ref=e122]:
+                  - generic [ref=e123]:
+                    - button [ref=e124] [cursor=pointer]:
+                      - img [ref=e125]
+                    - spinbutton [ref=e126]
+                    - button [ref=e127] [cursor=pointer]:
+                      - img [ref=e128]
+                - cell "—" [ref=e129]
+              - row "Pork Bone-Out 13,500 g —" [ref=e130]:
+                - cell "Pork Bone-Out" [ref=e131]
+                - cell "13,500 g" [ref=e132]
+                - cell [ref=e133]:
+                  - generic [ref=e134]:
+                    - button [ref=e135] [cursor=pointer]:
+                      - img [ref=e136]
+                    - spinbutton [ref=e137]
+                    - button [ref=e138] [cursor=pointer]:
+                      - img [ref=e139]
+                - cell "—" [ref=e140]
+              - row "Chicken Wing 6,000 g —" [ref=e141]:
+                - cell "Chicken Wing" [ref=e142]
+                - cell "6,000 g" [ref=e143]
+                - cell [ref=e144]:
+                  - generic [ref=e145]:
+                    - button [ref=e146] [cursor=pointer]:
+                      - img [ref=e147]
+                    - spinbutton [ref=e148]
+                    - button [ref=e149] [cursor=pointer]:
+                      - img [ref=e150]
+                - cell "—" [ref=e151]
+              - row "Chicken Leg 8,000 g —" [ref=e152]:
+                - cell "Chicken Leg" [ref=e153]
+                - cell "8,000 g" [ref=e154]
+                - cell [ref=e155]:
+                  - generic [ref=e156]:
+                    - button [ref=e157] [cursor=pointer]:
+                      - img [ref=e158]
+                    - spinbutton [ref=e159]
+                    - button [ref=e160] [cursor=pointer]:
+                      - img [ref=e161]
+                - cell "—" [ref=e162]
+              - row "Kimchi 25 portions —" [ref=e163]:
+                - cell "Kimchi" [ref=e164]
+                - cell "25 portions" [ref=e165]
+                - cell [ref=e166]:
+                  - generic [ref=e167]:
+                    - button [ref=e168] [cursor=pointer]:
+                      - img [ref=e169]
+                    - spinbutton [ref=e170]
+                    - button [ref=e171] [cursor=pointer]:
+                      - img [ref=e172]
+                - cell "—" [ref=e173]
+              - row "Steamed Rice 21 portions —" [ref=e174]:
+                - cell "Steamed Rice" [ref=e175]
+                - cell "21 portions" [ref=e176]
+                - cell [ref=e177]:
+                  - generic [ref=e178]:
+                    - button [ref=e179] [cursor=pointer]:
+                      - img [ref=e180]
+                    - spinbutton [ref=e181]
+                    - button [ref=e182] [cursor=pointer]:
+                      - img [ref=e183]
+                - cell "—" [ref=e184]
+              - row "Soju (Original) 23 bottles —" [ref=e185]:
+                - cell "Soju (Original)" [ref=e186]
+                - cell "23 bottles" [ref=e187]
+                - cell [ref=e188]:
+                  - generic [ref=e189]:
+                    - button [ref=e190] [cursor=pointer]:
+                      - img [ref=e191]
+                    - spinbutton [ref=e192]
+                    - button [ref=e193] [cursor=pointer]:
+                      - img [ref=e194]
+                - cell "—" [ref=e195]
+              - row "Lettuce 3,000 g —" [ref=e196]:
+                - cell "Lettuce" [ref=e197]
+                - cell "3,000 g" [ref=e198]
+                - cell [ref=e199]:
+                  - generic [ref=e200]:
+                    - button [ref=e201] [cursor=pointer]:
+                      - img [ref=e202]
+                    - spinbutton [ref=e203]
+                    - button [ref=e204] [cursor=pointer]:
+                      - img [ref=e205]
+                - cell "—" [ref=e206]
+              - row "Perilla Leaves (Kkaennip) 3,000 g —" [ref=e207]:
+                - cell "Perilla Leaves (Kkaennip)" [ref=e208]
+                - cell "3,000 g" [ref=e209]
+                - cell [ref=e210]:
+                  - generic [ref=e211]:
+                    - button [ref=e212] [cursor=pointer]:
+                      - img [ref=e213]
+                    - spinbutton [ref=e214]
+                    - button [ref=e215] [cursor=pointer]:
+                      - img [ref=e216]
+                - cell "—" [ref=e217]
+              - row "Garlic (Whole Cloves) 3,000 g —" [ref=e218]:
+                - cell "Garlic (Whole Cloves)" [ref=e219]
+                - cell "3,000 g" [ref=e220]
+                - cell [ref=e221]:
+                  - generic [ref=e222]:
+                    - button [ref=e223] [cursor=pointer]:
+                      - img [ref=e224]
+                    - spinbutton [ref=e225]
+                    - button [ref=e226] [cursor=pointer]:
+                      - img [ref=e227]
+                - cell "—" [ref=e228]
+              - row "Garlic (Sliced) 3,000 g —" [ref=e229]:
+                - cell "Garlic (Sliced)" [ref=e230]
+                - cell "3,000 g" [ref=e231]
+                - cell [ref=e232]:
+                  - generic [ref=e233]:
+                    - button [ref=e234] [cursor=pointer]:
+                      - img [ref=e235]
+                    - spinbutton [ref=e236]
+                    - button [ref=e237] [cursor=pointer]:
+                      - img [ref=e238]
+                - cell "—" [ref=e239]
+              - row "Green Onions / Scallions 3,000 g —" [ref=e240]:
+                - cell "Green Onions / Scallions" [ref=e241]
+                - cell "3,000 g" [ref=e242]
+                - cell [ref=e243]:
+                  - generic [ref=e244]:
+                    - button [ref=e245] [cursor=pointer]:
+                      - img [ref=e246]
+                    - spinbutton [ref=e247]
+                    - button [ref=e248] [cursor=pointer]:
+                      - img [ref=e249]
+                - cell "—" [ref=e250]
+              - row "Sliced Pork 12,000 g —" [ref=e251]:
+                - cell "Sliced Pork" [ref=e252]
+                - cell "12,000 g" [ref=e253]
+                - cell [ref=e254]:
+                  - generic [ref=e255]:
+                    - button [ref=e256] [cursor=pointer]:
+                      - img [ref=e257]
+                    - spinbutton [ref=e258]
+                    - button [ref=e259] [cursor=pointer]:
+                      - img [ref=e260]
+                - cell "—" [ref=e261]
+              - row "Jalapeño / Green Chilies 3,000 g —" [ref=e262]:
+                - cell "Jalapeño / Green Chilies" [ref=e263]
+                - cell "3,000 g" [ref=e264]
+                - cell [ref=e265]:
+                  - generic [ref=e266]:
+                    - button [ref=e267] [cursor=pointer]:
+                      - img [ref=e268]
+                    - spinbutton [ref=e269]
+                    - button [ref=e270] [cursor=pointer]:
+                      - img [ref=e271]
+                - cell "—" [ref=e272]
+              - row "White/Yellow Onions 3,000 g —" [ref=e273]:
+                - cell "White/Yellow Onions" [ref=e274]
+                - cell "3,000 g" [ref=e275]
+                - cell [ref=e276]:
+                  - generic [ref=e277]:
+                    - button [ref=e278] [cursor=pointer]:
+                      - img [ref=e279]
+                    - spinbutton [ref=e280]
+                    - button [ref=e281] [cursor=pointer]:
+                      - img [ref=e282]
+                - cell "—" [ref=e283]
+              - row "Korean Radish (Mu) 3,000 g —" [ref=e284]:
+                - cell "Korean Radish (Mu)" [ref=e285]
+                - cell "3,000 g" [ref=e286]
+                - cell [ref=e287]:
+                  - generic [ref=e288]:
+                    - button [ref=e289] [cursor=pointer]:
+                      - img [ref=e290]
+                    - spinbutton [ref=e291]
+                    - button [ref=e292] [cursor=pointer]:
+                      - img [ref=e293]
+                - cell "—" [ref=e294]
+              - row "Enoki Mushrooms 3,000 g —" [ref=e295]:
+                - cell "Enoki Mushrooms" [ref=e296]
+                - cell "3,000 g" [ref=e297]
+                - cell [ref=e298]:
+                  - generic [ref=e299]:
+                    - button [ref=e300] [cursor=pointer]:
+                      - img [ref=e301]
+                    - spinbutton [ref=e302]
+                    - button [ref=e303] [cursor=pointer]:
+                      - img [ref=e304]
+                - cell "—" [ref=e305]
+              - row "Raw Rice (Uncooked) 38 kg —" [ref=e306]:
+                - cell "Raw Rice (Uncooked)" [ref=e307]
+                - cell "38 kg" [ref=e308]
+                - cell [ref=e309]:
+                  - generic [ref=e310]:
+                    - button [ref=e311] [cursor=pointer]:
+                      - img [ref=e312]
+                    - spinbutton [ref=e313]
+                    - button [ref=e314] [cursor=pointer]:
+                      - img [ref=e315]
+                - cell "—" [ref=e316]
+              - row "Salt 4,500 g —" [ref=e317]:
+                - cell "Salt" [ref=e318]
+                - cell "4,500 g" [ref=e319]
+                - cell [ref=e320]:
+                  - generic [ref=e321]:
+                    - button [ref=e322] [cursor=pointer]:
+                      - img [ref=e323]
+                    - spinbutton [ref=e324]
+                    - button [ref=e325] [cursor=pointer]:
+                      - img [ref=e326]
+                - cell "—" [ref=e327]
+              - row "Black Pepper (Ground) 750 g —" [ref=e328]:
+                - cell "Black Pepper (Ground)" [ref=e329]
+                - cell "750 g" [ref=e330]
+                - cell [ref=e331]:
+                  - generic [ref=e332]:
+                    - button [ref=e333] [cursor=pointer]:
+                      - img [ref=e334]
+                    - spinbutton [ref=e335]
+                    - button [ref=e336] [cursor=pointer]:
+                      - img [ref=e337]
+                - cell "—" [ref=e338]
+              - row "Sugar 3,000 g —" [ref=e339]:
+                - cell "Sugar" [ref=e340]
+                - cell "3,000 g" [ref=e341]
+                - cell [ref=e342]:
+                  - generic [ref=e343]:
+                    - button [ref=e344] [cursor=pointer]:
+                      - img [ref=e345]
+                    - spinbutton [ref=e346]
+                    - button [ref=e347] [cursor=pointer]:
+                      - img [ref=e348]
+                - cell "—" [ref=e349]
+              - row "Cooking Oil 7,500 ml —" [ref=e350]:
+                - cell "Cooking Oil" [ref=e351]
+                - cell "7,500 ml" [ref=e352]
+                - cell [ref=e353]:
+                  - generic [ref=e354]:
+                    - button [ref=e355] [cursor=pointer]:
+                      - img [ref=e356]
+                    - spinbutton [ref=e357]
+                    - button [ref=e358] [cursor=pointer]:
+                      - img [ref=e359]
+                - cell "—" [ref=e360]
+              - row "Sesame Seeds (Roasted) 1,500 g —" [ref=e361]:
+                - cell "Sesame Seeds (Roasted)" [ref=e362]
+                - cell "1,500 g" [ref=e363]
+                - cell [ref=e364]:
+                  - generic [ref=e365]:
+                    - button [ref=e366] [cursor=pointer]:
+                      - img [ref=e367]
+                    - spinbutton [ref=e368]
+                    - button [ref=e369] [cursor=pointer]:
+                      - img [ref=e370]
+                - cell "—" [ref=e371]
+              - row "Eggs 90 pcs —" [ref=e372]:
+                - cell "Eggs" [ref=e373]
+                - cell "90 pcs" [ref=e374]
+                - cell [ref=e375]:
+                  - generic [ref=e376]:
+                    - button [ref=e377] [cursor=pointer]:
+                      - img [ref=e378]
+                    - spinbutton [ref=e379]
+                    - button [ref=e380] [cursor=pointer]:
+                      - img [ref=e381]
+                - cell "—" [ref=e382]
+              - row "Tofu 15 blocks —" [ref=e383]:
+                - cell "Tofu" [ref=e384]
+                - cell "15 blocks" [ref=e385]
+                - cell [ref=e386]:
+                  - generic [ref=e387]:
+                    - button [ref=e388] [cursor=pointer]:
+                      - img [ref=e389]
+                    - spinbutton [ref=e390]
+                    - button [ref=e391] [cursor=pointer]:
+                      - img [ref=e392]
+                - cell "—" [ref=e393]
+              - row "Dried Seaweed (Gim) 30 packs —" [ref=e394]:
+                - cell "Dried Seaweed (Gim)" [ref=e395]
+                - cell "30 packs" [ref=e396]
+                - cell [ref=e397]:
+                  - generic [ref=e398]:
+                    - button [ref=e399] [cursor=pointer]:
+                      - img [ref=e400]
+                    - spinbutton [ref=e401]
+                    - button [ref=e402] [cursor=pointer]:
+                      - img [ref=e403]
+                - cell "—" [ref=e404]
+              - row "Tteok (Rice Cakes) 4,500 g —" [ref=e405]:
+                - cell "Tteok (Rice Cakes)" [ref=e406]
+                - cell "4,500 g" [ref=e407]
+                - cell [ref=e408]:
+                  - generic [ref=e409]:
+                    - button [ref=e410] [cursor=pointer]:
+                      - img [ref=e411]
+                    - spinbutton [ref=e412]
+                    - button [ref=e413] [cursor=pointer]:
+                      - img [ref=e414]
+                - cell "—" [ref=e415]
+              - row "Button Mushrooms 3,000 g —" [ref=e416]:
+                - cell "Button Mushrooms" [ref=e417]
+                - cell "3,000 g" [ref=e418]
+                - cell [ref=e419]:
+                  - generic [ref=e420]:
+                    - button [ref=e421] [cursor=pointer]:
+                      - img [ref=e422]
+                    - spinbutton [ref=e423]
+                    - button [ref=e424] [cursor=pointer]:
+                      - img [ref=e425]
+                - cell "—" [ref=e426]
+              - row "Flour 3,000 g —" [ref=e427]:
+                - cell "Flour" [ref=e428]
+                - cell "3,000 g" [ref=e429]
+                - cell [ref=e430]:
+                  - generic [ref=e431]:
+                    - button [ref=e432] [cursor=pointer]:
+                      - img [ref=e433]
+                    - spinbutton [ref=e434]
+                    - button [ref=e435] [cursor=pointer]:
+                      - img [ref=e436]
+                - cell "—" [ref=e437]
+              - row "Cornstarch 1,500 g —" [ref=e438]:
+                - cell "Cornstarch" [ref=e439]
+                - cell "1,500 g" [ref=e440]
+                - cell [ref=e441]:
+                  - generic [ref=e442]:
+                    - button [ref=e443] [cursor=pointer]:
+                      - img [ref=e444]
+                    - spinbutton [ref=e445]
+                    - button [ref=e446] [cursor=pointer]:
+                      - img [ref=e447]
+                - cell "—" [ref=e448]
+              - row "Vinegar 3,000 ml —" [ref=e449]:
+                - cell "Vinegar" [ref=e450]
+                - cell "3,000 ml" [ref=e451]
+                - cell [ref=e452]:
+                  - generic [ref=e453]:
+                    - button [ref=e454] [cursor=pointer]:
+                      - img [ref=e455]
+                    - spinbutton [ref=e456]
+                    - button [ref=e457] [cursor=pointer]:
+                      - img [ref=e458]
+                - cell "—" [ref=e459]
+              - row "Dangmyeon (Glass Noodles) 3,000 g —" [ref=e460]:
+                - cell "Dangmyeon (Glass Noodles)" [ref=e461]
+                - cell "3,000 g" [ref=e462]
+                - cell [ref=e463]:
+                  - generic [ref=e464]:
+                    - button [ref=e465] [cursor=pointer]:
+                      - img [ref=e466]
+                    - spinbutton [ref=e467]
+                    - button [ref=e468] [cursor=pointer]:
+                      - img [ref=e469]
+                - cell "—" [ref=e470]
+              - row "Charcoal 30 kg —" [ref=e471]:
+                - cell "Charcoal" [ref=e472]
+                - cell "30 kg" [ref=e473]
+                - cell [ref=e474]:
+                  - generic [ref=e475]:
+                    - button [ref=e476] [cursor=pointer]:
+                      - img [ref=e477]
+                    - spinbutton [ref=e478]
+                    - button [ref=e479] [cursor=pointer]:
+                      - img [ref=e480]
+                - cell "—" [ref=e481]
+              - row "Corn 3,000 g —" [ref=e482]:
+                - cell "Corn" [ref=e483]
+                - cell "3,000 g" [ref=e484]
+                - cell [ref=e485]:
+                  - generic [ref=e486]:
+                    - button [ref=e487] [cursor=pointer]:
+                      - img [ref=e488]
+                    - spinbutton [ref=e489]
+                    - button [ref=e490] [cursor=pointer]:
+                      - img [ref=e491]
+                - cell "—" [ref=e492]
+              - row "Baguio Pechay 3,000 g —" [ref=e493]:
+                - cell "Baguio Pechay" [ref=e494]
+                - cell "3,000 g" [ref=e495]
+                - cell [ref=e496]:
+                  - generic [ref=e497]:
+                    - button [ref=e498] [cursor=pointer]:
+                      - img [ref=e499]
+                    - spinbutton [ref=e500]
+                    - button [ref=e501] [cursor=pointer]:
+                      - img [ref=e502]
+                - cell "—" [ref=e503]
+              - row "Squash 3,000 g —" [ref=e504]:
+                - cell "Squash" [ref=e505]
+                - cell "3,000 g" [ref=e506]
+                - cell [ref=e507]:
+                  - generic [ref=e508]:
+                    - button [ref=e509] [cursor=pointer]:
+                      - img [ref=e510]
+                    - spinbutton [ref=e511]
+                    - button [ref=e512] [cursor=pointer]:
+                      - img [ref=e513]
+                - cell "—" [ref=e514]
+              - row "Baechu Kimchi 30 portions —" [ref=e515]:
+                - cell "Baechu Kimchi" [ref=e516]
+                - cell "30 portions" [ref=e517]
+                - cell [ref=e518]:
+                  - generic [ref=e519]:
+                    - button [ref=e520] [cursor=pointer]:
+                      - img [ref=e521]
+                    - spinbutton [ref=e522]
+                    - button [ref=e523] [cursor=pointer]:
+                      - img [ref=e524]
+                - cell "—" [ref=e525]
+              - row "Kkakdugi 30 portions —" [ref=e526]:
+                - cell "Kkakdugi" [ref=e527]
+                - cell "30 portions" [ref=e528]
+                - cell [ref=e529]:
+                  - generic [ref=e530]:
+                    - button [ref=e531] [cursor=pointer]:
+                      - img [ref=e532]
+                    - spinbutton [ref=e533]
+                    - button [ref=e534] [cursor=pointer]:
+                      - img [ref=e535]
+                - cell "—" [ref=e536]
+              - row "Pork Bones 2,850 g —" [ref=e537]:
+                - cell "Pork Bones" [ref=e538]
+                - cell "2,850 g" [ref=e539]
+                - cell [ref=e540]:
+                  - generic [ref=e541]:
+                    - button [ref=e542] [cursor=pointer]:
+                      - img [ref=e543]
+                    - spinbutton [ref=e544]
+                    - button [ref=e545] [cursor=pointer]:
+                      - img [ref=e546]
+                - cell "—" [ref=e547]
+              - row "Kongnamul-muchim 30 portions —" [ref=e548]:
+                - cell "Kongnamul-muchim" [ref=e549]
+                - cell "30 portions" [ref=e550]
+                - cell [ref=e551]:
+                  - generic [ref=e552]:
+                    - button [ref=e553] [cursor=pointer]:
+                      - img [ref=e554]
+                    - spinbutton [ref=e555]
+                    - button [ref=e556] [cursor=pointer]:
+                      - img [ref=e557]
+                - cell "—" [ref=e558]
+              - row "Oi Muchim 30 portions —" [ref=e559]:
+                - cell "Oi Muchim" [ref=e560]
+                - cell "30 portions" [ref=e561]
+                - cell [ref=e562]:
+                  - generic [ref=e563]:
+                    - button [ref=e564] [cursor=pointer]:
+                      - img [ref=e565]
+                    - spinbutton [ref=e566]
+                    - button [ref=e567] [cursor=pointer]:
+                      - img [ref=e568]
+                - cell "—" [ref=e569]
+              - row "Pickled White Onions 30 portions —" [ref=e570]:
+                - cell "Pickled White Onions" [ref=e571]
+                - cell "30 portions" [ref=e572]
+                - cell [ref=e573]:
+                  - generic [ref=e574]:
+                    - button [ref=e575] [cursor=pointer]:
+                      - img [ref=e576]
+                    - spinbutton [ref=e577]
+                    - button [ref=e578] [cursor=pointer]:
+                      - img [ref=e579]
+                - cell "—" [ref=e580]
+              - row "Pickled Daikon Radish 30 portions —" [ref=e581]:
+                - cell "Pickled Daikon Radish" [ref=e582]
+                - cell "30 portions" [ref=e583]
+                - cell [ref=e584]:
+                  - generic [ref=e585]:
+                    - button [ref=e586] [cursor=pointer]:
+                      - img [ref=e587]
+                    - spinbutton [ref=e588]
+                    - button [ref=e589] [cursor=pointer]:
+                      - img [ref=e590]
+                - cell "—" [ref=e591]
+              - row "Eomuk Bokkeum 30 portions —" [ref=e592]:
+                - cell "Eomuk Bokkeum" [ref=e593]
+                - cell "30 portions" [ref=e594]
+                - cell [ref=e595]:
+                  - generic [ref=e596]:
+                    - button [ref=e597] [cursor=pointer]:
+                      - img [ref=e598]
+                    - spinbutton [ref=e599]
+                    - button [ref=e600] [cursor=pointer]:
+                      - img [ref=e601]
+                - cell "—" [ref=e602]
+              - row "Japchae 30 portions —" [ref=e603]:
+                - cell "Japchae" [ref=e604]
+                - cell "30 portions" [ref=e605]
+                - cell [ref=e606]:
+                  - generic [ref=e607]:
+                    - button [ref=e608] [cursor=pointer]:
+                      - img [ref=e609]
+                    - spinbutton [ref=e610]
+                    - button [ref=e611] [cursor=pointer]:
+                      - img [ref=e612]
+                - cell "—" [ref=e613]
+              - row "Gamja Jorim 30 portions —" [ref=e614]:
+                - cell "Gamja Jorim" [ref=e615]
+                - cell "30 portions" [ref=e616]
+                - cell [ref=e617]:
+                  - generic [ref=e618]:
+                    - button [ref=e619] [cursor=pointer]:
+                      - img [ref=e620]
+                    - spinbutton [ref=e621]
+                    - button [ref=e622] [cursor=pointer]:
+                      - img [ref=e623]
+                - cell "—" [ref=e624]
+              - row "Gyeran-jjim 30 portions —" [ref=e625]:
+                - cell "Gyeran-jjim" [ref=e626]
+                - cell "30 portions" [ref=e627]
+                - cell [ref=e628]:
+                  - generic [ref=e629]:
+                    - button [ref=e630] [cursor=pointer]:
+                      - img [ref=e631]
+                    - spinbutton [ref=e632]
+                    - button [ref=e633] [cursor=pointer]:
+                      - img [ref=e634]
+                - cell "—" [ref=e635]
+              - row "Pajeon 30 portions —" [ref=e636]:
+                - cell "Pajeon" [ref=e637]
+                - cell "30 portions" [ref=e638]
+                - cell [ref=e639]:
+                  - generic [ref=e640]:
+                    - button [ref=e641] [cursor=pointer]:
+                      - img [ref=e642]
+                    - spinbutton [ref=e643]
+                    - button [ref=e644] [cursor=pointer]:
+                      - img [ref=e645]
+                - cell "—" [ref=e646]
+              - row "Gamja Salad 30 portions —" [ref=e647]:
+                - cell "Gamja Salad" [ref=e648]
+                - cell "30 portions" [ref=e649]
+                - cell [ref=e650]:
+                  - generic [ref=e651]:
+                    - button [ref=e652] [cursor=pointer]:
+                      - img [ref=e653]
+                    - spinbutton [ref=e654]
+                    - button [ref=e655] [cursor=pointer]:
+                      - img [ref=e656]
+                - cell "—" [ref=e657]
+              - row "Pork Trimmings 1,500 g —" [ref=e658]:
+                - cell "Pork Trimmings" [ref=e659]
+                - cell "1,500 g" [ref=e660]
+                - cell [ref=e661]:
+                  - generic [ref=e662]:
+                    - button [ref=e663] [cursor=pointer]:
+                      - img [ref=e664]
+                    - spinbutton [ref=e665]
+                    - button [ref=e666] [cursor=pointer]:
+                      - img [ref=e667]
+                - cell "—" [ref=e668]
+              - row "Cheesy Tteokbokki 30 portions —" [ref=e669]:
+                - cell "Cheesy Tteokbokki" [ref=e670]
+                - cell "30 portions" [ref=e671]
+                - cell [ref=e672]:
+                  - generic [ref=e673]:
+                    - button [ref=e674] [cursor=pointer]:
+                      - img [ref=e675]
+                    - spinbutton [ref=e676]
+                    - button [ref=e677] [cursor=pointer]:
+                      - img [ref=e678]
+                - cell "—" [ref=e679]
+              - row "Gochujang 3,000 g —" [ref=e680]:
+                - cell "Gochujang" [ref=e681]
+                - cell "3,000 g" [ref=e682]
+                - cell [ref=e683]:
+                  - generic [ref=e684]:
+                    - button [ref=e685] [cursor=pointer]:
+                      - img [ref=e686]
+                    - spinbutton [ref=e687]
+                    - button [ref=e688] [cursor=pointer]:
+                      - img [ref=e689]
+                - cell "—" [ref=e690]
+              - row "Doenjang 3,000 g —" [ref=e691]:
+                - cell "Doenjang" [ref=e692]
+                - cell "3,000 g" [ref=e693]
+                - cell [ref=e694]:
+                  - generic [ref=e695]:
+                    - button [ref=e696] [cursor=pointer]:
+                      - img [ref=e697]
+                    - spinbutton [ref=e698]
+                    - button [ref=e699] [cursor=pointer]:
+                      - img [ref=e700]
+                - cell "—" [ref=e701]
+              - row "Gochugaru (Coarse) 3,000 g —" [ref=e702]:
+                - cell "Gochugaru (Coarse)" [ref=e703]
+                - cell "3,000 g" [ref=e704]
+                - cell [ref=e705]:
+                  - generic [ref=e706]:
+                    - button [ref=e707] [cursor=pointer]:
+                      - img [ref=e708]
+                    - spinbutton [ref=e709]
+                    - button [ref=e710] [cursor=pointer]:
+                      - img [ref=e711]
+                - cell "—" [ref=e712]
+              - row "Gochugaru (Fine) 3,000 g —" [ref=e713]:
+                - cell "Gochugaru (Fine)" [ref=e714]
+                - cell "3,000 g" [ref=e715]
+                - cell [ref=e716]:
+                  - generic [ref=e717]:
+                    - button [ref=e718] [cursor=pointer]:
+                      - img [ref=e719]
+                    - spinbutton [ref=e720]
+                    - button [ref=e721] [cursor=pointer]:
+                      - img [ref=e722]
+                - cell "—" [ref=e723]
+              - row "Jin-ganjang (Dark Soy Sauce) 3,000 ml —" [ref=e724]:
+                - cell "Jin-ganjang (Dark Soy Sauce)" [ref=e725]
+                - cell "3,000 ml" [ref=e726]
+                - cell [ref=e727]:
+                  - generic [ref=e728]:
+                    - button [ref=e729] [cursor=pointer]:
+                      - img [ref=e730]
+                    - spinbutton [ref=e731]
+                    - button [ref=e732] [cursor=pointer]:
+                      - img [ref=e733]
+                - cell "—" [ref=e734]
+              - row "Guk-ganjang (Soup Soy Sauce) 3,000 ml —" [ref=e735]:
+                - cell "Guk-ganjang (Soup Soy Sauce)" [ref=e736]
+                - cell "3,000 ml" [ref=e737]
+                - cell [ref=e738]:
+                  - generic [ref=e739]:
+                    - button [ref=e740] [cursor=pointer]:
+                      - img [ref=e741]
+                    - spinbutton [ref=e742]
+                    - button [ref=e743] [cursor=pointer]:
+                      - img [ref=e744]
+                - cell "—" [ref=e745]
+              - row "Yangjo-ganjang (Brewed Soy) 3,000 ml —" [ref=e746]:
+                - cell "Yangjo-ganjang (Brewed Soy)" [ref=e747]
+                - cell "3,000 ml" [ref=e748]
+                - cell [ref=e749]:
+                  - generic [ref=e750]:
+                    - button [ref=e751] [cursor=pointer]:
+                      - img [ref=e752]
+                    - spinbutton [ref=e753]
+                    - button [ref=e754] [cursor=pointer]:
+                      - img [ref=e755]
+                - cell "—" [ref=e756]
+              - row "Toasted Sesame Oil 3,000 ml —" [ref=e757]:
+                - cell "Toasted Sesame Oil" [ref=e758]
+                - cell "3,000 ml" [ref=e759]
+                - cell [ref=e760]:
+                  - generic [ref=e761]:
+                    - button [ref=e762] [cursor=pointer]:
+                      - img [ref=e763]
+                    - spinbutton [ref=e764]
+                    - button [ref=e765] [cursor=pointer]:
+                      - img [ref=e766]
+                - cell "—" [ref=e767]
+              - row "Mulyeot (Corn/Rice Syrup) 3,000 ml —" [ref=e768]:
+                - cell "Mulyeot (Corn/Rice Syrup)" [ref=e769]
+                - cell "3,000 ml" [ref=e770]
+                - cell [ref=e771]:
+                  - generic [ref=e772]:
+                    - button [ref=e773] [cursor=pointer]:
+                      - img [ref=e774]
+                    - spinbutton [ref=e775]
+                    - button [ref=e776] [cursor=pointer]:
+                      - img [ref=e777]
+                - cell "—" [ref=e778]
+              - row "Beef Bone-In 9,500 g —" [ref=e779]:
+                - cell "Beef Bone-In" [ref=e780]
+                - cell "9,500 g" [ref=e781]
+                - cell [ref=e782]:
+                  - generic [ref=e783]:
+                    - button [ref=e784] [cursor=pointer]:
+                      - img [ref=e785]
+                    - spinbutton [ref=e786]
+                    - button [ref=e787] [cursor=pointer]:
+                      - img [ref=e788]
+                - cell "—" [ref=e789]
+              - row "Mirin / Rice Wine 3,000 ml —" [ref=e790]:
+                - cell "Mirin / Rice Wine" [ref=e791]
+                - cell "3,000 ml" [ref=e792]
+                - cell [ref=e793]:
+                  - generic [ref=e794]:
+                    - button [ref=e795] [cursor=pointer]:
+                      - img [ref=e796]
+                    - spinbutton [ref=e797]
+                    - button [ref=e798] [cursor=pointer]:
+                      - img [ref=e799]
+                - cell "—" [ref=e800]
+              - row "Aekjeot (Fish Sauce) 3,000 ml —" [ref=e801]:
+                - cell "Aekjeot (Fish Sauce)" [ref=e802]
+                - cell "3,000 ml" [ref=e803]
+                - cell [ref=e804]:
+                  - generic [ref=e805]:
+                    - button [ref=e806] [cursor=pointer]:
+                      - img [ref=e807]
+                    - spinbutton [ref=e808]
+                    - button [ref=e809] [cursor=pointer]:
+                      - img [ref=e810]
+                - cell "—" [ref=e811]
+              - row "Dasida (Beef Stock Powder) 3,000 ml —" [ref=e812]:
+                - cell "Dasida (Beef Stock Powder)" [ref=e813]
+                - cell "3,000 ml" [ref=e814]
+                - cell [ref=e815]:
+                  - generic [ref=e816]:
+                    - button [ref=e817] [cursor=pointer]:
+                      - img [ref=e818]
+                    - spinbutton [ref=e819]
+                    - button [ref=e820] [cursor=pointer]:
+                      - img [ref=e821]
+                - cell "—" [ref=e822]
+              - row "Mayonnaise 3,000 ml —" [ref=e823]:
+                - cell "Mayonnaise" [ref=e824]
+                - cell "3,000 ml" [ref=e825]
+                - cell [ref=e826]:
+                  - generic [ref=e827]:
+                    - button [ref=e828] [cursor=pointer]:
+                      - img [ref=e829]
+                    - spinbutton [ref=e830]
+                    - button [ref=e831] [cursor=pointer]:
+                      - img [ref=e832]
+                - cell "—" [ref=e833]
+              - row "Ssamjang 1,500 ml —" [ref=e834]:
+                - cell "Ssamjang" [ref=e835]
+                - cell "1,500 ml" [ref=e836]
+                - cell [ref=e837]:
+                  - generic [ref=e838]:
+                    - button [ref=e839] [cursor=pointer]:
+                      - img [ref=e840]
+                    - spinbutton [ref=e841]
+                    - button [ref=e842] [cursor=pointer]:
+                      - img [ref=e843]
+                - cell "—" [ref=e844]
+              - row "Sogeumjang 1,500 ml —" [ref=e845]:
+                - cell "Sogeumjang" [ref=e846]
+                - cell "1,500 ml" [ref=e847]
+                - cell [ref=e848]:
+                  - generic [ref=e849]:
+                    - button [ref=e850] [cursor=pointer]:
+                      - img [ref=e851]
+                    - spinbutton [ref=e852]
+                    - button [ref=e853] [cursor=pointer]:
+                      - img [ref=e854]
+                - cell "—" [ref=e855]
+              - row "Cheese Sauce 1,500 ml —" [ref=e856]:
+                - cell "Cheese Sauce" [ref=e857]
+                - cell "1,500 ml" [ref=e858]
+                - cell [ref=e859]:
+                  - generic [ref=e860]:
+                    - button [ref=e861] [cursor=pointer]:
+                      - img [ref=e862]
+                    - spinbutton [ref=e863]
+                    - button [ref=e864] [cursor=pointer]:
+                      - img [ref=e865]
+                - cell "—" [ref=e866]
+              - row "Wasabi Soy 1,500 ml —" [ref=e867]:
+                - cell "Wasabi Soy" [ref=e868]
+                - cell "1,500 ml" [ref=e869]
+                - cell [ref=e870]:
+                  - generic [ref=e871]:
+                    - button [ref=e872] [cursor=pointer]:
+                      - img [ref=e873]
+                    - spinbutton [ref=e874]
+                    - button [ref=e875] [cursor=pointer]:
+                      - img [ref=e876]
+                - cell "—" [ref=e877]
+              - row "Original Soju 36 bottles —" [ref=e878]:
+                - cell "Original Soju" [ref=e879]
+                - cell "36 bottles" [ref=e880]
+                - cell [ref=e881]:
+                  - generic [ref=e882]:
+                    - button [ref=e883] [cursor=pointer]:
+                      - img [ref=e884]
+                    - spinbutton [ref=e885]
+                    - button [ref=e886] [cursor=pointer]:
+                      - img [ref=e887]
+                - cell "—" [ref=e888]
+              - row "Flavored Soju - Grapefruit 36 bottles —" [ref=e889]:
+                - cell "Flavored Soju - Grapefruit" [ref=e890]
+                - cell "36 bottles" [ref=e891]
+                - cell [ref=e892]:
+                  - generic [ref=e893]:
+                    - button [ref=e894] [cursor=pointer]:
+                      - img [ref=e895]
+                    - spinbutton [ref=e896]
+                    - button [ref=e897] [cursor=pointer]:
+                      - img [ref=e898]
+                - cell "—" [ref=e899]
+              - row "Beef Bone-Out 7,500 g —" [ref=e900]:
+                - cell "Beef Bone-Out" [ref=e901]
+                - cell "7,500 g" [ref=e902]
+                - cell [ref=e903]:
+                  - generic [ref=e904]:
+                    - button [ref=e905] [cursor=pointer]:
+                      - img [ref=e906]
+                    - spinbutton [ref=e907]
+                    - button [ref=e908] [cursor=pointer]:
+                      - img [ref=e909]
+                - cell "—" [ref=e910]
+              - row "Flavored Soju - Green Grape 36 bottles —" [ref=e911]:
+                - cell "Flavored Soju - Green Grape" [ref=e912]
+                - cell "36 bottles" [ref=e913]
+                - cell [ref=e914]:
+                  - generic [ref=e915]:
+                    - button [ref=e916] [cursor=pointer]:
+                      - img [ref=e917]
+                    - spinbutton [ref=e918]
+                    - button [ref=e919] [cursor=pointer]:
+                      - img [ref=e920]
+                - cell "—" [ref=e921]
+              - row "Flavored Soju - Plum 36 bottles —" [ref=e922]:
+                - cell "Flavored Soju - Plum" [ref=e923]
+                - cell "36 bottles" [ref=e924]
+                - cell [ref=e925]:
+                  - generic [ref=e926]:
+                    - button [ref=e927] [cursor=pointer]:
+                      - img [ref=e928]
+                    - spinbutton [ref=e929]
+                    - button [ref=e930] [cursor=pointer]:
+                      - img [ref=e931]
+                - cell "—" [ref=e932]
+              - row "Flavored Soju - Strawberry 36 bottles —" [ref=e933]:
+                - cell "Flavored Soju - Strawberry" [ref=e934]
+                - cell "36 bottles" [ref=e935]
+                - cell [ref=e936]:
+                  - generic [ref=e937]:
+                    - button [ref=e938] [cursor=pointer]:
+                      - img [ref=e939]
+                    - spinbutton [ref=e940]
+                    - button [ref=e941] [cursor=pointer]:
+                      - img [ref=e942]
+                - cell "—" [ref=e943]
+              - row "Makgeolli 36 bottles —" [ref=e944]:
+                - cell "Makgeolli" [ref=e945]
+                - cell "36 bottles" [ref=e946]
+                - cell [ref=e947]:
+                  - generic [ref=e948]:
+                    - button [ref=e949] [cursor=pointer]:
+                      - img [ref=e950]
+                    - spinbutton [ref=e951]
+                    - button [ref=e952] [cursor=pointer]:
+                      - img [ref=e953]
+                - cell "—" [ref=e954]
+              - row "San Miguel Pilsen 36 bottles —" [ref=e955]:
+                - cell "San Miguel Pilsen" [ref=e956]
+                - cell "36 bottles" [ref=e957]
+                - cell [ref=e958]:
+                  - generic [ref=e959]:
+                    - button [ref=e960] [cursor=pointer]:
+                      - img [ref=e961]
+                    - spinbutton [ref=e962]
+                    - button [ref=e963] [cursor=pointer]:
+                      - img [ref=e964]
+                - cell "—" [ref=e965]
+              - row "San Miguel Light 36 bottles —" [ref=e966]:
+                - cell "San Miguel Light" [ref=e967]
+                - cell "36 bottles" [ref=e968]
+                - cell [ref=e969]:
+                  - generic [ref=e970]:
+                    - button [ref=e971] [cursor=pointer]:
+                      - img [ref=e972]
+                    - spinbutton [ref=e973]
+                    - button [ref=e974] [cursor=pointer]:
+                      - img [ref=e975]
+                - cell "—" [ref=e976]
+              - row "Red Horse 36 bottles —" [ref=e977]:
+                - cell "Red Horse" [ref=e978]
+                - cell "36 bottles" [ref=e979]
+                - cell [ref=e980]:
+                  - generic [ref=e981]:
+                    - button [ref=e982] [cursor=pointer]:
+                      - img [ref=e983]
+                    - spinbutton [ref=e984]
+                    - button [ref=e985] [cursor=pointer]:
+                      - img [ref=e986]
+                - cell "—" [ref=e987]
+              - row "Cass 36 bottles —" [ref=e988]:
+                - cell "Cass" [ref=e989]
+                - cell "36 bottles" [ref=e990]
+                - cell [ref=e991]:
+                  - generic [ref=e992]:
+                    - button [ref=e993] [cursor=pointer]:
+                      - img [ref=e994]
+                    - spinbutton [ref=e995]
+                    - button [ref=e996] [cursor=pointer]:
+                      - img [ref=e997]
+                - cell "—" [ref=e998]
+              - row "Hite 36 bottles —" [ref=e999]:
+                - cell "Hite" [ref=e1000]
+                - cell "36 bottles" [ref=e1001]
+                - cell [ref=e1002]:
+                  - generic [ref=e1003]:
+                    - button [ref=e1004] [cursor=pointer]:
+                      - img [ref=e1005]
+                    - spinbutton [ref=e1006]
+                    - button [ref=e1007] [cursor=pointer]:
+                      - img [ref=e1008]
+                - cell "—" [ref=e1009]
+              - row "OB 36 bottles —" [ref=e1010]:
+                - cell "OB" [ref=e1011]
+                - cell "36 bottles" [ref=e1012]
+                - cell [ref=e1013]:
+                  - generic [ref=e1014]:
+                    - button [ref=e1015] [cursor=pointer]:
+                      - img [ref=e1016]
+                    - spinbutton [ref=e1017]
+                    - button [ref=e1018] [cursor=pointer]:
+                      - img [ref=e1019]
+                - cell "—" [ref=e1020]
+              - row "Sliced Beef 8,500 g —" [ref=e1021]:
+                - cell "Sliced Beef" [ref=e1022]
+                - cell "8,500 g" [ref=e1023]
+                - cell [ref=e1024]:
+                  - generic [ref=e1025]:
+                    - button [ref=e1026] [cursor=pointer]:
+                      - img [ref=e1027]
+                    - spinbutton [ref=e1028]
+                    - button [ref=e1029] [cursor=pointer]:
+                      - img [ref=e1030]
+                - cell "—" [ref=e1031]
+              - row "Taedonggang 36 bottles —" [ref=e1032]:
+                - cell "Taedonggang" [ref=e1033]
+                - cell "36 bottles" [ref=e1034]
+                - cell [ref=e1035]:
+                  - generic [ref=e1036]:
+                    - button [ref=e1037] [cursor=pointer]:
+                      - img [ref=e1038]
+                    - spinbutton [ref=e1039]
+                    - button [ref=e1040] [cursor=pointer]:
+                      - img [ref=e1041]
+                - cell "—" [ref=e1042]
+              - row "Coca-Cola 36 bottles —" [ref=e1043]:
+                - cell "Coca-Cola" [ref=e1044]
+                - cell "36 bottles" [ref=e1045]
+                - cell [ref=e1046]:
+                  - generic [ref=e1047]:
+                    - button [ref=e1048] [cursor=pointer]:
+                      - img [ref=e1049]
+                    - spinbutton [ref=e1050]
+                    - button [ref=e1051] [cursor=pointer]:
+                      - img [ref=e1052]
+                - cell "—" [ref=e1053]
+              - row "Sprite 36 bottles —" [ref=e1054]:
+                - cell "Sprite" [ref=e1055]
+                - cell "36 bottles" [ref=e1056]
+                - cell [ref=e1057]:
+                  - generic [ref=e1058]:
+                    - button [ref=e1059] [cursor=pointer]:
+                      - img [ref=e1060]
+                    - spinbutton [ref=e1061]
+                    - button [ref=e1062] [cursor=pointer]:
+                      - img [ref=e1063]
+                - cell "—" [ref=e1064]
+              - row "Coke Zero 36 bottles —" [ref=e1065]:
+                - cell "Coke Zero" [ref=e1066]
+                - cell "36 bottles" [ref=e1067]
+                - cell [ref=e1068]:
+                  - generic [ref=e1069]:
+                    - button [ref=e1070] [cursor=pointer]:
+                      - img [ref=e1071]
+                    - spinbutton [ref=e1072]
+                    - button [ref=e1073] [cursor=pointer]:
+                      - img [ref=e1074]
+                - cell "—" [ref=e1075]
+              - row "Chilsung Cider 36 bottles —" [ref=e1076]:
+                - cell "Chilsung Cider" [ref=e1077]
+                - cell "36 bottles" [ref=e1078]
+                - cell [ref=e1079]:
+                  - generic [ref=e1080]:
+                    - button [ref=e1081] [cursor=pointer]:
+                      - img [ref=e1082]
+                    - spinbutton [ref=e1083]
+                    - button [ref=e1084] [cursor=pointer]:
+                      - img [ref=e1085]
+                - cell "—" [ref=e1086]
+              - row "Iced Red Tea 36 bottles —" [ref=e1087]:
+                - cell "Iced Red Tea" [ref=e1088]
+                - cell "36 bottles" [ref=e1089]
+                - cell [ref=e1090]:
+                  - generic [ref=e1091]:
+                    - button [ref=e1092] [cursor=pointer]:
+                      - img [ref=e1093]
+                    - spinbutton [ref=e1094]
+                    - button [ref=e1095] [cursor=pointer]:
+                      - img [ref=e1096]
+                - cell "—" [ref=e1097]
+              - row "Barley Tea (Boricha) 36 bottles —" [ref=e1098]:
+                - cell "Barley Tea (Boricha)" [ref=e1099]
+                - cell "36 bottles" [ref=e1100]
+                - cell [ref=e1101]:
+                  - generic [ref=e1102]:
+                    - button [ref=e1103] [cursor=pointer]:
+                      - img [ref=e1104]
+                    - spinbutton [ref=e1105]
+                    - button [ref=e1106] [cursor=pointer]:
+                      - img [ref=e1107]
+                - cell "—" [ref=e1108]
+              - row "Lemonade 36 bottles —" [ref=e1109]:
+                - cell "Lemonade" [ref=e1110]
+                - cell "36 bottles" [ref=e1111]
+                - cell [ref=e1112]:
+                  - generic [ref=e1113]:
+                    - button [ref=e1114] [cursor=pointer]:
+                      - img [ref=e1115]
+                    - spinbutton [ref=e1116]
+                    - button [ref=e1117] [cursor=pointer]:
+                      - img [ref=e1118]
+                - cell "—" [ref=e1119]
+              - row "Beef Bones 1,500 g —" [ref=e1120]:
+                - cell "Beef Bones" [ref=e1121]
+                - cell "1,500 g" [ref=e1122]
+                - cell [ref=e1123]:
+                  - generic [ref=e1124]:
+                    - button [ref=e1125] [cursor=pointer]:
+                      - img [ref=e1126]
+                    - spinbutton [ref=e1127]
+                    - button [ref=e1128] [cursor=pointer]:
+                      - img [ref=e1129]
+                - cell "—" [ref=e1130]
+              - row "Beef Trimmings 750 g —" [ref=e1131]:
+                - cell "Beef Trimmings" [ref=e1132]
+                - cell "750 g" [ref=e1133]
+                - cell [ref=e1134]:
+                  - generic [ref=e1135]:
+                    - button [ref=e1136] [cursor=pointer]:
+                      - img [ref=e1137]
+                    - spinbutton [ref=e1138]
+                    - button [ref=e1139] [cursor=pointer]:
+                      - img [ref=e1140]
+                - cell "—" [ref=e1141]
+          - button "Submit Count" [ref=e112] [cursor=pointer]
+  - generic [ref=e1142]: WTF! Samgyup POS

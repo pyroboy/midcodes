@@ -68,8 +68,8 @@
             <button onclick={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center">✕</button>
             
             <div>
-                <h2 class="text-xl font-black text-gray-900">Leftover Penalty?</h2>
-                <p class="text-sm text-gray-500">Unconsumed meat over 100g applies penalty.</p>
+                <h2 class="text-xl font-black text-gray-900">Leftover Check</h2>
+                <p class="text-sm text-gray-500">Weigh any uneaten meat. Leftovers over 100g are charged at <span class="font-semibold text-accent">₱{rate}/100g</span>. Enter 0 if plate is clean.</p>
             </div>
 
             {#if btScale.connectionStatus === 'connected'}

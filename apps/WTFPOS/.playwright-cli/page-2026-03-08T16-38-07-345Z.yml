@@ -1,0 +1,130 @@
+- generic [ref=e2]:
+  - button "📡" [ref=e3] [cursor=pointer]
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - button "Toggle sidebar" [ref=e11] [cursor=pointer]:
+        - generic [ref=e12]: W!
+      - separator [ref=e13]
+      - generic [ref=e15]:
+        - link "Receive Delivery" [ref=e16] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e17]
+        - link "Log Expense" [ref=e18] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e19]
+        - link "Log Waste" [ref=e20] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e21]
+        - link "Stock Count" [ref=e22] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e23]
+        - link "X-Reading" [ref=e24] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e25]
+        - link "Transfer Stock" [ref=e26] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e27]
+        - link "End of Day" [ref=e28] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e29]
+      - list [ref=e33]:
+        - listitem [ref=e34]:
+          - link "POS" [ref=e35] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e36]
+            - generic: POS
+        - listitem [ref=e40]:
+          - link "Kitchen" [ref=e41] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e42]
+            - generic: Kitchen
+        - listitem [ref=e43]:
+          - link "Stock" [ref=e44] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e45]
+            - generic: Stock
+        - listitem [ref=e46]:
+          - link "Reports" [ref=e47] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e48]
+            - generic: Reports
+        - listitem [ref=e49]:
+          - link "Admin" [ref=e50] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e51]
+            - generic: Admin
+      - generic [ref=e52]:
+        - separator [ref=e53]
+        - generic [ref=e55]: C
+        - link "Logout" [ref=e57] [cursor=pointer]:
+          - /url: /
+          - img [ref=e58]
+      - button "Toggle Sidebar" [ref=e61]
+    - main [ref=e62]:
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - img [ref=e65]
+          - heading "ALL LOCATIONS" [level=2] [ref=e66]
+        - button "Change Location" [ref=e67] [cursor=pointer]:
+          - img [ref=e68]
+          - text: Change Location
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - heading "Consolidated Reports" [level=1] [ref=e72]
+            - generic [ref=e73]: 🌐 All Branches
+          - navigation [ref=e74]:
+            - generic [ref=e75]:
+              - generic [ref=e76]: Operations
+              - generic [ref=e77]:
+                - link "Meat Report" [ref=e78] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e79] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e80] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e81] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e82] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e83] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e84] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e86]:
+              - generic [ref=e87]: Expenses
+              - generic [ref=e88]:
+                - link "Daily" [ref=e89] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e90] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e92]:
+              - generic [ref=e93]: Revenue & Sales
+              - generic [ref=e94]:
+                - link "Sales Summary" [ref=e95] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e96] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e97] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e99]:
+              - generic [ref=e100]: Profitability
+              - generic [ref=e101]:
+                - link "Gross Profit" [ref=e102] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e103] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e105]:
+              - generic [ref=e106]: Branch
+              - link "Compare" [ref=e108] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e110]:
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - heading "Mar 9, 2026" [level=2] [ref=e113]
+              - generic [ref=e114]: Live totals
+            - button "Start End of Day" [ref=e116] [cursor=pointer]
+          - generic [ref=e118]:
+            - generic [ref=e119]: 🙈
+            - heading "Detailed Reports Hidden" [level=3] [ref=e120]
+            - paragraph [ref=e121]: Click "Start End of Day" to begin your blind cash count and unlock today's detailed sales and variance reports.

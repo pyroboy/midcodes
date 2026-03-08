@@ -129,6 +129,7 @@ export interface OrderItem {
 	sentAt: string | null;
 	tag: 'PKG' | 'FREE' | null;
 	notes?: string;
+	addedAt?: string;
 }
 
 export type DiscountType = 'none' | 'senior' | 'pwd' | 'promo' | 'comp' | 'service_recovery';

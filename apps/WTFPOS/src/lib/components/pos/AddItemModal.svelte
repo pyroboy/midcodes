@@ -9,9 +9,27 @@
     interface Props {
         order: Order;
         onclose: () => void;
+        oncharged?: (count: number) => void;
     }
 
-    let { order, onclose }: Props = $props();
+    let { order, onclose, oncharged }: Props = $props();
+
+    // P0-2: close-guard state — show confirm when pending items exist
+    let confirmingClose = $state(false);
+
+    function tryClose() {
+        if (pendingItems.length > 0) {
+            confirmingClose = true;
+        } else {
+            onclose();
+        }
+    }
+
+    function discardAndClose() {
+        pendingItems = [];
+        confirmingClose = false;
+        onclose();
+    }
 
     const categories: { id: MenuCategory; label: string }[] = [
         { id: 'packages', label: '🎫 Package' },
@@ -30,6 +48,15 @@
     
     let weightScreenItem = $state<MenuItem | null>(null);
     let weightInput = $state('');
+    let showIncluded = $state(false);
+
+    // P1-5: Split pending items into package line vs. included (collapsed by default)
+    const hasPkg = $derived(pendingItems.some(p => p.item.category === 'packages'));
+    const pkgItem = $derived(pendingItems.find(p => p.item.category === 'packages'));
+    const includedItems = $derived(pendingItems.filter(p => p.forceFree && p.item.category !== 'packages'));
+    const addOnItems = $derived(pendingItems.filter(p => !p.forceFree && p.item.category !== 'packages'));
+    const includedMeatCount = $derived(includedItems.filter(p => p.item.category === 'meats').length);
+    const includedSideCount = $derived(includedItems.filter(p => p.item.category !== 'meats').length);
 
     const activePax = $derived(order.pax);
 
@@ -42,7 +69,11 @@
                 : categories)
     );
 
-    const filteredItems = $derived(menuItems.value.filter((m) => m.category === activeCategory && m.available));
+    const filteredItems = $derived(
+        menuItems.value
+            .filter((m) => m.category === activeCategory)
+            .sort((a, b) => (a.available === b.available ? 0 : a.available ? -1 : 1))
+    );
 
     const pendingTotal = $derived(
         pendingItems.reduce((s, p) => {
@@ -95,17 +126,19 @@
 
     function chargeToOrder() {
         if (!order) return;
+        const count = pendingItems.length;
         for (const p of pendingItems) {
             addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree, p.isTakeout ? '[TAKEOUT]' : undefined);
         }
         pendingItems = [];
+        oncharged?.(count);
         onclose();
     }
 
     function undoPending() { pendingItems = []; }
 </script>
 
-<svelte:window onkeydown={(e) => { if (e.key === 'Escape') onclose(); }} />
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') tryClose(); }} />
 
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
     <div class="flex h-[700px] w-full max-w-[1100px] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
@@ -123,7 +156,7 @@
                         <p class="text-sm text-gray-500">🔥 {order.packageName ?? 'Table'} · {order.pax} pax</p>
                     {/if}
                 </div>
-                <button onclick={onclose} class="text-gray-400 hover:text-gray-600 p-2" aria-label="Close modal">✕</button>
+                <button onclick={tryClose} class="text-gray-400 hover:text-gray-600 p-2" aria-label="Close modal">✕</button>
             </div>
 
             <div class="flex gap-2 border-b border-border bg-surface-secondary px-6 py-3">
@@ -161,6 +194,7 @@
                     <div class="flex h-full flex-col items-center justify-center gap-6">
                         <h3 class="text-3xl font-bold text-gray-900">{weightScreenItem.name}</h3>
                         <p class="text-sm text-gray-500">Enter weight from scale (grams)</p>
+                        <p class="text-xs text-status-yellow font-medium">⚠ Use actual scale weight — estimates cause stock drift. Refills can be corrected at the weigh station.</p>
                         <div class="flex flex-wrap items-center justify-center gap-3 w-[400px]">
                             {#each [100, 150, 200, 250, 300, 400] as preset}
                                 <button onclick={() => commitMeat(preset)} class="btn-secondary font-mono w-[30%]">
@@ -193,17 +227,25 @@
                     <div class="grid grid-cols-3 gap-4">
                         {#each filteredItems as item (item.id)}
                             <button
-                                onclick={() => tapItem(item)}
+                                onclick={() => item.available && tapItem(item)}
+                                disabled={!item.available}
                                 class={cn(
-                                    'relative flex flex-col gap-2.5 rounded-xl border text-left transition-all active:scale-[0.98] overflow-hidden',
-                                    pendingItems.some(p => p.item.id === item.id)
-                                        ? 'border-accent bg-accent-light'
-                                        : 'border-border bg-surface-secondary hover:border-gray-300',
+                                    'relative flex flex-col gap-2.5 rounded-xl border text-left transition-all overflow-hidden',
+                                    !item.available
+                                        ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
+                                        : pendingItems.some(p => p.item.id === item.id)
+                                            ? 'border-accent bg-accent-light active:scale-[0.98]'
+                                            : 'border-border bg-surface-secondary hover:border-gray-300 active:scale-[0.98]',
                                     item.protein === 'beef' ? '!border-l-red-500 !border-l-4' : '',
                                     item.protein === 'pork' ? '!border-l-orange-500 !border-l-4' : '',
                                     item.protein === 'chicken' ? '!border-l-yellow-500 !border-l-4' : ''
                                 )}
                             >
+                                {#if !item.available}
+                                    <div class="absolute inset-0 z-10 flex items-center justify-center">
+                                        <span class="rounded-lg bg-gray-900/70 px-3 py-1.5 text-xs font-bold text-white uppercase tracking-wider">Sold Out</span>
+                                    </div>
+                                {/if}
                                 {#if item.image}
                                     <div class="w-full h-28 bg-gray-100">
                                         <img src={item.image} alt={item.name} class="w-full h-full object-cover" />
@@ -261,15 +303,73 @@
                     <div class="flex h-full items-center justify-center text-sm text-gray-400 py-12">
                         No items yet
                     </div>
+                {:else if hasPkg}
+                    <!-- P1-5: Package with collapsed included items -->
+                    {#if pkgItem}
+                        <div class="flex items-center justify-between py-3">
+                            <div class="flex flex-col gap-0.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-medium text-gray-900">{pkgItem.item.name}</span>
+                                    <span class="rounded bg-accent-light px-1.5 py-0.5 text-[10px] font-bold text-accent">PKG</span>
+                                </div>
+                                <span class="text-xs text-gray-400">× {activePax} pax</span>
+                            </div>
+                        </div>
+                    {/if}
+                    {#if includedItems.length > 0}
+                        <button
+                            onclick={() => showIncluded = !showIncluded}
+                            class="flex items-center justify-between w-full py-2 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                            <span>Includes {includedMeatCount > 0 ? `${includedMeatCount} meats` : ''}{includedMeatCount > 0 && includedSideCount > 0 ? ', ' : ''}{includedSideCount > 0 ? `${includedSideCount} sides` : ''}</span>
+                            <span class="text-[10px]">{showIncluded ? '▲ hide' : '▼ show'}</span>
+                        </button>
+                        {#if showIncluded}
+                            {#each includedItems as p}
+                                <div class="flex items-center justify-between py-2 pl-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs text-gray-500">{p.item.name}</span>
+                                        <span class="rounded bg-status-green-light px-1 py-0.5 text-[9px] font-bold text-status-green">FREE</span>
+                                    </div>
+                                </div>
+                            {/each}
+                        {/if}
+                    {/if}
+                    <!-- Non-free add-ons still show normally -->
+                    {#each addOnItems as p}
+                        {@const idx = pendingItems.indexOf(p)}
+                        <div class="flex items-center justify-between py-3">
+                            <div class="flex flex-col gap-0.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-medium text-gray-900">{p.item.name}</span>
+                                </div>
+                                {#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                {#if order.orderType === 'dine-in'}
+                                    <button
+                                        onclick={() => p.isTakeout = !p.isTakeout}
+                                        class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
+                                    >
+                                        {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
+                                    </button>
+                                {/if}
+                                <div class="flex items-center gap-1.5 ml-1">
+                                    <button onclick={() => changeQty(idx, -1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">−</button>
+                                    <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
+                                    <button onclick={() => changeQty(idx, +1)} class="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200" style="min-height: unset">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
                 {:else}
+                    <!-- Non-package items (takeout, etc.) — flat list -->
                     {#each pendingItems as p, idx (p.item.id + idx)}
                         <div class="flex items-center justify-between py-3">
                             <div class="flex flex-col gap-0.5">
                                 <div class="flex items-center gap-2">
                                     <span class="text-sm font-medium text-gray-900">{p.item.name}</span>
-                                    {#if p.item.category === 'packages'}
-                                        <span class="rounded bg-accent-light px-1.5 py-0.5 text-[10px] font-bold text-accent">PKG</span>
-                                    {:else if p.forceFree}
+                                    {#if p.forceFree}
                                         <span class="rounded bg-status-green-light px-1.5 py-0.5 text-[10px] font-bold text-status-green">FREE</span>
                                     {/if}
                                 </div>
@@ -315,3 +415,19 @@
         </div>
     </div>
 </div>
+
+{#if confirmingClose}
+    <!-- P0-2: Confirm discard of uncommitted pending items -->
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+        <div class="pos-card flex flex-col gap-4 p-6 w-[340px]">
+            <div class="flex flex-col gap-1">
+                <p class="text-base font-bold text-gray-900">Discard {pendingItems.length} pending item{pendingItems.length !== 1 ? 's' : ''}?</p>
+                <p class="text-sm text-gray-500">These items have not been charged yet and will not be sent to the kitchen.</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick={() => { confirmingClose = false; }} class="btn-secondary flex-1 text-sm" style="min-height: 44px">Keep Editing</button>
+                <button onclick={discardAndClose} class="btn-danger flex-1 text-sm" style="min-height: 44px">Discard</button>
+            </div>
+        </div>
+    </div>
+{/if}

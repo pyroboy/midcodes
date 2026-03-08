@@ -12,6 +12,7 @@
  */
 
 import { orders } from './pos/orders.svelte';
+import { MANAGER_PIN } from './session.svelte';
 
 // ─── Critical Action Registry ─────────────────────────────────────────────────
 
@@ -127,8 +128,7 @@ export function getActiveServiceInfo(locationId: string): ActiveServiceInfo {
 
 // ─── Manager PIN ──────────────────────────────────────────────────────────────
 
-/** Manager override PIN. Stored here as the single source of truth. */
-export const MANAGER_PIN = '1234';
+export { MANAGER_PIN } from './session.svelte';
 
 export function verifyManagerPin(input: string): boolean {
 	return input === MANAGER_PIN;

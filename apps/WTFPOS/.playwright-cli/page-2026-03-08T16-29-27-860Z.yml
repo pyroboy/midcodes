@@ -1,0 +1,157 @@
+- generic [ref=e2]:
+  - generic [ref=e138]:
+    - generic [ref=e142]:
+      - button "Toggle sidebar" [ref=e145] [cursor=pointer]:
+        - generic [ref=e146]: W!
+      - separator [ref=e147]
+      - generic [ref=e149]:
+        - link "Receive Delivery" [ref=e150] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e151]
+        - link "Log Expense" [ref=e152] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e153]
+        - link "Log Waste" [ref=e154] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e155]
+        - link "Stock Count" [ref=e156] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e157]
+        - link "X-Reading" [ref=e158] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e159]
+        - link "Transfer Stock" [ref=e160] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e161]
+        - link "End of Day" [ref=e162] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e163]
+      - list [ref=e167]:
+        - listitem [ref=e168]:
+          - link "POS" [ref=e169] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e170]
+            - generic: POS
+        - listitem [ref=e171]:
+          - link "Kitchen" [ref=e172] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e173]
+            - generic: Kitchen
+        - listitem [ref=e174]:
+          - link "Stock" [ref=e175] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e176]
+            - generic: Stock
+        - listitem [ref=e177]:
+          - link "Reports" [ref=e178] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e179]
+            - generic: Reports
+      - generic [ref=e180]:
+        - separator [ref=e181]
+        - generic [ref=e183]: J
+        - link "Logout" [ref=e185] [cursor=pointer]:
+          - /url: /
+          - img [ref=e186]
+      - button "Toggle Sidebar" [ref=e187]
+    - main [ref=e188]:
+      - generic [ref=e189]:
+        - generic [ref=e190]:
+          - img [ref=e191]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e192]
+        - button "Change Location" [ref=e193] [cursor=pointer]:
+          - img [ref=e194]
+          - text: Change Location
+      - generic [ref=e196]:
+        - generic [ref=e197]:
+          - generic [ref=e198]:
+            - generic [ref=e199]:
+              - button "Toggle Sidebar" [ref=e200] [cursor=pointer]:
+                - img
+                - generic [ref=e201]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e202]
+              - generic [ref=e203]: 0 occ
+              - generic [ref=e204]: 8 free
+            - generic [ref=e205]:
+              - button "Toggle color legend" [ref=e207] [cursor=pointer]:
+                - img [ref=e208]
+              - button "📦 New Takeout" [ref=e209] [cursor=pointer]
+              - button "🧾 History 54" [ref=e210] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e211]: "54"
+          - img [ref=e213]:
+            - button "Table T1" [ref=e216] [cursor=pointer]:
+              - generic: T1
+              - generic: cap 4
+            - button "Table T2" [ref=e218] [cursor=pointer]:
+              - generic: T2
+              - generic: cap 4
+            - button "Table T3" [ref=e220] [cursor=pointer]:
+              - generic: T3
+              - generic: cap 4
+            - button "Table T4" [ref=e222] [cursor=pointer]:
+              - generic: T4
+              - generic: cap 4
+            - button "Table T5" [ref=e224] [cursor=pointer]:
+              - generic: T5
+              - generic: cap 4
+            - button "Table T6" [ref=e226] [cursor=pointer]:
+              - generic: T6
+              - generic: cap 4
+            - button "Table T7" [ref=e228] [cursor=pointer]:
+              - generic: T7
+              - generic: cap 2
+            - button "Table T8" [ref=e230] [cursor=pointer]:
+              - generic: T8
+              - generic: cap 2
+          - generic [ref=e232]:
+            - heading "📦 Takeout Orders 2" [level=2] [ref=e233]:
+              - text: 📦 Takeout Orders
+              - generic [ref=e234]: "2"
+            - generic [ref=e235]:
+              - generic [ref=e236]:
+                - button "#TO01 Maria ₱860.00 6 items" [ref=e237] [cursor=pointer]:
+                  - text: "#TO01"
+                  - generic [ref=e238]: Maria
+                  - text: ₱860.00
+                  - generic [ref=e239]: 6 items
+                - generic [ref=e240]: PREP
+                - button "→ Mark Ready" [ref=e241] [cursor=pointer]
+              - generic [ref=e242]:
+                - button "#TO02 Ana ₱596.00 3 items" [ref=e243] [cursor=pointer]:
+                  - text: "#TO02"
+                  - generic [ref=e244]: Ana
+                  - text: ₱596.00
+                  - generic [ref=e245]: 3 items
+                - generic [ref=e246]: PREP
+                - button "→ Mark Ready" [ref=e247] [cursor=pointer]
+        - generic [ref=e249]:
+          - generic [ref=e250]: 🧾
+          - generic [ref=e251]:
+            - generic [ref=e252]: No Table Selected
+            - generic [ref=e253]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e254]:
+            - generic [ref=e255]: Green = available — tap to open
+            - generic [ref=e257]: Orange = occupied — tap to view bill
+      - generic [ref=e260]:
+        - generic [ref=e261]:
+          - generic [ref=e262]: 🏦
+          - heading "Start Your Shift" [level=2] [ref=e263]
+          - paragraph [ref=e264]:
+            - text: Declare your opening cash float before accessing the POS.
+            - generic [ref=e265]:
+              - text: Logged as
+              - strong [ref=e266]: Juan Reyes
+        - generic [ref=e267]:
+          - generic [ref=e268]: Quick Select
+          - generic [ref=e269]:
+            - button "₱1,000" [ref=e270] [cursor=pointer]
+            - button "₱2,000" [ref=e271] [cursor=pointer]
+            - button "₱3,000" [ref=e272] [cursor=pointer]
+            - button "₱5,000" [ref=e273] [cursor=pointer]
+        - generic [ref=e274]:
+          - generic [ref=e275]: Opening Cash Float (₱)
+          - spinbutton [ref=e276]: "0"
+        - button "Start Shift →" [ref=e277] [cursor=pointer]
+        - paragraph [ref=e278]: You can enter ₱0 if no opening float is provided.
+  - generic [ref=e109]: WTF! Samgyup POS

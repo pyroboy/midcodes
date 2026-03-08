@@ -1,0 +1,151 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - generic [ref=e14]:
+        - link "Receive Delivery" [ref=e15] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e16]
+        - link "Log Expense" [ref=e17] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e18]
+        - link "Log Waste" [ref=e19] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e20]
+        - link "Stock Count" [ref=e21] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e22]
+        - link "X-Reading" [ref=e23] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e24]
+        - link "Transfer Stock" [ref=e25] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e26]
+        - link "End of Day" [ref=e27] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e28]
+      - list [ref=e32]:
+        - listitem [ref=e33]:
+          - link "POS" [ref=e34] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e35]
+            - generic: POS
+        - listitem [ref=e39]:
+          - link "Kitchen" [ref=e40] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e41]
+            - generic: Kitchen
+        - listitem [ref=e42]:
+          - link "Stock" [ref=e43] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e44]
+            - generic: Stock
+        - listitem [ref=e45]:
+          - link "Reports" [ref=e46] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e47]
+            - generic: Reports
+      - generic [ref=e48]:
+        - separator [ref=e49]
+        - generic [ref=e51]: J
+        - link "Logout" [ref=e53] [cursor=pointer]:
+          - /url: /
+          - img [ref=e54]
+      - button "Toggle Sidebar" [ref=e57]
+    - main [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - img [ref=e61]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e62]
+        - button "Change Location" [ref=e63] [cursor=pointer]:
+          - img [ref=e64]
+          - text: Change Location
+      - generic [ref=e312]:
+        - generic [ref=e313]:
+          - heading "Consolidated Reports" [level=1] [ref=e315]
+          - navigation [ref=e316]:
+            - generic [ref=e317]:
+              - generic [ref=e318]: Operations
+              - generic [ref=e319]:
+                - link "Meat Report" [ref=e320] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e321] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e322] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e323] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e324] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e325] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e326] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e328]:
+              - generic [ref=e329]: Expenses
+              - generic [ref=e330]:
+                - link "Daily" [ref=e331] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e332] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e334]:
+              - generic [ref=e335]: Revenue & Sales
+              - generic [ref=e336]:
+                - link "Sales Summary" [ref=e337] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e338] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e339] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e341]:
+              - generic [ref=e342]: Profitability
+              - generic [ref=e343]:
+                - link "Gross Profit" [ref=e344] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e345] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e347]:
+              - generic [ref=e348]: Branch
+              - link "Compare" [ref=e350] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e352]:
+          - generic [ref=e353]:
+            - generic [ref=e354]:
+              - heading "Mar 9, 2026" [level=2] [ref=e355]
+              - generic [ref=e356]: Live totals
+            - button "Start End of Day" [ref=e358] [cursor=pointer]
+          - generic [ref=e360]:
+            - generic [ref=e361]: 🙈
+            - heading "Detailed Reports Hidden" [level=3] [ref=e362]
+            - paragraph [ref=e363]: Click "Start End of Day" to begin your blind cash count and unlock today's detailed sales and variance reports.
+          - generic [ref=e365]:
+            - generic [ref=e366]:
+              - heading "End of Day" [level=3] [ref=e367]
+              - button [ref=e368] [cursor=pointer]:
+                - img [ref=e369]
+            - generic [ref=e370]:
+              - generic [ref=e371]:
+                - heading "Actual Cash Count" [level=4] [ref=e372]
+                - paragraph [ref=e373]: Blind Close Active
+                - paragraph [ref=e374]: Count and declare your drawer cash before seeing expected totals.
+              - generic [ref=e375]:
+                - generic [ref=e376]: Cash in Drawer (₱)
+                - spinbutton [ref=e377]: "0"
+              - button "Declare Drawer Count" [disabled] [ref=e378] [cursor=pointer]
+            - generic:
+              - generic:
+                - heading "Utility Readings" [level=4]
+                - paragraph: Record today's meter readings to estimate daily utility usage.
+              - generic:
+                - generic:
+                  - generic: Electricity (kWh)
+                  - spinbutton
+                  - generic: "Prev: 120"
+                - generic:
+                  - generic: Gas (kg)
+                  - spinbutton
+                  - generic: "Prev: 11"
+            - button "Close" [ref=e379] [cursor=pointer]
+  - generic [ref=e311]: WTF! Samgyup POS

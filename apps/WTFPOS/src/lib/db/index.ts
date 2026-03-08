@@ -18,7 +18,8 @@ import {
 	readingSchema,
 	auditLogSchema,
 	kitchenAlertSchema,
-	floorElementSchema
+	floorElementSchema,
+	shiftsSchema
 } from './schemas';
 
 import { dev } from '$app/environment';
@@ -110,7 +111,16 @@ export async function getDb() {
 						3: (d: any) => d, // v2→v3: nested required
 						4: (d: any) => addUpdatedAt(d, 'createdAt'), // v3→v4: +updatedAt
 						5: (d: any) => d,  // v4→v5: nullable string fields (schema-only fix)
-						6: (d: any) => d   // v5→v6: printStatus string → string|null (schema-only fix)
+						6: (d: any) => d,  // v5→v6: printStatus string → string|null (schema-only fix)
+						7: (d: any) => {   // v6→v7: backfill addedAt on existing items
+							if (d.items) {
+								d.items = d.items.map((item: any) => ({
+									...item,
+									addedAt: item.addedAt ?? d.createdAt ?? new Date().toISOString()
+								}));
+							}
+							return d;
+						}
 					}
 				},
 				menu_items: {
@@ -214,6 +224,10 @@ export async function getDb() {
 						1: (d: any) => d,
 						2: (d: any) => ({ ...d, gridSize: null }) // v1→v2: merged floor_canvas
 					}
+				},
+				shifts: {
+					schema: shiftsSchema
+					// v0 — new collection, no migrations needed
 				},
 			});
 

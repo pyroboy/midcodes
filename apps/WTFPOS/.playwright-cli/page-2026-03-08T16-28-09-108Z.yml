@@ -1,0 +1,170 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - generic [ref=e120]:
+        - link "Receive Delivery" [ref=e121] [cursor=pointer]:
+          - /url: /stock/deliveries?action=open
+          - img [ref=e122]
+        - link "Log Expense" [ref=e123] [cursor=pointer]:
+          - /url: /reports/expenses-daily?action=open
+          - img [ref=e124]
+        - link "Log Waste" [ref=e125] [cursor=pointer]:
+          - /url: /stock/waste?action=open
+          - img [ref=e126]
+        - link "Stock Count" [ref=e127] [cursor=pointer]:
+          - /url: /stock/counts?action=open
+          - img [ref=e128]
+        - link "X-Reading" [ref=e129] [cursor=pointer]:
+          - /url: /reports/x-read?action=open
+          - img [ref=e130]
+        - link "Transfer Stock" [ref=e131] [cursor=pointer]:
+          - /url: /stock/transfers?action=open
+          - img [ref=e132]
+        - link "End of Day" [ref=e133] [cursor=pointer]:
+          - /url: /reports/eod?action=open
+          - img [ref=e134]
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e19]
+            - generic: POS
+        - listitem [ref=e135]:
+          - link "Kitchen" [ref=e136] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e137]
+            - generic: Kitchen
+        - listitem [ref=e138]:
+          - link "Stock" [ref=e139] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e140]
+            - generic: Stock
+        - listitem [ref=e141]:
+          - link "Reports" [ref=e142] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e143]
+            - generic: Reports
+      - generic [ref=e23]:
+        - separator [ref=e24]
+        - generic [ref=e26]: J
+        - link "Logout" [ref=e28] [cursor=pointer]:
+          - /url: /
+          - img [ref=e29]
+      - button "Toggle Sidebar" [ref=e32]
+    - main [ref=e33]:
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - img [ref=e146]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e147]
+        - button "Change Location" [ref=e148] [cursor=pointer]:
+          - img [ref=e149]
+          - text: Change Location
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - heading "Consolidated Reports" [level=1] [ref=e37]
+          - navigation [ref=e38]:
+            - generic [ref=e39]:
+              - generic [ref=e40]: Operations
+              - generic [ref=e41]:
+                - link "Meat Report" [ref=e42] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e43] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e44] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e45] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e46] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e47] [cursor=pointer]:
+                  - /url: /reports/eod
+                - link "Staff Perf." [ref=e48] [cursor=pointer]:
+                  - /url: /reports/staff-performance
+            - generic [ref=e50]:
+              - generic [ref=e51]: Expenses
+              - generic [ref=e52]:
+                - link "Daily" [ref=e53] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Monthly" [ref=e54] [cursor=pointer]:
+                  - /url: /reports/expenses-monthly
+            - generic [ref=e56]:
+              - generic [ref=e57]: Revenue & Sales
+              - generic [ref=e58]:
+                - link "Sales Summary" [ref=e59] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e60] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e61] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e63]:
+              - generic [ref=e64]: Profitability
+              - generic [ref=e65]:
+                - link "Gross Profit" [ref=e66] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e67] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e69]:
+              - generic [ref=e70]: Branch
+              - link "Compare" [ref=e72] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e74]:
+          - generic [ref=e150]:
+            - button "Today" [ref=e151] [cursor=pointer]
+            - button "This Week" [ref=e152] [cursor=pointer]
+            - button "This Month" [ref=e153] [cursor=pointer]
+          - generic [ref=e154]:
+            - generic [ref=e155]:
+              - paragraph [ref=e156]: Tagbilaran Branch
+              - paragraph [ref=e157]: ₱37,009.00
+              - paragraph [ref=e158]: Net Profit
+            - generic [ref=e159]:
+              - paragraph [ref=e160]: Panglao Branch
+              - paragraph [ref=e161]: ₱31,176.00
+              - paragraph [ref=e162]: Net Profit
+          - table [ref=e164]:
+            - rowgroup [ref=e165]:
+              - row "Metric Tagbilaran Branch Panglao Branch" [ref=e166]:
+                - columnheader "Metric" [ref=e167]
+                - columnheader "Tagbilaran Branch" [ref=e168]
+                - columnheader "Panglao Branch" [ref=e169]
+            - rowgroup [ref=e170]:
+              - row "Gross Revenue ₱79,592.00 ✓ ₱69,977.00" [ref=e171]:
+                - cell "Gross Revenue" [ref=e172]
+                - cell "₱79,592.00 ✓" [ref=e173]
+                - cell "₱69,977.00" [ref=e174]
+              - row "Net Revenue ₱77,116.00 ✓ ₱68,486.00" [ref=e175]:
+                - cell "Net Revenue" [ref=e176]
+                - cell "₱77,116.00 ✓" [ref=e177]
+                - cell "₱68,486.00" [ref=e178]
+              - row "Total Expenses ₱40,107.00 ₱37,310.00 ✓" [ref=e179]:
+                - cell "Total Expenses" [ref=e180]
+                - cell "₱40,107.00" [ref=e181]
+                - cell "₱37,310.00 ✓" [ref=e182]
+              - row "Gross Profit ₱40,896.00 ✓ ₱31,515.00" [ref=e183]:
+                - cell "Gross Profit" [ref=e184]
+                - cell "₱40,896.00 ✓" [ref=e185]
+                - cell "₱31,515.00" [ref=e186]
+              - row "Net Profit ₱37,009.00 ✓ ₱31,176.00" [ref=e187]:
+                - cell "Net Profit" [ref=e188]
+                - cell "₱37,009.00 ✓" [ref=e189]
+                - cell "₱31,176.00" [ref=e190]
+              - row "Gross Margin 51.4% ✓ 45.0%" [ref=e191]:
+                - cell "Gross Margin" [ref=e192]
+                - cell "51.4% ✓" [ref=e193]
+                - cell "45.0%" [ref=e194]
+              - row "Net Margin 46.5% ✓ 44.6%" [ref=e195]:
+                - cell "Net Margin" [ref=e196]
+                - cell "46.5% ✓" [ref=e197]
+                - cell "44.6%" [ref=e198]
+              - row "Total Pax 131 144 ✓" [ref=e199]:
+                - cell "Total Pax" [ref=e200]
+                - cell "131" [ref=e201]
+                - cell "144 ✓" [ref=e202]
+              - row "Avg Ticket ₱589.00 ✓ ₱476.00" [ref=e203]:
+                - cell "Avg Ticket" [ref=e204]
+                - cell "₱589.00 ✓" [ref=e205]
+                - cell "₱476.00" [ref=e206]
+  - generic [ref=e207]: WTF! Samgyup POS

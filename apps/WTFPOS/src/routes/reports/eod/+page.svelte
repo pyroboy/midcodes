@@ -7,6 +7,7 @@
 	import { allExpenses } from '$lib/stores/expenses.svelte';
 	import { tables } from '$lib/stores/pos.svelte';
 	import { session } from '$lib/stores/session.svelte';
+	import { getActiveShift, closeShift } from '$lib/stores/pos/shifts.svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
@@ -57,7 +58,8 @@
 	);
 
 	let closingActual = $state(0);
-	const openingCash    = 5000;
+	const activeShift = $derived(getActiveShift());
+	const openingCash = $derived(activeShift?.openingFloat ?? 0);
 	const cashExpenses   = $derived(
 		allExpenses.value
 			.filter(e =>
@@ -142,6 +144,7 @@
 			closingActual,
 			cashVariance,
 		});
+		await closeShift(closingActual);
 		eodSubmitted = true;
 	}
 </script>

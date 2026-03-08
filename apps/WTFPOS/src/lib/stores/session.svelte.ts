@@ -43,6 +43,9 @@ export const LOCATION_SHORT_NAMES: Record<string, string> = {
 export const ELEVATED_ROLES: Role[] = ['owner', 'admin', 'manager'];
 export const ADMIN_ROLES: Role[]    = ['owner', 'admin'];
 
+/** Manager override PIN — single source of truth. Set VITE_MANAGER_PIN in .env to override. */
+export const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || '1234';
+
 /** Which top-level nav tabs each role can access */
 export const ROLE_NAV_ACCESS: Record<Role, string[]> = {
 	staff:   ['/pos'],
