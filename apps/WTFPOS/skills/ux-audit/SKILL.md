@@ -12,7 +12,7 @@ description: >
   WTFPOS design system. Also triggers on "touch targets", "contrast ratio", "too many buttons",
   "feels cluttered", "hard to find", "confusing layout", "simulate kitchen and pos", "multi-device
   test", or "parallel role audit".
-version: 2.3.0
+version: 3.0.0
 ---
 
 # UX Audit — WTFPOS
@@ -131,6 +131,94 @@ SidebarProvider
 
 ---
 
+## Agent Performance Rules (Multi-User)
+
+These rules apply to **every agent** launched in a multi-user audit. They minimize tool call
+waste, prevent data loss from agent crashes, and maximize useful output per agent.
+
+### Rule 1 — Pre-Bake Auth (Skip Login UI)
+
+Agents inject `sessionStorage` directly instead of navigating the login UI.
+This saves 4–8 tool calls per agent and eliminates "Username not found" failures
+with fictional personas.
+
+```bash
+# Step 1: Inject session BEFORE navigating to any authenticated page
+playwright-cli eval "sessionStorage.setItem('wtfpos_session', JSON.stringify({userName:'Ate Rose', role:'staff', locationId:'tag', isLocked:true}))"
+
+# Step 2: Navigate directly to the role's primary page
+playwright-cli navigate http://localhost:5173/pos
+```
+
+**Session payloads per role:**
+
+| Role | userName | role | locationId | isLocked | Primary page |
+|------|----------|------|------------|----------|-------------|
+| Staff | Ate Rose | `staff` | `tag` | `true` | `/pos` |
+| Kitchen | Kuya Marc | `kitchen` | `tag` | `true` | `/kitchen/orders` |
+| Manager | Sir Dan | `manager` | `tag` | `false` | `/pos` |
+| Owner | Boss Chris | `owner` | `all` | `false` | `/pos` |
+
+> **Why `isLocked`?** Staff and kitchen roles cannot switch locations (`isLocked: true`).
+> Manager and owner are elevated roles that can switch freely (`isLocked: false`).
+
+### Rule 2 — Hard Snapshot Budget (max 10 per agent)
+
+Each agent is limited to **10 snapshots max**. Snapshot only when:
+- Entering a new page for the first time
+- A modal or overlay opens
+- Something unexpected happens (error, wrong state, missing element)
+- A `[HANDOFF]` point requires verification
+
+Do **NOT** snapshot after: clicking a nav link you've used before, filling a form field,
+or re-entering a page you've already captured.
+
+### Rule 3 — Micro-Audit Steps (5–7 per agent)
+
+Each agent should have **5–7 focused steps**, not 10–12 broad steps. If a role needs
+more coverage, split into 2 focused agents running in parallel:
+
+```
+❌ Bad:   1 agent × 12 steps = ~200 tool calls, high failure risk
+✅ Good:  2 agents × 6 steps = ~80 tool calls each, low failure risk
+```
+
+Split examples:
+- `Staff-A`: table open → package select → add items (5 steps)
+- `Staff-B`: checkout → receipt → order history (5 steps)
+
+### Rule 4 — Write-As-You-Go
+
+Agents must **write partial results to their output file after each completed step**.
+If the agent dies at step 5, steps 1–4 are preserved.
+
+```
+After step B1: append "B1: PASS — ..." to file
+After step B2: append "B2: CONCERN — ..." to file
+...
+After final step: write complete report with Key Findings section
+```
+
+Use the `Write` tool to create the file after step 1, then `Edit` to append after
+each subsequent step. This ensures zero data loss on crash.
+
+### Rule 5 — Skip Snapshots for Known Navigation
+
+These elements are stable across all authenticated pages — agents can interact
+with them without taking a snapshot first:
+
+| Element | Location | How to reach |
+|---------|----------|-------------|
+| LocationBanner | Top of every page, inside `SidebarInset` | Always visible |
+| Sidebar nav links | Left rail (desktop) or Sheet drawer (mobile) | Always visible on desktop |
+| Login role cards | `/` login page | Always visible |
+| Location switcher | Inside LocationBanner → "Change Location" button | Always 2 clicks |
+
+When navigating to a known page via URL (e.g., `playwright-cli navigate http://localhost:5173/reports/eod`),
+skip the intermediate snapshot — navigate first, then snapshot the destination.
+
+---
+
 ## Audit Workflow
 
 ### Step 1 — Select Audit Mode (MANDATORY FIRST STEP)
@@ -161,6 +249,15 @@ Clarify with the user:
 - **Viewport** — Default tablet `1024x768`, or specify mobile/desktop
 
 #### A2 — Open App
+
+Before opening the browser, snapshot the exact list of files already in `.playwright-cli/`. This is the baseline — cleanup will only delete files **not in this list**:
+
+```bash
+mkdir -p .playwright-cli/
+ls .playwright-cli/ 2>/dev/null | sort > /tmp/ux-audit-before-$$
+```
+
+Then open the browser:
 
 ```bash
 playwright-cli open http://localhost:5173
@@ -200,11 +297,28 @@ For interactive pages, trigger key states and snapshot each:
 - **Error state** — Validation failure, network error
 - **Completion state** — After successful action (e.g., order paid)
 
-#### A7 — Close, Report & Save
+#### A7 — Close, Clean Up & Save
 
 ```bash
 playwright-cli close
 ```
+
+**Immediately after closing, delete only the files THIS session created:**
+
+```bash
+comm -13 /tmp/ux-audit-before-$$ <(ls .playwright-cli/ 2>/dev/null | sort) \
+  | grep -E '\.(yml|png)$' \
+  | xargs -I{} rm -f ".playwright-cli/{}"
+rm /tmp/ux-audit-before-$$
+```
+
+**Why this pattern is safe for concurrent agents:**
+- `$$` is the shell PID — unique per process, so two concurrent audit sessions never share a before-list file
+- `comm -13` computes the exact diff: files in the current directory that were **not** in the before-snapshot. Only those files are candidates for deletion.
+- `grep -E '\.(yml|png)$'` is a type-gate — even if the diff accidentally included an unexpected file, only known playwright-cli artifact types are deleted
+- Files that existed before this session started (from other running agents, previous sessions, or anything else) are in the before-list and will **never** be deleted
+- The `.playwright-cli/` directory itself is preserved
+- No time-based logic — this is an exact filename set diff, not a timestamp approximation
 
 Produce the audit report using the **Single-User Output Template** below. Save to:
 
@@ -351,8 +465,23 @@ The user may:
 
 #### B4 — Agent Architecture
 
+**Before launching any agents**, snapshot the exact list of files already in `.playwright-cli/`. This is the orchestrator's baseline — cleanup will only delete files not in this list:
+
+```bash
+mkdir -p .playwright-cli/
+ls .playwright-cli/ 2>/dev/null | sort > /tmp/ux-audit-before-$$
+```
+
 Each role gets its own **parallel Agent** with its own playwright-cli browser session.
 Agents are launched using the `Agent` tool with **parallel calls in a single message**.
+
+> **IMPORTANT:** All agents MUST follow the **Agent Performance Rules** section above.
+> Include those rules in every agent prompt. Key rules: pre-bake auth via sessionStorage
+> injection, max 10 snapshots, 5–7 steps per agent, write-as-you-go, skip known nav.
+
+**Micro-audit splitting:** If a role has more than 7 steps in the approved script,
+split it into 2 focused agents (e.g., `Staff-A: table flow`, `Staff-B: checkout flow`).
+Both agents run in parallel.
 
 **How it works:**
 
@@ -360,21 +489,20 @@ Agents are launched using the `Agent` tool with **parallel calls in a single mes
 ┌─────────────────────────────────────────────────────┐
 │                  MAIN ORCHESTRATOR                   │
 │  (generates script, launches agents, synthesizes)    │
-└──────────┬──────────────────────┬────────────────────┘
-           │                      │
-    ┌──────▼──────┐        ┌──────▼──────┐
-    │  POS Agent  │        │ KDS Agent   │
-    │  (staff)    │        │ (kitchen)   │
-    │  Session 1  │        │  Session 2  │
-    │  /pos page  │        │  /kitchen/* │
-    └──────┬──────┘        └──────┬──────┘
-           │                      │
-           └──────────┬───────────┘
-                      │
-              ┌───────▼───────┐
-              │  Shared RxDB  │
-              │  (IndexedDB)  │
-              └───────────────┘
+└──────┬──────────┬──────────┬──────────┬──────────────┘
+       │          │          │          │
+ ┌─────▼────┐ ┌──▼─────┐ ┌──▼─────┐ ┌──▼─────┐
+ │ Staff-A  │ │Staff-B │ │ KDS    │ │Manager │
+ │ tables   │ │checkout│ │kitchen │ │reports │
+ │ 5 steps  │ │5 steps │ │6 steps │ │6 steps │
+ └─────┬────┘ └──┬─────┘ └──┬─────┘ └──┬─────┘
+       │         │          │          │
+       └─────────┴─────┬────┴──────────┘
+                       │
+               ┌───────▼───────┐
+               │  Shared RxDB  │
+               │  (IndexedDB)  │
+               └───────────────┘
 ```
 
 **Shared state mechanism:** All browser sessions on `localhost:5173` share the same
@@ -382,44 +510,73 @@ IndexedDB database (same origin). When POS Agent creates an order + KDS ticket,
 Kitchen Agent sees it reactively via RxDB subscriptions. This accurately simulates
 Phase 1 same-device data flow.
 
+**Auth injection (mandatory — replaces login UI):**
+
+Each agent's first two commands must be:
+```bash
+playwright-cli open http://localhost:5173
+playwright-cli eval "sessionStorage.setItem('wtfpos_session', JSON.stringify({userName:'ROLE_NAME', role:'ROLE', locationId:'LOC', isLocked:LOCKED}))"
+playwright-cli navigate http://localhost:5173/TARGET_PAGE
+```
+
+See **Rule 1** in Agent Performance Rules for the exact session payloads per role.
+
 #### B5 — Build Agent Prompts
 
 Each agent receives a detailed prompt built from the approved scenario script.
+**Every agent prompt MUST include** the 5 Agent Performance Rules verbatim.
 
 **Prompt structure per agent:**
 
 1. **Role identity** — Who they are, which branch, what their shift looks like
-2. **Full scenario list** — All approved scenarios, with their steps for THIS role only
-3. **playwright-cli instructions** — Open browser, login, navigate, interact, **snapshot** (NOT screenshot) at each key moment
-4. **Audit lens** — What to evaluate from this role's perspective:
+2. **Auth injection commands** — The exact 3 playwright-cli commands to inject session
+   and navigate to the target page (from Rule 1). No login UI.
+3. **Steps (5–7 max)** — Only this agent's steps from the approved script. If the role
+   had more than 7 steps, this agent gets half of them.
+4. **Snapshot budget** — "You have 10 snapshots max. Use them wisely."
+5. **Write-as-you-go instruction** — "After each completed step, append your finding to
+   the output file. Use Write for the first step, Edit/append for subsequent steps."
+6. **Audit lens** — What to evaluate from this role's perspective:
    - Staff: speed, clarity, error prevention, touch target sizing
    - Kitchen: glanceability, ticket priority, bump efficiency, hands-may-be-greasy ergonomics
    - Manager: oversight visibility, cross-page navigation efficiency, data accuracy
-5. **Synchronization cues** — What to wait for at each [HANDOFF] point (use `waitForTimeout`
+   - Owner: cross-branch overview quality, admin access, data aggregation accuracy
+7. **Synchronization cues** — What to wait for at each [HANDOFF] point (use `waitForTimeout`
    or snapshot-and-check patterns). Include generous pauses (3-5s) at handoff points.
-6. **Output format** — Return a structured mini-report:
-   - Per-scenario: what happened, what worked, what didn't, screenshots of key moments
-   - Overall: layout map, friction inventory, principle violations spotted
+8. **Output format** — Return a structured mini-report:
+   - Per-step: PASS/CONCERN/FAIL + one-line observation
+   - Key Findings: bullet list with P0/P1/P2 severity
+   - Role-specific assessment section (e.g., "Bump Undo Toast Assessment" for kitchen)
+9. **Output file path** — Where to save the partial audit file
 
 #### B6 — Launch Parallel Agents
 
 Launch all agents **in a single message** using parallel `Agent` tool calls.
+
+**Agent count guidelines:**
+
+| Roles requested | Steps per role | Total agents |
+|----------------|---------------|-------------|
+| 2 roles × ≤7 steps each | ≤7 | 2 agents |
+| 3 roles × ≤7 steps each | ≤7 | 3 agents |
+| 4 roles × ≤7 steps each | ≤7 | 4 agents |
+| Any role × 8+ steps | Split → 2 agents | +1 agent per split |
+| 4 roles × 10+ steps each | Split all | 8 agents |
 
 **Timing coordination:**
 - Agents don't directly communicate with each other
 - Coordination happens through **shared data** — Agent 1 creates data, Agent 2 observes it
 - Use `waitForTimeout` in playwright-cli to allow data propagation between roles
 - Each agent should include pauses (3-5 seconds) at synchronization points
-- For extreme intensity: agents may need to loop through scenarios sequentially within
-  their own session, not all at once
 
 **Execution order within each agent:**
-1. Open browser, login, navigate to role's primary page
-2. Run scenarios in order (1, 2, 3...)
-3. Snapshot at every key state change
-4. At [HANDOFF] points, pause and check for expected data from other agent
-5. After all scenarios complete, close browser
-6. Return structured report
+1. Open browser, inject sessionStorage (Rule 1), navigate to primary page
+2. Run steps in order (1, 2, 3...) — max 7 steps
+3. Snapshot at key state changes — max 10 snapshots (Rule 2)
+4. Write findings after each step (Rule 4)
+5. At [HANDOFF] points, pause and check for expected data from other agent
+6. After all steps, write final Key Findings section and close browser
+7. Return structured report
 
 #### B7 — Collect & Synthesize
 
@@ -432,7 +589,22 @@ After all agents return their individual reports:
 5. **"Best Shift Ever" vision** — Multi-perspective narrative covering all roles in the scenario
 6. **Scenario scorecard** — Per-scenario pass/fail summary
 
-#### B8 — Save Multi-User Audit File
+#### B8 — Clean Up & Save Multi-User Audit File
+
+**After all agents have returned their reports**, delete only the files this session created:
+
+```bash
+comm -13 /tmp/ux-audit-before-$$ <(ls .playwright-cli/ 2>/dev/null | sort) \
+  | grep -E '\.(yml|png)$' \
+  | xargs -I{} rm -f ".playwright-cli/{}"
+rm /tmp/ux-audit-before-$$
+```
+
+**Critical rules for multi-user cleanup:**
+- The before-snapshot was taken at B4 (before any agent launched), so the diff covers everything all parallel sub-agents generated
+- Individual sub-agents do **NOT** run their own cleanup — only the orchestrator runs cleanup, and only after all agents have returned. This prevents an early-finishing agent from deleting files a still-running agent is actively writing.
+- The `grep -E '\.(yml|png)$'` type-gate means even a diff collision with an unrelated concurrent playwright-cli process won't delete anything unexpected
+- Any other running playwright-cli sessions (from unrelated tasks) that started before B4 are protected by the before-snapshot; sessions that started after B4 but are still running when cleanup executes are protected by the `.yml|.png` gate since their files would already be in-use and were created concurrently — in practice this window is tiny (milliseconds between agent completion and cleanup)
 
 Save to:
 
@@ -731,6 +903,8 @@ When `tailwind.config.js` or `app.css` changes:
 
 | Version | Date | Change |
 |---|---|---|
+| 3.0.0 | 2026-03-09 | **Agent Performance Rules**: Pre-bake auth via sessionStorage injection (skip login UI), hard snapshot budget (max 10), micro-audit pattern (5–7 steps/agent, split large roles), write-as-you-go (partial results survive crashes), known element ref shortcuts. Updated B4/B5/B6 to enforce rules. Updated architecture diagram to show split agents. |
+| 2.4.0 | 2026-03-09 | Harden artifact cleanup: replace time-based `-newer` marker with exact before-snapshot diff (`comm -13`) + `.yml|.png` type-gate; orchestrator-only cleanup in multi-user path; safe for concurrent playwright-cli agents |
 | 2.3.0 | 2026-03-09 | Add full issue breakdown (all findings, no summarising) + overall recommendation sentence + HITL Fix Selection Gate (gate #6) to both single-user and multi-user paths — audits now close the loop into code fixes |
 | 2.2.0 | 2026-03-08 | Add mandatory `snapshot` over `screenshot` rule with rationale; reinforce in all workflow steps and agent prompt instructions |
 | 2.1.0 | 2026-03-08 | Replace pre-built scenarios with dynamic scenario architect; add intensity levels (light/heavy/extreme); add script approval HITL gate; add scenario scorecard output |
