@@ -44,7 +44,7 @@
     );
 
     // Pending items staged before pushing to bill
-    let pendingItems = $state<{ item: MenuItem; qty: number; weight?: number; forceFree?: boolean; isTakeout?: boolean }[]>([]);
+    let pendingItems = $state<{ item: MenuItem; qty: number; weight?: number; forceFree?: boolean; isTakeout?: boolean; notes?: string }[]>([]);
     
     let weightScreenItem = $state<MenuItem | null>(null);
     let weightInput = $state('');
@@ -59,6 +59,9 @@
     const includedSideCount = $derived(includedItems.filter(p => p.item.category !== 'meats').length);
 
     const activePax = $derived(order.pax);
+    const activeChildPax = $derived(order.childPax ?? 0);
+    const activeFreePax = $derived(order.freePax ?? 0);
+    const activeAdultPax = $derived(Math.max(0, activePax - activeChildPax - activeFreePax));
 
     // Takeout hides "packages" + "meats"; dine-in hides packages if already set
     const visibleCategories = $derived(
@@ -78,7 +81,11 @@
     const pendingTotal = $derived(
         pendingItems.reduce((s, p) => {
             if (p.forceFree) return s;
-            if (p.item.category === 'packages') return s + (p.item.price * activePax);
+            if (p.item.category === 'packages') {
+                const adultTotal = p.item.price * activeAdultPax;
+                const childTotal = (p.item.childPrice ?? p.item.price) * activeChildPax;
+                return s + adultTotal + childTotal;
+            }
             return s + (p.item.isWeightBased ? Math.round((p.weight ?? 0) * (p.item.pricePerGram ?? 0)) : p.item.price) * p.qty;
         }, 0)
     );
@@ -96,6 +103,13 @@
                 for (const sideId of item.autoSides) {
                     const side = menuItems.value.find(m => m.id === sideId);
                     if (side) pendingItems.push({ item: side, qty: 1, forceFree: true });
+                }
+            }
+            // Pax-scaled sides: ceil(pax/6) — e.g. 1 ice tea pitcher per 6 pax
+            if (item.scaledAutoSides) {
+                for (const sideId of item.scaledAutoSides) {
+                    const side = menuItems.value.find(m => m.id === sideId);
+                    if (side) pendingItems.push({ item: side, qty: Math.ceil(activePax / 6), forceFree: true });
                 }
             }
             activeCategory = 'meats';
@@ -128,7 +142,9 @@
         if (!order) return;
         const count = pendingItems.length;
         for (const p of pendingItems) {
-            addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree, p.isTakeout ? '[TAKEOUT]' : undefined);
+            const noteParts = [p.isTakeout ? '[TAKEOUT]' : '', p.notes?.trim() ?? ''].filter(Boolean);
+            const notes = noteParts.length > 0 ? noteParts.join(' — ') : undefined;
+            addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree, notes);
         }
         pendingItems = [];
         oncharged?.(count);
@@ -270,7 +286,15 @@
                                             {/if}
                                         </div>
                                         {#if item.desc}<p class="text-sm text-gray-500">{item.desc}</p>{/if}
-                                        <p class="font-mono text-sm font-bold text-gray-900">₱{item.price}/pax</p>
+                                        {#if activeChildPax > 0 || activeFreePax > 0}
+                                            <div class="font-mono text-xs text-gray-700 leading-relaxed">
+                                                {#if activeAdultPax > 0}<div>₱{item.price} × {activeAdultPax} adult{activeAdultPax !== 1 ? 's' : ''}</div>{/if}
+                                                {#if activeChildPax > 0}<div>₱{item.childPrice ?? item.price} × {activeChildPax} child{activeChildPax !== 1 ? 'ren' : ''} (6–9)</div>{/if}
+                                                {#if activeFreePax > 0}<div class="text-gray-400">Free × {activeFreePax} (&lt;5)</div>{/if}
+                                            </div>
+                                        {:else}
+                                            <p class="font-mono text-sm font-bold text-gray-900">₱{item.price}/pax</p>
+                                        {/if}
                                         {#if item.perks}<p class="text-xs text-status-green">✓ {item.perks}</p>{/if}
                                     {:else if item.isWeightBased}
                                         <span class="text-sm font-semibold text-gray-900">{item.name}</span>
@@ -329,6 +353,9 @@
                                 <div class="flex items-center justify-between py-2 pl-3">
                                     <div class="flex items-center gap-2">
                                         <span class="text-xs text-gray-500">{p.item.name}</span>
+                                        {#if p.qty > 1}
+                                            <span class="rounded bg-gray-100 px-1 py-0.5 text-[9px] font-bold text-gray-600">×{p.qty}</span>
+                                        {/if}
                                         <span class="rounded bg-status-green-light px-1 py-0.5 text-[9px] font-bold text-status-green">FREE</span>
                                     </div>
                                 </div>
@@ -338,58 +365,76 @@
                     <!-- Non-free add-ons still show normally -->
                     {#each addOnItems as p}
                         {@const idx = pendingItems.indexOf(p)}
-                        <div class="flex items-center justify-between py-3">
-                            <div class="flex flex-col gap-0.5">
+                        <div class="flex flex-col gap-1 py-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex flex-col gap-0.5">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-medium text-gray-900">{p.item.name}</span>
+                                    </div>
+                                    {#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
+                                </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-sm font-medium text-gray-900">{p.item.name}</span>
-                                </div>
-                                {#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                {#if order.orderType === 'dine-in'}
-                                    <button
-                                        onclick={() => p.isTakeout = !p.isTakeout}
-                                        class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
-                                    >
-                                        {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
-                                    </button>
-                                {/if}
-                                <div class="flex items-center gap-1.5 ml-1">
-                                    <button onclick={() => changeQty(idx, -1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">−</button>
-                                    <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
-                                    <button onclick={() => changeQty(idx, +1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">+</button>
+                                    {#if order.orderType === 'dine-in'}
+                                        <button
+                                            onclick={() => p.isTakeout = !p.isTakeout}
+                                            class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
+                                        >
+                                            {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
+                                        </button>
+                                    {/if}
+                                    <div class="flex items-center gap-1.5 ml-1">
+                                        <button onclick={() => changeQty(idx, -1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">−</button>
+                                        <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
+                                        <button onclick={() => changeQty(idx, +1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">+</button>
+                                    </div>
                                 </div>
                             </div>
+                            <input
+                                type="text"
+                                bind:value={p.notes}
+                                placeholder="Special request (e.g. less spicy, no garlic)..."
+                                class="w-full rounded-md border border-border bg-gray-50 px-2.5 py-1.5 text-xs text-gray-700 placeholder-gray-400 focus:border-accent focus:outline-none"
+                            />
                         </div>
                     {/each}
                 {:else}
                     <!-- Non-package items (takeout, etc.) — flat list -->
                     {#each pendingItems as p, idx (p.item.id + idx)}
-                        <div class="flex items-center justify-between py-3">
-                            <div class="flex flex-col gap-0.5">
+                        <div class="flex flex-col gap-1 py-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex flex-col gap-0.5">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm font-medium text-gray-900">{p.item.name}</span>
+                                        {#if p.forceFree}
+                                            <span class="rounded bg-status-green-light px-1.5 py-0.5 text-[10px] font-bold text-status-green">FREE</span>
+                                        {/if}
+                                    </div>
+                                    {#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
+                                </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-sm font-medium text-gray-900">{p.item.name}</span>
-                                    {#if p.forceFree}
-                                        <span class="rounded bg-status-green-light px-1.5 py-0.5 text-[10px] font-bold text-status-green">FREE</span>
+                                    {#if order.orderType === 'dine-in'}
+                                        <button
+                                            onclick={() => p.isTakeout = !p.isTakeout}
+                                            class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
+                                        >
+                                            {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
+                                        </button>
                                     {/if}
-                                </div>
-                                {#if p.weight}<span class="text-xs text-gray-400">{p.weight}g</span>{/if}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                {#if order.orderType === 'dine-in'}
-                                    <button
-                                        onclick={() => p.isTakeout = !p.isTakeout}
-                                        class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
-                                    >
-                                        {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
-                                    </button>
-                                {/if}
-                                <div class="flex items-center gap-1.5 ml-1">
-                                    <button onclick={() => changeQty(idx, -1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">−</button>
-                                    <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
-                                    <button onclick={() => changeQty(idx, +1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">+</button>
+                                    <div class="flex items-center gap-1.5 ml-1">
+                                        <button onclick={() => changeQty(idx, -1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">−</button>
+                                        <span class="min-w-[1.5rem] text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
+                                        <button onclick={() => changeQty(idx, +1)} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md bg-gray-100 text-sm font-bold hover:bg-gray-200">+</button>
+                                    </div>
                                 </div>
                             </div>
+                            {#if !p.forceFree}
+                                <input
+                                    type="text"
+                                    bind:value={p.notes}
+                                    placeholder="Special request (e.g. less spicy, no garlic)..."
+                                    class="w-full rounded-md border border-border bg-gray-50 px-2.5 py-1.5 text-xs text-gray-700 placeholder-gray-400 focus:border-accent focus:outline-none"
+                                />
+                            {/if}
                         </div>
                     {/each}
                 {/if}

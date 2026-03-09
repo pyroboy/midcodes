@@ -72,7 +72,7 @@ export const floorElementSchema: RxJsonSchema<any> = {
 // ─── Order ───────────────────────────────────────────────────────────────────
 export const orderSchema: RxJsonSchema<any> = {
 	title: 'order schema',
-	version: 7,
+	version: 9,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -85,6 +85,8 @@ export const orderSchema: RxJsonSchema<any> = {
 		packageName: { type: ['string', 'null'] },
 		packageId: { type: ['string', 'null'] },
 		pax: { type: 'number' },
+		childPax: { type: 'number' },
+		freePax: { type: 'number' },
 		items: {
 			type: 'array',
 			items: {
@@ -95,6 +97,7 @@ export const orderSchema: RxJsonSchema<any> = {
 					menuItemName: { type: 'string' },
 					quantity: { type: 'number' },
 					unitPrice: { type: 'number' },
+					childUnitPrice: { type: ['number', 'null'] },
 					weight: { type: ['number', 'null'] },
 					status: { type: 'string' },
 					sentAt: { type: ['string', 'null'] },
@@ -160,6 +163,7 @@ export const orderSchema: RxJsonSchema<any> = {
 			}
 		},
 		printStatus: { type: ['string', 'null'] },
+		discountIdPhotos: { type: 'array', items: { type: 'string' }, default: [] },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
 	required: ['id', 'locationId', 'orderType', 'pax', 'items', 'status', 'subtotal', 'discountAmount', 'vatAmount', 'total', 'payments', 'createdAt', 'billPrinted', 'updatedAt'],
@@ -169,7 +173,7 @@ export const orderSchema: RxJsonSchema<any> = {
 // ─── Menu Item ───────────────────────────────────────────────────────────────
 export const menuItemSchema: RxJsonSchema<any> = {
 	title: 'menu item schema',
-	version: 1,
+	version: 3,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -178,6 +182,7 @@ export const menuItemSchema: RxJsonSchema<any> = {
 		category: { type: 'string' },
 		protein: { type: 'string' },
 		price: { type: 'number' },
+		childPrice: { type: 'number' },
 		isWeightBased: { type: 'boolean' },
 		pricePerGram: { type: 'number' },
 		available: { type: 'boolean' },
@@ -188,6 +193,7 @@ export const menuItemSchema: RxJsonSchema<any> = {
 		isRetail: { type: 'boolean' },
 		meats: { type: 'array', items: { type: 'string' } },
 		autoSides: { type: 'array', items: { type: 'string' } },
+		scaledAutoSides: { type: 'array', items: { type: 'string' } },
 		image: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},

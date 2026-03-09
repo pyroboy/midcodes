@@ -11,12 +11,28 @@
 	import VarianceBar from './VarianceBar.svelte';
 
 	let activePeriod = $state<CountPeriod>('pm10');
+	let activeCategory = $state<string>('Meats');
 
 	// Only show items for the current branch (no cross-branch editing)
 	const branchItems = $derived(
 		stockItems.value.filter(s =>
 			session.locationId === 'all' || s.locationId === session.locationId
 		)
+	);
+
+	// Distinct categories from branch items — Meats first, others alphabetically
+	const availableCategories = $derived((() => {
+		const cats = [...new Set(branchItems.map(s => s.category ?? 'Other'))];
+		const meats = cats.includes('Meats') ? ['Meats'] : [];
+		const others = cats.filter(c => c !== 'Meats').sort();
+		return [...meats, ...others];
+	})());
+
+	// Items filtered by active category tab (or all items when 'All')
+	const displayedItems = $derived(
+		activeCategory === 'All'
+			? branchItems
+			: branchItems.filter(s => (s.category ?? 'Other') === activeCategory)
 	);
 
 	const activePeriodData = $derived(countPeriods.find(p => p.id === activePeriod));

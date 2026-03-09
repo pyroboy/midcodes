@@ -2,28 +2,34 @@
 	import { goto } from '$app/navigation';
 	import { cn } from '$lib/utils';
 	import { setSession, MANAGER_PIN } from '$lib/stores/session.svelte';
-	import type { Role } from '$lib/stores/session.svelte';
+	import type { Role, KitchenFocus } from '$lib/stores/session.svelte';
 	import { writeLog } from '$lib/stores/audit.svelte';
 
 	// ─── Accounts ─────────────────────────────────────────────────────────────
 	import type { LocationId } from '$lib/stores/session.svelte';
 	import { LOCATIONS } from '$lib/stores/session.svelte';
 
-	type Account = { password: string; role: Role; displayName: string; dest: string; requiresPin?: boolean; locationId: LocationId };
+	type Account = { password: string; role: Role; displayName: string; dest: string; requiresPin?: boolean; locationId: LocationId; kitchenFocus?: KitchenFocus };
 
 	const ACCOUNTS: Record<string, Account> = {
 		// ── Alta Citta · Tagbilaran ─────────────────────────────────────────
-		'maria':  { password: 'maria',  role: 'staff',   displayName: 'Maria Santos',  dest: '/pos',     locationId: 'tag'    },
-		'juan':   { password: 'juan',   role: 'manager', displayName: 'Juan Reyes',    dest: '/pos',     requiresPin: true, locationId: 'tag'    },
-		'pedro':  { password: 'pedro',  role: 'kitchen', displayName: 'Pedro Cruz',    dest: '/kitchen', locationId: 'tag'    },
+		'maria':   { password: 'maria',   role: 'staff',   displayName: 'Maria Santos',       dest: '/pos',                     locationId: 'tag'    },
+		'juan':    { password: 'juan',    role: 'manager', displayName: 'Juan Reyes',          dest: '/pos',    requiresPin: true, locationId: 'tag'    },
+		'pedro':   { password: 'pedro',   role: 'kitchen', displayName: 'Pedro Cruz',          dest: '/kitchen',                  locationId: 'tag'    },
+		'lito':    { password: 'lito',    role: 'kitchen', displayName: 'Lito Paglinawan',     dest: '/kitchen/orders',           locationId: 'tag',   kitchenFocus: 'grill'   },
+		'benny':   { password: 'benny',   role: 'kitchen', displayName: 'Benny Flores',        dest: '/kitchen/weigh-station',    locationId: 'tag',   kitchenFocus: 'butcher' },
+		'corazon': { password: 'corazon', role: 'kitchen', displayName: 'Corazon Dela Cruz',   dest: '/kitchen/orders',           locationId: 'tag',   kitchenFocus: 'sides'   },
 		// ── Alona Beach · Panglao ───────────────────────────────────────────
-		'ana':    { password: 'ana',    role: 'staff',   displayName: 'Ana Lim',       dest: '/pos',     locationId: 'pgl'   },
-		'carlo':  { password: 'carlo',  role: 'manager', displayName: 'Carlo Ramos',   dest: '/pos',     requiresPin: true, locationId: 'pgl'   },
-		'jose':   { password: 'jose',   role: 'kitchen', displayName: 'Jose Santos',   dest: '/kitchen', locationId: 'pgl'   },
+		'ana':     { password: 'ana',     role: 'staff',   displayName: 'Ana Lim',             dest: '/pos',                     locationId: 'pgl'   },
+		'carlo':   { password: 'carlo',   role: 'manager', displayName: 'Carlo Ramos',         dest: '/pos',    requiresPin: true, locationId: 'pgl'   },
+		'jose':    { password: 'jose',    role: 'kitchen', displayName: 'Jose Santos',         dest: '/kitchen',                  locationId: 'pgl'   },
+		'romy':    { password: 'romy',    role: 'kitchen', displayName: 'Romy Dalisay',        dest: '/kitchen/orders',           locationId: 'pgl',   kitchenFocus: 'grill'   },
+		'dante':   { password: 'dante',   role: 'kitchen', displayName: 'Dante Villanueva',    dest: '/kitchen/weigh-station',    locationId: 'pgl',   kitchenFocus: 'butcher' },
+		'nena':    { password: 'nena',    role: 'kitchen', displayName: 'Nena Ocampo',         dest: '/kitchen/orders',           locationId: 'pgl',   kitchenFocus: 'sides'   },
 		// ── Tagbilaran Warehouse ─────────────────────────────────────────────
-		'noel':   { password: 'noel',   role: 'staff',   displayName: 'Noel Garcia',   dest: '/stock',   locationId: 'wh-tag' },
+		'noel':    { password: 'noel',    role: 'staff',   displayName: 'Noel Garcia',         dest: '/stock',                   locationId: 'wh-tag' },
 		// ── Management (all-locations) ───────────────────────────────────────
-		'chris':  { password: 'chris',  role: 'owner',   displayName: 'Christopher S', dest: '/pos',     locationId: 'all'   },
+		'chris':   { password: 'chris',   role: 'owner',   displayName: 'Christopher S',       dest: '/pos',                     locationId: 'all'   },
 		// ── System Admin ─────────────────────────────────────────────────────────
 		'sysadmin': { password: 'sysadmin', role: 'admin', displayName: 'System Admin', dest: '/admin/devices', locationId: 'all' },
 	};
@@ -44,10 +50,12 @@
 	};
 
 	const TEST_GROUPS: { heading: string; usernames: string[] }[] = [
-		{ heading: '🏠 Alta Citta · Tagbilaran', usernames: ['maria', 'juan', 'pedro'] },
-		{ heading: '🏠 Alona Beach · Panglao',   usernames: ['ana', 'carlo', 'jose']   },
-		{ heading: '🏭 Tagbilaran Warehouse',     usernames: ['noel']                   },
-		{ heading: '💼 Management',               usernames: ['chris']                  },
+		{ heading: '🏠 Alta Citta · POS / Management', usernames: ['maria', 'juan']                  },
+		{ heading: '🔥 Alta Citta · Kitchen',          usernames: ['pedro', 'lito', 'benny', 'corazon'] },
+		{ heading: '🏠 Alona Beach · POS / Management',usernames: ['ana', 'carlo']                   },
+		{ heading: '🔥 Alona Beach · Kitchen',         usernames: ['jose', 'romy', 'dante', 'nena']  },
+		{ heading: '🏭 Tagbilaran Warehouse',          usernames: ['noel']                           },
+		{ heading: '💼 Management',                    usernames: ['chris']                          },
 	];
 
 	// ─── Form state ───────────────────────────────────────────────────────────
@@ -71,7 +79,7 @@
 		if (!account) { error = 'Username not found.'; return; }
 		if (account.password !== password) { error = 'Incorrect password.'; return; }
 
-		setSession(account.displayName, account.role, account.locationId);
+		setSession(account.displayName, account.role, account.locationId, account.kitchenFocus ?? null);
 
 		// Collapse sidebar on login
 		document.cookie = 'sidebar:state=false; path=/; max-age=604800';
@@ -96,7 +104,7 @@
 			const acct = ACCOUNTS[username.trim().toLowerCase()];
 			if (acct) {
 				// Ensure session is set with correct role before navigating (P0-6)
-				setSession(acct.displayName, acct.role, acct.locationId);
+				setSession(acct.displayName, acct.role, acct.locationId, acct.kitchenFocus ?? null);
 				writeLog('auth', `Login: ${acct.displayName} (${acct.role}) — PIN verified`);
 			}
 			showPin = false;
@@ -255,6 +263,13 @@
 										<span class="rounded border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-orange-700">
 											PIN
 										</span>
+									{/if}
+									{#if acct.kitchenFocus === 'grill'}
+										<span class="rounded border border-red-200 bg-red-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-red-700">🔥 Grill</span>
+									{:else if acct.kitchenFocus === 'butcher'}
+										<span class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-amber-700">⚖️ Butcher</span>
+									{:else if acct.kitchenFocus === 'sides'}
+										<span class="rounded border border-green-200 bg-green-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-green-700">🥗 Sides</span>
 									{/if}
 								</div>
 							</div>

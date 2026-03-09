@@ -56,7 +56,7 @@
 <div class="flex items-center justify-end gap-1">
 	<button
 		onclick={decrement}
-		class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 active:bg-gray-200"
+		class="flex h-11 w-11 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 active:bg-gray-200"
 		tabindex="-1"
 	>
 		<Minus class="h-4 w-4" />
@@ -73,7 +73,7 @@
 	/>
 	<button
 		onclick={increment}
-		class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 active:bg-gray-200"
+		class="flex h-11 w-11 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 active:bg-gray-200"
 		tabindex="-1"
 	>
 		<Plus class="h-4 w-4" />

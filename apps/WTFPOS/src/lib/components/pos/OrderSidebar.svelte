@@ -11,6 +11,7 @@
 	interface Props {
 		order: Order | undefined;
 		table: Table | null;
+		hasTakeoutOrders?: boolean;
 		onclose: () => void;
 		onadditem: () => void;
 		onrefill: () => void;
@@ -21,6 +22,7 @@
 		onsplit: () => void;
 		onchangepax: () => void;
 		onmerge?: () => void;
+		onattachtakeout?: () => void;
 		oncanceltable?: () => void;
 		pendingRejections?: KitchenAlert[];
 		onacknowledgeRejection?: (alertId: string) => void;
@@ -40,6 +42,8 @@
 		onsplit,
 		onchangepax,
 		onmerge,
+		onattachtakeout,
+		hasTakeoutOrders = false,
 		oncanceltable,
 		pendingRejections = [],
 		onacknowledgeRejection,
@@ -53,6 +57,9 @@
 	// Grace period item removal state
 	let removePinItemId = $state<string | null>(null);
 	let showRemovePin = $state(false);
+
+	// Full-order void PIN gate
+	let showVoidPin = $state(false);
 
 	function handleRemoveItem(item: Order['items'][number]) {
 		if (!order) return;
@@ -225,6 +232,9 @@
 					<span class="text-xs text-gray-400">{item.weight}g</span>
 				{/if}
 			</div>
+			{#if item.notes && item.notes !== 'refill'}
+				<p class="text-xs text-gray-400 pl-1 italic">"{item.notes}"</p>
+			{/if}
 			{#if item.status === 'cancelled'}
 				<span class="text-xs italic text-status-red">voided</span>
 			{/if}
@@ -491,6 +501,11 @@
 			<div class="flex flex-col gap-0.5">
 				<span class="text-base font-bold text-gray-900">BILL</span>
 				<span class="text-xs text-gray-400">{activeItemCount} items</span>
+				{#if order.discountType !== 'none' && order.discountAmount > 0}
+					<span class="text-xs font-semibold text-status-green">
+						{order.discountType === 'senior' ? 'SC' : order.discountType === 'pwd' ? 'PWD' : order.discountType.toUpperCase()} −{formatPeso(order.discountAmount)}
+					</span>
+				{/if}
 			</div>
 			<span class={cn('font-mono text-2xl font-extrabold transition-colors duration-300', billFlash ? 'text-accent' : 'text-gray-900')}>{formatPeso(order.total)}</span>
 		</div>
@@ -523,7 +538,7 @@
 				{/if}
 			{:else}
 				<div class="flex gap-2">
-					<button onclick={onvoid} disabled={activeItemCount === 0} class={cn('btn-danger px-3 text-sm', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
+					<button onclick={() => showVoidPin = true} disabled={activeItemCount === 0} class={cn('btn-danger px-3 text-sm', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
 					<button onclick={oncheckout} disabled={activeItemCount === 0} class={cn('btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Checkout</button>
 					<button onclick={() => printBill(order.id)} disabled={activeItemCount === 0} class={cn('btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Print</button>
 				</div>
@@ -557,6 +572,9 @@
 					{#if order.orderType === 'dine-in' && table && onmerge}
 						<button onclick={onmerge} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Merge</button>
 					{/if}
+					{#if order.orderType === 'dine-in' && table && onattachtakeout && hasTakeoutOrders}
+						<button onclick={onattachtakeout} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Attach Takeout</button>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -575,4 +593,14 @@
 		showRemovePin = false;
 		removePinItemId = null;
 	}}
+/>
+
+<ManagerPinModal
+	isOpen={showVoidPin}
+	title="Void Entire Order"
+	description="Voiding the entire order will cancel all items and release the table. Enter Manager PIN to proceed."
+	confirmLabel="Void Order"
+	confirmClass="btn-danger"
+	onClose={() => showVoidPin = false}
+	onConfirm={() => { showVoidPin = false; onvoid(); }}
 />

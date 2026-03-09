@@ -8,9 +8,10 @@ import { browser } from '$app/environment';
 
 const SESSION_KEY = 'wtfpos_session';
 
-export type Role         = 'staff' | 'manager' | 'kitchen' | 'owner' | 'admin';
-export type LocationType = 'retail' | 'warehouse';
-export type LocationId   = 'tag' | 'pgl' | 'wh-tag' | 'all';
+export type Role          = 'staff' | 'manager' | 'kitchen' | 'owner' | 'admin';
+export type LocationType  = 'retail' | 'warehouse';
+export type LocationId    = 'tag' | 'pgl' | 'wh-tag' | 'all';
+export type KitchenFocus  = 'grill' | 'butcher' | 'sides' | null;
 
 /** @deprecated Use LocationId */
 export type BranchId = LocationId;
@@ -55,24 +56,26 @@ export const ROLE_NAV_ACCESS: Record<Role, string[]> = {
 	admin:   ['/pos', '/kitchen', '/stock', '/reports', '/admin'],
 };
 
-function loadPersistedSession(): { userName: string; role: Role; locationId: LocationId; isLocked: boolean } {
-	if (!browser) return { userName: '', role: 'staff', locationId: 'tag', isLocked: false };
+function loadPersistedSession(): { userName: string; role: Role; locationId: LocationId; isLocked: boolean; kitchenFocus: KitchenFocus } {
+	if (!browser) return { userName: '', role: 'staff', locationId: 'tag', isLocked: false, kitchenFocus: null };
 	try {
 		const raw = sessionStorage.getItem(SESSION_KEY);
-		if (raw) return JSON.parse(raw);
+		if (raw) return { kitchenFocus: null, ...JSON.parse(raw) };
 	} catch {}
-	return { userName: '', role: 'staff', locationId: 'tag', isLocked: false };
+	return { userName: '', role: 'staff', locationId: 'tag', isLocked: false, kitchenFocus: null };
 }
 
 const _persisted = loadPersistedSession();
 
 export const session = $state({
-	userName:   _persisted.userName,
-	role:       _persisted.role,
+	userName:     _persisted.userName,
+	role:         _persisted.role,
 	/** Current location; replaces the old 'branch' field */
-	locationId: _persisted.locationId,
+	locationId:   _persisted.locationId,
 	/** True when the user cannot switch locations */
-	isLocked:   _persisted.isLocked,
+	isLocked:     _persisted.isLocked,
+	/** Kitchen sub-role for focused UI — grill/butcher/sides or null */
+	kitchenFocus: _persisted.kitchenFocus,
 });
 
 // ─── Location Helpers ─────────────────────────────────────────────────────────
@@ -102,18 +105,20 @@ export function deriveSessionState(
 	};
 }
 
-export function setSession(userName: string, role: Role, locationId: LocationId = 'tag') {
-	session.userName = userName;
-	session.role     = role;
+export function setSession(userName: string, role: Role, locationId: LocationId = 'tag', kitchenFocus: KitchenFocus = null) {
+	session.userName     = userName;
+	session.role         = role;
+	session.kitchenFocus = kitchenFocus;
 	const { resolvedLocationId, isLocked } = deriveSessionState(role, locationId);
 	session.locationId = resolvedLocationId;
 	session.isLocked   = isLocked;
 	if (browser) {
 		sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-			userName: session.userName,
-			role:     session.role,
-			locationId: session.locationId,
-			isLocked:   session.isLocked,
+			userName:     session.userName,
+			role:         session.role,
+			locationId:   session.locationId,
+			isLocked:     session.isLocked,
+			kitchenFocus: session.kitchenFocus,
 		}));
 	}
 }
@@ -128,10 +133,11 @@ export function setLocation(locationId: LocationId) {
 	session.locationId = locationId;
 	if (browser) {
 		sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-			userName:   session.userName,
-			role:       session.role,
-			locationId: session.locationId,
-			isLocked:   session.isLocked,
+			userName:     session.userName,
+			role:         session.role,
+			locationId:   session.locationId,
+			isLocked:     session.isLocked,
+			kitchenFocus: session.kitchenFocus,
 		}));
 	}
 }
@@ -139,9 +145,10 @@ export function setLocation(locationId: LocationId) {
 // TODO: P0-8 session expiry warning — requires server-side session timestamps
 
 export function clearSession() {
-	session.userName   = '';
-	session.role       = 'staff';
-	session.locationId = 'tag';
-	session.isLocked   = false;
+	session.userName     = '';
+	session.role         = 'staff';
+	session.locationId   = 'tag';
+	session.isLocked     = false;
+	session.kitchenFocus = null;
 	if (browser) sessionStorage.removeItem(SESSION_KEY);
 }

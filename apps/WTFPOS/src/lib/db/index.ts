@@ -120,13 +120,22 @@ export async function getDb() {
 								}));
 							}
 							return d;
-						}
+						},
+						8: (d: any) => ({ // v7→v8: +childPax, +freePax, +childUnitPrice on items
+							...d,
+							childPax: d.childPax ?? 0,
+							freePax: d.freePax ?? 0,
+							items: d.items ? d.items.map((item: any) => ({ ...item, childUnitPrice: item.childUnitPrice ?? null })) : d.items
+						}),
+						9: (d: any) => ({ ...d, discountIdPhotos: d.discountIdPhotos ?? [] }) // v8→v9: +discountIdPhotos for BIR audit trail
 					}
 				},
 				menu_items: {
 					schema: menuItemSchema,
 					migrationStrategies: {
-						1: (d: any) => addUpdatedAt(d) // v0→v1: +updatedAt (no existing timestamp)
+						1: (d: any) => addUpdatedAt(d), // v0→v1: +updatedAt
+						2: (d: any) => d,               // v1→v2: +scaledAutoSides (optional, passthrough)
+						3: (d: any) => d                // v2→v3: +childPrice (optional, passthrough)
 					}
 				},
 				stock_items: {

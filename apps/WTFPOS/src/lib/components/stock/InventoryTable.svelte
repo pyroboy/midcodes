@@ -27,7 +27,9 @@
 	import InventoryItemCard from './InventoryItemCard.svelte';
 	import InventoryItemRow from './InventoryItemRow.svelte';
 
-	const isReadonly = $derived(session.role === 'kitchen');
+	// Kitchen staff can make stock adjustments (Add/Deduct) but cannot edit item details or toggle 86
+	const isReadonly = $derived(false);
+	const canEditDetails = $derived(session.role !== 'kitchen');
 
 	// ─── View / Search / Filter ───────────────────────────────────────────────
 	let viewMode     = $state<'grid' | 'list'>('list');
@@ -231,7 +233,7 @@
 									{hoveredItemId}
 									onOpenModal={openItemModal}
 									onEditClick={openEditModalClick}
-									readonly={isReadonly}
+									readonly={!canEditDetails}
 									onHover={(id) => hoveredItemId = id}
 								/>
 							{/each}
@@ -255,7 +257,7 @@
 								{item}
 								onOpenModal={openItemModal}
 								onEditClick={openEditModalClick}
-								readonly={isReadonly}
+								readonly={!canEditDetails}
 							/>
 						{/each}
 					</div>
@@ -324,11 +326,11 @@
 											{hoveredItemId}
 											onOpenModal={openItemModal}
 											onEditClick={openEditModalClick}
-											readonly={isReadonly}
+											readonly={!canEditDetails}
 											onHover={(id) => hoveredItemId = id}
 											animate={true}
 											menuAvailable={menuItemsById.get(item.menuItemId)?.available ?? true}
-											onToggle86={isReadonly ? undefined : () => toggleMenuItemAvailability(item.menuItemId)}
+											onToggle86={canEditDetails ? () => toggleMenuItemAvailability(item.menuItemId) : undefined}
 										/>
 									{/each}
 								{/if}
@@ -344,9 +346,9 @@
 									{item}
 									onOpenModal={openItemModal}
 									onEditClick={openEditModalClick}
-									readonly={isReadonly}
+									readonly={!canEditDetails}
 									menuAvailable={menuItemsById.get(item.menuItemId)?.available ?? true}
-									onToggle86={isReadonly ? undefined : () => toggleMenuItemAvailability(item.menuItemId)}
+									onToggle86={canEditDetails ? () => toggleMenuItemAvailability(item.menuItemId) : undefined}
 								/>
 							{/each}
 						{/if}

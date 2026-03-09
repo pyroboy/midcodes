@@ -3,8 +3,22 @@
  */
 import type { Order } from '$lib/types';
 
-export function calculateOrderTotals(order: Pick<Order, 'items' | 'discountType' | 'discountPax' | 'pax'>): { subtotal: number, discountAmount: number, vatAmount: number, total: number } {
-	const sub = order.items.filter((i) => i.status !== 'cancelled' && i.tag !== 'FREE').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+export function calculateOrderTotals(order: Pick<Order, 'items' | 'discountType' | 'discountPax' | 'pax' | 'childPax' | 'freePax'>): { subtotal: number, discountAmount: number, vatAmount: number, total: number } {
+	let sub = order.items.filter((i) => i.status !== 'cancelled' && i.tag !== 'FREE').reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+
+	// Child pricing: adjust package contribution when childPax or freePax > 0
+	const childPax = order.childPax ?? 0;
+	const freePax = order.freePax ?? 0;
+	if (childPax > 0 || freePax > 0) {
+		const pkgItem = order.items.find(i => i.tag === 'PKG' && i.status !== 'cancelled');
+		if (pkgItem) {
+			const totalPax = order.pax;
+			const adultPax = Math.max(0, totalPax - childPax - freePax);
+			const childUnitPrice = pkgItem.childUnitPrice ?? pkgItem.unitPrice;
+			// Replace pax * unitPrice with adultPax * unitPrice + childPax * childUnitPrice
+			sub = sub - pkgItem.unitPrice * totalPax + pkgItem.unitPrice * adultPax + childUnitPrice * childPax;
+		}
+	}
 	let disc = 0;
 	let vat = 0;
 

@@ -136,7 +136,7 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 
 	const { unitPrice, quantity, tag } = deriveOrderItemProps(item, order.pax, qty, weight, forceFree);
 
-	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity, unitPrice, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes: notes ?? '', addedAt: new Date().toISOString() };
+	const newItem = { id: nanoid(), menuItemId: item.id, menuItemName: item.name, quantity, unitPrice, childUnitPrice: item.category === 'packages' ? (item.childPrice ?? null) : null, weight: weight ?? null, status: 'pending' as const, sentAt: null, tag, notes: notes ?? '', addedAt: new Date().toISOString() };
 
 	let totals!: ReturnType<typeof calculateOrderTotals>;
 	await orderDoc.incrementalModify((doc: Order) => {
@@ -188,7 +188,7 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 
 export async function recalcOrder(
 	order: Order,
-	overrides?: { discountType?: DiscountType; discountPax?: number; discountIds?: string[] }
+	overrides?: { discountType?: DiscountType; discountPax?: number; discountIds?: string[]; discountIdPhotos?: string[] }
 ) {
 	if (!browser) return;
 	const db = await getDb();
@@ -201,6 +201,7 @@ export async function recalcOrder(
 		doc.discountType = overrides?.discountType ?? order.discountType;
 		doc.discountPax   = overrides?.discountPax  ?? order.discountPax;
 		doc.discountIds   = overrides?.discountIds  ?? order.discountIds;
+		if (overrides?.discountIdPhotos !== undefined) doc.discountIdPhotos = overrides.discountIdPhotos;
 		const totals = calculateOrderTotals(doc);
 		Object.assign(doc, totals);
 		finalTotal = totals.total;
@@ -705,6 +706,51 @@ export async function addRefillRequest(orderId: string, menuItem: MenuItem): Pro
 }
 
 /**
+ * Sends a service request (extra tong, scissors, utensils, etc.) to the KDS only.
+ * Does NOT add to order.items — no billing impact, no receipt entry.
+ * Kitchen sees it in the NEEDS section of the ticket and acknowledges it.
+ */
+export async function addServiceRequest(orderId: string, requestText: string): Promise<void> {
+	if (!browser || !requestText.trim()) return;
+	const db = await getDb();
+	const orderDoc = await db.orders.findOne(orderId).exec();
+	if (!orderDoc) return;
+	const order = orderDoc.toMutableJSON() as Order;
+
+	const kdsItem = {
+		id: nanoid(),
+		menuItemName: requestText.trim(),
+		quantity: 1,
+		status: 'pending' as const,
+		category: 'service' as const,
+		notes: ''
+	};
+
+	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
+	if (ticket) {
+		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
+		if (tDoc) {
+			await tDoc.incrementalModify((doc: any) => {
+				doc.items = [...doc.items, kdsItem];
+				doc.updatedAt = new Date().toISOString();
+				return doc;
+			});
+		}
+	} else {
+		await db.kds_tickets.insert({
+			id: nanoid(),
+			orderId,
+			locationId: order.locationId,
+			tableNumber: order.tableNumber,
+			customerName: order.customerName,
+			items: [kdsItem],
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString()
+		});
+	}
+}
+
+/**
  * Called from the weigh station when meat is weighed and dispatched.
  * Writes actual weight to the order item, deducts stock, updates KDS to 'cooking'.
  */
@@ -788,4 +834,62 @@ export async function changePackage(orderId: string, newPackageId: string) {
 	const diff = Math.abs(finalTotal - order.total);
 	const direction = finalTotal > order.total ? 'upgrade' : 'downgrade';
 	log.packageChanged(tableLabel, oldPkgName, newPkg.name, direction, diff);
+}
+
+/** Merge all items from a takeout order into a dine-in table order, then cancel the takeout. */
+export async function mergeTakeoutToTable(
+	takeoutOrderId: string,
+	tableOrderId: string
+): Promise<{ success: boolean; error?: string }> {
+	if (!browser) return { success: false, error: 'Not in browser' };
+
+	const takeout = orders.value.find(o => o.id === takeoutOrderId);
+	if (!takeout) return { success: false, error: 'Takeout order not found' };
+	if (takeout.orderType !== 'takeout') return { success: false, error: 'Source is not a takeout order' };
+	if (takeout.status !== 'open') return { success: false, error: 'Takeout order is not open' };
+
+	const tableOrder = orders.value.find(o => o.id === tableOrderId);
+	if (!tableOrder) return { success: false, error: 'Table order not found' };
+	if (tableOrder.orderType !== 'dine-in') return { success: false, error: 'Target is not a dine-in order' };
+	if (tableOrder.status !== 'open') return { success: false, error: 'Table order is not open' };
+
+	const db = await getDb();
+
+	// Copy non-cancelled takeout items into the table order
+	const itemsToMerge = takeout.items
+		.filter(i => i.status !== 'cancelled')
+		.map(i => ({ ...i, id: nanoid(), addedAt: new Date().toISOString() }));
+
+	let newTotal = 0;
+	const tableDoc = await db.orders.findOne(tableOrderId).exec();
+	if (!tableDoc) return { success: false, error: 'Table order doc not found' };
+
+	await tableDoc.incrementalModify((doc: Order) => {
+		doc.items = [...doc.items, ...itemsToMerge];
+		const totals = calculateOrderTotals(doc);
+		Object.assign(doc, totals);
+		newTotal = totals.total;
+		doc.updatedAt = new Date().toISOString();
+		return doc;
+	});
+
+	// Cancel the takeout order
+	const takeoutDoc = await db.orders.findOne(takeoutOrderId).exec();
+	if (takeoutDoc) {
+		await takeoutDoc.incrementalPatch({
+			status: 'cancelled',
+			cancelReason: 'walkout',
+			notes: `Merged into table order ${tableOrderId}`,
+			closedAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString()
+		});
+	}
+
+	await updateTableBillTotal(tableOrder.tableId, newTotal);
+
+	const takeoutLabel = getOrderLabel(takeout);
+	const tableLabel = getOrderLabel(tableOrder);
+	log.tableTransferred(takeoutLabel, tableLabel);
+
+	return { success: true };
 }

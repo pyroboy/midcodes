@@ -8,10 +8,25 @@
 	import { untrack } from 'svelte';
 	import KdsHistoryModal from '$lib/components/kitchen/KdsHistoryModal.svelte';
 	import RefuseReasonModal from '$lib/components/kitchen/RefuseReasonModal.svelte';
+	import { session } from '$lib/stores/session.svelte';
 
 	// ── UI State ──
 	let showKdsHistory = $state(false);
 	let expandedItemId = $state<string | null>(null);
+
+	// ── Section visibility (focus-aware) ──
+	let showMeats  = $state(true);
+	let showDishes = $state(true);
+
+	$effect(() => {
+		if (session.kitchenFocus === 'grill') {
+			showMeats = true; showDishes = false;
+		} else if (session.kitchenFocus === 'sides') {
+			showMeats = false; showDishes = true;
+		} else {
+			showMeats = true; showDishes = true;
+		}
+	});
 
 	// ── P1-14: Un-86 confirmation state ──
 	let confirmingUnEighty6 = $state<string | null>(null);
@@ -299,9 +314,10 @@
 	// ── Group Items (served items STAY visible, only cancelled + packages filtered out) ──
 	function groupItems(items: KdsTicketItem[]) {
 		const notCancelled = (i: KdsTicketItem) => i.status !== 'cancelled' && i.category !== 'packages';
-		const meats  = items.filter(i => i.category === 'meats' && notCancelled(i));
-		const dishes = items.filter(i => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && notCancelled(i));
-		return { meats, dishes, extras: [] as typeof dishes };
+		const meats   = items.filter(i => i.category === 'meats' && notCancelled(i));
+		const dishes  = items.filter(i => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && notCancelled(i));
+		const service = items.filter(i => i.category === 'service' && i.status !== 'cancelled');
+		return { meats, dishes, extras: [] as typeof dishes, service };
 	}
 
 	// ── Actions ──
@@ -592,7 +608,11 @@
 					{#if grouped.meats.length > 0}
 						{@const pendingRefillCount = grouped.meats.filter(i => i.notes === REFILL_NOTE && !i.weight && i.status !== 'served').length}
 						<div class="py-2">
-							<div class="flex items-center justify-between px-4 py-1.5">
+							<button
+								onclick={() => (showMeats = !showMeats)}
+								class="flex w-full items-center justify-between px-4 py-1.5 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+								style="min-height: unset"
+							>
 								<div class="flex items-center gap-2">
 									<span class="text-xs font-bold uppercase tracking-wider text-red-800">
 										&#129385; MEATS
@@ -603,11 +623,22 @@
 											&#8635; {pendingRefillCount} refill{pendingRefillCount > 1 ? 's' : ''}
 										</span>
 									{/if}
+									{#if !showMeats}
+										<span class="rounded-full bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5">
+											{grouped.meats.filter(i => i.status !== 'served').length} hidden
+										</span>
+									{/if}
 								</div>
-								<span class="text-xs font-mono font-bold text-red-700">
-									{grouped.meats.filter(i => i.status !== 'served').reduce((s: number, i) => s + (i.weight ?? 0), 0)}g
-								</span>
-							</div>
+								<div class="flex items-center gap-2">
+									<span class="text-xs font-mono font-bold text-red-700">
+										{grouped.meats.filter(i => i.status !== 'served').reduce((s: number, i) => s + (i.weight ?? 0), 0)}g
+									</span>
+									<span class="text-gray-400">
+										{#if showMeats}<ChevronUp class="w-3.5 h-3.5" />{:else}<ChevronDown class="w-3.5 h-3.5" />{/if}
+									</span>
+								</div>
+							</button>
+							{#if showMeats}
 							{#each grouped.meats as item (item.id)}
 								{@const isServed = item.status === 'served'}
 								{@const isExpanded = expandedItemId === item.id && !isServed}
@@ -678,17 +709,33 @@
 									{/if}
 								</div>
 							{/each}
+							{/if}
 						</div>
 					{/if}
 
 					<!-- DISHES & DRINKS -->
 					{#if grouped.dishes.length > 0}
 						<div class="py-2">
-							<div class="px-4 py-1.5">
-								<span class="text-xs font-bold uppercase tracking-wider text-status-cyan">
-									&#127836; DISHES & DRINKS
+							<button
+								onclick={() => (showDishes = !showDishes)}
+								class="flex w-full items-center justify-between px-4 py-1.5 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+								style="min-height: unset"
+							>
+								<div class="flex items-center gap-2">
+									<span class="text-xs font-bold uppercase tracking-wider text-status-cyan">
+										&#127836; DISHES & DRINKS
+									</span>
+									{#if !showDishes}
+										<span class="rounded-full bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5">
+											{grouped.dishes.filter(i => i.status !== 'served').length} hidden
+										</span>
+									{/if}
+								</div>
+								<span class="text-gray-400">
+									{#if showDishes}<ChevronUp class="w-3.5 h-3.5" />{:else}<ChevronDown class="w-3.5 h-3.5" />{/if}
 								</span>
-							</div>
+							</button>
+							{#if showDishes}
 							{#each grouped.dishes as item (item.id)}
 								{@const isServed = item.status === 'served'}
 								{@const isExpanded = expandedItemId === item.id && !isServed}
@@ -749,69 +796,45 @@
 									{/if}
 								</div>
 							{/each}
+							{/if}
 						</div>
 					{/if}
 
-					<!-- SIDE REQUESTS -->
-					{#if grouped.extras.length > 0}
-						<div class="py-2">
+					<!-- NEEDS (service requests: extra tong, scissors, etc.) -->
+					{#if grouped.service.length > 0}
+						<div class="py-2 bg-status-purple/5">
 							<div class="px-4 py-1.5">
 								<span class="text-xs font-bold uppercase tracking-wider text-status-purple">
-									&#127915; SIDE REQUESTS
+									🔧 NEEDS
 								</span>
 							</div>
-							{#each grouped.extras as item (item.id)}
-								{@const isServed = item.status === 'served'}
-								{@const isExpanded = expandedItemId === item.id && !isServed}
-								<div class="border-b border-border/30 last:border-b-0">
-									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-									<div
-										class={cn(
-											'flex items-center gap-2 px-4 py-2 transition-colors',
-											isServed ? 'opacity-50' : 'cursor-pointer active:bg-gray-50'
-										)}
-										onclick={() => !isServed && toggleExpand(item.id)}
-										role={isServed ? undefined : 'button'}
-										tabindex={isServed ? -1 : 0}
-										aria-expanded={isServed ? undefined : isExpanded}
-										aria-label={isServed ? undefined : `${isExpanded ? 'Collapse' : 'Expand'} actions for ${item.menuItemName}`}
-									>
+							{#each grouped.service as item (item.id)}
+								{@const isAcked = item.status === 'served'}
+								<div class="border-b border-status-purple/10 last:border-b-0">
+									<div class={cn('flex items-center gap-2 px-4 py-2', isAcked && 'opacity-40')}>
 										<div class="flex-1 flex items-center gap-2 min-w-0">
-											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
+											<span class={cn('text-sm font-semibold truncate', isAcked ? 'line-through text-gray-400' : 'text-status-purple')}>
 												{item.menuItemName}
 											</span>
-											{#if item.quantity > 1}
-												<span class="shrink-0 text-xs text-gray-400">{item.quantity}x</span>
-											{/if}
 										</div>
-										{#if isServed}
+										{#if isAcked}
 											<span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-status-green/10 text-status-green">
 												<Check class="w-5 h-5" strokeWidth={3} />
 											</span>
 										{:else}
-											<span class="shrink-0 text-gray-400">
-												{#if isExpanded}
-													<ChevronUp class="w-4 h-4" />
-												{:else}
-													<ChevronDown class="w-4 h-4" />
-												{/if}
-											</span>
 											<button
-												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
-												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
-												style="min-height: 48px"
+												onclick={() => markItemServed(ticket.orderId, item.id)}
+												class="shrink-0 rounded-lg border-2 border-status-purple px-4 py-2 text-xs font-black text-status-purple hover:bg-status-purple hover:text-white active:scale-95 transition-all no-select"
+												style="min-height: 44px"
 											>
-												&#10003;
+												Done
 											</button>
 										{/if}
-									</div>
-									{#if isExpanded}
-										{@render itemActions(ticket.orderId, ticket.tableNumber, item.menuItemName)}
-									{/if}
 								</div>
-							{/each}
-						</div>
-					{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
 				</div>
 
 				<!-- ALL DONE -->

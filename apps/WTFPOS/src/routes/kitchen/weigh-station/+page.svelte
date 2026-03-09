@@ -267,7 +267,9 @@
 	</div>
 
 	<!-- CENTER: Numpad + Weight Display -->
-	<div class="flex-1 flex flex-col items-center justify-center gap-6 p-8">
+	<div class="flex-1 flex flex-col min-h-0">
+		<!-- Scrollable content area -->
+		<div class="flex-1 overflow-y-auto flex flex-col items-center justify-center gap-6 p-8">
 		{#if selectedItem}
 			{@const group = tableGroups.find((g) => g.orderId === selectedItem?.orderId)}
 			<!-- Selected item info -->
@@ -430,22 +432,28 @@
 				</div>
 			{/if}
 
-			<!-- DISPATCH button -->
-			<button
-				onclick={dispatch}
-				disabled={!weightInput || parseInt(weightInput) <= 0}
-				class="w-full max-w-sm rounded-xl bg-status-green py-5 text-xl font-extrabold text-white
-				       hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none shadow-md"
-				style="min-height: 64px"
-			>
-				DISPATCH
-			</button>
 		{:else}
 			<!-- No selection state -->
 			<div class="text-center text-gray-400">
 				<div class="text-6xl mb-4">⚖️</div>
 				<p class="text-xl font-semibold text-gray-600">Select a meat order</p>
 				<p class="text-sm mt-1">Choose from the pending list on the left</p>
+			</div>
+		{/if}
+		</div>
+
+		<!-- DISPATCH button — sticky at bottom, always visible when item is selected -->
+		{#if selectedItem}
+			<div class="sticky bottom-0 bg-surface border-t border-border px-8 py-4 flex justify-center">
+				<button
+					onclick={dispatch}
+					disabled={!weightInput || parseInt(weightInput) <= 0}
+					class="w-full max-w-sm rounded-xl bg-status-green py-5 text-xl font-extrabold text-white
+					       hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none shadow-md"
+					style="min-height: 64px"
+				>
+					DISPATCH
+				</button>
 			</div>
 		{/if}
 	</div>
@@ -461,7 +469,8 @@
 			</div>
 			<button
 				onclick={() => (showYieldCalc = true)}
-				class="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-accent border border-border hover:bg-gray-200 transition-colors"
+				class="rounded-lg bg-gray-100 px-4 py-2.5 text-xs font-bold text-accent border border-border hover:bg-gray-200 transition-colors"
+				style="min-height: 44px"
 				>Yield %</button
 			>
 		</div>

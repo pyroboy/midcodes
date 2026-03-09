@@ -20,6 +20,7 @@
     import PaxChangeModal from '$lib/components/pos/PaxChangeModal.svelte';
     import LeftoverPenaltyModal from '$lib/components/pos/LeftoverPenaltyModal.svelte';
     import MergeTablesModal from '$lib/components/pos/MergeTablesModal.svelte';
+    import AttachTakeoutModal from '$lib/components/pos/AttachTakeoutModal.svelte';
     import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
     import ShiftStartModal from '$lib/components/pos/ShiftStartModal.svelte';
     import { getActiveShift } from '$lib/stores/pos/shifts.svelte';
@@ -110,6 +111,15 @@
     let showAddItem = $state(false);
     let showCheckout = $state(false);
     let checkoutOrder = $state<Order | null>(null); // captured when checkout opens
+
+    // Keep checkoutOrder in sync with live RxDB updates while checkout is open.
+    // Without this, recalcOrder() writes discount/total to RxDB but CheckoutModal
+    // still receives the stale snapshot — discount line and TOTAL never update.
+    $effect(() => {
+        if (showCheckout && currentActiveOrder) {
+            checkoutOrder = currentActiveOrder;
+        }
+    });
     let showVoidConfirm = $state(false);
     let showTransferModal = $state(false);
     let showPackageChange = $state(false);
@@ -121,6 +131,10 @@
     let showMergeModal = $state(false);
     let showRefill = $state(false);
     let paxModalTable = $state<Table | null>(null);
+    // P0-03: Attach takeout to table
+    let showAttachTakeout = $state(false);
+    // P2-03: Track split bill by order ID so modal stays mounted after closeTable
+    let splitBillOrderId = $state<string | null>(null);
 
     // ─── Kitchen Rejection Alerts ──────────────────────────────────────────────
     const pendingRejections = $derived<KitchenAlert[]>(
@@ -242,11 +256,11 @@
         showAddItem = false;
     }
 
-    async function confirmPax(pax: number) {
+    async function confirmPax(pax: number, childPax: number, freePax: number) {
         if (paxModalTable) {
             const tableId = paxModalTable.id;
             paxModalTable = null; // clear before await to prevent double-click
-            await openTable(tableId, pax);
+            await openTable(tableId, pax, undefined, childPax, freePax);
             selectedTableId = tableId;
             // Only auto-open AddItemModal if the order has no items yet
             const table = allTables.value.find(t => t.id === tableId);
@@ -280,8 +294,14 @@
         showPackageChange = false;
     }
 
-    function handleSplitComplete() {
+    function handleSplitComplete(paidOrder: Order) {
         showSplitBill = false;
+        splitBillOrderId = null;
+        // P2-03: Show receipt with the split order summary before clearing bill
+        receiptOrder = paidOrder;
+        receiptChange = 0;
+        receiptMethod = 'Split';
+        showReceipt = true;
         closeBill();
     }
 
@@ -496,7 +516,9 @@
                 onvoid={() => showVoidConfirm = true}
                 ontransfer={() => showTransferModal = true}
                 onchangepackage={() => showPackageChange = true}
-                onsplit={() => showSplitBill = true}
+                onsplit={() => { splitBillOrderId = currentActiveOrder?.id ?? null; showSplitBill = true; }}
+                onattachtakeout={() => showAttachTakeout = true}
+                hasTakeoutOrders={takeoutOrders.length > 0}
                 onchangepax={() => showPaxChange = true}
                 onmerge={() => showMergeModal = true}
                 oncanceltable={handleCancelTable}
@@ -605,12 +627,15 @@
     />
 {/if}
 
-{#if showSplitBill && currentActiveOrder}
-    <SplitBillModal
-        order={currentActiveOrder}
-        onclose={() => showSplitBill = false}
-        oncomplete={handleSplitComplete}
-    />
+{#if showSplitBill && splitBillOrderId}
+    {@const splitOrder = orders.find(o => o.id === splitBillOrderId)}
+    {#if splitOrder}
+        <SplitBillModal
+            order={splitOrder}
+            onclose={() => { showSplitBill = false; splitBillOrderId = null; }}
+            oncomplete={handleSplitComplete}
+        />
+    {/if}
 {/if}
 
 <PaxChangeModal
@@ -644,6 +669,16 @@
             showMergeModal = false;
             selectedTableId = targetTableId;
         }}
+    />
+{/if}
+
+{#if showAttachTakeout && currentActiveOrder && selectedTable}
+    <AttachTakeoutModal
+        tableOrder={currentActiveOrder}
+        table={selectedTable}
+        {takeoutOrders}
+        onclose={() => showAttachTakeout = false}
+        onattached={() => { showAttachTakeout = false; }}
     />
 {/if}
 

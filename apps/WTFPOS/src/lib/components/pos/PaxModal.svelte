@@ -4,90 +4,195 @@
 
     interface Props {
         table: Table | null;
-        onconfirm: (pax: number) => void;
+        onconfirm: (pax: number, childPax: number, freePax: number) => void;
         oncancel: () => void;
     }
 
     let { table, onconfirm, oncancel }: Props = $props();
 
-    let customPax = $state('');
-    // P0-02 / P2-03: inline capacity error — always visible on tap, not hover-only
+    let adults = $state(2);
+    let children = $state(0);  // ages 6–9, reduced price
+    let free = $state(0);      // ages under 5, no charge
+
+    let customAdults = $state('');
     let capacityError = $state('');
 
-    function handleQuickSelect(num: number) {
+    let total = $derived(adults + children + free);
+
+    function clampedAdults(n: number) {
+        adults = Math.max(1, n);
         capacityError = '';
-        if (table && num > table.capacity) {
-            capacityError = `Maximum ${table.capacity} guest${table.capacity !== 1 ? 's' : ''} for this table.`;
-            return;
-        }
-        onconfirm(num);
+        checkCapacity();
     }
 
-    function handleCustomConfirm() {
-        const val = parseInt(customPax);
-        if (isNaN(val) || val < 1) return;
-        if (table && val > table.capacity) {
-            capacityError = `Maximum ${table.capacity} guest${table.capacity !== 1 ? 's' : ''} for this table.`;
-            return;
-        }
+    function clampedChildren(n: number) {
+        children = Math.max(0, n);
         capacityError = '';
-        customPax = '';
-        onconfirm(val);
+        checkCapacity();
     }
 
-    // Clear error when input changes
-    function handleCustomInput() {
-        if (capacityError) capacityError = '';
+    function clampedFree(n: number) {
+        free = Math.max(0, n);
+        capacityError = '';
+        checkCapacity();
     }
+
+    function checkCapacity(): boolean {
+        if (table && total > table.capacity) {
+            capacityError = `Maximum ${table.capacity} guest${table.capacity !== 1 ? 's' : ''} for this table.`;
+            return false;
+        }
+        return true;
+    }
+
+    function handleConfirm() {
+        if (!checkCapacity()) return;
+        onconfirm(total, children, free);
+    }
+
+    // Quick-select presets for adults row (1–8)
+    const adultPresets = [1, 2, 3, 4, 5, 6, 7, 8];
+    // Quick-select presets for children/free rows (0–4)
+    const childPresets = [0, 1, 2, 3, 4];
 </script>
 
 {#if table}
     <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div class="pos-card w-[320px] flex flex-col gap-4">
-            <h3 class="font-bold text-gray-900">How many guests for {table.label}?</h3>
-            <p class="text-xs text-gray-400 -mt-2">Capacity: <strong class="text-gray-600">{table.capacity}</strong></p>
-            <div class="grid grid-cols-4 gap-2">
-                {#each Array.from({length: 12}, (_, i) => i + 1) as num}
-                    <button
-                        onclick={() => handleQuickSelect(num)}
-                        class={cn(
-                            'btn-secondary h-12 text-lg',
-                            table && num > table.capacity && 'opacity-40'
-                        )}
-                    >
-                        {num}
-                    </button>
-                {/each}
+        <div class="pos-card w-[360px] flex flex-col gap-5">
+            <div>
+                <h3 class="font-bold text-gray-900">How many guests for {table.label}?</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Capacity: <strong class="text-gray-600">{table.capacity}</strong></p>
             </div>
-            <!-- P2-03 / P0-02: Always-visible inline capacity error (visible on tap, not hover-only) -->
+
+            <!-- Adults row -->
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-sm font-semibold text-gray-800">Adults</span>
+                        <span class="ml-1.5 text-xs text-gray-400">full price</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button
+                            onclick={() => clampedAdults(adults - 1)}
+                            class="btn-secondary h-8 w-8 text-base p-0 flex items-center justify-center"
+                            disabled={adults <= 1}
+                        >−</button>
+                        <span class="w-8 text-center font-mono font-bold text-gray-900">{adults}</span>
+                        <button
+                            onclick={() => clampedAdults(adults + 1)}
+                            class="btn-secondary h-8 w-8 text-base p-0 flex items-center justify-center"
+                        >+</button>
+                    </div>
+                </div>
+                <div class="flex gap-1.5">
+                    {#each adultPresets as num}
+                        <button
+                            onclick={() => clampedAdults(num)}
+                            class={cn(
+                                'flex-1 rounded-lg border text-sm font-semibold py-1.5 transition-colors',
+                                adults === num
+                                    ? 'bg-accent text-white border-accent'
+                                    : 'bg-surface-secondary text-gray-600 border-border hover:border-accent/50'
+                            )}
+                        >{num}</button>
+                    {/each}
+                </div>
+            </div>
+
+            <div class="border-t border-border"></div>
+
+            <!-- Children 6–9 row -->
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-sm font-semibold text-gray-800">Children</span>
+                        <span class="ml-1.5 text-xs text-gray-400">ages 6–9 · reduced price</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button
+                            onclick={() => clampedChildren(children - 1)}
+                            class="btn-secondary h-8 w-8 text-base p-0 flex items-center justify-center"
+                            disabled={children <= 0}
+                        >−</button>
+                        <span class="w-8 text-center font-mono font-bold text-gray-900">{children}</span>
+                        <button
+                            onclick={() => clampedChildren(children + 1)}
+                            class="btn-secondary h-8 w-8 text-base p-0 flex items-center justify-center"
+                        >+</button>
+                    </div>
+                </div>
+                <div class="flex gap-1.5">
+                    {#each childPresets as num}
+                        <button
+                            onclick={() => clampedChildren(num)}
+                            class={cn(
+                                'flex-1 rounded-lg border text-sm font-semibold py-1.5 transition-colors',
+                                children === num
+                                    ? 'bg-accent text-white border-accent'
+                                    : 'bg-surface-secondary text-gray-600 border-border hover:border-accent/50'
+                            )}
+                        >{num}</button>
+                    {/each}
+                </div>
+            </div>
+
+            <!-- Free under-5 row -->
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-sm font-semibold text-gray-800">Free</span>
+                        <span class="ml-1.5 text-xs text-gray-400">under 5 · no charge</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button
+                            onclick={() => clampedFree(free - 1)}
+                            class="btn-secondary h-8 w-8 text-base p-0 flex items-center justify-center"
+                            disabled={free <= 0}
+                        >−</button>
+                        <span class="w-8 text-center font-mono font-bold text-gray-900">{free}</span>
+                        <button
+                            onclick={() => clampedFree(free + 1)}
+                            class="btn-secondary h-8 w-8 text-base p-0 flex items-center justify-center"
+                        >+</button>
+                    </div>
+                </div>
+                <div class="flex gap-1.5">
+                    {#each childPresets as num}
+                        <button
+                            onclick={() => clampedFree(num)}
+                            class={cn(
+                                'flex-1 rounded-lg border text-sm font-semibold py-1.5 transition-colors',
+                                free === num
+                                    ? 'bg-accent text-white border-accent'
+                                    : 'bg-surface-secondary text-gray-600 border-border hover:border-accent/50'
+                            )}
+                        >{num}</button>
+                    {/each}
+                </div>
+            </div>
+
+            <!-- Capacity error -->
             {#if capacityError}
                 <p class="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm font-semibold text-status-red">
                     {capacityError}
                 </p>
             {/if}
-            <div class="flex flex-col gap-1.5">
-                <label for="pax-custom-input" class="text-xs font-semibold text-gray-500">Other (type number)</label>
-                <div class="flex gap-2">
-                    <input
-                        id="pax-custom-input"
-                        type="number"
-                        min="1"
-                        bind:value={customPax}
-                        placeholder="e.g. 15"
-                        class="pos-input flex-1"
-                        oninput={handleCustomInput}
-                        onkeydown={(e) => { if (e.key === 'Enter') handleCustomConfirm(); }}
-                    />
-                    <button
-                        onclick={handleCustomConfirm}
-                        disabled={!customPax || isNaN(parseInt(customPax)) || parseInt(customPax) < 1}
-                        class="btn-primary px-4 disabled:opacity-40"
-                        style="min-height: 44px"
-                    >OK</button>
-                </div>
+
+            <!-- Total summary -->
+            <div class="rounded-xl bg-surface-secondary border border-border px-4 py-3 flex items-center justify-between">
+                <span class="text-sm text-gray-500">Total guests</span>
+                <span class="font-mono font-bold text-xl text-gray-900">{total}</span>
             </div>
-            <div class="flex gap-2 mt-2">
+
+            <!-- Actions -->
+            <div class="flex gap-2">
                 <button class="btn-ghost flex-1" onclick={oncancel}>Cancel</button>
+                <button
+                    onclick={handleConfirm}
+                    class="btn-primary flex-1"
+                    style="min-height: 44px"
+                    disabled={total < 1}
+                >Confirm</button>
             </div>
         </div>
     </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { initEqualSplit, initItemSplit, assignItemToSubBill, paySubBill, cancelSplit } from '$lib/stores/pos.svelte';
 	import { formatPeso, cn } from '$lib/utils';
 	import type { Order, PaymentMethod, SubBill } from '$lib/types';
@@ -10,7 +11,7 @@
 	}: {
 		order: Order;
 		onclose: () => void;
-		oncomplete: () => void;
+		oncomplete: (paidOrder: Order) => void;
 	} = $props();
 
 	let step = $state<'choose' | 'split' | 'pay'>('choose');
@@ -21,6 +22,16 @@
 	let activeSubBillId = $state<string | null>(null);
 	let payMethod = $state<PaymentMethod>('cash');
 	let cashTendered = $state(0);
+
+	// P0-02: Local payment tracking — avoids race with RxDB propagation
+	// untrack: intentionally captures only the initial set of already-paid sub-bills
+	let paidSubBillIds = $state(new Set(untrack(() => order.subBills?.filter(sb => sb.payment !== null).map(sb => sb.id) ?? [])));
+
+	// P1-03: Per-guest receipt state
+	let showSubReceipt = $state(false);
+	let paidSubBill = $state<SubBill | null>(null);
+	let lastPayMethodLabel = $state('');
+	let subChange = $state(0);
 
 	// Item assignment state (by-item mode)
 	let selectedItemId = $state<string | null>(null);
@@ -68,18 +79,28 @@
 		if (!activeSubBillId || !activeSubBill) return;
 		const amount = payMethod === 'cash' ? cashTendered : activeSubBill.total;
 		if (payMethod === 'cash' && cashTendered < activeSubBill.total) return;
+
+		// P0-02: Capture receipt data before async DB write
+		paidSubBill = { ...activeSubBill };
+		lastPayMethodLabel = payMethod === 'gcash' ? 'GCash' : payMethod === 'maya' ? 'Maya' : 'Cash';
+		subChange = payMethod === 'cash' ? Math.max(0, cashTendered - activeSubBill.total) : 0;
+		paidSubBillIds = new Set([...paidSubBillIds, activeSubBillId]);
+
 		paySubBill(order.id, activeSubBillId, payMethod, amount);
+		showSubReceipt = true;
+	}
 
-		// If all paid, close
-		if (order.subBills?.every(sb => sb.payment !== null)) {
-			oncomplete();
-			return;
+	function proceedFromSubReceipt() {
+		showSubReceipt = false;
+		if (!order.subBills) return;
+		const next = order.subBills.find(sb => !paidSubBillIds.has(sb.id));
+		if (next) {
+			activeSubBillId = next.id;
+			payMethod = 'cash';
+			cashTendered = 0;
+		} else {
+			activeSubBillId = null; // All paid → show "All paid!" UI
 		}
-
-		// Move to next unpaid sub-bill
-		activeSubBillId = order.subBills?.find(sb => !sb.payment)?.id ?? null;
-		payMethod = 'cash';
-		cashTendered = 0;
 	}
 
 	function handleCancel() {
@@ -96,6 +117,11 @@
 		activeSubBill
 			? (payMethod !== 'cash' || cashTendered >= activeSubBill.total)
 			: false
+	);
+
+	// P1-03: Number of guests still to pay after the current payment
+	const remainingAfterCurrent = $derived(
+		order.subBills?.filter(sb => !paidSubBillIds.has(sb.id)).length ?? 0
 	);
 
 	// Check if all items are assigned (by-item mode)
@@ -300,20 +326,20 @@
 				<h3 class="text-lg font-bold text-gray-900">💳 Split Payment</h3>
 				<div class="flex items-center gap-2">
 					<span class="text-xs text-gray-400">
-						{order.subBills.filter(sb => sb.payment).length}/{order.subBills.length} paid
+						{paidSubBillIds.size}/{order.subBills.length} paid
 					</span>
 					<button onclick={handleCancel} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>
 				</div>
 			</div>
 
-			<!-- Sub-bill tabs -->
+			<!-- Sub-bill tabs — use local paidSubBillIds for immediate feedback -->
 			<div class="flex gap-2 border-b border-border bg-surface-secondary px-6 py-3 overflow-x-auto">
 				{#each order.subBills as sb (sb.id)}
 					<button
-						onclick={() => { if (!sb.payment) { activeSubBillId = sb.id; payMethod = 'cash'; cashTendered = 0; } }}
+						onclick={() => { if (!paidSubBillIds.has(sb.id) && !showSubReceipt) { activeSubBillId = sb.id; payMethod = 'cash'; cashTendered = 0; } }}
 						class={cn(
 							'shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-all',
-							sb.payment
+							paidSubBillIds.has(sb.id)
 								? 'bg-status-green-light text-status-green cursor-default'
 								: sb.id === activeSubBillId
 									? 'bg-accent text-white shadow-md'
@@ -321,12 +347,44 @@
 						)}
 						style="min-height: 40px"
 					>
-						{sb.payment ? '✓ ' : ''}{sb.label} · {formatPeso(sb.total)}
+						{paidSubBillIds.has(sb.id) ? '✓ ' : ''}{sb.label} · {formatPeso(sb.total)}
 					</button>
 				{/each}
 			</div>
 
-			{#if activeSubBill && !activeSubBill.payment}
+			{#if showSubReceipt && paidSubBill}
+				<!-- P1-03: Per-guest receipt after each payment -->
+				<div class="flex flex-col items-center gap-4 px-6 py-6">
+					<div class="flex items-center gap-2">
+						<span class="text-2xl text-status-green">✓</span>
+						<span class="text-base font-bold text-gray-900">{paidSubBill.label} Paid</span>
+					</div>
+					<div class="w-full rounded-xl bg-surface-secondary border border-border p-4 font-mono text-sm">
+						<div class="flex justify-between">
+							<span class="font-sans text-gray-600">{paidSubBill.label}</span>
+							<span class="font-bold text-gray-900">{formatPeso(paidSubBill.total)}</span>
+						</div>
+						<div class="flex justify-between text-xs text-gray-400 mt-1">
+							<span>via</span>
+							<span>{lastPayMethodLabel}</span>
+						</div>
+						{#if lastPayMethodLabel === 'Cash' && subChange > 0}
+							<div class="flex justify-between font-bold text-status-green mt-1 border-t border-border pt-1">
+								<span>Change</span>
+								<span>{formatPeso(subChange)}</span>
+							</div>
+						{/if}
+					</div>
+					<button
+						class="btn-primary w-full"
+						onclick={proceedFromSubReceipt}
+						style="min-height: 48px"
+					>
+						{remainingAfterCurrent > 0 ? `Next Guest → (${remainingAfterCurrent} left)` : 'All Done ✓'}
+					</button>
+				</div>
+
+			{:else if activeSubBillId !== null && !paidSubBillIds.has(activeSubBillId) && activeSubBill}
 				<!-- Active sub-bill payment -->
 				<div class="flex flex-col gap-4 px-6 py-5">
 					<div class="flex items-center justify-between rounded-xl bg-surface-secondary border border-border p-4">
@@ -339,7 +397,7 @@
 						{#each [
 							{ id: 'cash' as PaymentMethod, label: '💵 Cash' },
 							{ id: 'gcash' as PaymentMethod, label: '📱 GCash' },
-							{ id: 'card' as PaymentMethod, label: '💳 Card' }
+							{ id: 'maya' as PaymentMethod, label: '📱 Maya' }
 						] as method}
 							<button
 								onclick={() => { payMethod = method.id; if (method.id !== 'cash') cashTendered = 0; }}
@@ -373,7 +431,7 @@
 									>₱{amount.toLocaleString()}</button>
 								{/each}
 								<button
-									onclick={() => { if (activeSubBill) cashTendered = activeSubBill.total; }}
+									onclick={() => { cashTendered = activeSubBill!.total; }}
 									class="rounded-lg py-2 text-xs font-bold text-accent border border-accent bg-accent-light hover:bg-orange-100 transition-all"
 									style="min-height: 40px"
 								>Exact</button>
@@ -411,9 +469,10 @@
 				<div class="flex flex-col items-center gap-4 px-6 py-12">
 					<span class="text-4xl">✅</span>
 					<span class="text-lg font-bold text-gray-900">All sub-bills paid!</span>
+					<p class="text-sm text-gray-400 text-center">Total: {formatPeso(order.total)}</p>
 				</div>
 				<div class="flex gap-3 border-t border-border px-6 py-4">
-					<button class="btn-primary flex-1" onclick={oncomplete} style="min-height: 48px">
+					<button class="btn-primary flex-1" onclick={() => oncomplete(order)} style="min-height: 48px">
 						Done
 					</button>
 				</div>

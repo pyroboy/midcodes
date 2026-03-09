@@ -87,7 +87,7 @@ export interface Location {
 
 // ─── Menu ─────────────────────────────────────────────────────────────────────
 
-export type MenuCategory = 'packages' | 'meats' | 'sides' | 'dishes' | 'drinks';
+export type MenuCategory = 'packages' | 'meats' | 'sides' | 'dishes' | 'drinks' | 'service';
 export type MeatProtein = 'beef' | 'pork' | 'chicken' | 'seafood' | 'other';
 
 export interface MenuItem {
@@ -96,6 +96,7 @@ export interface MenuItem {
 	category: MenuCategory;
 	protein?: MeatProtein;
 	price: number;
+	childPrice?: number;      // reduced package price for children ages 6–9
 	isWeightBased: boolean;
 	pricePerGram?: number;
 	available: boolean;
@@ -104,8 +105,9 @@ export interface MenuItem {
 	isFree?: boolean;
 	trackInventory?: boolean; // Tier 3: Toggle whether this item deducts from Stock
 	isRetail?: boolean;       // Tier 4: For barcode scanning
-	meats?: string[];      // IDs of meat MenuItems included in this package
-	autoSides?: string[];  // IDs of side MenuItems auto-included with this package
+	meats?: string[];           // IDs of meat MenuItems included in this package
+	autoSides?: string[];       // IDs of side MenuItems auto-included (qty 1 each)
+	scaledAutoSides?: string[]; // IDs of sides scaled by ceil(pax/6) — e.g. ice tea pitchers
 	image?: string;
 	updatedAt: string;
 }
@@ -124,6 +126,7 @@ export interface OrderItem {
 	menuItemName: string;
 	quantity: number;
 	unitPrice: number;
+	childUnitPrice?: number | null; // child price for package items (ages 6–9)
 	weight: number | null;
 	status: OrderItemStatus;
 	sentAt: string | null;
@@ -166,7 +169,9 @@ export interface Order {
 	tableNumber: number | null; // null for takeout orders
 	packageName: string | null;
 	packageId: string | null;  // tracks active package for table card indicator
-	pax: number;               // number of diners
+	pax: number;               // number of diners (adults + children + free)
+	childPax?: number;         // children ages 6–9 (reduced package price)
+	freePax?: number;          // children under 5 (free)
 	items: OrderItem[];
 	status: 'open' | 'pending_payment' | 'paid' | 'cancelled';
 	discountType: DiscountType;
@@ -190,6 +195,7 @@ export interface Order {
 	splitType?: SplitType;
 	subBills?: SubBill[];
 	printStatus?: 'pending' | 'printing' | 'success' | 'failed'; // Tier 4
+	discountIdPhotos?: string[]; // one photo URL per SC/PWD qualifying person (index matches discountIds)
 	updatedAt: string;
 }
 

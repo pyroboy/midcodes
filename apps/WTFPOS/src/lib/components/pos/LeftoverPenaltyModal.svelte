@@ -110,14 +110,14 @@
             </div>
 
             <div class="flex gap-2">
-                <button onclick={handleSkip} class="btn-ghost flex-1 py-3 text-xs">Waive (Manager)</button>
                 {#if weightGrams > 0}
+                    <button onclick={handleSkip} class="btn-ghost flex-1 py-3 text-xs">Waive (Manager)</button>
                     <button onclick={handleApply} class="btn-primary flex-[2] py-3 text-sm shadow-xl shadow-orange-500/20">
                         Apply & Checkout
                     </button>
                 {:else}
-                    <button onclick={onPreCheckout} class="btn-success flex-[2] py-3 text-sm shadow-xl text-white bg-status-green hover:bg-emerald-600">
-                        Skip / Checkout
+                    <button onclick={onPreCheckout} class="btn-success w-full py-3 text-sm font-bold shadow-xl text-white bg-status-green hover:bg-emerald-600">
+                        ✓ No Leftovers — Proceed to Checkout
                     </button>
                 {/if}
             </div>

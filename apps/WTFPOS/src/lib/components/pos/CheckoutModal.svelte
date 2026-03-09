@@ -7,6 +7,7 @@
     import { session } from '$lib/stores/session.svelte';
     import { formatPeso, cn } from '$lib/utils';
     import ManagerPinModal from './ManagerPinModal.svelte';
+    import PhotoCapture from '$lib/components/PhotoCapture.svelte';
 
     interface Props {
         order: Order;
@@ -67,6 +68,12 @@
     let localDiscountType = $state<DiscountType>(untrack(() => order.discountType));
     let discountPaxInput  = $state<number>(untrack(() => order.discountPax ?? 1));
     let discountIdsInput  = $state<string[]>([]);
+    // Restore persisted photos from RxDB on mount (BIR audit trail survives modal close)
+    let discountIdPhotos  = $state<string[][]>(untrack(() => {
+        const stored = order.discountIdPhotos ?? [];
+        const pax = order.discountPax ?? 1;
+        return Array.from({ length: pax }, (_, i) => (stored[i] ? [stored[i]] : []));
+    }));
 
     const showScPwdSection = $derived(localDiscountType === 'senior' || localDiscountType === 'pwd');
 
@@ -81,6 +88,7 @@
         const validatedPax = Math.max(1, Math.min(newPax, order.pax));
         discountPaxInput = validatedPax;
         discountIdsInput = Array.from({ length: validatedPax }, (_, i) => discountIdsInput[i] ?? '');
+        discountIdPhotos = Array.from({ length: validatedPax }, (_, i) => discountIdPhotos[i] ?? []);
         recalcOrder(order, { discountType: localDiscountType, discountPax: validatedPax, discountIds: [...discountIdsInput] });
     }
 
@@ -122,6 +130,9 @@
     function handlePinConfirmed() {
         showPinForDiscount = false;
         localDiscountType = pendingDiscountType;
+        // P0-01: Initialize ID input slots so the form renders immediately after PIN
+        discountIdsInput = Array.from({ length: discountPaxInput }, (_, i) => discountIdsInput[i] ?? '');
+        discountIdPhotos = Array.from({ length: discountPaxInput }, (_, i) => discountIdPhotos[i] ?? []);
         recalcOrder(order, { discountType: pendingDiscountType, discountPax: discountPaxInput, discountIds: [...discountIdsInput] });
         const tableLabel = order.orderType === 'takeout'
             ? `Takeout (${order.customerName ?? 'Walk-in'})`
@@ -209,13 +220,43 @@
         </div>
 
         <div class="flex flex-col gap-2 border-b border-border px-6 py-4 bg-surface-secondary">
+            {#if order.packageId && ((order.childPax ?? 0) > 0 || (order.freePax ?? 0) > 0)}
+                {@const pkgItem = order.items.find(i => i.tag === 'PKG' && i.status !== 'cancelled')}
+                {@const adultPax = Math.max(0, order.pax - (order.childPax ?? 0) - (order.freePax ?? 0))}
+                <div class="flex flex-col gap-0.5 text-xs text-gray-500 font-mono">
+                    {#if adultPax > 0 && pkgItem}
+                        <div class="flex justify-between">
+                            <span>{adultPax} adult{adultPax !== 1 ? 's' : ''} × ₱{pkgItem.unitPrice}</span>
+                            <span>{formatPeso(pkgItem.unitPrice * adultPax)}</span>
+                        </div>
+                    {/if}
+                    {#if (order.childPax ?? 0) > 0 && pkgItem}
+                        <div class="flex justify-between">
+                            <span>{order.childPax} child{(order.childPax ?? 0) !== 1 ? 'ren' : ''} × ₱{pkgItem.childUnitPrice ?? pkgItem.unitPrice}</span>
+                            <span>{formatPeso((pkgItem.childUnitPrice ?? pkgItem.unitPrice) * (order.childPax ?? 0))}</span>
+                        </div>
+                    {/if}
+                    {#if (order.freePax ?? 0) > 0}
+                        <div class="flex justify-between text-gray-400">
+                            <span>{order.freePax} free (&lt;5)</span>
+                            <span>₱0</span>
+                        </div>
+                    {/if}
+                </div>
+            {/if}
             <div class="flex justify-between text-sm text-gray-600">
                 <span>Subtotal ({order.packageId ? `${order.pax} pax` : `${order.items.filter(i => i.status !== 'cancelled').length} items`})</span>
                 <span class="font-mono font-semibold">{formatPeso(order.subtotal)}</span>
             </div>
-            {#if order.discountType !== 'none'}
+            {#if order.discountType !== 'none' && order.discountAmount > 0}
+                {@const discountLabel =
+                    order.discountType === 'senior' ? `Senior Citizen 20% (${order.discountPax ?? 1} of ${order.pax} pax)` :
+                    order.discountType === 'pwd'    ? `PWD 20% (${order.discountPax ?? 1} of ${order.pax} pax)` :
+                    order.discountType === 'promo'  ? 'Promo Discount' :
+                    order.discountType === 'comp'   ? 'Complimentary' :
+                    'Service Recovery'}
                 <div class="flex justify-between text-sm text-status-green">
-                    <span>Discount ({order.discountType === 'senior' ? 'Senior 20%' : 'PWD 20%'})</span>
+                    <span>{discountLabel}</span>
                     <span class="font-mono font-semibold">-{formatPeso(order.discountAmount)}</span>
                 </div>
             {/if}
@@ -241,7 +282,7 @@
                         onclick={() => applyDiscount(discount.id)}
                         class={cn(
                             'rounded-xl px-3 font-semibold transition-all text-sm min-h-[44px]',
-                            order.discountType === discount.id
+                            localDiscountType === discount.id
                                 ? 'bg-status-green text-white shadow-md'
                                 : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
                         )}
@@ -261,7 +302,7 @@
                         onclick={() => applyDiscount(discount.id)}
                         class={cn(
                             'rounded-lg px-2 text-xs font-semibold transition-all min-h-[44px]',
-                            order.discountType === discount.id
+                            localDiscountType === discount.id
                                 ? 'bg-status-green text-white shadow-md'
                                 : 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
                         )}
@@ -278,7 +319,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex flex-col gap-0.5">
                         <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                            Qualifying Persons ({order.discountType === 'senior' ? 'Senior Citizen' : 'PWD'})
+                            Qualifying Persons ({localDiscountType === 'senior' ? 'Senior Citizen' : 'PWD'})
                         </span>
                         <span class="text-[10px] text-gray-400">
                             {discountPaxInput} of {order.pax} pax qualify for 20% discount
@@ -288,13 +329,13 @@
                         <button
                             onclick={() => applyScPwdPax(discountPaxInput - 1)}
                             disabled={discountPaxInput <= 1}
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
+                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
                         >−</button>
                         <span class="w-8 text-center font-mono text-xl font-extrabold text-gray-900">{discountPaxInput}</span>
                         <button
                             onclick={() => applyScPwdPax(discountPaxInput + 1)}
                             disabled={discountPaxInput >= order.pax}
-                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
+                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
                         >+</button>
                     </div>
                 </div>
@@ -302,16 +343,29 @@
                 <div class="flex flex-col gap-2">
                     <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ID Numbers (required to confirm checkout)</span>
                     {#each discountIdsInput as _, i}
-                        <div class="flex items-center gap-2">
-                            <span class="w-20 shrink-0 text-xs font-semibold text-gray-500">
-                                {order.discountType === 'senior' ? 'SC' : 'PWD'} ID #{i + 1}
-                            </span>
-                            <input
-                                type="text"
-                                bind:value={discountIdsInput[i]}
-                                oninput={syncDiscountIds}
-                                placeholder="e.g. 12345678"
-                                class="pos-input flex-1 text-sm"
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="w-20 shrink-0 text-xs font-semibold text-gray-500">
+                                    {localDiscountType === 'senior' ? 'SC' : 'PWD'} ID #{i + 1}
+                                </span>
+                                <input
+                                    type="text"
+                                    bind:value={discountIdsInput[i]}
+                                    oninput={syncDiscountIds}
+                                    placeholder="e.g. 12345678"
+                                    class="pos-input flex-1 text-sm"
+                                />
+                            </div>
+                            <PhotoCapture
+                                photos={discountIdPhotos[i] ?? []}
+                                onchange={(photos) => {
+                                    discountIdPhotos[i] = photos;
+                                    // Persist to RxDB so photos survive modal close (BIR audit trail)
+                                    const flat = discountIdPhotos.map(p => p[0] ?? '');
+                                    recalcOrder(order, { discountType: localDiscountType, discountPax: discountPaxInput, discountIds: [...discountIdsInput], discountIdPhotos: flat });
+                                }}
+                                max={1}
+                                label="📷 Attach ID photo"
                             />
                         </div>
                     {/each}

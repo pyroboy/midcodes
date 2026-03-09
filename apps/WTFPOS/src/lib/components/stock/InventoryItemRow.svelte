@@ -88,25 +88,27 @@
 	</td>
 	<td class="px-4 py-3 text-right">
 		{#if !readonly}
-			<div class="flex items-center justify-end gap-2">
+			<div class="flex items-center justify-end gap-1">
 				{#if onToggle86}
 					<button
 						onclick={(e) => { e.stopPropagation(); onToggle86!(); }}
 						class={cn(
-							'rounded px-2 py-0.5 text-[10px] font-bold border transition-colors',
+							'rounded px-2 py-0.5 text-[10px] font-bold border transition-colors flex items-center justify-center',
 							menuAvailable
 								? 'border-gray-200 text-gray-400 hover:border-status-red/40 hover:text-status-red hover:bg-status-red-light'
 								: 'border-status-red/40 bg-status-red-light text-status-red'
 						)}
+						style="min-height: 44px; min-width: 44px"
 						title={menuAvailable ? 'Mark as sold out (86)' : 'Unmark — restore to menu'}
 					>
 						{menuAvailable ? '86' : '86\'d'}
 					</button>
 				{/if}
 				<button
-					class="text-gray-400 hover:text-accent transition-colors"
+					class="text-gray-400 hover:text-accent transition-colors flex items-center justify-center"
 					onclick={(e) => onEditClick(item, e)}
 					aria-label="Edit Info"
+					style="min-height: 44px; min-width: 44px"
 				>
 					<Edit3 class="w-4 h-4" />
 				</button>

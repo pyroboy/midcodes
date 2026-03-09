@@ -66,6 +66,21 @@
 		stockItems.value.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
 	);
 
+	// Grouped items for select — Meats first, then other categories alphabetically
+	const groupedStockItems = $derived((() => {
+		const groups: Record<string, typeof branchStockItems> = {};
+		for (const item of branchStockItems) {
+			const cat = item.category ?? 'Other';
+			if (!groups[cat]) groups[cat] = [];
+			groups[cat].push(item);
+		}
+		const meatsGroup = groups['Meats'] ? [['Meats', groups['Meats']] as [string, typeof branchStockItems]] : [];
+		const otherGroups = Object.entries(groups)
+			.filter(([cat]) => cat !== 'Meats')
+			.sort(([a], [b]) => a.localeCompare(b)) as [string, typeof branchStockItems][];
+		return [...meatsGroup, ...otherGroups];
+	})());
+
 	// Auto-fill unit from selected item
 	const selectedItem = $derived(stockItems.value.find(s => s.id === selectedStockId));
 	const unit = $derived(selectedItem?.unit ?? '');
@@ -113,9 +128,10 @@
 		showModal = true;
 	}
 
-	// Elevated roles (manager, owner, admin) skip the PIN gate — their role is already the authorization
+	// Elevated roles (manager, owner, admin) and kitchen staff skip the PIN gate
+	// Kitchen role logs waste as part of their normal prep workflow — PIN would block their core job
 	const isElevatedRole = $derived(
-		session.role === 'manager' || session.role === 'owner' || session.role === 'admin'
+		session.role === 'manager' || session.role === 'owner' || session.role === 'admin' || session.role === 'kitchen'
 	);
 
 	function handleLog() {
@@ -267,8 +283,12 @@
 				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Item *</span>
 				<select bind:value={selectedStockId} class="pos-input">
 					<option value="">Select item…</option>
-					{#each branchStockItems as s}
-						<option value={s.id}>{s.name}</option>
+					{#each groupedStockItems as [cat, items]}
+						<optgroup label={cat}>
+							{#each items as s}
+								<option value={s.id}>{s.name}</option>
+							{/each}
+						</optgroup>
 					{/each}
 				</select>
 			</div>

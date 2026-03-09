@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Order, MenuItem } from '$lib/types';
-	import { menuItems, addItemToOrder, addRefillRequest, REFILL_NOTE, getRefillCount } from '$lib/stores/pos.svelte';
+	import { menuItems, addItemToOrder, addRefillRequest, addServiceRequest, REFILL_NOTE, getRefillCount } from '$lib/stores/pos.svelte';
 	import { cn } from '$lib/utils';
 
 	interface Props {
@@ -14,6 +14,23 @@
 	// Transient feedback state
 	let addedItemId = $state<string | null>(null);
 	let repeatConfirmed = $state(false);
+
+	// Service request state
+	const SERVICE_PRESETS = ['Extra Tong', 'Extra Scissors', 'Extra Plates', 'Extra Tissue', 'Extra Cups'];
+	let sentServiceKey = $state<string | null>(null);
+	let customService = $state('');
+	let showCustomInput = $state(false);
+
+	const ICE_TEA_PITCHER_ID = 'side-tea-pitcher';
+
+	async function requestService(text: string) {
+		if (!order?.id || !text.trim()) return;
+		await addServiceRequest(order.id, text.trim());
+		sentServiceKey = text;
+		customService = '';
+		showCustomInput = false;
+		setTimeout(() => { sentServiceKey = null; }, 1400);
+	}
 
 	const activePackage = $derived(
 		order?.packageId ? menuItems.value.find(m => m.id === order.packageId) : null
@@ -61,6 +78,8 @@
 
 	async function requestSide(side: MenuItem) {
 		if (!order) return;
+		// Ice tea pitcher is auto-included only — no additional refills permitted
+		if (side.id === ICE_TEA_PITCHER_ID) return;
 		await addItemToOrder(order.id, side, 1, undefined, true);
 		addedItemId = side.id;
 		setTimeout(() => { addedItemId = null; }, 1200);
@@ -151,18 +170,24 @@
 					<!-- P1-4 + P2-4: uniform chip layout, no image inconsistency, no green border semantic conflict -->
 					<div class="flex flex-wrap gap-2">
 						{#each freeSides as side (side.id)}
+							{@const isPitcher = side.id === ICE_TEA_PITCHER_ID}
 							<button
 								onclick={() => requestSide(side)}
+								disabled={isPitcher}
 								class={cn(
-									'relative flex items-center rounded-lg border bg-white px-3 text-xs font-bold text-gray-700 transition-all active:scale-95 hover:border-accent hover:text-accent overflow-hidden',
-									addedItemId === side.id
-										? 'border-status-green bg-status-green/10 text-status-green'
-										: 'border-border'
+									'relative flex items-center rounded-lg border bg-white px-3 text-xs font-bold transition-all overflow-hidden',
+									isPitcher
+										? 'opacity-50 cursor-not-allowed border-dashed border-gray-300 text-gray-400'
+										: addedItemId === side.id
+											? 'border-status-green bg-status-green/10 text-status-green active:scale-95 hover:border-accent hover:text-accent'
+											: 'text-gray-700 border-border active:scale-95 hover:border-accent hover:text-accent'
 								)}
 								style="min-height: 44px"
 							>
 								{side.name}
-								{#if addedItemId === side.id}
+								{#if isPitcher}
+									<span class="ml-1 text-[10px] font-normal">(included)</span>
+								{:else if addedItemId === side.id}
 									<span class="ml-1">✓</span>
 								{/if}
 							</button>
@@ -174,6 +199,57 @@
 			{#if refillMeats.length === 0 && freeSides.length === 0}
 				<p class="text-xs text-gray-400 text-center py-4">No active AYCE package on this order.</p>
 			{/if}
+
+			<!-- Service Requests -->
+			<hr class="border-border" />
+			<div>
+				<p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">🔧 Needs (Kitchen Alert)</p>
+				<div class="flex flex-wrap gap-2">
+					{#each SERVICE_PRESETS as preset}
+						<button
+							onclick={() => requestService(preset)}
+							class={cn(
+								'relative flex items-center rounded-lg border px-3 text-xs font-bold transition-all active:scale-95 overflow-hidden',
+								sentServiceKey === preset
+									? 'border-status-purple bg-status-purple/10 text-status-purple'
+									: 'border-border bg-white text-gray-700 hover:border-status-purple hover:text-status-purple'
+							)}
+							style="min-height: 44px"
+						>
+							{preset}
+							{#if sentServiceKey === preset}<span class="ml-1">✓</span>{/if}
+						</button>
+					{/each}
+					{#if showCustomInput}
+						<div class="flex w-full gap-2 mt-1">
+							<input
+								type="text"
+								bind:value={customService}
+								placeholder="e.g. Extra napkins..."
+								class="pos-input flex-1 text-xs"
+								style="min-height: 44px"
+								onkeydown={(e) => { if (e.key === 'Enter') requestService(customService); if (e.key === 'Escape') { showCustomInput = false; customService = ''; } }}
+							/>
+							<button
+								onclick={() => requestService(customService)}
+								disabled={!customService.trim()}
+								class="rounded-lg bg-status-purple px-4 text-xs font-bold text-white disabled:opacity-40 active:scale-95 transition-all"
+								style="min-height: 44px"
+							>
+								Send
+							</button>
+						</div>
+					{:else}
+						<button
+							onclick={() => { showCustomInput = true; }}
+							class="flex items-center rounded-lg border border-dashed border-gray-300 px-3 text-xs font-bold text-gray-400 hover:border-status-purple hover:text-status-purple transition-all active:scale-95"
+							style="min-height: 44px"
+						>
+							+ Custom
+						</button>
+					{/if}
+				</div>
+			</div>
 		</div>
 
 		<!-- Footer -->
