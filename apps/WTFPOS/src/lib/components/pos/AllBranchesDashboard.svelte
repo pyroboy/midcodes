@@ -2,6 +2,10 @@
     import type { Table, Order, ChairSide } from '$lib/types';
     import { formatPeso, formatCountdown, cn } from '$lib/utils';
     import { floorLayout } from '$lib/stores/floor-layout.svelte';
+    import LocationSelectorModal from '$lib/components/stock/LocationSelectorModal.svelte';
+    import { ArrowDownUp } from 'lucide-svelte';
+
+    let showLocationModal = $state(false);
 
     interface Props {
         allTables: Table[];
@@ -114,6 +118,20 @@
         </div>
         <span class="text-[9px] sm:text-[11px] font-mono uppercase tracking-wider text-gray-500 hidden sm:inline">read only · order taking disabled</span>
         <span class="text-[9px] font-mono uppercase tracking-wider text-gray-500 sm:hidden">read only</span>
+    </div>
+
+    <!-- Select Branch CTA (P2-15) -->
+    <div class="border-b border-border bg-accent-light px-3 py-2 sm:px-5 sm:py-2.5 flex items-center justify-between gap-3">
+        <p class="text-xs sm:text-sm font-semibold text-accent">
+            You are viewing all branches in read-only mode.
+        </p>
+        <button
+            onclick={() => (showLocationModal = true)}
+            class="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-accent-dark active:scale-95 min-h-[44px] sm:min-h-0"
+        >
+            <ArrowDownUp class="h-3.5 w-3.5 shrink-0" />
+            Select Branch to act
+        </button>
     </div>
 
     <!-- Branch panels -->
@@ -251,3 +269,7 @@
         {/each}
     </div>
 </div>
+
+{#if showLocationModal}
+    <LocationSelectorModal onClose={() => (showLocationModal = false)} />
+{/if}

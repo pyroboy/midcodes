@@ -7,6 +7,9 @@
 **Viewport:** 1024 × 768 (tablet)
 **Auditor:** Claude (automated via playwright-cli)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 4 of 12 issues resolved (P0: 2/3 · P1: 2/5 · P2: 0/4)
+
 ---
 
 ## A. Text Layout Map
@@ -98,11 +101,11 @@
 
 ## D. Bugs Found (Functional)
 
-| # | Bug | Severity | Location |
-|---|-----|----------|----------|
-| B1 | **Receipt shows wrong Tendered amount** — entered ₱2,000 but receipt shows "Tendered ₱1,996.00", Change ₱0.00 | **P0-Critical** | `ReceiptModal.svelte` line ~75: recalculates `order.total + change` instead of using actual cashTendered |
-| B2 | **"Invalid Date" on receipt** — `closedAt` is null/undefined when receipt renders | **P0-Critical** | `ReceiptModal.svelte` line ~88: `new Date(order.closedAt ?? '')` → empty string creates Invalid Date |
-| B3 | **No way to cancel a 0-balance table** — table opened with pax but no items cannot be closed by staff | **P0-Critical** | `OrderSidebar.svelte`: no "Cancel Table" or "Close Table" action. Void/Checkout/Print all disabled with 0 items. More Options only shows Transfer/Pax/Merge. |
+| # | Bug | Severity | Location | Status |
+|---|-----|----------|----------|--------|
+| B1 | **Receipt shows wrong Tendered amount** — entered ₱2,000 but receipt shows "Tendered ₱1,996.00", Change ₱0.00 | **P0-Critical** | `ReceiptModal.svelte` line ~75: recalculates `order.total + change` instead of using actual cashTendered | 🔴 OPEN |
+| B2 | **"Invalid Date" on receipt** — `closedAt` is null/undefined when receipt renders | **P0-Critical** | `ReceiptModal.svelte` line ~88: `new Date(order.closedAt ?? '')` → empty string creates Invalid Date | 🟢 FIXED |
+| B3 | **No way to cancel a 0-balance table** — table opened with pax but no items cannot be closed by staff | **P0-Critical** | `OrderSidebar.svelte`: no "Cancel Table" or "Close Table" action. Void/Checkout/Print all disabled with 0 items. More Options only shows Transfer/Pax/Merge. | 🟢 FIXED |
 
 ---
 
@@ -110,30 +113,30 @@
 
 ### P0 — Must Fix (Blocks daily operations)
 
-| # | Issue | Fix | Effort | Impact |
-|---|-------|-----|--------|--------|
-| P0-1 | **Receipt Tendered/Change bug** | Pass `cashTendered` prop to ReceiptModal instead of recalculating | S | High |
-| P0-2 | **"Invalid Date" on receipt** | Set `closedAt` at checkout confirm time before rendering receipt, or guard with `closedAt ? ... : 'Just now'` | S | High |
-| P0-3 | **Cannot cancel 0-balance table** | Add "Cancel Table" button to OrderSidebar when `items.length === 0` (or to More Options). Should reset table to available without requiring manager PIN for 0-balance. | S | High |
+| # | Issue | Fix | Effort | Impact | Status |
+|---|-------|-----|--------|--------|--------|
+| P0-1 | **Receipt Tendered/Change bug** | Pass `cashTendered` prop to ReceiptModal instead of recalculating | S | High | 🔴 OPEN |
+| P0-2 | **"Invalid Date" on receipt** | Set `closedAt` at checkout confirm time before rendering receipt, or guard with `closedAt ? ... : 'Just now'` | S | High | 🟢 FIXED |
+| P0-3 | **Cannot cancel 0-balance table** | Add "Cancel Table" button to OrderSidebar when `items.length === 0` (or to More Options). Should reset table to available without requiring manager PIN for 0-balance. | S | High | 🟢 FIXED |
 
 ### P1 — Should Fix (Degrades daily experience)
 
-| # | Issue | Fix | Effort | Impact |
-|---|-------|-----|--------|--------|
-| P1-1 | **Receipt itemizes all FREE items** | Hide package-included items from receipt. Show only: "4× Beef + Pork Unlimited ₱1,996.00" and any paid add-ons. Optionally show "6 refills served" as a summary line. | M | High |
-| P1-2 | **Stacked WEIGHING badges per refill** | Aggregate duplicate items: show "Samgyupsal × 4" with single WEIGHING badge instead of 4 stacked badges | M | High |
-| P1-3 | **"22" unlabeled number on table card** | Either remove it (low value for AYCE), or replace with refill count badge (e.g., "🔄 6") which is actually actionable info | S | Med |
-| P1-4 | **"Subtotal (22 items)" inflated count** | Count only paid items in checkout subtotal. For AYCE: "Subtotal (4 pax)" instead of "Subtotal (22 items)" | S | Med |
-| P1-5 | **Pending items panel overwhelm** | After package select, collapse included items under package: "Beef + Pork Unlimited (includes 4 meats, 9 sides)" with expand toggle. Only show the PKG line in pending by default. | M | Med |
+| # | Issue | Fix | Effort | Impact | Status |
+|---|-------|-----|--------|--------|--------|
+| P1-1 | **Receipt itemizes all FREE items** | Hide package-included items from receipt. Show only: "4× Beef + Pork Unlimited ₱1,996.00" and any paid add-ons. Optionally show "6 refills served" as a summary line. | M | High | 🟢 FIXED |
+| P1-2 | **Stacked WEIGHING badges per refill** | Aggregate duplicate items: show "Samgyupsal × 4" with single WEIGHING badge instead of 4 stacked badges | M | High | 🟢 FIXED |
+| P1-3 | **"22" unlabeled number on table card** | Either remove it (low value for AYCE), or replace with refill count badge (e.g., "🔄 6") which is actually actionable info | S | Med | 🔴 OPEN |
+| P1-4 | **"Subtotal (22 items)" inflated count** | Count only paid items in checkout subtotal. For AYCE: "Subtotal (4 pax)" instead of "Subtotal (22 items)" | S | Med | 🔴 OPEN |
+| P1-5 | **Pending items panel overwhelm** | After package select, collapse included items under package: "Beef + Pork Unlimited (includes 4 meats, 9 sides)" with expand toggle. Only show the PKG line in pending by default. | M | Med | 🔴 OPEN |
 
 ### P2 — Nice to Have (Polish)
 
-| # | Issue | Fix | Effort | Impact |
-|---|-------|-----|--------|--------|
-| P2-1 | **Timer format inconsistency** | Unify: floor shows "05:24" (mm:ss), sidebar shows "5m". Pick one format for both — recommend "5m" for quick glance | S | Low |
-| P2-2 | **"P&B" abbreviation unclear** | Use full "Beef+Pork" or a color-coded package icon instead of text abbreviation | S | Low |
-| P2-3 | **"4p" vs "4 pax" inconsistency** | Empty tables show "4p" (capacity), occupied show "4 pax" (actual guests). Consider "cap: 4" for empty tables to distinguish from guest count | S | Low |
-| P2-4 | **Pax modal highlights even numbers** | Numbers 2, 4, 6 have orange borders suggesting "recommended" — but this is actually the capacity of the table, not a recommendation. Confusing visual signal. | S | Low |
+| # | Issue | Fix | Effort | Impact | Status |
+|---|-------|-----|--------|--------|--------|
+| P2-1 | **Timer format inconsistency** | Unify: floor shows "05:24" (mm:ss), sidebar shows "5m". Pick one format for both — recommend "5m" for quick glance | S | Low | 🔴 OPEN |
+| P2-2 | **"P&B" abbreviation unclear** | Use full "Beef+Pork" or a color-coded package icon instead of text abbreviation | S | Low | 🔴 OPEN |
+| P2-3 | **"4p" vs "4 pax" inconsistency** | Empty tables show "4p" (capacity), occupied show "4 pax" (actual guests). Consider "cap: 4" for empty tables to distinguish from guest count | S | Low | 🔴 OPEN |
+| P2-4 | **Pax modal highlights even numbers** | Numbers 2, 4, 6 have orange borders suggesting "recommended" — but this is actually the capacity of the table, not a recommendation. Confusing visual signal. | S | Low | 🔴 OPEN |
 
 ---
 

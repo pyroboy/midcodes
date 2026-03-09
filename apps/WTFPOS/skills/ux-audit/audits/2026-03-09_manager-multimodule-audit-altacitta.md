@@ -5,6 +5,9 @@
 **Scenarios:** S03, S04, S05, S08, S09, S11, S12, S13
 **Viewport:** 1024×768
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** Expense issues largely resolved; Delivery form draft guard and item typeahead remain open. Key fixes: expense category grouping, log filter, inline validation, date field, spinner, photo capture, paid-by persistence. Key open: delivery Cancel guard, 80-item dropdown no typeahead, waste form current-stock hint.
+
 ---
 
 ## A. Manager Navigation Map (ASCII)

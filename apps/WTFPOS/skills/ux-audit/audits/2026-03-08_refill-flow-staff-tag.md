@@ -2,6 +2,9 @@
 **Role:** Staff (Maria Santos) · **Branch:** Alta Citta (tag) · **Viewport:** 1024×768 tablet landscape
 **Date:** 2026-03-08 · **Auditor:** Claude Code (ux-audit skill)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 5 of 11 issues resolved (P0: 3/3 · P1: 2/4 · P2: 0/4)
+
 ---
 
 ## A. Text Layout Map
@@ -116,29 +119,29 @@
 
 ### P0 — Critical (fix before next shift)
 
-| ID | Issue | Fix | Effort | Impact |
-|----|-------|-----|--------|--------|
-| P0-1 | **Zero feedback on meat tap** — No visual state change after tapping a refill item. Staff doesn't know if it registered. | Add a transient "added" state on the button: brief green flash + a `+1` badge that fades in for 800ms. Or: show a persistent count badge (like `×2`) on repeated taps instead of adding duplicate line items silently. | S | High |
-| P0-2 | **"Repeat Last" gives no confirmation** — Tapping the dashed button is silent. | Brief background flash (accent-light → white over 400ms) on the "Repeat Last" button. Show a transient toast or inline confirmation: "Repeat sent ✓" that fades in 1.5s. | S | High |
-| P0-3 | **✕ close button at 32px** — Explicitly below 44px minimum with `min-height: unset`. On a busy shift, staff will miss this target and accidentally tap behind it. | Remove `style="min-height: unset"` and change `h-8 w-8` to `h-11 w-11` (44px) to meet minimum. | XS | High |
+| ID | Issue | Fix | Effort | Impact | Status |
+|----|-------|-----|--------|--------|--------|
+| P0-1 | **Zero feedback on meat tap** — No visual state change after tapping a refill item. Staff doesn't know if it registered. | Add a transient "added" state on the button: brief green flash + a `+1` badge that fades in for 800ms. Or: show a persistent count badge (like `×2`) on repeated taps instead of adding duplicate line items silently. | S | High | 🟢 FIXED |
+| P0-2 | **"Repeat Last" gives no confirmation** — Tapping the dashed button is silent. | Brief background flash (accent-light → white over 400ms) on the "Repeat Last" button. Show a transient toast or inline confirmation: "Repeat sent ✓" that fades in 1.5s. | S | High | 🟢 FIXED |
+| P0-3 | **✕ close button at 32px** — Explicitly below 44px minimum with `min-height: unset`. On a busy shift, staff will miss this target and accidentally tap behind it. | Remove `style="min-height: unset"` and change `h-8 w-8` to `h-11 w-11` (44px) to meet minimum. | XS | High | 🟢 FIXED |
 
 ### P1 — Important (fix this week)
 
-| ID | Issue | Fix | Effort | Impact |
-|----|-------|-----|--------|--------|
-| P1-1 | **"Done" at 36px and "Repeat Last" at 40px** — Both footer buttons miss touch target minimums. | Change "Done" to `min-height: 44px`. Change "Repeat Last" to `min-height: 44px`. | XS | Med |
-| P1-2 | **Refill items buried at bottom of long order list** — After 12 initial items, refill items appear at positions 13+, requiring scroll to verify. | Two options: (a) Sort refill items to appear just below the package line at top of list; or (b) Add a "🔄 2 refills this session" summary badge near the top of the sidebar, below the package name. | M | High |
-| P1-3 | **No round counter / refill history in panel** — Staff has no quick way to know "we've done 2 rounds of Pork Sliced" without scrolling the order list. | Add a small round indicator below the package name in the modal header: e.g., "Round 2" or "Refills: Pork Sliced ×2". Derive from order items with REFILL_NOTE. | M | Med |
-| P1-4 | **Inconsistent image coverage in Free Sides** — 7 of 9 sides lack images, creating uneven card heights (~40px no-img vs ~85px with-img). | Either add placeholder images for all sides, or remove images from the sides grid entirely and use a compact list style (text-only chip buttons at 44px height, 2-col layout for side items). | M | Med |
+| ID | Issue | Fix | Effort | Impact | Status |
+|----|-------|-----|--------|--------|--------|
+| P1-1 | **"Done" at 36px and "Repeat Last" at 40px** — Both footer buttons miss touch target minimums. | Change "Done" to `min-height: 44px`. Change "Repeat Last" to `min-height: 44px`. | XS | Med | 🟢 FIXED |
+| P1-2 | **Refill items buried at bottom of long order list** — After 12 initial items, refill items appear at positions 13+, requiring scroll to verify. | Two options: (a) Sort refill items to appear just below the package line at top of list; or (b) Add a "🔄 2 refills this session" summary badge near the top of the sidebar, below the package name. | M | High | 🔴 OPEN |
+| P1-3 | **No round counter / refill history in panel** — Staff has no quick way to know "we've done 2 rounds of Pork Sliced" without scrolling the order list. | Add a small round indicator below the package name in the modal header: e.g., "Round 2" or "Refills: Pork Sliced ×2". Derive from order items with REFILL_NOTE. | M | Med | 🟢 FIXED |
+| P1-4 | **Inconsistent image coverage in Free Sides** — 7 of 9 sides lack images, creating uneven card heights (~40px no-img vs ~85px with-img). | Either add placeholder images for all sides, or remove images from the sides grid entirely and use a compact list style (text-only chip buttons at 44px height, 2-col layout for side items). | M | Med | 🔴 OPEN |
 
 ### P2 — Polish (backlog)
 
-| ID | Issue | Fix | Effort | Impact |
-|----|-------|-----|--------|--------|
-| P2-1 | **Section labels at 10px** — "MEATS" and "FREE SIDES" labels (`text-[10px]`) fail WCAG AA at small text sizes. | Increase to `text-xs` (12px) minimum. | XS | Low |
-| P2-2 | **Meats section needs stronger visual separation from Sides** — The two sections have fundamentally different ordering logic (meats = kitchen queue, sides = add to bill), but are separated only by a 16px gap and a weak 10px label. | Add a horizontal divider `<hr>` between Meats and Free Sides sections, or use a card background (`bg-surface-secondary rounded-lg p-3`) to visually contain each section. | S | Med |
-| P2-3 | **Meat card item names at 11px** — `text-[11px]` is below 12px minimum for restaurant reading distance. | Change to `text-xs` (12px) for meat card labels. | XS | Low |
-| P2-4 | **Free sides section green border conflicts with "available" table status color** — `border-status-green/30` on side buttons uses the same hue as available table cards. | Use a neutral `border-gray-200` or `border-accent/20` for free side cards to decouple from status semantics. | XS | Low |
+| ID | Issue | Fix | Effort | Impact | Status |
+|----|-------|-----|--------|--------|--------|
+| P2-1 | **Section labels at 10px** — "MEATS" and "FREE SIDES" labels (`text-[10px]`) fail WCAG AA at small text sizes. | Increase to `text-xs` (12px) minimum. | XS | Low | 🔴 OPEN |
+| P2-2 | **Meats section needs stronger visual separation from Sides** — The two sections have fundamentally different ordering logic (meats = kitchen queue, sides = add to bill), but are separated only by a 16px gap and a weak 10px label. | Add a horizontal divider `<hr>` between Meats and Free Sides sections, or use a card background (`bg-surface-secondary rounded-lg p-3`) to visually contain each section. | S | Med | 🔴 OPEN |
+| P2-3 | **Meat card item names at 11px** — `text-[11px]` is below 12px minimum for restaurant reading distance. | Change to `text-xs` (12px) for meat card labels. | XS | Low | 🔴 OPEN |
+| P2-4 | **Free sides section green border conflicts with "available" table status color** — `border-status-green/30` on side buttons uses the same hue as available table cards. | Use a neutral `border-gray-200` or `border-accent/20` for free side cards to decouple from status semantics. | XS | Low | 🔴 OPEN |
 
 ---
 

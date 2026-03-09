@@ -6,6 +6,9 @@
 **Viewport:** 1024×768 (tablet, all roles)
 **Pages covered:** `/pos`, `/kitchen/orders`, `/kitchen/all-orders`, `/kitchen/weigh-station`, `/reports/x-read`
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 2 of 38 issues resolved (P0: 0/7 · P1: 2/18 · P2: 0/13)
+
 ---
 
 ## A. Text Layout Maps (per role)
@@ -220,66 +223,66 @@ Meanwhile, Juan the manager glanced at the Quick Action "X-Reading" icon once mi
 
 ### P0 — MUST FIX (service-blocking)
 
-| Code | Role(s) | Issue | Fix | Effort |
-|---|---|---|---|---|
-| P0-1 | Staff | Touch targets below 44px — ✕ remove (20px), ±qty (28px), discount toggles (32px) will cause chronic mis-taps during service | Set `min-height: 44px; min-width: 44px` on all interactive elements in OrderSidebar + AddItemModal | S |
-| P0-2 | Staff | `wtfpos_session` in `localStorage` — same-origin tab collision corrupts session state on multi-tab or multi-device same-browser use | Move to `sessionStorage` | S |
-| P0-3 | Staff | PaxModal max pax = 12, no custom input — groups of 13+ physically cannot be opened | Add a custom numeric input for pax beyond the button grid | S |
-| P0-4 | Kitchen | `formatCountdown()` doesn't clamp negatives — renders `-1291:-14` for stale-dated seed tickets; urgency styling fires incorrectly | `Math.max(0, seconds)` before calculation in formatCountdown | S |
-| P0-5 | Kitchen | Kitchen role can access `/pos` directly by URL — no route guard; cook sees cashier interface | Add role check in `/pos` route load function | S |
-| P0-6 | Manager | Manager PIN login does not update session role — floor plan loads but sidebar still shows previous user's role | Fix PIN auth flow to call `setSession` with manager role before navigation | M |
-| P0-7 | Manager | SVG floor plan table taps intercepted by sidebar Quick Action links — manager cannot reliably open tables | Resolve z-index/hit-test collision between sidebar Quick Actions and SVG table elements | M |
+| Code | Role(s) | Issue | Fix | Effort | Status |
+|---|---|---|---|---|---|
+| P0-1 | Staff | Touch targets below 44px — ✕ remove (20px), ±qty (28px), discount toggles (32px) will cause chronic mis-taps during service | Set `min-height: 44px; min-width: 44px` on all interactive elements in OrderSidebar + AddItemModal | S | 🔴 OPEN |
+| P0-2 | Staff | `wtfpos_session` in `localStorage` — same-origin tab collision corrupts session state on multi-tab or multi-device same-browser use | Move to `sessionStorage` | S | 🔴 OPEN |
+| P0-3 | Staff | PaxModal max pax = 12, no custom input — groups of 13+ physically cannot be opened | Add a custom numeric input for pax beyond the button grid | S | 🔴 OPEN |
+| P0-4 | Kitchen | `formatCountdown()` doesn't clamp negatives — renders `-1291:-14` for stale-dated seed tickets; urgency styling fires incorrectly | `Math.max(0, seconds)` before calculation in formatCountdown | S | 🔴 OPEN |
+| P0-5 | Kitchen | Kitchen role can access `/pos` directly by URL — no route guard; cook sees cashier interface | Add role check in `/pos` route load function | S | 🔴 OPEN |
+| P0-6 | Manager | Manager PIN login does not update session role — floor plan loads but sidebar still shows previous user's role | Fix PIN auth flow to call `setSession` with manager role before navigation | M | 🔴 OPEN |
+| P0-7 | Manager | SVG floor plan table taps intercepted by sidebar Quick Action links — manager cannot reliably open tables | Resolve z-index/hit-test collision between sidebar Quick Actions and SVG table elements | M | 🔴 OPEN |
 
 ### P1 — FIX THIS SPRINT (friction)
 
-| Code | Role(s) | Issue | Fix | Effort |
-|---|---|---|---|---|
-| P1-1 | Staff | "Transfer · Pax · Split · Merge" overflow toggle is non-discoverable — no label, no affordance | Rename to "More Actions ▼" with chevron icon; surface Transfer as always-visible secondary button | S |
-| P1-2 | Staff | Auto-open AddItemModal on table open blocks rapid multi-table creation during peak (adds 3 extra close taps per table) | Make auto-open conditional: only auto-open for first item add, not when switching between tables | M |
-| P1-3 | Staff | Kitchen rejections not globally visible — ⚠ badge on floor card only, 9px text, invisible from other table context | Add dismissable `AlertBanner` at top of POS for each new unacknowledged rejection (with table reference) | M |
-| P1-4 | Staff | ShiftStartModal shows open orders dimmed with no reassurance text | Add "X open orders are safe and will remain open" beneath the dimmed view | S |
-| P1-5 | Staff | Takeout labels use time-based ID (#TO-HH-MM) — not scannable or searchable by staff | Use sequential per-shift counter (#TO-001, #TO-002…) | M |
-| P1-6 | Staff | History badge shows all-time order count (66) — misleads staff into thinking it's today's pending history | Filter History badge count to today's closed orders only | S |
-| P1-7 | Kitchen | Expand-to-reveal-actions pattern has no visual affordance — new cooks will never discover RETURN or SOLD OUT | Add ▼ chevron or `···` indicator on unserved item rows; add one-time coach mark on first KDS load | S |
-| P1-8 | Kitchen | SOLD OUT toggle has no confirmation — greasy-hand accidental activation marks item unavailable system-wide | Add a 1-tap undo toast: "Kimchi marked sold out — Undo" for 3 seconds | S |
-| P1-9 | Kitchen | No feedback after RETURN confirm — cook doesn't know the rejection alert reached POS | Add brief toast: "✓ Return flagged — Alert sent to T3" | S |
-| P1-10 | Kitchen | History modal Recall button: 32px height (below 44px minimum) | Set `min-height: 44px` on Recall button | S |
-| P1-11 | Kitchen | `bumpedBy` shows "Kitchen Staff" instead of actual username — no attribution clarity | Populate `bumpedBy` with `session.userName` at bump time | S |
-| P1-12 | Kitchen | "Last Completed" stat uses countdown format instead of elapsed time — shows "20:35" meaning "20 min 35 sec ago" but reads as a countdown | Replace `formatCountdown()` for this stat with a `formatTimeAgo()` format: "20m ago" | S |
-| P1-13 | Manager | No AYCE time-remaining indicator on table cards — only elapsed time shown; manager can't tell who's approaching their limit | Add a second timer row to table cards for AYCE tables: `Limit: 15m left` (based on branch policy) | M |
-| P1-14 | Manager | 7 Quick Action icons in collapsed sidebar have no labels — requires memorization | Add tooltip on hover; add label below icon in expanded sidebar | S |
-| P1-15 | Staff + Kitchen | No LocationBanner shown to Staff and Kitchen roles — branch context is invisible to front-line workers | Show LocationBanner to all roles (hide the "Change Location" button for locked roles) | S |
-| P1-16 | Manager | "Change Location" has no mid-service confirmation — one tap could silently switch all data to another branch during active service | Add a confirmation modal: "Switch to Alona Beach? This will hide Alta Citta data." | S |
-| P1-17 | Manager | "Generate X-Read" has no confirmation dialog — this is a permanent BIR audit document | Add confirmation: "Generate X-Read for Alta Citta? This cannot be undone." | S |
-| P1-18 | Manager | Maya e-wallet missing from X-Read payment breakdown; no VAT split shown | Add Maya row to payment breakdown. Add VAT line to totals (BIR compliance) | M |
+| Code | Role(s) | Issue | Fix | Effort | Status |
+|---|---|---|---|---|---|
+| P1-1 | Staff | "Transfer · Pax · Split · Merge" overflow toggle is non-discoverable — no label, no affordance | Rename to "More Actions ▼" with chevron icon; surface Transfer as always-visible secondary button | S | 🔴 OPEN |
+| P1-2 | Staff | Auto-open AddItemModal on table open blocks rapid multi-table creation during peak (adds 3 extra close taps per table) | Make auto-open conditional: only auto-open for first item add, not when switching between tables | M | 🔴 OPEN |
+| P1-3 | Staff | Kitchen rejections not globally visible — ⚠ badge on floor card only, 9px text, invisible from other table context | Add dismissable `AlertBanner` at top of POS for each new unacknowledged rejection (with table reference) | M | 🔴 OPEN |
+| P1-4 | Staff | ShiftStartModal shows open orders dimmed with no reassurance text | Add "X open orders are safe and will remain open" beneath the dimmed view | S | 🔴 OPEN |
+| P1-5 | Staff | Takeout labels use time-based ID (#TO-HH-MM) — not scannable or searchable by staff | Use sequential per-shift counter (#TO-001, #TO-002…) | M | 🔴 OPEN |
+| P1-6 | Staff | History badge shows all-time order count (66) — misleads staff into thinking it's today's pending history | Filter History badge count to today's closed orders only | S | 🔴 OPEN |
+| P1-7 | Kitchen | Expand-to-reveal-actions pattern has no visual affordance — new cooks will never discover RETURN or SOLD OUT | Add ▼ chevron or `···` indicator on unserved item rows; add one-time coach mark on first KDS load | S | 🔴 OPEN |
+| P1-8 | Kitchen | SOLD OUT toggle has no confirmation — greasy-hand accidental activation marks item unavailable system-wide | Add a 1-tap undo toast: "Kimchi marked sold out — Undo" for 3 seconds | S | 🔴 OPEN |
+| P1-9 | Kitchen | No feedback after RETURN confirm — cook doesn't know the rejection alert reached POS | Add brief toast: "✓ Return flagged — Alert sent to T3" | S | 🔴 OPEN |
+| P1-10 | Kitchen | History modal Recall button: 32px height (below 44px minimum) | Set `min-height: 44px` on Recall button | S | 🔴 OPEN |
+| P1-11 | Kitchen | `bumpedBy` shows "Kitchen Staff" instead of actual username — no attribution clarity | Populate `bumpedBy` with `session.userName` at bump time | S | 🔴 OPEN |
+| P1-12 | Kitchen | "Last Completed" stat uses countdown format instead of elapsed time — shows "20:35" meaning "20 min 35 sec ago" but reads as a countdown | Replace `formatCountdown()` for this stat with a `formatTimeAgo()` format: "20m ago" | S | 🔴 OPEN |
+| P1-13 | Manager | No AYCE time-remaining indicator on table cards — only elapsed time shown; manager can't tell who's approaching their limit | Add a second timer row to table cards for AYCE tables: `Limit: 15m left` (based on branch policy) | M | 🔴 OPEN |
+| P1-14 | Manager | 7 Quick Action icons in collapsed sidebar have no labels — requires memorization | Add tooltip on hover; add label below icon in expanded sidebar | S | 🔴 OPEN |
+| P1-15 | Staff + Kitchen | No LocationBanner shown to Staff and Kitchen roles — branch context is invisible to front-line workers | Show LocationBanner to all roles (hide the "Change Location" button for locked roles) | S | 🔴 OPEN |
+| P1-16 | Manager | "Change Location" has no mid-service confirmation — one tap could silently switch all data to another branch during active service | Add a confirmation modal: "Switch to Alona Beach? This will hide Alta Citta data." | S | 🔴 OPEN |
+| P1-17 | Manager | "Generate X-Read" has no confirmation dialog — this is a permanent BIR audit document | Add confirmation: "Generate X-Read for Alta Citta? This cannot be undone." | S | 🟢 FIXED |
+| P1-18 | Manager | Maya e-wallet missing from X-Read payment breakdown; no VAT split shown | Add Maya row to payment breakdown. Add VAT line to totals (BIR compliance) | M | 🟢 FIXED |
 
 ### P2 — BACKLOG (polish)
 
-| Code | Role(s) | Issue | Fix | Effort |
-|---|---|---|---|---|
-| P2-1 | Staff | Leftover penalty step is surprising for new staff — no in-context explanation | Add a tooltip or ℹ icon on LeftoverPenaltyModal explaining the AYCE policy | S |
-| P2-2 | Staff | "Cancel Table" button has no visual affordance for its 2-step confirmation | Add a subtle ⚠ icon to the button to signal it's a guarded action | S |
-| P2-3 | Staff | `text-gray-400` hint/placeholder text on `bg-surface-secondary` ≈ 2.5:1 (fails WCAG AA) | Use `text-gray-500` minimum for all placeholder/hint text | S |
-| P2-4 | Staff + Manager | 9px package badge text and 8px timer text on SVG table cards — below WCAG minimum readable size | Minimum 12px for all on-card text; 11px minimum for badges | S |
-| P2-5 | Staff | Merge Tables has no pre-merge bill preview — staff can't see what the combined bill will look like before confirming | Add a 2-column preview in MergeTablesModal: "T4 items + T6 items → Combined: ₱4,200" | M |
-| P2-6 | Kitchen | MEATS section header: `text-xs text-status-red` (#EF4444) on white = ~3.6:1 (fails WCAG AA for 12px bold) | Use `text-red-800` for MEATS section header (passes at 7.5:1) | S |
-| P2-7 | Kitchen | "✓ Bump" (card header) and "ALL DONE ✓" (card footer) call identical `completeAll()` — confusing dual labels | Differentiate label: header = "Skip All" (shortcut semantics), footer = "All Done ✓" (primary confirm) | S |
-| P2-8 | Kitchen | History modal: 64 entries in a single unbroken scroll — no date grouping, no search | Add date group headers and a search-by-table-number filter | M |
-| P2-9 | Kitchen | Item row `role="button"` has no accessible label indicating it's expandable | Add `aria-expanded` and `aria-label="Expand actions for {item.menuItemName}"` | S |
-| P2-10 | Kitchen | Progress bar div has no `role="progressbar"` or `aria-valuenow` | Add ARIA progressbar semantics | S |
-| P2-11 | Manager | Rejection alert badge text: 9px — below WCAG 12px minimum | See P2-4 — same fix | S |
-| P2-12 | Manager | X-Read attribution inconsistent between historical entries (role label) and new entries (person name) | Standardize to `session.userName` at generation time | S |
-| P2-13 | Manager | "Generate X-Read" button: 40px height (below 44px) | `min-height: 48px` (use `.btn` class consistently) | S |
+| Code | Role(s) | Issue | Fix | Effort | Status |
+|---|---|---|---|---|---|
+| P2-1 | Staff | Leftover penalty step is surprising for new staff — no in-context explanation | Add a tooltip or ℹ icon on LeftoverPenaltyModal explaining the AYCE policy | S | 🔴 OPEN |
+| P2-2 | Staff | "Cancel Table" button has no visual affordance for its 2-step confirmation | Add a subtle ⚠ icon to the button to signal it's a guarded action | S | 🔴 OPEN |
+| P2-3 | Staff | `text-gray-400` hint/placeholder text on `bg-surface-secondary` ≈ 2.5:1 (fails WCAG AA) | Use `text-gray-500` minimum for all placeholder/hint text | S | 🔴 OPEN |
+| P2-4 | Staff + Manager | 9px package badge text and 8px timer text on SVG table cards — below WCAG minimum readable size | Minimum 12px for all on-card text; 11px minimum for badges | S | 🔴 OPEN |
+| P2-5 | Staff | Merge Tables has no pre-merge bill preview — staff can't see what the combined bill will look like before confirming | Add a 2-column preview in MergeTablesModal: "T4 items + T6 items → Combined: ₱4,200" | M | 🔴 OPEN |
+| P2-6 | Kitchen | MEATS section header: `text-xs text-status-red` (#EF4444) on white = ~3.6:1 (fails WCAG AA for 12px bold) | Use `text-red-800` for MEATS section header (passes at 7.5:1) | S | 🔴 OPEN |
+| P2-7 | Kitchen | "✓ Bump" (card header) and "ALL DONE ✓" (card footer) call identical `completeAll()` — confusing dual labels | Differentiate label: header = "Skip All" (shortcut semantics), footer = "All Done ✓" (primary confirm) | S | 🔴 OPEN |
+| P2-8 | Kitchen | History modal: 64 entries in a single unbroken scroll — no date grouping, no search | Add date group headers and a search-by-table-number filter | M | 🔴 OPEN |
+| P2-9 | Kitchen | Item row `role="button"` has no accessible label indicating it's expandable | Add `aria-expanded` and `aria-label="Expand actions for {item.menuItemName}"` | S | 🔴 OPEN |
+| P2-10 | Kitchen | Progress bar div has no `role="progressbar"` or `aria-valuenow` | Add ARIA progressbar semantics | S | 🔴 OPEN |
+| P2-11 | Manager | Rejection alert badge text: 9px — below WCAG 12px minimum | See P2-4 — same fix | S | 🔴 OPEN |
+| P2-12 | Manager | X-Read attribution inconsistent between historical entries (role label) and new entries (person name) | Standardize to `session.userName` at generation time | S | 🔴 OPEN |
+| P2-13 | Manager | "Generate X-Read" button: 40px height (below 44px) | `min-height: 48px` (use `.btn` class consistently) | S | 🔴 OPEN |
 
 ---
 
 ## H. Multi-User Specific Recommendations
 
-| Priority | Cross-Role Issue | Roles | Fix | Effort | Impact |
-|---|---|---|---|---|---|
-| **P0** | Manager PIN session bug — login doesn't update role, causing wrong access control state | Manager ↔ All | Fix `setSession` call in PIN auth flow | M | High |
-| **P0** | SVG table taps intercepted by sidebar overlay — manager can't open tables | Manager ↔ Staff view | Fix z-index / hit-test collision | M | High |
-| **P1** | Kitchen rejections only visible on affected table card — staff on T1 misses T3 rejection | Kitchen → Staff | Global AlertBanner for new rejections | M | High |
-| **P1** | LocationBanner hidden from Staff + Kitchen — no branch awareness for locked roles | All roles | Show banner (read-only) to all | S | Med |
-| **P1** | REFILL + WEIGHING badges inline only — dense KDS may not draw cook's eye to urgent refills | Kitchen | Move refill badge to card header (adjacent to table number) | S | Med |
-| **P2** | "Change Location" has no protection during live service — one misclick affects all data | Manager | Confirmation modal with active order count | S | Med |
+| Priority | Cross-Role Issue | Roles | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|---|
+| **P0** | Manager PIN session bug — login doesn't update role, causing wrong access control state | Manager ↔ All | Fix `setSession` call in PIN auth flow | M | High | 🔴 OPEN |
+| **P0** | SVG table taps intercepted by sidebar overlay — manager can't open tables | Manager ↔ Staff view | Fix z-index / hit-test collision | M | High | 🔴 OPEN |
+| **P1** | Kitchen rejections only visible on affected table card — staff on T1 misses T3 rejection | Kitchen → Staff | Global AlertBanner for new rejections | M | High | 🔴 OPEN |
+| **P1** | LocationBanner hidden from Staff + Kitchen — no branch awareness for locked roles | All roles | Show banner (read-only) to all | S | Med | 🔴 OPEN |
+| **P1** | REFILL + WEIGHING badges inline only — dense KDS may not draw cook's eye to urgent refills | Kitchen | Move refill badge to card header (adjacent to table number) | S | Med | 🔴 OPEN |
+| **P2** | "Change Location" has no protection during live service — one misclick affects all data | Manager | Confirmation modal with active order count | S | Med | 🔴 OPEN |

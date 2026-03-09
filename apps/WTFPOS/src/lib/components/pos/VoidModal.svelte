@@ -73,7 +73,7 @@
 									? 'bg-status-red text-white'
 									: 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
 							)}
-							style="min-height: 40px"
+							style="min-height: 44px"
 						>
 							{reason.label}
 						</button>

@@ -150,7 +150,8 @@ export async function getDb() {
 						1: (d: any) => d,
 						2: (d: any) => { d.depleted = d.depleted ?? false; return d; },
 						3: (d: any) => addUpdatedAt(d, 'receivedAt'), // v2→v3: +updatedAt
-					4: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }) // v3→v4: +locationId (defaults to primary branch)
+						4: (d: any) => ({ ...d, locationId: d.locationId ?? 'tag' }), // v3→v4: +locationId (defaults to primary branch)
+						5: (d: any) => ({ ...d, unitCost: d.unitCost ?? null }) // v4→v5: +unitCost (optional procurement cost)
 					}
 				},
 				stock_events: {
@@ -173,6 +174,8 @@ export async function getDb() {
 						1: (d: any) => d,
 						2: (d: any) => d,
 						3: (d: any) => addUpdatedAt(d, 'createdAt'), // v2→v3: +updatedAt
+						4: (d: any) => ({ ...d, expenseDate: d.expenseDate ?? null }), // v3→v4: +expenseDate
+						5: (d: any) => d, // v4→v5: schema fix for DB6
 					}
 				},
 				stock_counts: {
@@ -209,8 +212,10 @@ export async function getDb() {
 					}
 				},
 				readings: {
-					schema: readingSchema
-					// v0 — new merged collection (replaces x_reads + z_reads), no migrations needed
+					schema: readingSchema,
+					migrationStrategies: {
+						1: (d: any) => ({ ...d, maya: 0, voidAmount: null }) // v0→v1: +maya payment method, +voidAmount
+					}
 				},
 				audit_logs: {
 					schema: auditLogSchema

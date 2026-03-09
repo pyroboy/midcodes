@@ -221,7 +221,7 @@ export const stockItemSchema: RxJsonSchema<any> = {
 // ─── Delivery ────────────────────────────────────────────────────────────────
 export const deliverySchema: RxJsonSchema<any> = {
 	title: 'delivery schema',
-	version: 4,
+	version: 5,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -239,6 +239,7 @@ export const deliverySchema: RxJsonSchema<any> = {
 		usedQty: { type: 'number' },
 		depleted: { type: 'boolean' },
 		photo: { type: 'string' },
+		unitCost: { type: ['number', 'null'] },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
 	required: ['id', 'locationId', 'stockItemId', 'itemName', 'qty', 'unit', 'supplier', 'receivedAt', 'depleted', 'updatedAt'],
@@ -344,7 +345,7 @@ export const deviceSchema: RxJsonSchema<any> = {
 // ─── Expense ─────────────────────────────────────────────────────────────────
 export const expenseSchema: RxJsonSchema<any> = {
 	title: 'expense schema',
-	version: 3,
+	version: 5,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -356,6 +357,7 @@ export const expenseSchema: RxJsonSchema<any> = {
 		locationId: { type: 'string', maxLength: 100 },
 		createdBy: { type: 'string' },
 		createdAt: { type: 'string', maxLength: 30 },
+		expenseDate: { type: ['string', 'null'], maxLength: 20 },
 		receiptPhoto: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
@@ -405,7 +407,7 @@ export const kdsTicketSchema: RxJsonSchema<any> = {
 // type: 'z-read' — end-of-day permanent close (one per business date per location)
 export const readingSchema: RxJsonSchema<any> = {
 	title: 'reading schema',
-	version: 0,
+	version: 1,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -419,10 +421,12 @@ export const readingSchema: RxJsonSchema<any> = {
 		totalPax: { type: 'number' },
 		cash: { type: 'number' },
 		gcash: { type: 'number' },
+		maya: { type: 'number' },
 		card: { type: 'number' },
 		// x-read fields
 		timestamp: { type: ['string', 'null'] },
 		voidCount: { type: ['number', 'null'] },
+		voidAmount: { type: ['number', 'null'] },
 		discountCount: { type: ['number', 'null'] },
 		generatedBy: { type: ['string', 'null'] },
 		// z-read fields

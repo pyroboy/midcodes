@@ -1,0 +1,150 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+          - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph [ref=e17]: 10:27:54 AM
+    - separator [ref=e18]
+    - generic [ref=e19]:
+      - paragraph [ref=e21]: Quick Actions
+      - generic [ref=e22]:
+        - link "Receive Delivery" [ref=e23] [cursor=pointer]:
+          - /url: /stock/deliveries
+          - img [ref=e24]
+          - generic [ref=e25]: Receive Delivery
+        - link "Log Expense" [ref=e26] [cursor=pointer]:
+          - /url: /reports/expenses-daily
+          - img [ref=e27]
+          - generic [ref=e28]: Log Expense
+        - link "Log Waste" [ref=e29] [cursor=pointer]:
+          - /url: /stock/waste
+          - img [ref=e30]
+          - generic [ref=e31]: Log Waste
+        - link "Stock Count" [ref=e32] [cursor=pointer]:
+          - /url: /stock/counts
+          - img [ref=e33]
+          - generic [ref=e34]: Stock Count
+        - link "X-Reading" [ref=e35] [cursor=pointer]:
+          - /url: /reports/x-read
+          - img [ref=e36]
+          - generic [ref=e37]: X-Reading
+        - link "Transfer Stock" [ref=e38] [cursor=pointer]:
+          - /url: /stock/transfers
+          - img [ref=e39]
+          - generic [ref=e40]: Transfer Stock
+        - link "End of Day" [ref=e41] [cursor=pointer]:
+          - /url: /reports/eod
+          - img [ref=e42]
+          - generic [ref=e43]: End of Day
+    - list [ref=e46]:
+      - listitem [ref=e47]:
+        - link "POS" [ref=e48] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e50]
+          - generic [ref=e54]: POS
+      - listitem [ref=e55]:
+        - link "Kitchen" [ref=e56] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e58]
+          - generic [ref=e59]: Kitchen
+      - listitem [ref=e60]:
+        - link "Stock" [ref=e61] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e63]
+          - generic [ref=e64]: Stock
+      - listitem [ref=e65]:
+        - link "Reports" [ref=e66] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e68]
+          - generic [ref=e69]: Reports
+    - generic [ref=e70]:
+      - separator [ref=e71]
+      - generic [ref=e72]:
+        - generic [ref=e73]: J
+        - generic [ref=e74]:
+          - generic [ref=e75]: Juan Reyes
+          - generic [ref=e76]: manager
+      - button "Change Location" [ref=e78] [cursor=pointer]:
+        - img [ref=e79]
+        - generic [ref=e80]: Change Location
+      - link "Logout" [ref=e82] [cursor=pointer]:
+        - /url: /
+        - img [ref=e83]
+        - generic [ref=e86]: Logout
+    - button "Toggle Sidebar" [ref=e87]
+  - main [ref=e88]:
+    - generic [ref=e89]:
+      - generic [ref=e90]:
+        - img [ref=e91]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e92]
+      - button "Change Location" [ref=e93] [cursor=pointer]:
+        - img [ref=e94]
+        - text: Change Location
+    - generic [ref=e95]:
+      - generic [ref=e96]:
+        - heading "Expenses" [level=1] [ref=e97]
+        - generic [ref=e98]:
+          - paragraph [ref=e99]: Today's Total
+          - paragraph [ref=e100]: ₱0.00
+          - paragraph [ref=e101]: "All time: ₱0.00"
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - heading "Record Expense" [level=2] [ref=e104]
+          - generic [ref=e105]:
+            - generic [ref=e106]: Category
+            - combobox "Category" [ref=e107]:
+              - option "Labor Budget" [selected]
+              - option "Wages"
+              - option "Rent"
+              - option "Meat Procurement"
+              - option "Produce & Sides"
+              - option "Electricity"
+              - option "Gas/LPG"
+              - option "Water"
+              - option "Internet"
+              - option "Petty Cash Replenishment"
+              - option "Miscellaneous"
+          - generic [ref=e108]:
+            - generic [ref=e109]: Amount (₱)
+            - spinbutton "Amount (₱)" [ref=e110]
+          - generic [ref=e111]:
+            - generic [ref=e112]: Description
+            - textbox "Description 0/200" [ref=e113]:
+              - /placeholder: e.g., Unbox wet wipes
+            - generic [ref=e114]: 0/200
+          - generic [ref=e115]:
+            - generic [ref=e116]: Date
+            - textbox "Date" [ref=e117]: 2026-03-09
+          - generic [ref=e118]:
+            - generic [ref=e119]: Paid By
+            - combobox "Paid By" [ref=e120]:
+              - option "Petty Cash" [selected]
+              - option "Cash from Register"
+              - option "Company Card"
+              - option "GCash"
+              - option "Maya"
+              - option "Owner's Pocket"
+          - generic [ref=e121]:
+            - generic [ref=e122]: Receipt Photo (Optional)
+            - button "Add" [ref=e124] [cursor=pointer]:
+              - img [ref=e125]
+              - generic [ref=e128]: Add
+          - button "➕ Record Expense" [disabled] [ref=e129]:
+            - generic [ref=e130]: ➕
+            - text: Record Expense
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - heading "Expense Log (0 today)" [level=2] [ref=e133]
+            - generic [ref=e134]:
+              - button "Today" [ref=e135] [cursor=pointer]
+              - button "This Week" [ref=e136] [cursor=pointer]
+              - button "All Time" [ref=e137] [cursor=pointer]
+          - generic [ref=e139]:
+            - generic [ref=e140]: 📝
+            - paragraph [ref=e141]: No expenses for this period.

@@ -308,10 +308,12 @@ export interface Reading {
 	totalPax: number;
 	cash: number;
 	gcash: number;
+	maya: number;
 	card: number;
 	// x-read fields
 	timestamp?: string | null;
 	voidCount?: number | null;
+	voidAmount?: number | null;
 	discountCount?: number | null;
 	generatedBy?: string | null;
 	// z-read fields
@@ -348,6 +350,7 @@ export async function generateXRead(): Promise<Reading> {
 	const discounted = getOrders().filter(o => o.status === 'paid' && o.discountType !== 'none');
 	const paid = getOrders().filter(o => o.status === 'paid');
 	const totalPax = paid.reduce((s, o) => s + (o.pax ?? 0), 0);
+	const voidAmount = voids.reduce((s, o) => s + (o.total ?? 0), 0);
 
 	const now = new Date().toISOString();
 	const snapshot: Reading = {
@@ -363,8 +366,10 @@ export async function generateXRead(): Promise<Reading> {
 		totalPax,
 		cash: summary.cash,
 		gcash: summary.gcash,
+		maya: summary.maya,
 		card: summary.card,
 		voidCount: voids.length,
+		voidAmount,
 		discountCount: discounted.length,
 		generatedBy: session.userName || 'Staff',
 	};

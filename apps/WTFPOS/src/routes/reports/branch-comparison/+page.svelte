@@ -4,8 +4,12 @@
 	import { allExpenses } from '$lib/stores/expenses.svelte';
 	import { inPeriod } from '$lib/stores/reports.svelte';
 
-	type Period = 'today' | 'week' | 'month';
+	type Period = 'today' | 'week' | 'month' | 'custom';
 	let period = $state<Period>('today');
+
+	// Custom date range
+	let customFrom = $state('');
+	let customTo   = $state('');
 
 	const BRANCHES = [
 		{ id: 'tag', name: 'Tagbilaran Branch' },
@@ -26,10 +30,30 @@
 		avgTicket: number;
 	}
 
+	function inCustomRange(isoDate: string, from: Date, to: Date): boolean {
+		const d = new Date(isoDate);
+		return d >= from && d <= to;
+	}
+
 	function computeBranches(p: Period): BranchData[] {
+		const fromDate = p === 'custom' && customFrom ? new Date(customFrom) : null;
+		const toDate   = p === 'custom' && customTo   ? new Date(customTo + 'T23:59:59') : null;
+
 		return BRANCHES.map(({ id, name }) => {
-			const os = allOrders.value.filter(o => o.status === 'paid' && o.locationId === id && inPeriod(o.createdAt, p));
-			const ex = allExpenses.value.filter(e => e.locationId === id && inPeriod(e.createdAt, p));
+			const os = allOrders.value.filter(o => {
+				if (o.status !== 'paid' || o.locationId !== id) return false;
+				if (p === 'custom') {
+					return fromDate && toDate ? inCustomRange(o.createdAt, fromDate, toDate) : false;
+				}
+				return inPeriod(o.createdAt, p);
+			});
+			const ex = allExpenses.value.filter(e => {
+				if (e.locationId !== id) return false;
+				if (p === 'custom') {
+					return fromDate && toDate ? inCustomRange(e.createdAt, fromDate, toDate) : false;
+				}
+				return inPeriod(e.createdAt, p);
+			});
 
 			const grossRevenue  = os.reduce((s, o) => s + o.subtotal, 0);
 			const netRevenue    = os.reduce((s, o) => s + o.total, 0);
@@ -91,11 +115,11 @@
 	}
 </script>
 
-<!-- Period toggle -->
-<div class="mb-5 flex items-center gap-2">
+<!-- Period toggle + custom date range -->
+<div class="mb-5 flex flex-wrap items-center gap-2">
 	{#each (['today', 'week', 'month'] as const) as p}
 		<button
-			onclick={() => (period = p)}
+			onclick={() => { period = p; customFrom = ''; customTo = ''; }}
 			class={cn(
 				'rounded-md px-4 py-1.5 text-sm font-semibold transition-colors',
 				period === p ? 'bg-accent text-white' : 'border border-border bg-white text-gray-600 hover:bg-gray-50'
@@ -105,6 +129,33 @@
 			{p === 'today' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
 		</button>
 	{/each}
+
+	<!-- Custom date range inputs -->
+	<div class="flex items-center gap-2 ml-2">
+		<span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Custom:</span>
+		<input
+			type="date"
+			bind:value={customFrom}
+			class={cn(
+				'pos-input text-sm py-1.5',
+				period === 'custom' ? 'border-accent ring-1 ring-accent/20' : ''
+			)}
+			style="min-height: unset; width: 140px"
+			onchange={() => { if (customFrom && customTo) period = 'custom'; }}
+		/>
+		<span class="text-gray-400 text-xs">to</span>
+		<input
+			type="date"
+			bind:value={customTo}
+			min={customFrom}
+			class={cn(
+				'pos-input text-sm py-1.5',
+				period === 'custom' ? 'border-accent ring-1 ring-accent/20' : ''
+			)}
+			style="min-height: unset; width: 140px"
+			onchange={() => { if (customFrom && customTo) period = 'custom'; }}
+		/>
+	</div>
 </div>
 
 <!-- Branch headers -->
@@ -130,6 +181,7 @@
 			<p class="text-sm text-gray-500 mt-0.5">
 				{period === 'today' ? "No paid orders today yet. Try 'This Week' or 'This Month' to see historical data." :
 				 period === 'week'  ? "No paid orders this week. Try 'This Month' to see more data." :
+				 period === 'custom' ? "No paid orders in the selected date range. Adjust the from/to dates." :
 				                     "No paid orders this month. Check that orders have been settled (paid status)."}
 			</p>
 		</div>

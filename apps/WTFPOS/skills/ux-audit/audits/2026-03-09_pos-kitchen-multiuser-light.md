@@ -9,6 +9,9 @@ intensity: light
 method: code-read + browser snapshot (playwright-cli)
 ---
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 8 issues resolved (P0: 0/2 · P1: 0/3 · P2: 0/3)
+
 # Light UX Audit — POS ↔ Kitchen Multi-User Flow
 ## WTFPOS · Alta Citta · 2026-03-09
 
@@ -220,16 +223,16 @@ hidden behind the modal overlay — warrants investigation.
 
 ## E. Recommendations (Prioritized)
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | Staff with `role: staff` can navigate to `/kitchen/orders` and interact with KDS without re-authentication | Add route guard: `/kitchen/*` requires `role === 'kitchen'` or elevated role. Staff should be redirected to `/pos`. | S | High — security/correctness |
-| **P0** | No "unsaved items" warning when closing AddItemModal with pending items. Closing modal or navigating away silently discards uncommitted items, and no KDS ticket or stock deduction fires. | Show confirmation dialog before closing modal when `pendingItems.length > 0`: "You have N items pending. Close without charging?" | S | High — data loss during rush |
-| **P1** | No "Sent to Kitchen" feedback after CHARGE is pressed. Staff has no confirmation the KDS ticket was created. | Show brief toast/snackbar: "✓ Sent to kitchen — X items" for 2 seconds after CHARGE. | S | High — reduces staff anxiety during service |
-| **P1** | No "Kitchen refused item" alert visible in POS order sidebar. When kitchen rejects an item, the cancelled item disappears silently from the bill. | Show a badge/notification in the order sidebar when an item is cancelled by kitchen: "⚠ Pork Sliced — refused by kitchen" | M | High — staff won't know to re-order or inform guests |
-| **P1** | Initial meat weight entered by staff at CHARGE time is an estimate, not actual. Creates stock drift. | Document or enforce: weight-based items should go through the weigh station refill flow for accuracy. Or add a "pending weight" status for initial meat orders. | M | Medium — inventory accuracy |
-| **P2** | "Cancel Table" button in order sidebar has no visible confirmation gate in accessibility tree | Add are-you-sure step (consistent with existing manager PIN gate pattern) | S | Medium — prevents accidental cancellations |
-| **P2** | Kitchen queue has no priority/urgency escalation at the ticket level for long-waiting tables | Add elapsed time indicator on KDS ticket cards, color-escalating at >15m (yellow) and >30m (red) | M | Medium — kitchen prioritization |
-| **P2** | "More Options" button label is ambiguous for staff — unclear what actions it contains | Rename to describe primary action (e.g., "Transfer / Merge / Split") or show icon hints | S | Low — discoverability |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | Staff with `role: staff` can navigate to `/kitchen/orders` and interact with KDS without re-authentication | Add route guard: `/kitchen/*` requires `role === 'kitchen'` or elevated role. Staff should be redirected to `/pos`. | S | High — security/correctness | 🔴 OPEN |
+| **P0** | No "unsaved items" warning when closing AddItemModal with pending items. Closing modal or navigating away silently discards uncommitted items, and no KDS ticket or stock deduction fires. | Show confirmation dialog before closing modal when `pendingItems.length > 0`: "You have N items pending. Close without charging?" | S | High — data loss during rush | 🔴 OPEN |
+| **P1** | No "Sent to Kitchen" feedback after CHARGE is pressed. Staff has no confirmation the KDS ticket was created. | Show brief toast/snackbar: "✓ Sent to kitchen — X items" for 2 seconds after CHARGE. | S | High — reduces staff anxiety during service | 🔴 OPEN |
+| **P1** | No "Kitchen refused item" alert visible in POS order sidebar. When kitchen rejects an item, the cancelled item disappears silently from the bill. | Show a badge/notification in the order sidebar when an item is cancelled by kitchen: "⚠ Pork Sliced — refused by kitchen" | M | High — staff won't know to re-order or inform guests | 🔴 OPEN |
+| **P1** | Initial meat weight entered by staff at CHARGE time is an estimate, not actual. Creates stock drift. | Document or enforce: weight-based items should go through the weigh station refill flow for accuracy. Or add a "pending weight" status for initial meat orders. | M | Medium — inventory accuracy | 🔴 OPEN |
+| **P2** | "Cancel Table" button in order sidebar has no visible confirmation gate in accessibility tree | Add are-you-sure step (consistent with existing manager PIN gate pattern) | S | Medium — prevents accidental cancellations | 🔴 OPEN |
+| **P2** | Kitchen queue has no priority/urgency escalation at the ticket level for long-waiting tables | Add elapsed time indicator on KDS ticket cards, color-escalating at >15m (yellow) and >30m (red) | M | Medium — kitchen prioritization | 🔴 OPEN |
+| **P2** | "More Options" button label is ambiguous for staff — unclear what actions it contains | Rename to describe primary action (e.g., "Transfer / Merge / Split") or show icon hints | S | Low — discoverability | 🔴 OPEN |
 
 ---
 

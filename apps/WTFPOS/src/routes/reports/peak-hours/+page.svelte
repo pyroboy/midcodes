@@ -47,7 +47,23 @@
 		if (pct >= 0.2) return 'bg-yellow-200 text-gray-700';
 		return 'bg-gray-100 text-gray-500';
 	}
+
+	const LOCATION_NAMES: Record<string, string> = {
+		tag: 'Alta Citta (Tagbilaran)',
+		pgl: 'Alona Beach (Panglao)',
+		'wh-tag': 'Tagbilaran Warehouse',
+		all: 'All Locations',
+	};
+	const locationLabel = $derived(LOCATION_NAMES[session.locationId] ?? session.locationId);
+	const todayLabel = new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 </script>
+
+<!-- Branch + date sub-header -->
+<div class="mb-3 flex items-center gap-2 text-sm text-gray-500">
+	<span class="font-semibold text-gray-700">{locationLabel}</span>
+	<span>·</span>
+	<span>{todayLabel}</span>
+</div>
 
 <!-- Period toggle -->
 <div class="mb-5 flex items-center gap-2">

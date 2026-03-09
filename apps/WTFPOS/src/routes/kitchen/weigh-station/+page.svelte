@@ -5,7 +5,10 @@
 	import YieldCalculatorModal from '$lib/components/kitchen/YieldCalculatorModal.svelte';
 	import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
 	import { btScale } from '$lib/stores/bluetooth-scale.svelte';
+	import { stockItems, getCurrentStock } from '$lib/stores/stock.svelte';
 	import { Bluetooth } from 'lucide-svelte';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
 	const SUGGESTED_GRAMS_PER_PAX = 150;
 
@@ -81,16 +84,57 @@
 	let showYieldCalc = $state(false);
 	let inputMode = $state<'manual' | 'scale'>('manual');
 
+	const DISPATCH_LOG_MAX = 50;
+
+	function dispatchLogKey(locationId: string) {
+		return `wtfpos_dispatched_log_${locationId}`;
+	}
+
+	// P2-11: Restore dispatched log from localStorage on mount
+	onMount(() => {
+		if (!browser) return;
+		try {
+			const raw = localStorage.getItem(dispatchLogKey(session.locationId));
+			if (raw) dispatched = JSON.parse(raw);
+		} catch {
+			dispatched = [];
+		}
+	});
+
 	// Reset dispatched log and selection when location changes (e.g. owner switching branch)
 	$effect(() => {
-		void session.locationId;
-		dispatched = [];
+		const locId = session.locationId;
 		selectedItem = null;
 		weightInput = '';
+		// Load log for the new location
+		if (browser) {
+			try {
+				const raw = localStorage.getItem(dispatchLogKey(locId));
+				dispatched = raw ? JSON.parse(raw) : [];
+			} catch {
+				dispatched = [];
+			}
+		} else {
+			dispatched = [];
+		}
 	});
 
 	const btConnected = $derived(btScale.connectionStatus === 'connected');
 	const totalDispatched = $derived(dispatched.reduce((s, d) => s + d.weight, 0));
+
+	// P1-17: Derive current stock for the selected item so kitchen can sanity-check
+	const selectedStockItem = $derived.by(() => {
+		const item = selectedItem;
+		if (!item) return null;
+		return stockItems.value.find(
+			(s) =>
+				s.name.toLowerCase() === item.name.toLowerCase() &&
+				(s.locationId === session.locationId || session.locationId === 'all')
+		) ?? null;
+	});
+	const selectedCurrentStock = $derived(
+		selectedStockItem ? getCurrentStock(selectedStockItem.id) : null
+	);
 
 	function selectItem(item: PendingMeat) {
 		selectedItem = item;
@@ -116,15 +160,21 @@
 
 		await dispatchMeatWeight(selectedItem.orderId, selectedItem.itemId, grams);
 
-		dispatched = [
-			{
-				table: selectedItem.tableNumber,
-				name: selectedItem.name,
-				weight: grams,
-				time: new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
-			},
-			...dispatched
-		];
+		const entry = {
+			table: selectedItem.tableNumber,
+			name: selectedItem.name,
+			weight: grams,
+			time: new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
+		};
+		// P2-11: Keep only the last DISPATCH_LOG_MAX entries; persist to localStorage
+		dispatched = [entry, ...dispatched].slice(0, DISPATCH_LOG_MAX);
+		if (browser) {
+			try {
+				localStorage.setItem(dispatchLogKey(session.locationId), JSON.stringify(dispatched));
+			} catch {
+				// localStorage write failure — non-fatal
+			}
+		}
 
 		selectedItem = null;
 		weightInput = '';
@@ -239,6 +289,21 @@
 						<span class="text-gray-300">|</span>
 						<span class="font-mono text-amber-600 font-semibold">
 							Suggested: ~{group.suggestedPerMeat}g
+						</span>
+					</div>
+				{/if}
+				{#if selectedCurrentStock !== null && selectedStockItem}
+					<div class="mt-2 text-sm text-gray-500">
+						Current stock:
+						<span class={cn(
+							'font-mono font-semibold',
+							selectedCurrentStock <= 0
+								? 'text-status-red'
+								: selectedCurrentStock < (selectedStockItem.minLevel ?? 500)
+									? 'text-status-yellow'
+									: 'text-status-green'
+						)}>
+							{selectedCurrentStock}{selectedStockItem.unit}
 						</span>
 					</div>
 				{/if}

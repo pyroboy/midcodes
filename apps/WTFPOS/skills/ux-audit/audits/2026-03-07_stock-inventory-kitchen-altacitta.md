@@ -8,6 +8,9 @@
 **Viewport:** 1024 x 768 (tablet landscape)
 **States captured:** Initial loaded state (93 items, all Well-Stocked)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 10 issues resolved (P0: 0/2 · P1: 0/5 · P2: 0/3)
+
 ---
 
 ## A. Text Layout Map
@@ -97,18 +100,18 @@ The "Well-Stocked" status on every single row becomes invisible after the third 
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | Empty "Stock Level" column cells on item rows — likely a rendering bug or missing bar visualization | Investigate and fix. If a progress bar was intended, render it. If not, remove the column. | S | High |
-| **P0** | No visual differentiation between "barely above minimum" (582g / 500g min) and "well above minimum" (33,410g / 5,000g min) — both show "Well-Stocked" identically | Add a stock health gradient: green-bold for >2x minimum, green-light for 1-2x, yellow for 1-1.5x, red for <1x. Or add a percentage-based visual bar. | M | High |
-| **P1** | All 93 items expanded by default — kitchen user must scroll past drinks and supplies to check meat | Default to collapsed categories. For kitchen role, auto-expand meat categories only. Add a "Meats" quick filter button. | M | High |
-| **P1** | Zero-value summary cards (Low: 0, Critical: 0) take equal visual weight as meaningful cards | Dim/shrink zero-value cards. Only elevate them visually when count > 0. Consider: when Critical > 0, make it pulse or use red background. | S | Med |
-| **P1** | "Well-Stocked" text repeated 93 times becomes invisible noise — status column provides no signal when everything is OK | When all items are OK, collapse status column or show it only on items approaching threshold. Add "All items well-stocked" summary banner instead. | M | Med |
-| **P1** | No "last updated" or "as of" timestamp — Pedro doesn't know if this is live or from this morning's count | Add a timestamp: "Stock as of [last count/delivery time]" near the summary cards | S | Med |
-| **P1** | Inconsistent category group headers — Drinks has a simple text header while Beef/Pork/Chicken have rich headers with pie charts and top-3 breakdowns | Apply the same group header pattern to all categories, or define rules for when the rich header appears (e.g., only for categories with >2 items tracked by weight) | M | Low |
-| **P2** | "Edit Info" button on every row — kitchen role likely shouldn't edit item metadata (that's admin/manager) | Hide "Edit Info" for kitchen role. Show read-only row with detail expand instead. | S | Med |
-| **P2** | Sub-nav has 5 tabs + badges — at 1024px they may crowd the horizontal space | Verify tab wrapping at tablet width. If crowded, use scrollable tabs or collapse to icons with tooltips. | S | Low |
-| **P2** | No quick way to see "what changed since yesterday" — Pedro wants to verify the morning delivery was logged | Add a "Recent changes" indicator (badge or timestamp) on recently-updated items, or a "Last delivery" mini-card at the top. | M | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | Empty "Stock Level" column cells on item rows — likely a rendering bug or missing bar visualization | Investigate and fix. If a progress bar was intended, render it. If not, remove the column. | S | High | 🔴 OPEN |
+| **P0** | No visual differentiation between "barely above minimum" (582g / 500g min) and "well above minimum" (33,410g / 5,000g min) — both show "Well-Stocked" identically | Add a stock health gradient: green-bold for >2x minimum, green-light for 1-2x, yellow for 1-1.5x, red for <1x. Or add a percentage-based visual bar. | M | High | 🔴 OPEN |
+| **P1** | All 93 items expanded by default — kitchen user must scroll past drinks and supplies to check meat | Default to collapsed categories. For kitchen role, auto-expand meat categories only. Add a "Meats" quick filter button. | M | High | 🔴 OPEN |
+| **P1** | Zero-value summary cards (Low: 0, Critical: 0) take equal visual weight as meaningful cards | Dim/shrink zero-value cards. Only elevate them visually when count > 0. Consider: when Critical > 0, make it pulse or use red background. | S | Med | 🔴 OPEN |
+| **P1** | "Well-Stocked" text repeated 93 times becomes invisible noise — status column provides no signal when everything is OK | When all items are OK, collapse status column or show it only on items approaching threshold. Add "All items well-stocked" summary banner instead. | M | Med | 🔴 OPEN |
+| **P1** | No "last updated" or "as of" timestamp — Pedro doesn't know if this is live or from this morning's count | Add a timestamp: "Stock as of [last count/delivery time]" near the summary cards | S | Med | 🔴 OPEN |
+| **P1** | Inconsistent category group headers — Drinks has a simple text header while Beef/Pork/Chicken have rich headers with pie charts and top-3 breakdowns | Apply the same group header pattern to all categories, or define rules for when the rich header appears (e.g., only for categories with >2 items tracked by weight) | M | Low | 🔴 OPEN |
+| **P2** | "Edit Info" button on every row — kitchen role likely shouldn't edit item metadata (that's admin/manager) | Hide "Edit Info" for kitchen role. Show read-only row with detail expand instead. | S | Med | 🔴 OPEN |
+| **P2** | Sub-nav has 5 tabs + badges — at 1024px they may crowd the horizontal space | Verify tab wrapping at tablet width. If crowded, use scrollable tabs or collapse to icons with tooltips. | S | Low | 🔴 OPEN |
+| **P2** | No quick way to see "what changed since yesterday" — Pedro wants to verify the morning delivery was logged | Add a "Recent changes" indicator (badge or timestamp) on recently-updated items, or a "Last delivery" mini-card at the top. | M | Low | 🔴 OPEN |
 
 ---
 

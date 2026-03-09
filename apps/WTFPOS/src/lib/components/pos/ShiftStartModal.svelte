@@ -3,6 +3,12 @@
 	import { openShift } from '$lib/stores/pos/shifts.svelte';
 	import { session } from '$lib/stores/session.svelte';
 
+	interface Props {
+		onSkip?: () => void;
+	}
+
+	let { onSkip }: Props = $props();
+
 	let openingFloat = $state(0);
 	let loading = $state(false);
 	let error = $state('');
@@ -92,5 +98,16 @@
 
 		<p class="text-center text-xs text-gray-400">You can enter ₱0 if no opening float is provided.</p>
 	<p class="text-center text-sm text-gray-500 mt-2">Existing open orders are safe — they will remain open.</p>
+
+	{#if onSkip}
+		<!-- P2-12: Neutral skip label — not role-specific -->
+		<button
+			onclick={onSkip}
+			class="text-center text-xs text-gray-400 hover:text-gray-600 transition-colors underline-offset-2 hover:underline"
+			style="min-height: 44px"
+		>
+			Skip — I'll add float later
+		</button>
+	{/if}
 	</div>
 </div>

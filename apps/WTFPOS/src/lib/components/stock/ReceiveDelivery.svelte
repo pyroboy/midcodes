@@ -1,191 +1,259 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
+	import { cn, formatPeso } from '$lib/utils';
 	import {
 		stockItems, deliveries, receiveDelivery,
 	} from '$lib/stores/stock.svelte';
 	import { session } from '$lib/stores/session.svelte';
+	import { isWarehouseSession } from '$lib/stores/session.svelte';
 	import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
 	import { btScale } from '$lib/stores/bluetooth-scale.svelte';
+	import PhotoCapture from '$lib/components/PhotoCapture.svelte';
 
-	const UNITS = ['grams', 'kg', 'portions', 'bowls', 'bottles', 'liters', 'pcs'];
+	interface Props {
+		/** Called after a delivery is successfully saved. Parent can use this to close a modal or show a toast. */
+		onSaved?: (result: { itemName: string; qty: number; unit: string; unitCost: number; totalCost: number }) => void;
+	}
 
-	let selectedStockId = $state('');
-	let qty      = $state('');
-	let unit     = $state('grams');
-	let supplier = $state('');
-	let notes    = $state('');
-	let saved    = $state(false);
-	let receiptPhoto = $state<File | null>(null);
-
-	// Find the last delivery for the selected item to auto-fill supplier
-	$effect(() => {
-		if (selectedStockId) {
-			const lastDelivery = deliveries.value.find(d => d.stockItemId === selectedStockId);
-			if (lastDelivery && !supplier) {
-				supplier = lastDelivery.supplier;
-			}
-		}
-	});
+	let { onSaved }: Props = $props();
 
 	// Branch-scoped items and deliveries
-	const branchStockItems = $derived(
-		stockItems.value.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
+	const activeItems = $derived(
+		stockItems.value.filter(s => isWarehouseSession() || s.locationId === session.locationId)
 	);
-	const branchStockIds = $derived(new Set(branchStockItems.map(s => s.id)));
+
+	const branchStockIds = $derived(new Set(activeItems.map(s => s.id)));
 	const branchDeliveries = $derived(
 		deliveries.value.filter(d => branchStockIds.has(d.stockItemId))
 	);
 
-	const selectedItem = $derived(stockItems.value.find(s => s.id === selectedStockId));
-	const canSave = $derived(selectedStockId !== '' && parseFloat(qty) > 0 && supplier.trim() !== '');
-	const isWeightUnit = $derived(unit === 'grams' || unit === 'kg');
-	const btConnected = $derived(btScale.connectionStatus === 'connected');
+	// P1-2: Recent suppliers derived from delivery history
+	const recentSuppliers = $derived(
+		[...new Set(
+			branchDeliveries
+				.map((d: any) => d.supplier as string)
+				.filter(Boolean)
+		)].slice(0, 5)
+	);
+
+	let formStockItemId = $state('');
+	let formQty         = $state('');
+	let formUnitCost    = $state('');
+	let formSupplier    = $state('');
+	let formBatchNo     = $state('');
+	let formExpiryDate  = $state('');
+	let formNotes       = $state('');
+	let formError       = $state('');
+	let formPhotos      = $state<string[]>([]);
+	let formItemSearch  = $state('');
+	let saved           = $state(false);
+	let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const filteredFormItems = $derived(
+		formItemSearch.trim()
+			? activeItems.filter(i => i.name.toLowerCase().includes(formItemSearch.toLowerCase()))
+			: activeItems
+	);
+
+	const selectedItem   = $derived(activeItems.find(s => s.id === formStockItemId));
+	const parsedQty      = $derived(parseFloat(formQty) || 0);
+	const parsedUnitCost = $derived(parseFloat(formUnitCost) || 0);
+	const computedTotalCost = $derived(parsedUnitCost > 0 ? parsedUnitCost * parsedQty : 0);
+	const isWeightUnit   = $derived(selectedItem?.unit === 'grams' || selectedItem?.unit === 'kg');
+	const btConnected    = $derived(btScale.connectionStatus === 'connected');
+	const canSave        = $derived(!!formStockItemId && parsedQty > 0 && !!formSupplier.trim());
+
+	// Auto-fill supplier from last delivery for the selected item
+	$effect(() => {
+		if (formStockItemId) {
+			const lastDelivery = branchDeliveries.find((d: any) => d.stockItemId === formStockItemId);
+			if (lastDelivery && !formSupplier) {
+				formSupplier = lastDelivery.supplier;
+			}
+		}
+	});
+
+	// Cleanup timer on destroy
+	$effect(() => {
+		return () => {
+			if (saveTimer) clearTimeout(saveTimer);
+		};
+	});
 
 	async function handleReceive() {
-		if (!canSave) return;
-		const item = stockItems.value.find(s => s.id === selectedStockId);
+		formError = '';
+		if (!formStockItemId) { formError = 'Please select an item.'; return; }
+		if (parsedQty <= 0)   { formError = 'Quantity must be greater than zero.'; return; }
+		if (!formSupplier.trim()) { formError = 'Supplier is required.'; return; }
+
+		const item = stockItems.value.find(s => s.id === formStockItemId);
 		if (!item) return;
 
-		let photoUrl: string | undefined = undefined;
-		if (receiptPhoto) {
-			photoUrl = URL.createObjectURL(receiptPhoto);
+		const unitCost = parsedUnitCost > 0 ? parsedUnitCost : undefined;
+
+		await receiveDelivery(
+			item.id,
+			item.name,
+			parsedQty,
+			item.unit,
+			formSupplier.trim(),
+			formNotes,
+			formBatchNo || undefined,
+			formExpiryDate || undefined,
+			undefined,
+			unitCost
+		);
+
+		const result = {
+			itemName: item.name,
+			qty: parsedQty,
+			unit: item.unit,
+			unitCost: parsedUnitCost,
+			totalCost: computedTotalCost,
+		};
+
+		// Reset form
+		formStockItemId = ''; formQty = ''; formUnitCost = ''; formSupplier = '';
+		formBatchNo = ''; formExpiryDate = ''; formNotes = ''; formError = '';
+		formPhotos = []; formItemSearch = '';
+
+		if (onSaved) {
+			onSaved(result);
+		} else {
+			// Standalone mode: show inline confirmation
+			if (saveTimer) clearTimeout(saveTimer);
+			saved = true;
+			saveTimer = setTimeout(() => (saved = false), 2500);
 		}
-
-		await receiveDelivery(selectedStockId, item.name, parseFloat(qty) || 0, unit, supplier, notes, undefined, undefined, photoUrl);
-		
-		selectedStockId = ''; qty = ''; unit = 'grams'; supplier = ''; notes = ''; receiptPhoto = null;
-		
-		const fileInput = document.getElementById('delivery-photo') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
-
-		saved = true;
-		setTimeout(() => (saved = false), 2500);
 	}
 </script>
 
-<div class="grid grid-cols-[380px_1fr] gap-6 h-full">
-	<!-- Form panel -->
-	<div class="rounded-xl border border-border bg-white p-6 flex flex-col gap-5 self-start">
-		<div>
-			<h2 class="text-base font-bold text-gray-900">Log Delivery</h2>
-			<p class="mt-0.5 text-xs text-gray-400">Record incoming stock from suppliers</p>
+<div class="rounded-xl border border-border bg-white p-6 flex flex-col gap-5 self-start">
+	<div>
+		<h2 class="text-base font-bold text-gray-900">Log Delivery</h2>
+		<p class="mt-0.5 text-xs text-gray-400">Record incoming stock from suppliers</p>
+	</div>
+
+	<div class="flex flex-col gap-4">
+		<!-- Searchable item picker -->
+		<div class="flex flex-col gap-1.5">
+			<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Item *</span>
+			<input
+				type="text"
+				bind:value={formItemSearch}
+				class="pos-input"
+				placeholder="Search items..."
+			/>
+			<select bind:value={formStockItemId} class="pos-input">
+				<option value="" disabled>Select an item…</option>
+				{#each filteredFormItems as s}
+					<option value={s.id}>{s.name} ({s.unit})</option>
+				{/each}
+			</select>
+			{#if selectedItem}
+				<p class="text-[10px] font-medium text-gray-400 mt-0.5 pl-1">
+					Current Stock: <strong class="text-gray-700">{Math.round(selectedItem.openingStock)} {selectedItem.unit}</strong>
+				</p>
+			{/if}
 		</div>
 
-		<div class="flex flex-col gap-4">
-			<div class="flex flex-col gap-1.5">
-				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Item *</span>
-				<select bind:value={selectedStockId} class="pos-input">
-					<option value="">Select item…</option>
-					{#each branchStockItems as s}
-						<option value={s.id}>{s.name}</option>
+		<div class="flex gap-3">
+			<div class="flex-1 flex flex-col gap-1.5">
+				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Quantity *</span>
+				{#if isWeightUnit && btConnected}
+					<BluetoothWeightInput
+						id="delivery-qty"
+						value={formQty}
+						onValueChange={(v) => { formQty = v; }}
+						theme="light"
+					/>
+				{:else}
+					<input type="number" bind:value={formQty} placeholder="0" min="0" step="any" class="pos-input font-mono" />
+				{/if}
+			</div>
+			<div class="flex-1 flex flex-col gap-1.5">
+				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Unit</span>
+				<input type="text" class="pos-input bg-gray-50 text-gray-500" value={selectedItem?.unit ?? '—'} disabled />
+			</div>
+		</div>
+
+		<!-- Unit Cost + computed Total Cost -->
+		<div class="flex gap-3">
+			<label class="flex-1 flex flex-col gap-1.5">
+				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Unit Cost ₱ <span class="font-normal text-gray-400 normal-case">(optional)</span></span>
+				<input type="number" bind:value={formUnitCost} class="pos-input font-mono" min="0" step="0.01" placeholder="0.00" />
+			</label>
+			<div class="flex-1 flex flex-col gap-1.5">
+				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Cost</span>
+				{#if parsedUnitCost > 0 && parsedQty > 0}
+					<div class="pos-input bg-gray-50 font-mono font-semibold text-gray-700 flex items-center">
+						{formatPeso(computedTotalCost)}
+					</div>
+				{:else}
+					<div class="pos-input bg-gray-50 text-gray-400 text-sm flex items-center">—</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Supplier with recent chips -->
+		<div class="flex flex-col gap-1.5">
+			<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Supplier *</span>
+			<input
+				type="text"
+				bind:value={formSupplier}
+				placeholder="e.g. Metro Meat Co."
+				class={cn('pos-input', !formSupplier.trim() && formStockItemId && 'border-status-red focus:border-status-red focus:ring-status-red/20')}
+			/>
+			{#if !formSupplier.trim() && formStockItemId}
+				<p class="text-[10px] font-medium text-status-red">Supplier is required</p>
+			{/if}
+			{#if recentSuppliers.length > 0}
+				<div class="flex flex-wrap gap-1.5 mt-0.5">
+					{#each recentSuppliers as supplier}
+						<button
+							type="button"
+							class="px-2.5 py-1 text-xs rounded-full border border-border bg-gray-50 text-gray-700 hover:bg-accent hover:text-white hover:border-accent transition-colors"
+							onclick={() => (formSupplier = supplier)}
+						>{supplier}</button>
 					{/each}
-				</select>
-				{#if selectedItem}
-					<p class="text-[10px] font-medium text-gray-400 mt-1 pl-1">
-						Current Stock: <strong class="text-gray-700">{Math.round(selectedItem.openingStock)} {selectedItem.unit}</strong>
-					</p>
-				{/if}
-			</div>
-
-			<div class="grid grid-cols-2 gap-3">
-				<div class="flex flex-col gap-1.5">
-					<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Quantity *</span>
-					{#if isWeightUnit && btConnected}
-						<BluetoothWeightInput
-							id="delivery-qty"
-							value={qty}
-							onValueChange={(v) => { qty = v; }}
-							theme="light"
-						/>
-					{:else}
-						<input type="number" bind:value={qty} placeholder="0" min="0" class="pos-input" />
-					{/if}
 				</div>
-				<div class="flex flex-col gap-1.5">
-					<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Unit</span>
-					<select bind:value={unit} class="pos-input">
-						{#each UNITS as u}<option value={u}>{u}</option>{/each}
-					</select>
-				</div>
-			</div>
-
-			<div class="flex flex-col gap-1.5">
-				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Supplier *</span>
-				<input type="text" bind:value={supplier} placeholder="e.g. Metro Meat Co." class={cn('pos-input', !supplier.trim() && selectedStockId && 'border-status-red focus:border-status-red focus:ring-status-red/20')} />
-				{#if !supplier.trim() && selectedStockId}
-					<p class="text-[10px] font-medium text-status-red">Supplier is required</p>
-				{/if}
-			</div>
-
-			<div class="flex flex-col gap-1.5">
-				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Notes (optional)</span>
-				<input type="text" bind:value={notes} placeholder="e.g. Checked for freshness" class="pos-input" />
-			</div>
-
-			<div class="flex flex-col gap-1.5">
-				<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Proof of Delivery (Photo)</span>
-				<input 
-					id="delivery-photo"
-					type="file" 
-					accept="image/*" 
-					capture="environment"
-					onchange={(e) => {
-						const target = e.target as HTMLInputElement;
-						receiptPhoto = target.files?.[0] || null;
-					}}
-					class="pos-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" 
-				/>
-			</div>
+			{/if}
 		</div>
 
-		<button onclick={handleReceive} disabled={!canSave} class="btn-primary disabled:opacity-40">
-			{saved ? '✓ Saved!' : '+ Log Delivery'}
-		</button>
+		<!-- Batch + Expiry -->
+		<div class="flex gap-3 border-t border-border pt-4">
+			<label class="flex-1 flex flex-col gap-1.5">
+				<span class="text-xs font-semibold text-accent uppercase tracking-wide">Batch No (Optional)</span>
+				<input type="text" bind:value={formBatchNo} class="pos-input font-mono" placeholder="e.g. B-2024-05" />
+			</label>
+			<label class="flex-1 flex flex-col gap-1.5">
+				<span class="text-xs font-semibold text-status-red uppercase tracking-wide">Expiry (Optional)</span>
+				<input type="date" bind:value={formExpiryDate} class="pos-input" />
+			</label>
+		</div>
+
+		<PhotoCapture
+			photos={formPhotos}
+			onchange={(p) => (formPhotos = p)}
+			label="Delivery Photos (optional)"
+		/>
+
+		<div class="flex flex-col gap-1.5">
+			<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Notes (optional)</span>
+			<input type="text" bind:value={formNotes} placeholder="e.g. Checked for freshness" class="pos-input" />
+		</div>
 	</div>
 
-	<!-- Deliveries log -->
-	<div class="flex flex-col gap-3">
-		<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">Today's Deliveries</h2>
-		{#if branchDeliveries.length === 0}
-			<div class="flex flex-1 items-center justify-center rounded-xl border border-border bg-white p-10 text-center text-gray-400">
-				<div>
-					<div class="mb-2 text-3xl">📦</div>
-					<p class="text-sm">No deliveries logged yet</p>
-				</div>
-			</div>
-		{:else}
-			<div class="overflow-hidden rounded-xl border border-border bg-white">
-				<table class="w-full text-sm">
-					<thead>
-						<tr class="border-b border-border bg-gray-50">
-							<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Item</th>
-							<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Qty</th>
-							<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Supplier</th>
-							<th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Photo</th>
-							<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Time</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-border">
-						{#each branchDeliveries as d (d.id)}
-							<tr class="hover:bg-gray-50">
-								<td class="px-4 py-3 font-medium text-gray-900">{d.itemName}</td>
-								<td class="px-4 py-3 text-right font-mono text-gray-700">{d.qty} {d.unit}</td>
-								<td class="px-4 py-3 text-gray-500">{d.supplier}</td>
-								<td class="px-4 py-3 text-center">
-									{#if d.photo}
-										<a href={d.photo} target="_blank" rel="noopener noreferrer" class="text-accent hover:underline text-lg" title="View Photo">
-											📸
-										</a>
-									{:else}
-										<span class="text-gray-300">-</span>
-									{/if}
-								</td>
-								<td class="px-4 py-3 text-right text-xs text-gray-400">{d.receivedAt}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
-	</div>
+	{#if formError}
+		<p class="rounded-lg bg-status-red-light border border-status-red/20 px-3 py-2 text-sm font-medium text-status-red">{formError}</p>
+	{/if}
+
+	{#if saved}
+		<div class="rounded-lg border border-status-green/20 bg-status-green-light px-4 py-3 text-center text-sm font-bold text-status-green">
+			Delivery recorded!
+		</div>
+	{:else}
+		<button onclick={handleReceive} disabled={!canSave} class="btn-primary disabled:opacity-40">
+			+ Log Delivery
+		</button>
+	{/if}
 </div>

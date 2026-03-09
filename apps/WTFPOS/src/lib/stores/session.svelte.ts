@@ -118,6 +118,24 @@ export function setSession(userName: string, role: Role, locationId: LocationId 
 	}
 }
 
+/**
+ * Update the active location and persist to sessionStorage so that the choice
+ * survives SvelteKit client-side navigation.  Elevated roles can switch freely;
+ * locked roles (staff / kitchen) are silently ignored.
+ */
+export function setLocation(locationId: LocationId) {
+	if (session.isLocked) return;
+	session.locationId = locationId;
+	if (browser) {
+		sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+			userName:   session.userName,
+			role:       session.role,
+			locationId: session.locationId,
+			isLocked:   session.isLocked,
+		}));
+	}
+}
+
 // TODO: P0-8 session expiry warning — requires server-side session timestamps
 
 export function clearSession() {

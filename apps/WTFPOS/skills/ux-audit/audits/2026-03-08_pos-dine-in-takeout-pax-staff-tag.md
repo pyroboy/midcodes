@@ -11,6 +11,9 @@
 **Viewport:** 1024 × 768 (tablet landscape)
 **States captured:** Login, POS floor (empty), PaxModal, AddItemModal (package + meats), Active AYCE order sidebar, More Options revealed, PaxChangeModal, Manager PIN modal, New Takeout modal, Takeout AddItemModal
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 5 of 9 issues resolved (P0: 2/2 · P1: 3/4 · P2: 0/3)
+
 ---
 
 ## A. Text Layout Map
@@ -191,17 +194,17 @@ The manager is at T6 dealing with a complaint. Maria walks over, explains, waits
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | `Pax` button buried 3 layers deep (scroll → More Options → Pax) for a scenario that happens constantly (mid-service party joins table) | Make the `{order.pax} pax` badge in the sidebar header tappable — tap it to open PaxChangeModal directly. No drilling required. | S | High |
-| **P0** | `More Options` sub-buttons have `min-height: 36px` — below 44px touch target minimum — fails the app's own design contract | Change to `min-height: 44px` on all More Options buttons | S | High |
-| **P1** | PaxChangeModal shows no financial impact for AYCE orders — manager authorizing a pax change can't see what they're approving | Add a derived line in PaxChangeModal below the stepper: "Beef+Pork Unlimited × {newPax} pax = {formatted total} ({delta})" — using bill-affecting color only if a package exists | M | High |
-| **P1** | No visual feedback after pax change recalculates the bill — bill total changes silently with no indicator | Briefly highlight the BILL total line in accent color (CSS transition) when `order.total` changes in the sidebar | S | Med |
-| **P1** | AYCE order sidebar lists 14 items with no visual grouping — violates Miller's 7±2 | Add a thin divider between meat items (WEIGHING) and side/starter items (REQUESTING), or collapse FREE sides into "🥬 Sides × N (FREE)" summary row | M | Med |
-| **P1** | "FREE — inventory tracked" banner in takeout AddItemModal is misleading — there is no package, so "FREE" has no meaning in this context | On takeout orders (no `packageId`), replace banner with "Complimentary sides" or simply remove it. The FREE badges on individual items should also be hidden on takeout. | S | Med |
-| **P2** | PaxModal (12 buttons, all identical) — common pax counts (2, 4, 6) have no visual differentiation | Slightly emphasize common AYCE pax counts (2, 4, 6) with a subtle ring or slightly larger button. Most groups at samgyupsal are 2, 4, or 6. | S | Low |
-| **P2** | Takeout AddItemModal: no explanation for why Package and Meats tabs are absent | Add a subtle one-line note: "Packages not available for takeout" OR simply label the absence clearly — currently no context given for the missing tabs | S | Low |
-| **P2** | No creation timestamp visible on takeout orders in the sidebar — "When was this order created?" is relevant during a busy queue | Add a small `{timeAgo(order.createdAt)}` next to the status badge in the takeout sidebar header | S | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | `Pax` button buried 3 layers deep (scroll → More Options → Pax) for a scenario that happens constantly (mid-service party joins table) | Make the `{order.pax} pax` badge in the sidebar header tappable — tap it to open PaxChangeModal directly. No drilling required. | S | High | 🟢 FIXED |
+| **P0** | `More Options` sub-buttons have `min-height: 36px` — below 44px touch target minimum — fails the app's own design contract | Change to `min-height: 44px` on all More Options buttons | S | High | 🟢 FIXED |
+| **P1** | PaxChangeModal shows no financial impact for AYCE orders — manager authorizing a pax change can't see what they're approving | Add a derived line in PaxChangeModal below the stepper: "Beef+Pork Unlimited × {newPax} pax = {formatted total} ({delta})" — using bill-affecting color only if a package exists | M | High | 🟢 FIXED |
+| **P1** | No visual feedback after pax change recalculates the bill — bill total changes silently with no indicator | Briefly highlight the BILL total line in accent color (CSS transition) when `order.total` changes in the sidebar | S | Med | 🟢 FIXED |
+| **P1** | AYCE order sidebar lists 14 items with no visual grouping — violates Miller's 7±2 | Add a thin divider between meat items (WEIGHING) and side/starter items (REQUESTING), or collapse FREE sides into "🥬 Sides × N (FREE)" summary row | M | Med | 🟢 FIXED |
+| **P1** | "FREE — inventory tracked" banner in takeout AddItemModal is misleading — there is no package, so "FREE" has no meaning in this context | On takeout orders (no `packageId`), replace banner with "Complimentary sides" or simply remove it. The FREE badges on individual items should also be hidden on takeout. | S | Med | 🔴 OPEN |
+| **P2** | PaxModal (12 buttons, all identical) — common pax counts (2, 4, 6) have no visual differentiation | Slightly emphasize common AYCE pax counts (2, 4, 6) with a subtle ring or slightly larger button. Most groups at samgyupsal are 2, 4, or 6. | S | Low | 🔴 OPEN |
+| **P2** | Takeout AddItemModal: no explanation for why Package and Meats tabs are absent | Add a subtle one-line note: "Packages not available for takeout" OR simply label the absence clearly — currently no context given for the missing tabs | S | Low | 🔴 OPEN |
+| **P2** | No creation timestamp visible on takeout orders in the sidebar — "When was this order created?" is relevant during a busy queue | Add a small `{timeAgo(order.createdAt)}` next to the status badge in the takeout sidebar header | S | Low | 🔴 OPEN |
 
 ---
 

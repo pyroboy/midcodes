@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { deliveries, getSpoilageAlerts, stockItems, receiveDelivery } from '$lib/stores/stock.svelte';
+	import { deliveries, getSpoilageAlerts, stockItems } from '$lib/stores/stock.svelte';
 	import { isWarehouseSession, session } from '$lib/stores/session.svelte';
-	import { cn } from '$lib/utils';
+	import { cn, formatPeso } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import { Plus, X, AlertTriangle, XCircle, Search, Calendar, Package } from 'lucide-svelte';
 	import ProgressRing from '$lib/components/stock/ProgressRing.svelte';
-	import PhotoCapture from '$lib/components/PhotoCapture.svelte';
+	import ReceiveDelivery from '$lib/components/stock/ReceiveDelivery.svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 
@@ -27,14 +27,14 @@
 	const filteredDeliveries = $derived(
 		preFilteredDeliveries.filter((d: any) => {
 			if (!showDepleted && d.depleted) return false;
-			
-			const matchSearch = !searchQuery.trim() || 
-				d.itemName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+
+			const matchSearch = !searchQuery.trim() ||
+				d.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				d.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				(d.batchNo && d.batchNo.toLowerCase().includes(searchQuery.toLowerCase()));
 
 			const matchItem = filterItem === 'all' || d.stockItemId === filterItem;
-			
+
 			// If filterDateRange !== 'all', we would filter by date here
 			// For this execution we assume everything is 'today' since the store seeds with times only
 			const matchDate = filterDateRange === 'all' || filterDateRange === 'today';
@@ -69,82 +69,31 @@
 
 	// ─── Receive Form ────────────────────────────────────────────────────────────
 	let showModal = $state(false);
-	let formStockItemId = $state('');
-	let formQty = $state('');
-	let formSupplier = $state('');
-	let formBatchNo = $state('');
-	let formExpiryDate = $state('');
-	let formNotes = $state('');
-	let formError = $state('');
-	let formPhotos = $state<string[]>([]);
 
-	// P0-2: Item search filter
-	let formItemSearch = $state('');
-	const filteredFormItems = $derived(
-		formItemSearch.trim()
-			? activeItems.filter(i => i.name.toLowerCase().includes(formItemSearch.toLowerCase()))
-			: activeItems
-	);
-
-	// P0-1: Success toast
+	// Issue 09: Success toast
 	let successMsg = $state<string | null>(null);
 	let successTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	// P1-2: Recent suppliers derived from delivery history
-	const recentSuppliers = $derived(
-		[...new Set(
-			preFilteredDeliveries
-				.map((d: any) => d.supplier as string)
-				.filter(Boolean)
-		)].slice(0, 5)
-	);
-
-	const parsedQty = $derived(parseFloat(formQty) || 0);
-	const selectedItem = $derived(activeItems.find(s => s.id === formStockItemId));
-	const canSave = $derived(!!formStockItemId && parsedQty > 0 && !!formSupplier.trim());
+	// Issue 16: Procurement CTA state
+	let lastSavedDelivery = $state<{ itemName: string; qty: number; unit: string; unitCost: number; totalCost: number } | null>(null);
 
 	function openModal() {
-		formStockItemId = activeItems[0]?.id ?? '';
-		formQty = '';
-		formSupplier = '';
-		formBatchNo = '';
-		formExpiryDate = '';
-		formNotes = '';
-		formError = '';
-		formPhotos = [];
-		formItemSearch = '';
+		lastSavedDelivery = null;
 		showModal = true;
 	}
 
-	async function saveDelivery() {
-		formError = '';
-		if (!formStockItemId) { formError = 'Please select an item.'; return; }
-		if (parsedQty <= 0)   { formError = 'Quantity must be greater than zero.'; return; }
-		if (!formSupplier.trim()) { formError = 'Supplier is required.'; return; }
-
-		const item = stockItems.value.find(s => s.id === formStockItemId);
-		if (!item) return;
-
-		const supplierName = formSupplier.trim();
-		const qty = parsedQty;
-		const unit = item.unit;
-		const itemName = item.name;
-
-		await receiveDelivery(
-			item.id,
-			item.name,
-			parsedQty,
-			item.unit,
-			supplierName,
-			formNotes,
-			formBatchNo || undefined,
-			formExpiryDate || undefined
-		);
-
-		// P0-1: Show success toast
+	function handleDeliverySaved(result: { itemName: string; qty: number; unit: string; unitCost: number; totalCost: number }) {
+		// Issue 09: Show success toast
 		if (successTimeout) clearTimeout(successTimeout);
-		successMsg = `✓ ${itemName} +${qty} ${unit} received from ${supplierName}`;
+		successMsg = `✓ Delivery recorded — +${result.qty}${result.unit} ${result.itemName}`;
 		successTimeout = setTimeout(() => { successMsg = null; successTimeout = null; }, 3500);
+
+		// Issue 16: Show procurement CTA if unit cost was provided
+		if (result.unitCost > 0) {
+			lastSavedDelivery = result;
+		} else {
+			lastSavedDelivery = null;
+		}
 
 		showModal = false;
 	}
@@ -217,7 +166,7 @@
 				class="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg border border-border bg-white focus:outline-none focus:border-accent"
 			/>
 		</div>
-		
+
 		<div class="flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-lg">
 			<Calendar class="w-4 h-4 text-gray-400" />
 			<select bind:value={filterDateRange} class="bg-transparent text-sm font-medium outline-none text-gray-700 min-w-[120px]">
@@ -264,7 +213,13 @@
 						<td class="px-5 py-3">
 							<div class="flex flex-col gap-0.5">
 								<span class="font-semibold text-gray-900">{d.itemName}</span>
-								<span class="text-xs text-gray-400">{d.supplier}</span>
+								<!-- Issue 10: Transfer badge for transfer-origin deliveries -->
+								<span class="text-xs text-gray-400 flex items-center gap-1.5">
+									{d.supplier}
+									{#if d.supplier?.includes('Transfer from')}
+										<span class="bg-purple-100 text-purple-700 text-xs px-1.5 py-0.5 rounded font-semibold leading-none">Transfer</span>
+									{/if}
+								</span>
 							</div>
 						</td>
 						<td class="px-5 py-3 text-right font-mono font-bold">
@@ -309,7 +264,7 @@
 	</div>
 </div>
 
-<!-- P0-1: Success toast -->
+<!-- Issue 09: Success toast -->
 {#if successMsg}
 	<div class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl bg-status-green px-5 py-3.5 text-white shadow-xl" transition:fade={{ duration: 200 }}>
 		<svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -319,102 +274,45 @@
 	</div>
 {/if}
 
+<!-- Issue 16: Procurement expense CTA (shown after delivery with unit cost) -->
+{#if lastSavedDelivery}
+	{@const procurementParams = new URLSearchParams({
+		category: 'Meat Procurement',
+		amount: String(lastSavedDelivery.totalCost),
+		description: `${lastSavedDelivery.itemName} ${lastSavedDelivery.qty}${lastSavedDelivery.unit}`
+	})}
+	<div class="fixed bottom-6 left-6 z-[60] flex items-center gap-3 rounded-xl border border-accent/30 bg-white px-4 py-3 shadow-xl" transition:fade={{ duration: 200 }}>
+		<div class="flex flex-col gap-0.5">
+			<span class="text-xs font-semibold text-gray-600">Procurement cost: <span class="font-mono text-accent">{formatPeso(lastSavedDelivery.totalCost)}</span></span>
+			<span class="text-xs text-gray-400">Add as expense?</span>
+		</div>
+		<a
+			href="/expenses?{procurementParams.toString()}"
+			class="btn-primary text-xs whitespace-nowrap"
+			onclick={() => { lastSavedDelivery = null; }}
+		>Record expense →</a>
+		<button onclick={() => { lastSavedDelivery = null; }} class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded" aria-label="Dismiss">
+			<X class="w-4 h-4" />
+		</button>
+	</div>
+{/if}
+
 <!-- Receive Delivery Modal -->
 {#if showModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="pos-card w-[480px] flex flex-col gap-5 max-h-[90vh] overflow-y-auto">
-			<div class="flex items-center justify-between">
-				<h3 class="text-lg font-bold text-gray-900">Receive Delivery / Batch</h3>
-				<button onclick={() => (showModal = false)} class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+		<div class="w-[500px] max-h-[90vh] overflow-y-auto rounded-xl shadow-xl">
+			<div class="relative">
+				<button
+					onclick={() => (showModal = false)}
+					class="absolute top-4 right-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+					aria-label="Close"
+				>
 					<X class="w-5 h-5" />
 				</button>
-			</div>
-
-			<div class="flex flex-col gap-4">
-				<!-- P0-2: Searchable item picker -->
-				<div class="flex flex-col gap-1.5">
-					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Item *</span>
-					<input
-						type="text"
-						bind:value={formItemSearch}
-						class="pos-input"
-						placeholder="Search items..."
-					/>
-					<select bind:value={formStockItemId} class="pos-input">
-						<option value="" disabled>Select an item...</option>
-						{#each filteredFormItems as item}
-							<option value={item.id}>{item.name} ({item.unit})</option>
-						{/each}
-					</select>
+				<ReceiveDelivery onSaved={handleDeliverySaved} />
+				<div class="px-6 pb-4 bg-white rounded-b-xl">
+					<button class="btn-ghost w-full text-gray-500" onclick={() => (showModal = false)}>Cancel</button>
 				</div>
-
-				{#if selectedItem}
-					<p class="text-xs text-gray-500 -mt-2 px-1">
-						Current stock: <span class="font-mono font-semibold text-gray-700">{Math.round(selectedItem.openingStock)} {selectedItem.unit}</span>
-					</p>
-				{/if}
-
-				<div class="flex gap-4">
-					<label class="flex-1 flex flex-col gap-1.5">
-						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity *</span>
-						<input type="number" bind:value={formQty} class="pos-input font-mono" min="0" step="any" />
-					</label>
-					<label class="flex-1 flex flex-col gap-1.5">
-						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</span>
-						<input type="text" class="pos-input bg-gray-50 text-gray-500" value={selectedItem?.unit ?? '—'} disabled />
-					</label>
-				</div>
-
-				<!-- P1-2: Supplier field with recent supplier chips -->
-				<div class="flex flex-col gap-1.5">
-					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier *</span>
-					<input type="text" bind:value={formSupplier} class="pos-input" placeholder="e.g. Monterey Meats" />
-					{#if recentSuppliers.length > 0}
-						<div class="flex flex-wrap gap-1.5 mt-0.5">
-							{#each recentSuppliers as supplier}
-								<button
-									type="button"
-									class="px-2.5 py-1 text-xs rounded-full border border-border bg-gray-50 text-gray-700 hover:bg-accent hover:text-white hover:border-accent transition-colors"
-									onclick={() => (formSupplier = supplier)}
-								>{supplier}</button>
-							{/each}
-						</div>
-					{/if}
-				</div>
-
-				<div class="flex gap-4 border-t border-border pt-4">
-					<label class="flex-1 flex flex-col gap-1.5">
-						<span class="text-xs font-semibold text-accent uppercase tracking-wider">Batch No (Optional)</span>
-						<input type="text" bind:value={formBatchNo} class="pos-input font-mono" placeholder="e.g. B-2024-05" />
-					</label>
-					<label class="flex-1 flex flex-col gap-1.5">
-						<span class="text-xs font-semibold text-status-red uppercase tracking-wider">Expiry (Optional)</span>
-						<input type="date" bind:value={formExpiryDate} class="pos-input" />
-					</label>
-				</div>
-
-				<PhotoCapture
-					photos={formPhotos}
-					onchange={(p) => (formPhotos = p)}
-					label="Delivery Photos (optional)"
-				/>
-
-				<label class="flex flex-col gap-1.5">
-					<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Notes</span>
-					<input type="text" bind:value={formNotes} class="pos-input" placeholder="Optional notes" />
-				</label>
-			</div>
-
-			{#if formError}
-				<p class="rounded-lg bg-status-red-light border border-status-red/20 px-3 py-2 text-sm font-medium text-status-red">{formError}</p>
-			{/if}
-
-			<!-- P1-1: Receive Stock is dominant primary; Cancel is ghost text -->
-			<div class="flex flex-col gap-2 mt-2">
-				<button class="btn-primary w-full" onclick={saveDelivery} disabled={!canSave}>
-					Receive Stock
-				</button>
-				<button class="btn-ghost w-full text-gray-500" onclick={() => (showModal = false)}>Cancel</button>
 			</div>
 		</div>
 	</div>

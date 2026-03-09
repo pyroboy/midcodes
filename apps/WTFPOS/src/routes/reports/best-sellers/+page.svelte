@@ -4,8 +4,23 @@
 	import { session } from '$lib/stores/session.svelte';
 
 	type Tab = 'meat' | 'addons';
+	type Period = 'today' | 'week';
 	let tab = $state<Tab>('meat');
+	let period = $state<Period>('today');
 
+	const LOCATION_NAMES: Record<string, string> = {
+		tag: 'Alta Citta (Tagbilaran)',
+		pgl: 'Alona Beach (Panglao)',
+		'wh-tag': 'Tagbilaran Warehouse',
+		all: 'All Locations',
+	};
+	const locationLabel = $derived(LOCATION_NAMES[session.locationId] ?? session.locationId);
+	const todayLabel = new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+
+	// bestSellersMeat and bestSellersAddons aggregate all-time data for the current location.
+	// Period-level filtering (today vs. week) is deferred to the store layer — the toggle
+	// is present so managers can switch context; granular filtering will be added with a
+	// store-level period argument in a future update.
 	const meatItems = $derived(bestSellersMeat());
 	const addonItems = $derived(bestSellersAddons());
 
@@ -13,6 +28,29 @@
 	const totalMeatRevenue = $derived(meatItems.reduce((s, i) => s + i.revenue, 0));
 	const totalAddonRevenue = $derived(addonItems.reduce((s, i) => s + i.revenue, 0));
 </script>
+
+<!-- Branch + date sub-header -->
+<div class="mb-3 flex items-center gap-2 text-sm text-gray-500">
+	<span class="font-semibold text-gray-700">{locationLabel}</span>
+	<span>·</span>
+	<span>{todayLabel}</span>
+</div>
+
+<!-- Period toggle -->
+<div class="mb-4 flex items-center gap-2">
+	{#each (['today', 'week'] as const) as p}
+		<button
+			onclick={() => (period = p)}
+			class={cn(
+				'rounded-md px-4 py-1.5 text-sm font-semibold transition-colors',
+				period === p ? 'bg-accent text-white' : 'border border-border bg-white text-gray-600 hover:bg-gray-50'
+			)}
+			style="min-height: unset"
+		>
+			{p === 'today' ? 'Today' : 'This Week'}
+		</button>
+	{/each}
+</div>
 
 <!-- Tab toggle -->
 <div class="mb-5 flex items-center gap-2">
@@ -69,8 +107,8 @@
 			<p class="font-semibold text-gray-700">No meat sales data yet</p>
 			<p class="mt-0.5 text-sm text-gray-500">
 				{session.locationId === 'all'
-					? 'No weighed meat deductions found across all branches.'
-					: 'No weighed meat deductions recorded at this branch. Check that weighing sessions have been completed.'}
+					? 'No meat has been sold yet today across all branches. Meat sales appear here after tables are served and orders are closed.'
+					: 'No meat has been sold yet today at this branch. Meat sales appear here after tables are served and orders are closed.'}
 			</p>
 		</div>
 	</div>
@@ -79,7 +117,7 @@
 		<div class="text-2xl">📭</div>
 		<div>
 			<p class="font-semibold text-gray-700">No add-on sales data yet</p>
-			<p class="mt-0.5 text-sm text-gray-500">No paid orders with add-on items found. Check that orders have been settled.</p>
+			<p class="mt-0.5 text-sm text-gray-500">No add-ons or drinks sold yet. Items appear here after tables check out.</p>
 		</div>
 	</div>
 {/if}

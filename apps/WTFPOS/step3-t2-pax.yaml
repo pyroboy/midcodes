@@ -1,0 +1,133 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e20]
+          - generic [ref=e24]: POS
+    - generic [ref=e25]:
+      - separator [ref=e26]
+      - generic [ref=e28]: A
+      - link "Logout" [ref=e30] [cursor=pointer]:
+        - /url: /
+        - img [ref=e31]
+    - button "Toggle Sidebar" [ref=e34]
+  - main [ref=e35]:
+    - generic [ref=e37]:
+      - img [ref=e38]
+      - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e39]
+    - generic [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - button "Toggle Sidebar" [ref=e45] [cursor=pointer]:
+              - img
+              - generic [ref=e46]: Toggle Sidebar
+            - heading "POS" [level=1] [ref=e47]
+            - generic [ref=e48]: 2 occ
+            - generic [ref=e49]: 6 free
+          - generic [ref=e50]:
+            - button "Toggle color legend" [ref=e52] [cursor=pointer]:
+              - img [ref=e53]
+            - button "📦 New Takeout" [ref=e55] [cursor=pointer]
+            - button "🧾 History" [ref=e56] [cursor=pointer]
+        - img [ref=e58]:
+          - button "Table T1" [ref=e61] [cursor=pointer]:
+            - generic: T1
+            - generic: cap 4
+          - button "Table T2" [active] [ref=e63] [cursor=pointer]:
+            - generic: T2
+            - generic: cap 4
+          - button "Table T3" [ref=e65] [cursor=pointer]:
+            - generic: T3
+            - generic: cap 4
+          - button "Table T4" [ref=e67] [cursor=pointer]:
+            - generic: T4
+            - generic: cap 4
+          - button "Table T5" [ref=e69] [cursor=pointer]:
+            - generic: 2m
+            - generic: T5
+            - generic: 2 pax
+          - button "Table T6" [ref=e71] [cursor=pointer]:
+            - generic: BEEF
+            - generic: 1m
+            - generic: T6
+            - generic: 3 pax
+            - generic: ₱1,797.00
+            - generic: "12"
+          - button "Table T7" [ref=e73] [cursor=pointer]:
+            - generic: T7
+            - generic: cap 2
+          - button "Table T8" [ref=e75] [cursor=pointer]:
+            - generic: T8
+            - generic: cap 2
+      - generic [ref=e77]:
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - generic [ref=e115]:
+              - generic [ref=e116]: T6
+              - button "3 pax ✎" [ref=e273] [cursor=pointer]
+              - generic [ref=e118]: 1m
+            - button "✕" [ref=e119] [cursor=pointer]
+          - generic [ref=e394]: Beef Unlimited
+          - generic [ref=e395]:
+            - button "🔄 Refill" [ref=e396] [cursor=pointer]
+            - button "Add Item" [ref=e397] [cursor=pointer]
+        - generic [ref=e121]:
+          - generic [ref=e398]:
+            - generic [ref=e400]:
+              - generic [ref=e401]: Beef Unlimited
+              - generic [ref=e402]: SENT
+            - generic [ref=e403]:
+              - generic [ref=e404]:
+                - generic [ref=e405]: ₱1,797.00
+                - generic [ref=e406]: PKG
+              - button "✕" [ref=e407] [cursor=pointer]
+          - generic [ref=e408]:
+            - generic [ref=e409]: Meats
+            - generic [ref=e410]:
+              - generic [ref=e411]: Premium USDA Beef
+              - generic [ref=e413]: WEIGHING
+            - generic [ref=e414]:
+              - generic [ref=e415]: Sliced Beef
+              - generic [ref=e417]: WEIGHING
+            - generic [ref=e418]: Sides
+            - button "9 requesting ▼ show" [ref=e419] [cursor=pointer]:
+              - generic [ref=e421]: 9 requesting
+              - generic [ref=e422]: ▼ show
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - generic [ref=e124]: BILL
+            - generic [ref=e125]: 12 items
+          - generic [ref=e126]: ₱1,797.00
+        - generic [ref=e127]:
+          - generic [ref=e423]:
+            - button "Cancel Order" [ref=e424] [cursor=pointer]
+            - button "Checkout" [ref=e425] [cursor=pointer]
+            - button "Print" [ref=e426] [cursor=pointer]
+          - button "⋯ More Options ▼" [ref=e130] [cursor=pointer]
+    - generic [ref=e440]:
+      - heading "How many guests for T2?" [level=3] [ref=e441]
+      - generic [ref=e442]:
+        - button "1" [ref=e443] [cursor=pointer]
+        - button "2" [ref=e444] [cursor=pointer]
+        - button "3" [ref=e445] [cursor=pointer]
+        - button "4" [ref=e446] [cursor=pointer]
+        - button "5" [disabled] [ref=e447]
+        - button "6" [disabled] [ref=e448]
+        - button "7" [disabled] [ref=e449]
+        - button "8" [disabled] [ref=e450]
+        - button "9" [disabled] [ref=e451]
+        - button "10" [disabled] [ref=e452]
+        - button "11" [disabled] [ref=e453]
+        - button "12" [disabled] [ref=e454]
+      - generic [ref=e455]:
+        - generic [ref=e456]: Other (type number)
+        - generic [ref=e457]:
+          - spinbutton "Other (type number)" [ref=e458]
+          - button "OK" [disabled] [ref=e459] [cursor=pointer]
+      - button "Cancel" [ref=e461] [cursor=pointer]

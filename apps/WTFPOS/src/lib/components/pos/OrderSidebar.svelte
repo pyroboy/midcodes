@@ -245,7 +245,7 @@
 			{#if item.status === 'pending' && order}
 				<button
 					onclick={() => handleRemoveItem(item)}
-					class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-status-red transition-colors shrink-0"
+					class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors shrink-0"
 					title={isWithinGracePeriod(item.addedAt) ? 'Remove (grace period)' : 'Remove (PIN required)'}
 				>✕</button>
 			{/if}
@@ -287,7 +287,6 @@
 						<button
 							onclick={onchangepax}
 							class="flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-accent transition-colors cursor-pointer"
-							style="min-height: unset"
 							title="Change guest count"
 						>
 							{order.pax} pax ✎
@@ -534,10 +533,13 @@
 			<!-- Table Actions (overflow) -->
 			<button
 				onclick={() => { showMoreActions = !showMoreActions; }}
-				class="w-full rounded-lg border border-border bg-surface py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all"
+				class="w-full rounded-lg border border-border bg-surface py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all flex flex-col items-center gap-0.5"
 				style="min-height: 44px"
 			>
-				{showMoreActions ? '▲ Hide' : 'More ▼'}
+				<span>{showMoreActions ? '▲ Hide' : 'More ▼'}</span>
+				{#if !showMoreActions}
+					<span class="text-[10px] font-normal text-gray-400">Transfer · Merge · Split · Pax</span>
+				{/if}
 			</button>
 
 			{#if showMoreActions}

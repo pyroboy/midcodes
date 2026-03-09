@@ -1,0 +1,90 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e20]
+            - generic [ref=e24]: POS
+      - generic [ref=e25]:
+        - separator [ref=e26]
+        - generic [ref=e28]: M
+        - link "Logout" [ref=e30] [cursor=pointer]:
+          - /url: /
+          - img [ref=e31]
+      - button "Toggle Sidebar" [ref=e34]
+    - main [ref=e35]:
+      - generic [ref=e73]:
+        - img [ref=e74]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e75]
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - generic [ref=e79]:
+            - generic [ref=e80]:
+              - button "Toggle Sidebar" [ref=e81] [cursor=pointer]:
+                - img
+                - generic [ref=e82]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e83]
+              - generic [ref=e84]: 1 occ
+              - generic [ref=e85]: 7 free
+            - generic [ref=e86]:
+              - button "Toggle color legend" [ref=e88] [cursor=pointer]:
+                - img [ref=e89]
+              - button "📦 New Takeout" [ref=e90] [cursor=pointer]
+              - button "🧾 History 8" [ref=e91] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e92]: "8"
+          - img [ref=e94]:
+            - button "Table T1" [ref=e97] [cursor=pointer]:
+              - generic: T1
+              - generic: cap 4
+            - button "Table T2" [ref=e99] [cursor=pointer]:
+              - generic: T2
+              - generic: cap 4
+            - button "Table T3" [ref=e101] [cursor=pointer]:
+              - generic: BEEF
+              - generic: 2m
+              - generic: T3
+              - generic: 4 pax
+              - generic: ₱2,396.00
+              - generic: "15"
+              - generic: R3
+            - button "Table T4" [ref=e106] [cursor=pointer]:
+              - generic: T4
+              - generic: cap 4
+            - button "Table T5" [ref=e108] [cursor=pointer]:
+              - generic: T5
+              - generic: cap 4
+            - button "Table T6" [ref=e110] [cursor=pointer]:
+              - generic: T6
+              - generic: cap 4
+            - button "Table T7" [ref=e112] [cursor=pointer]:
+              - generic: T7
+              - generic: cap 2
+            - button "Table T8" [ref=e114] [cursor=pointer]:
+              - generic: T8
+              - generic: cap 2
+          - generic [ref=e116]:
+            - heading "📦 Takeout Orders 1" [level=2] [ref=e117]:
+              - text: 📦 Takeout Orders
+              - generic [ref=e118]: "1"
+            - generic [ref=e120]:
+              - button "#TO01 Pedro ₱285.00 2 items" [ref=e121] [cursor=pointer]:
+                - text: "#TO01"
+                - generic [ref=e122]: Pedro
+                - text: ₱285.00
+                - generic [ref=e123]: 2 items
+              - generic [ref=e124]: PREP
+        - generic [ref=e126]:
+          - generic [ref=e127]: 🧾
+          - generic [ref=e128]:
+            - generic [ref=e129]: No Table Selected
+            - generic [ref=e130]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e131]:
+            - generic [ref=e132]: Green = available — tap to open
+            - generic [ref=e134]: Orange = occupied — tap to view bill
+  - generic [ref=e136]: WTF! Samgyup POS

@@ -52,7 +52,7 @@
 		{#if step === 'select'}
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">🔀 Transfer {fromTable.label}</h3>
-				<button onclick={onclose} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>
+				<button onclick={onclose} class="flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-gray-600">✕</button>
 			</div>
 			<p class="text-sm text-gray-500">Select an available table to transfer the active bill to.</p>
 

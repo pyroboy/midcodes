@@ -368,7 +368,7 @@ export function getSpoilageAlerts() {
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-export async function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '', batchNo?: string, expiryDate?: string, photo?: string): Promise<{ success: boolean; error?: string; id?: string }> {
+export async function receiveDelivery(stockItemId: string, itemName: string, qty: number, unit: string, supplier: string, notes: string = '', batchNo?: string, expiryDate?: string, photo?: string, unitCost?: number): Promise<{ success: boolean; error?: string; id?: string }> {
 	if (!browser) return { success: false, error: 'Not in browser environment' };
 	
 	// Validate inputs
@@ -397,6 +397,7 @@ export async function receiveDelivery(stockItemId: string, itemName: string, qty
 			usedQty: 0,
 			depleted: false,
 			...(photo && { photo }),
+			...(unitCost != null && unitCost > 0 && { unitCost }),
 			updatedAt: new Date().toISOString(),
 		});
 		log.deliveryReceived(itemName, qty, unit, supplier);

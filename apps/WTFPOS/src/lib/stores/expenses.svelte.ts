@@ -7,7 +7,7 @@ import { getDb } from '$lib/db';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { browser } from '$app/environment';
 import { log } from '$lib/stores/audit.svelte';
-export { expenseCategories, validateExpense } from '$lib/stores/expenses.utils';
+export { expenseCategories, expenseCategoryGroups, getCategoryBadgeClass, getCategoryGroup, validateExpense } from '$lib/stores/expenses.utils';
 import { expenseCategories } from '$lib/stores/expenses.utils';
 
 export interface Expense {
@@ -19,6 +19,7 @@ export interface Expense {
     locationId: string;
     createdBy: string;
     createdAt: string;
+    expenseDate?: string | null;
     receiptPhoto?: string;
     updatedAt: string;
 }
@@ -45,7 +46,7 @@ function validateExpense(category: string, amount: number, description: string, 
     return null;
 }
 
-export async function addExpense(category: string, amount: number, description: string, paidBy: string, receiptPhoto?: string): Promise<{ success: boolean; error?: string; id?: string }> {
+export async function addExpense(category: string, amount: number, description: string, paidBy: string, receiptPhoto?: string, expenseDate?: string): Promise<{ success: boolean; error?: string; id?: string }> {
     console.log('[EXPENSE_DEBUG] addExpense called:', { category, amount, description, paidBy, receiptPhoto });
     
     if (!browser) {
@@ -81,6 +82,7 @@ export async function addExpense(category: string, amount: number, description: 
         createdBy: session.userName || 'Staff',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        ...(expenseDate && { expenseDate }),
         ...(receiptPhoto && { receiptPhoto })
     };
     
@@ -100,7 +102,7 @@ export async function addExpense(category: string, amount: number, description: 
     }
 }
 
-export async function deleteExpense(id: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteExpense(id: string, _snapshot?: unknown): Promise<{ success: boolean; error?: string }> {
     if (!browser) return { success: false, error: 'Not in browser environment' };
     if (!id || typeof id !== 'string') return { success: false, error: 'Invalid expense ID' };
     

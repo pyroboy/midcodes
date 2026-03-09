@@ -5,6 +5,9 @@
 **Roles:** POS Staff + Kitchen
 **Mode:** Multi-user (parallel agents, shared IndexedDB)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 10 issues resolved (P0: 0/3 · P1: 0/6 · P2: 0/4)
+
 ---
 
 ## A. Layout Maps
@@ -143,31 +146,31 @@ By 9pm, T1 is ready to close. The cashier taps Checkout — a smooth flow: lefto
 
 ### P0 — Fix Before Next Service
 
-| Issue | Roles Affected | Fix | Effort | Impact |
-|---|---|---|---|---|
-| Kitchen refuse alert invisible on floor plan | Staff ↔ Kitchen | Add proactive toast/banner on POS floor when kitchen refuses an item — don't require staff to tap into the table | M | High |
-| ALL DONE button scroll distance on large tickets | Kitchen | Add sticky footer bump button OR duplicate a compact "✓ Bump All" button in the ticket card header | S | High |
-| Two T1 tickets appear as separate KDS cards (package + ad-hoc items same order) | Kitchen | Merge all KDS items per `orderId` into a single ticket — group by category within | M | High |
+| Issue | Roles Affected | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| Kitchen refuse alert invisible on floor plan | Staff ↔ Kitchen | Add proactive toast/banner on POS floor when kitchen refuses an item — don't require staff to tap into the table | M | High | 🔴 OPEN |
+| ALL DONE button scroll distance on large tickets | Kitchen | Add sticky footer bump button OR duplicate a compact "✓ Bump All" button in the ticket card header | S | High | 🔴 OPEN |
+| Two T1 tickets appear as separate KDS cards (package + ad-hoc items same order) | Kitchen | Merge all KDS items per `orderId` into a single ticket — group by category within | M | High | 🔴 OPEN |
 
 ### P1 — Fix This Sprint
 
-| Issue | Roles Affected | Fix | Effort | Impact |
-|---|---|---|---|---|
-| REFILL badge contrast fails WCAG AA (amber-600 on amber-100 = 2.8:1) | Kitchen | Use `text-amber-800 bg-amber-100` + add icon | S | Med |
-| Warning timer contrast fails WCAG AA (white on #F59E0B = 2.1:1) | Kitchen | Use `text-gray-900` on warning timer badge | S | Med |
-| WEIGHING state has no elapsed time indicator | Staff + Kitchen | Add age badge to WEIGHING items (e.g., "WEIGHING 2m") matching urgency color system | S | Med |
-| Leftover penalty modal appears without context before checkout | Staff | Add a single line of context above the numpad: "Any uneaten meat will be charged at ₱50/100g" | S | Med |
-| Refill and Add Item buttons equal visual weight on AYCE tables | Staff | Make Refill button primary (orange) and Add Item secondary (outlined) for AYCE orders | S | High |
-| SIDE REQUESTS items have no refuse option on KDS | Kitchen | Add refuse button to sides — consistent with meats and dishes | M | Med |
+| Issue | Roles Affected | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| REFILL badge contrast fails WCAG AA (amber-600 on amber-100 = 2.8:1) | Kitchen | Use `text-amber-800 bg-amber-100` + add icon | S | Med | 🔴 OPEN |
+| Warning timer contrast fails WCAG AA (white on #F59E0B = 2.1:1) | Kitchen | Use `text-gray-900` on warning timer badge | S | Med | 🔴 OPEN |
+| WEIGHING state has no elapsed time indicator | Staff + Kitchen | Add age badge to WEIGHING items (e.g., "WEIGHING 2m") matching urgency color system | S | Med | 🔴 OPEN |
+| Leftover penalty modal appears without context before checkout | Staff | Add a single line of context above the numpad: "Any uneaten meat will be charged at ₱50/100g" | S | Med | 🔴 OPEN |
+| Refill and Add Item buttons equal visual weight on AYCE tables | Staff | Make Refill button primary (orange) and Add Item secondary (outlined) for AYCE orders | S | High | 🔴 OPEN |
+| SIDE REQUESTS items have no refuse option on KDS | Kitchen | Add refuse button to sides — consistent with meats and dishes | M | Med | 🔴 OPEN |
 
 ### P2 — Backlog
 
-| Issue | Roles Affected | Fix | Effort | Impact |
-|---|---|---|---|---|
-| Third+ KDS tickets fall off 1024px screen | Kitchen | Reduce ticket min-width from 320px to 260px to fit 3 columns | S | Med |
-| Takeout ticket label clarity on KDS | Kitchen | Add "📦 TAKEOUT" icon prefix to takeout ticket headers | S | Low |
-| 9 collapsed side items on KDS — content hidden | Kitchen | Expand sides by default or show item names in collapsed state | S | Low |
-| Sold-out propagation from KDS to POS add-item modal | Staff ↔ Kitchen | Verify item availability toggle propagates instantly to add-item modal; add visual disabled state | M | Med |
+| Issue | Roles Affected | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| Third+ KDS tickets fall off 1024px screen | Kitchen | Reduce ticket min-width from 320px to 260px to fit 3 columns | S | Med | 🔴 OPEN |
+| Takeout ticket label clarity on KDS | Kitchen | Add "📦 TAKEOUT" icon prefix to takeout ticket headers | S | Low | 🔴 OPEN |
+| 9 collapsed side items on KDS — content hidden | Kitchen | Expand sides by default or show item names in collapsed state | S | Low | 🔴 OPEN |
+| Sold-out propagation from KDS to POS add-item modal | Staff ↔ Kitchen | Verify item availability toggle propagates instantly to add-item modal; add visual disabled state | M | Med | 🔴 OPEN |
 
 ---
 

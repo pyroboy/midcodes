@@ -6,6 +6,9 @@
 **Date:** 2026-03-09
 **Auditor note:** playwright-cli session died between bash tool calls; audit completed by issuing each command separately and tracking state across snapshot files. All steps A1–A11 completed successfully.
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 12 issues resolved (P0: 0/1 · P1: 0/5 · P2: 0/5)
+
 ---
 
 ## Steps Completed
@@ -146,3 +149,19 @@ The sidebar correctly switches to show the clicked occupied table's running bill
 **This flow is production-ready for core POS operations (open table → add items → checkout → receipt) but has one P0 security issue that must be fixed before deployment: Staff can access financial reports via direct URL.**
 
 The POS workflow itself is solid — the auto-open of AddItemModal after pax selection, the refill panel, the pax change with PIN gate on Apply (not on open), the leftover check, and the receipt flow all work correctly and feel well-designed for restaurant service. The void reason tracking works. P1 items are genuine friction points that should be addressed in this sprint, particularly the route guard and the pax modal PIN cancel behavior.
+
+## D. Fix Status
+
+| ID | Issue | Status |
+|----|-------|--------|
+| P0-1 | Staff can access /reports/* via direct URL navigation — no route guard | 🔴 OPEN |
+| P1-1 | Start Shift overlay is required every new browser session | 🔴 OPEN |
+| P1-2 | PaxChangeModal doesn't reset pax count after PIN cancel | 🔴 OPEN |
+| P1-3 | Order sidebar context during PaxModal for a second table — split attention | 🔴 OPEN |
+| P1-4 | Order History has no search or filter (78+ orders flat list) | 🔴 OPEN |
+| P1-5 | Leftover Check modal is a surprise before checkout | 🔴 OPEN |
+| P2-1 | VOID reason text in Order History is unstyled plain text | 🔴 OPEN |
+| P2-2 | VOID orders have no View/Correct buttons | 🔴 OPEN |
+| P2-3 | History button count doesn't match current session | 🔴 OPEN |
+| P2-4 | "🧾 History" button uses emoji instead of Lucide icon | 🔴 OPEN |
+| P2-5 | Package auto-switch to Meats tab after package add — no guidance on weight items | 🔴 OPEN |

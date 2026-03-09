@@ -1,0 +1,47 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e20]
+          - generic [ref=e24]: POS
+    - generic [ref=e25]:
+      - separator [ref=e26]
+      - generic [ref=e28]: U
+      - link "Logout" [ref=e30] [cursor=pointer]:
+        - /url: /
+        - img [ref=e31]
+    - button "Toggle Sidebar" [ref=e34]
+  - main [ref=e35]:
+    - generic [ref=e36]:
+      - navigation [ref=e37]:
+        - link "🧾 All Orders" [ref=e38] [cursor=pointer]:
+          - /url: /kitchen/all-orders
+        - link "📋 Order Queue" [ref=e39] [cursor=pointer]:
+          - /url: /kitchen/orders
+        - link "⚖️ Weigh Station" [ref=e40] [cursor=pointer]:
+          - /url: /kitchen/weigh-station
+      - main [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - heading "Pending Meat" [level=2] [ref=e45]
+              - paragraph [ref=e46]: 0 items waiting
+            - generic [ref=e49]:
+              - generic [ref=e50]: ✅
+              - paragraph [ref=e51]: All clear
+          - generic [ref=e53]:
+            - generic [ref=e54]: ⚖️
+            - paragraph [ref=e55]: Select a meat order
+            - paragraph [ref=e56]: Choose from the pending list on the left
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - generic [ref=e59]:
+                - heading "Dispatched" [level=2] [ref=e60]
+                - paragraph [ref=e61]: 0 items · 0.0kg total
+              - button "Yield %" [ref=e62] [cursor=pointer]
+            - paragraph [ref=e65]: No items dispatched yet

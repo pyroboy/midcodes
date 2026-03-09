@@ -13,6 +13,12 @@
 	let showKdsHistory = $state(false);
 	let expandedItemId = $state<string | null>(null);
 
+	// ── P1-14: Un-86 confirmation state ──
+	let confirmingUnEighty6 = $state<string | null>(null);
+
+	// ── P2-06: KDS notification volume ──
+	let notificationVolume = $state(0.7);
+
 	// Refuse modal
 	let refuseTarget = $state<{ orderId: string; tableNumber: number | null; itemName: string } | null>(null);
 
@@ -99,10 +105,26 @@
 		try {
 			if (!notificationAudio) {
 				notificationAudio = new Audio('/sounds/new-order.wav');
-				notificationAudio.volume = 0.7;
 			}
+			notificationAudio.volume = notificationVolume;
 			notificationAudio.currentTime = 0;
 			notificationAudio.play().catch(() => {});
+		} catch { /* skip if audio unavailable */ }
+	}
+
+	// ── P1-11: Void beep (Web Audio API — distinct from new-order chime) ──
+	function playVoidBeep() {
+		try {
+			const ctx = new AudioContext();
+			const osc = ctx.createOscillator();
+			const gain = ctx.createGain();
+			osc.connect(gain);
+			gain.connect(ctx.destination);
+			osc.frequency.value = 880; // 880Hz — distinct from 440Hz new-order chime
+			gain.gain.value = notificationVolume * 0.5;
+			osc.start();
+			osc.stop(ctx.currentTime + 0.2);
+			osc.onended = () => ctx.close();
 		} catch { /* skip if audio unavailable */ }
 	}
 
@@ -138,6 +160,90 @@
 		return () => {
 			if (pulseTimeout) clearTimeout(pulseTimeout);
 		};
+	});
+
+	// ── P1-11 / P1-12: Void detection — cancelled items that just appeared ──
+	// voidOverlays: map of orderId → { itemName, acknowledged }
+	interface VoidOverlay { itemName: string; acknowledged: boolean; timerId: ReturnType<typeof setTimeout> | null; }
+	let voidOverlays = $state(new Map<string, VoidOverlay>());
+	// Track which (orderId+itemId) pairs we've already notified about
+	let seenCancelledKeys = $state(new Set<string>());
+	let isFirstVoidRun = true;
+
+	$effect(() => {
+		// Collect all current cancelled item keys
+		const currentCancelledKeys = new Set<string>();
+		for (const ticket of activeTickets) {
+			for (const item of ticket.items) {
+				if (item.status === 'cancelled') {
+					currentCancelledKeys.add(`${ticket.orderId}:${item.id}`);
+				}
+			}
+		}
+
+		const seen = untrack(() => seenCancelledKeys);
+
+		if (isFirstVoidRun) {
+			isFirstVoidRun = false;
+			seenCancelledKeys = new Set(currentCancelledKeys);
+			return;
+		}
+
+		const freshCancelled: Array<{ orderId: string; itemId: string; itemName: string }> = [];
+		for (const ticket of activeTickets) {
+			for (const item of ticket.items) {
+				const key = `${ticket.orderId}:${item.id}`;
+				if (item.status === 'cancelled' && !seen.has(key)) {
+					freshCancelled.push({ orderId: ticket.orderId, itemId: item.id, itemName: item.menuItemName });
+				}
+			}
+		}
+
+		if (freshCancelled.length > 0) {
+			playVoidBeep();
+			const newSeen = new Set([...seen, ...currentCancelledKeys]);
+			seenCancelledKeys = newSeen;
+
+			// Show void overlay per orderId (last cancelled item name wins if multiple)
+			const newOverlays = new Map(untrack(() => voidOverlays));
+			for (const { orderId, itemName } of freshCancelled) {
+				const existing = newOverlays.get(orderId);
+				if (existing?.timerId) clearTimeout(existing.timerId);
+				// Auto-dismiss fallback after 30s
+				const timerId = setTimeout(() => {
+					voidOverlays = new Map(
+						[...voidOverlays].filter(([k]) => k !== orderId)
+					);
+				}, 30_000);
+				newOverlays.set(orderId, { itemName, acknowledged: false, timerId });
+			}
+			voidOverlays = newOverlays;
+		} else {
+			seenCancelledKeys = new Set(currentCancelledKeys);
+		}
+	});
+
+	function acknowledgeVoid(orderId: string) {
+		const overlay = voidOverlays.get(orderId);
+		if (overlay?.timerId) clearTimeout(overlay.timerId);
+		voidOverlays = new Map([...voidOverlays].filter(([k]) => k !== orderId));
+	}
+
+	// ── P2-08: Live indicator staleness tracking ──
+	let lastUpdated = $state(Date.now());
+	let isStale = $state(false);
+
+	$effect(() => {
+		// Touch activeTickets to create dependency — update timestamp on every change
+		activeTickets.length;
+		lastUpdated = Date.now();
+	});
+
+	$effect(() => {
+		const id = setInterval(() => {
+			isStale = Date.now() - untrack(() => lastUpdated) > 60_000;
+		}, 10_000);
+		return () => clearInterval(id);
 	});
 
 	// ── Auto-print incoming tickets ──
@@ -238,46 +344,91 @@
 		const mi = menuItemsByName.get(menuItemName);
 		if (!mi) return;
 		const wasAvailable = mi.available;
-		await toggleMenuItemAvailability(mi.id);
-		if (wasAvailable) {
-			// Item just marked sold out — show undo toast
-			showToast(`${menuItemName} marked sold out — Undo`, async () => {
-				const miNow = menuItemsByName.get(menuItemName);
-				if (miNow) await toggleMenuItemAvailability(miNow.id);
-				dismissToast();
-			});
-		} else {
-			dismissToast();
+
+		if (!wasAvailable) {
+			// ── P1-14: Un-86 confirmation — show inline confirm instead of firing immediately ──
+			confirmingUnEighty6 = menuItemName;
+			return;
 		}
+
+		await toggleMenuItemAvailability(mi.id);
+		// Item just marked sold out — show undo toast
+		showToast(`${menuItemName} marked sold out — Undo`, async () => {
+			const miNow = menuItemsByName.get(menuItemName);
+			if (miNow) await toggleMenuItemAvailability(miNow.id);
+			dismissToast();
+		});
+	}
+
+	async function confirmUnEighty6(menuItemName: string) {
+		const mi = menuItemsByName.get(menuItemName);
+		if (!mi) { confirmingUnEighty6 = null; return; }
+		await toggleMenuItemAvailability(mi.id);
+		confirmingUnEighty6 = null;
+		dismissToast();
 	}
 </script>
 
 {#snippet itemActions(orderId: string, tableNumber: number | null, menuItemName: string)}
-	<div class="flex gap-2 px-4 py-2 bg-gray-50 border-t border-border/30">
-		<button
-			onclick={() => openRefuseModal(orderId, tableNumber, menuItemName)}
-			class="btn-danger px-4 text-sm"
-			style="min-height: 44px"
-		>
-			RETURN
-		</button>
-		<button
-			onclick={() => handleSoldOut(menuItemName)}
-			class={cn(
-				'px-4 text-sm font-bold rounded-lg active:scale-95 transition-all',
-				isSoldOut(menuItemName) ? 'bg-status-red text-white' : 'bg-gray-200 text-gray-600 border border-border'
-			)}
-			style="min-height: 44px"
-		>
-			{isSoldOut(menuItemName) ? 'SOLD OUT &#10005;' : 'SOLD OUT'}
-		</button>
+	<div class="flex flex-col gap-0 bg-gray-50 border-t border-border/30">
+		<div class="flex gap-2 px-4 py-2">
+			<button
+				onclick={() => openRefuseModal(orderId, tableNumber, menuItemName)}
+				class="btn-danger px-4 text-sm"
+				style="min-height: 44px"
+			>
+				RETURN
+			</button>
+			<!-- P1-13: 86 button — always visible, clear warning color when sold out ── -->
+			<button
+				onclick={() => handleSoldOut(menuItemName)}
+				class={cn(
+					'px-4 text-sm font-bold rounded-lg active:scale-95 transition-all',
+					isSoldOut(menuItemName)
+						? 'bg-status-red text-white hover:bg-red-700'
+						: 'bg-gray-100 text-gray-700 border border-border hover:text-red-600 hover:border-red-400 hover:bg-red-50'
+				)}
+				style="min-height: 44px"
+			>
+				{isSoldOut(menuItemName) ? '86 ✕ SOLD OUT' : '86 ITEM'}
+			</button>
+		</div>
+		<!-- P1-14: Un-86 inline confirmation ── -->
+		{#if confirmingUnEighty6 === menuItemName}
+			<div class="flex items-center gap-2 px-4 py-2 bg-amber-50 border-t border-amber-200">
+				<span class="flex-1 text-sm font-semibold text-amber-800">Restore {menuItemName} to menu?</span>
+				<button
+					onclick={() => { confirmingUnEighty6 = null; }}
+					class="px-3 text-sm font-bold rounded-lg bg-white border border-border text-gray-600 hover:bg-gray-50 active:scale-95 transition-all"
+					style="min-height: 44px"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={() => confirmUnEighty6(menuItemName)}
+					class="px-3 text-sm font-bold rounded-lg bg-status-green text-white hover:bg-emerald-600 active:scale-95 transition-all"
+					style="min-height: 44px"
+				>
+					Restore
+				</button>
+			</div>
+		{/if}
 	</div>
 {/snippet}
 
-<!-- ── Live Indicator (fixed top-right) ── -->
-<div class="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border border-status-green/30 bg-white px-3 py-1.5 shadow-sm">
-	<span class="h-2 w-2 rounded-full bg-status-green animate-pulse"></span>
-	<span class="text-xs font-semibold text-status-green">Live</span>
+<!-- ── Live Indicator (fixed top-right) — P2-08: dims when stale >60s ── -->
+<div class={cn(
+	'fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm bg-white',
+	isStale ? 'border-status-yellow/40' : 'border-status-green/30'
+)}>
+	<span class={cn(
+		'h-2 w-2 rounded-full',
+		isStale ? 'bg-status-yellow' : 'bg-status-green animate-pulse'
+	)}></span>
+	<span class={cn(
+		'text-xs font-semibold',
+		isStale ? 'text-status-yellow' : 'text-status-green'
+	)}>{isStale ? '~ Stale' : 'Live'}</span>
 </div>
 
 <!-- ── Header ── -->
@@ -286,10 +437,25 @@
 		<div class="flex items-center gap-3">
 			<div>
 				<h1 class="text-xl font-bold text-gray-900 no-select">Kitchen Queue</h1>
-				<p class="text-xs text-gray-400 mt-0.5">Active tickets awaiting kitchen action</p>
+				<p class="text-sm text-gray-500 mt-0.5"><span class="font-bold">{queueOrders}</span> active · <span class="font-bold">{totalItems}</span> items</p>
 			</div>
 		</div>
 		<div class="flex items-center gap-3">
+			<!-- P2-06: Volume slider — 44px touch wrapper ── -->
+			<div class="flex items-center gap-2 min-h-[44px] px-3 py-1 rounded-lg border border-border bg-white">
+				<span class="text-xs font-semibold text-gray-500 shrink-0">&#128266;</span>
+				<div class="min-h-[44px] flex items-center w-20">
+					<input
+						type="range"
+						min="0"
+						max="1"
+						step="0.1"
+						bind:value={notificationVolume}
+						class="w-full cursor-pointer accent-accent"
+						aria-label="KDS notification volume"
+					/>
+				</div>
+			</div>
 			<button
 				onclick={() => recallLastTicket()}
 				disabled={kdsTicketHistory.value.length === 0}
@@ -404,15 +570,40 @@
 					></div>
 				</div>
 
+				<!-- P1-12: Void overlay — shown when a voided item arrives on this ticket ── -->
+				{#if voidOverlays.has(ticket.orderId)}
+					{@const overlay = voidOverlays.get(ticket.orderId)!}
+					<div class="flex items-center gap-3 px-4 py-3 bg-status-red text-white">
+						<span class="text-lg font-black shrink-0">&#9888;</span>
+						<span class="flex-1 text-sm font-bold">VOIDED: {overlay.itemName}</span>
+						<button
+							onclick={() => acknowledgeVoid(ticket.orderId)}
+							class="shrink-0 rounded-lg bg-white text-status-red font-black text-sm px-4 active:scale-95 transition-all"
+							style="min-height: 44px"
+						>
+							&#10003; Got it
+						</button>
+					</div>
+				{/if}
+
 				<!-- Items -->
 				<div class="flex flex-col gap-0 divide-y divide-border flex-1">
 					<!-- MEATS -->
 					{#if grouped.meats.length > 0}
+						{@const pendingRefillCount = grouped.meats.filter(i => i.notes === REFILL_NOTE && !i.weight && i.status !== 'served').length}
 						<div class="py-2">
 							<div class="flex items-center justify-between px-4 py-1.5">
-								<span class="text-xs font-bold uppercase tracking-wider text-red-800">
-									&#129385; MEATS
-								</span>
+								<div class="flex items-center gap-2">
+									<span class="text-xs font-bold uppercase tracking-wider text-red-800">
+										&#129385; MEATS
+									</span>
+									<!-- P2-07: Refill count pill ── -->
+									{#if pendingRefillCount > 0}
+										<span class="rounded-full bg-accent text-white text-xs font-black px-2 py-0.5">
+											&#8635; {pendingRefillCount} refill{pendingRefillCount > 1 ? 's' : ''}
+										</span>
+									{/if}
+								</div>
 								<span class="text-xs font-mono font-bold text-red-700">
 									{grouped.meats.filter(i => i.status !== 'served').reduce((s: number, i) => s + (i.weight ?? 0), 0)}g
 								</span>

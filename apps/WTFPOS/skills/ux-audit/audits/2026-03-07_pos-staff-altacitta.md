@@ -8,6 +8,9 @@
 **Viewport:** 1024 x 768 (tablet landscape)
 **States captured:** Initial (no selection), Pax modal, Active order + AddItemModal
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 3 of 9 issues resolved (P0: 2/2 · P1: 0/4 · P2: 1/3)
+
 ---
 
 ## A. Text Layout Map
@@ -106,17 +109,17 @@ It's Friday night at Alta Citta, 7:15 PM. Maria has been on shift since 5 PM and
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | "Access: View Only" displayed for staff who clearly HAVE write access -- creates confusion and hesitation | Fix the access label in LocationBanner to accurately reflect staff permissions (e.g., "Access: Cashier" or remove entirely for staff role) | S | High |
-| **P0** | `[Void]`, `[Checkout]`, `[Print]` buttons enabled on empty order (0 items, P0.00) -- invites accidental taps during rush | Disable these buttons when order has 0 items. Only enable when there's at least 1 item on the bill. | S | High |
-| **P1** | No selected-table indicator on floor SVG when order sidebar / modal is open -- staff loses spatial context | Add a visible highlight (ring, glow, or pulsing border) on the active table in the SVG when it's selected | S | High |
-| **P1** | LocationBanner consumes ~70px vertical space (4 lines) on a 768px viewport -- 9% of screen for context that could be 1 line | Compress to single line: `[MapPin icon] Alta Citta . Staff` with optional expand. Save 40-50px of vertical space for the floor plan. | M | Med |
-| **P1** | 6-item color legend always visible -- adds visual density without proportional value (staff learns colors on day 1) | Collapse legend into an `[i]` icon button that reveals on tap. Or move to a dismissable tooltip on first visit. | S | Med |
-| **P1** | `[-> Mark Ready]` action buttons on takeout orders visible to staff on POS floor -- this is a kitchen concern, not cashier | Hide `[-> Mark Ready]` from staff role on the POS page. Show status ("PREP") read-only instead. Or: move takeout management to a separate sub-view. | M | Med |
-| **P2** | `[More Options]` button orphaned on separate row from `[Void] [Checkout] [Print]` -- breaks button group proximity | Merge into the action row as a `[...]` overflow button, or make it a dropdown attached to the button group | S | Low |
-| **P2** | Pax picker shows 1-12 as a flat grid -- no visual hint of common pax counts | Highlight common pax counts (2, 4, 6) with slightly different styling or "common" label. Most tables are groups of 2 or 4. | S | Low |
-| **P2** | No visible scroll indicator on takeout orders list -- 4 items may extend below fold at 768px height | Add a fade gradient at bottom edge or "scroll for more" indicator if list overflows viewport | S | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | "Access: View Only" displayed for staff who clearly HAVE write access -- creates confusion and hesitation | Fix the access label in LocationBanner to accurately reflect staff permissions (e.g., "Access: Cashier" or remove entirely for staff role) | S | High | 🟢 FIXED |
+| **P0** | `[Void]`, `[Checkout]`, `[Print]` buttons enabled on empty order (0 items, P0.00) -- invites accidental taps during rush | Disable these buttons when order has 0 items. Only enable when there's at least 1 item on the bill. | S | High | 🟢 FIXED |
+| **P1** | No selected-table indicator on floor SVG when order sidebar / modal is open -- staff loses spatial context | Add a visible highlight (ring, glow, or pulsing border) on the active table in the SVG when it's selected | S | High | 🔴 OPEN |
+| **P1** | LocationBanner consumes ~70px vertical space (4 lines) on a 768px viewport -- 9% of screen for context that could be 1 line | Compress to single line: `[MapPin icon] Alta Citta . Staff` with optional expand. Save 40-50px of vertical space for the floor plan. | M | Med | 🔴 OPEN |
+| **P1** | 6-item color legend always visible -- adds visual density without proportional value (staff learns colors on day 1) | Collapse legend into an `[i]` icon button that reveals on tap. Or move to a dismissable tooltip on first visit. | S | Med | 🔴 OPEN |
+| **P1** | `[-> Mark Ready]` action buttons on takeout orders visible to staff on POS floor -- this is a kitchen concern, not cashier | Hide `[-> Mark Ready]` from staff role on the POS page. Show status ("PREP") read-only instead. Or: move takeout management to a separate sub-view. | M | Med | 🔴 OPEN |
+| **P2** | `[More Options]` button orphaned on separate row from `[Void] [Checkout] [Print]` -- breaks button group proximity | Merge into the action row as a `[...]` overflow button, or make it a dropdown attached to the button group | S | Low | 🟢 FIXED |
+| **P2** | Pax picker shows 1-12 as a flat grid -- no visual hint of common pax counts | Highlight common pax counts (2, 4, 6) with slightly different styling or "common" label. Most tables are groups of 2 or 4. | S | Low | 🔴 OPEN |
+| **P2** | No visible scroll indicator on takeout orders list -- 4 items may extend below fold at 768px height | Add a fade gradient at bottom edge or "scroll for more" indicator if list overflows viewport | S | Low | 🔴 OPEN |
 
 ---
 

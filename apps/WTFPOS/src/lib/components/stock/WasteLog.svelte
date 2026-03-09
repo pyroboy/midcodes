@@ -113,9 +113,18 @@
 		showModal = true;
 	}
 
+	// Elevated roles (manager, owner, admin) skip the PIN gate — their role is already the authorization
+	const isElevatedRole = $derived(
+		session.role === 'manager' || session.role === 'owner' || session.role === 'admin'
+	);
+
 	function handleLog() {
 		if (!canSave) return;
-		showPinModal = true;
+		if (isElevatedRole) {
+			handlePinConfirmed();
+		} else {
+			showPinModal = true;
+		}
 	}
 
 	async function handlePinConfirmed() {

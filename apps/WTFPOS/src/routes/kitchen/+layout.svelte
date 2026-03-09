@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SubNav from '$lib/components/SubNav.svelte';
+	import BluetoothScaleStatus from '$lib/components/BluetoothScaleStatus.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { startKitchenPush } from '$lib/stores/kitchen-push';
 	import { goto } from '$app/navigation';
@@ -34,7 +35,14 @@
 </script>
 
 <div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
-	<SubNav {links} />
+	<div class="flex items-center border-b border-border bg-surface">
+		<div class="flex-1">
+			<SubNav {links} />
+		</div>
+		<div class="pr-3">
+			<BluetoothScaleStatus />
+		</div>
+	</div>
 	<main class="flex-1 overflow-y-auto p-6">
 		{@render children()}
 	</main>

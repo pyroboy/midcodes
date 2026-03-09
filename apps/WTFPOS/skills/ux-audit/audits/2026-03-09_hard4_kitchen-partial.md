@@ -5,6 +5,9 @@
 **Date:** 2026-03-09
 **Session notes:** playwright-cli sessions were ephemeral (in-memory, headless); browser crashed repeatedly between steps. Each step required re-login. This in itself is a non-UX infra note but impacted audit continuity.
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 9 issues resolved (P1: 0/3 · P2: 0/4 · P3: 0/2)
+
 ---
 
 ## Steps Completed
@@ -62,6 +65,20 @@
 - **[P3] Delivery form: unclear if search box actually filters** — The delivery form has a "Search items..." textbox above the item dropdown, but it's not obvious whether typing in the search box filters the dropdown options in real-time. If the search box is just decorative, it's dead weight. If it does filter, the connection should be more explicit (e.g., options reduce visually as you type).
 
 - **[P3] Waste Breakdown percentages all showing "1%"** — All three waste reasons show "(1%)" in the breakdown legend, suggesting the data is either incomplete or the percentage calculation is off. If items are at exactly 1% each, the chart should still proportionally reflect relative sizes.
+
+## E. Fix Status
+
+| ID | Issue | Status |
+|----|-------|--------|
+| P1 | No bump undo toast / feedback after UNDO LAST | 🔴 OPEN |
+| P1 | Items show as pre-checked (green) after undo | 🔴 OPEN |
+| P1 | Item name truncation on ticket cards ("Sam...") | 🔴 OPEN |
+| P2 | Weigh Station: no Bluetooth scale UI or pairing button | 🔴 OPEN |
+| P2 | RETURN vs SOLD OUT naming ambiguity — should be REFUSE | 🔴 OPEN |
+| P2 | Waste Log item picker lacks search (plain 93-item dropdown) | 🔴 OPEN |
+| P2 | Waste Breakdown chart is too small to be useful | 🔴 OPEN |
+| P3 | "Transfer from wh-tag" supplier chip conflates delivery with transfer | 🔴 OPEN |
+| P3 | Delivery form: search box relationship to dropdown unclear | 🔴 OPEN |
 
 ---
 

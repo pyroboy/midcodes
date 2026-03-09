@@ -6,6 +6,9 @@
 **Intensity:** Extreme (13 scenarios)
 **Session mode:** Multi-agent, shared browser origin (localhost:5173)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 15 issues resolved (P0: 0/3 · P1: 0/6 · P2: 0/6)
+
 ---
 
 ## A. Layout Maps
@@ -601,3 +604,23 @@ The system has three categories of issues that require attention before a busy s
 3. **Rapid multi-table opening friction** ([P1-2]) will cause frustration during peak hours when a group of parties arrives simultaneously. The auto-AddItemModal pattern is great for single-table flow but actively impedes concurrent table setup.
 
 Fix P0-1 (touch targets) before deployment. Fix P1-1 and P1-2 this sprint.
+
+---
+
+## H. Fix Status
+
+- **P0-1** · Remove-item ✕ button 20px (OrderSidebar), ±qty buttons 28px (AddItemModal), discount toggles 32px (CheckoutModal) → 🔴 OPEN
+- **P0-2** · `wtfpos_session` in localStorage causes session clobber across tabs → 🔴 OPEN
+- **P0-3** · PaxModal max pax = 12 with no custom input for larger groups → 🔴 OPEN
+- **P1-1** · "Transfer · Pax · Split · Merge" toggle label is undiscoverable → 🔴 OPEN
+- **P1-2** · Auto-open AddItemModal breaks rapid multi-table creation flow → 🔴 OPEN
+- **P1-3** · Kitchen rejection only alerted inside the selected-table sidebar → 🔴 OPEN
+- **P1-4** · Shift Start Modal doesn't reassure staff about active orders behind it → 🔴 OPEN
+- **P1-5** · Takeout label is time-based (non-sequential) → 🔴 OPEN
+- **P1-6** · "History 66" badge count misleads on fresh shift → 🔴 OPEN
+- **P2-1** · LeftoverPenaltyModal is surprising for new staff with no pre-warning → 🔴 OPEN
+- **P2-2** · "Repeat Last" truncates for complex multi-meat orders → 🔴 OPEN
+- **P2-3** · "Cancel Table" shows no affordance for 2-step confirmation → 🔴 OPEN
+- **P2-4** · `text-gray-400` hint text contrast fails WCAG AA → 🔴 OPEN
+- **P2-5** · Status badge text is 9–10px (SENT/SERVING/etc.) → 🔴 OPEN
+- **P2-6** · Merge has no preview of combined bill before confirming → 🔴 OPEN

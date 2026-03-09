@@ -7,6 +7,9 @@
 **Scenario:** Friday dinner rush — overseeing floor, running X-read mid-service
 **Session method:** LocalStorage injection (`wtfpos_session`) — normal login PIN flow unreliable (see Finding M-P0-1)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 2 of 13 issues resolved (P0: 0/2 · P1: 2/7 · P2: 0/4)
+
 ---
 
 ## A. Floor Plan Layout Map
@@ -317,3 +320,21 @@ The Reports section shows a multi-group tab navigation with 5 groups: Operations
 | P2 | 4 | Clock hidden in collapsed sidebar; History count shows all-time; Alert badge 9px font; Inconsistent X-Read attribution |
 
 **Overall:** The floor plan's at-a-glance status (colored cards, animated badges, header occ/free count, location banner) provides a capable manager oversight experience. The X-Read page loads instantly and surfaces the right financial summary for mid-service checks. The critical gaps are: the manager authentication bug (P0), the AYCE countdown absence (P1), and the Maya/VAT omission from X-Read (P1, BIR compliance risk). The sidebar Quick Actions for manager are a strong UX advantage — 1-tap access to X-Read from anywhere in the app is excellent.
+
+---
+
+## E. Fix Status
+
+- **M-P0-1** · Manager login PIN flow does not persist session → 🔴 OPEN
+- **M-P0-2** · Floor plan SVG table tap intercepted by sidebar quick actions → 🔴 OPEN
+- **M-P1-1** · No AYCE time remaining countdown on table cards → 🔴 OPEN
+- **M-P1-2** · No floor-level summary for unserved items across tables → 🔴 OPEN
+- **M-P1-3** · Quick Actions icon-only in collapsed sidebar (unlabeled) → 🔴 OPEN
+- **M-P1-4** · LocationBanner hidden from Staff and Kitchen roles → 🔴 OPEN
+- **M-P1-5** · "Change Location" button available mid-service with no confirmation → 🔴 OPEN
+- **M-P1-6** · X-Read generation has no confirmation before writing → 🟢 FIXED (Manager PIN gate + modal confirmation added)
+- **M-P1-7** · X-Read page missing Maya payment and VAT breakdown → 🟢 FIXED (Maya payment method now tracked in X-Read)
+- **M-P2-1** · Sidebar clock hidden in collapsed mode → 🔴 OPEN
+- **M-P2-2** · History badge shows all-time order count → 🔴 OPEN
+- **M-P2-3** · Rejection alert badge uses 9px font (below WCAG minimum) → 🔴 OPEN
+- **M-P2-4** · X-Read attribution format inconsistent (role vs. user name) → 🔴 OPEN

@@ -1,0 +1,66 @@
+- generic [ref=e2]:
+  - generic [ref=e110]:
+    - generic [ref=e114]:
+      - button "Toggle sidebar" [ref=e117] [cursor=pointer]:
+        - generic [ref=e118]: W!
+      - separator [ref=e119]
+      - list [ref=e123]:
+        - listitem [ref=e124]:
+          - link "Kitchen" [ref=e125] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e127]
+            - generic [ref=e128]: Kitchen
+        - listitem [ref=e129]:
+          - link "Stock" [ref=e130] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e132]
+            - generic [ref=e133]: Stock
+      - generic [ref=e134]:
+        - separator [ref=e135]
+        - generic [ref=e137]: P
+        - link "Logout" [ref=e139] [cursor=pointer]:
+          - /url: /
+          - img [ref=e140]
+      - button "Toggle Sidebar" [ref=e141]
+    - main [ref=e142]:
+      - generic [ref=e144]:
+        - img [ref=e145]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e146]
+      - generic [ref=e147]:
+        - navigation [ref=e148]:
+          - link "🧾 All Orders" [ref=e149] [cursor=pointer]:
+            - /url: /kitchen/all-orders
+          - link "📋 Order Queue" [ref=e150] [cursor=pointer]:
+            - /url: /kitchen/orders
+          - link "⚖️ Weigh Station" [ref=e151] [cursor=pointer]:
+            - /url: /kitchen/weigh-station
+        - main [ref=e152]:
+          - generic [ref=e155]: Live
+          - generic [ref=e157]:
+            - generic [ref=e159]:
+              - heading "Kitchen Queue" [level=1] [ref=e160]
+              - paragraph [ref=e161]: Active tickets awaiting kitchen action
+            - generic [ref=e162]:
+              - generic [ref=e163]:
+                - generic "Alert volume" [ref=e164]: 🔊
+                - slider "Alert volume" [ref=e165] [cursor=pointer]: "0.7"
+              - button "↩ UNDO LAST" [ref=e166] [cursor=pointer]
+              - button "History 58" [ref=e167] [cursor=pointer]:
+                - text: History
+                - generic [ref=e168]: "58"
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]: ✅
+              - paragraph [ref=e172]: No pending orders
+              - paragraph [ref=e173]: New orders will appear here automatically
+            - generic [ref=e174]:
+              - generic [ref=e175]:
+                - generic [ref=e176]: "58"
+                - generic [ref=e177]: Served Today
+              - generic [ref=e178]:
+                - generic [ref=e179]: 20m
+                - generic [ref=e180]: Avg Service
+              - generic [ref=e181]:
+                - generic [ref=e182]: just now
+                - generic [ref=e183]: Last Completed
+  - generic [ref=e109]: WTF! Samgyup POS

@@ -28,6 +28,7 @@
     import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
+    import { browser } from '$app/environment';
 
     let showLegend = $state(false);
 
@@ -35,6 +36,34 @@
     onMount(() => {
         if (session.role === 'kitchen') {
             goto('/kitchen/orders');
+        }
+    });
+
+    // P1-03: Track shift-started state in localStorage to skip modal on refresh
+    // Key is per-location so switching branches re-checks independently.
+    function shiftLocalKey(): string {
+        return `wtfpos_shift_started_${session.locationId}`;
+    }
+
+    function markShiftStartedLocally() {
+        if (browser) localStorage.setItem(shiftLocalKey(), '1');
+    }
+
+    function clearShiftStartedLocally() {
+        if (browser) localStorage.removeItem(shiftLocalKey());
+    }
+
+    // Returns true if either RxDB has an active shift OR localStorage says we've already started
+    const shiftStarted = $derived(
+        !isWarehouseSession() &&
+        session.locationId !== 'all' &&
+        (!!getActiveShift() || (browser ? !!localStorage.getItem(shiftLocalKey()) : false))
+    );
+
+    // Sync localStorage whenever a real shift becomes active (written by openShift())
+    $effect(() => {
+        if (getActiveShift()) {
+            markShiftStartedLocally();
         }
     });
 
@@ -61,6 +90,10 @@
     // ─── Selected Order (dine-in or takeout) ──────────────────────────────────
     let selectedTableId    = $state<string | null>(null);
     let selectedTakeoutId  = $state<string | null>(null);
+
+    // P1-20: Ghost-occupied table recovery prompt state
+    let ghostTableId = $state<string | null>(null);
+    const ghostTable = $derived(ghostTableId ? (tables.find(t => t.id === ghostTableId) ?? null) : null);
 
     const selectedTable = $derived(selectedTableId ? (tables.find((t) => t.id === selectedTableId) ?? null) : null);
 
@@ -165,8 +198,33 @@
         if (table.status === 'available') {
             paxModalTable = table;
         } else {
+            // P1-20: Detect ghost-occupied table (occupied status but empty order)
+            const order = table.currentOrderId
+                ? allOrders.value.find(o => o.id === table.currentOrderId)
+                : undefined;
+            const activeItems = order?.items.filter(i => i.status !== 'cancelled') ?? [];
+            if (!order || activeItems.length === 0) {
+                ghostTableId = table.id;
+                return;
+            }
             selectedTableId = table.id;
             showAddItem = false;
+        }
+    }
+
+    // P1-20: Close and free the ghost-occupied table
+    async function handleFreeGhostTable() {
+        const tbl = ghostTable;
+        if (!tbl) return;
+        ghostTableId = null;
+        // Void empty order if present, then close table
+        const order = tbl.currentOrderId
+            ? allOrders.value.find(o => o.id === tbl.currentOrderId)
+            : undefined;
+        if (order) {
+            await voidOrder(order.id, 'mistake');
+        } else {
+            await closeTable(tbl.id);
         }
     }
 
@@ -304,7 +362,8 @@
     {#if session.locationId === 'all'}
         <AllBranchesDashboard allTables={allTables.value} allOrders={allOrders.value} />
     {:else}
-        <div class="flex flex-1 overflow-hidden">
+        <!-- P2-02: inert disables all interaction (clicks, focus, keyboard) on the floor when shift modal is blocking -->
+        <div class="flex flex-1 overflow-hidden" inert={(!isWarehouseSession() && !shiftStarted) ? true : undefined}>
             <div class="flex flex-1 flex-col overflow-hidden min-h-0 p-6 gap-5">
                 <!-- Header -->
                 <div class="flex items-center justify-between shrink-0">
@@ -588,6 +647,32 @@
     />
 {/if}
 
-{#if !isWarehouseSession() && session.locationId !== 'all' && !getActiveShift()}
-    <ShiftStartModal />
+{#if !isWarehouseSession() && session.locationId !== 'all' && !shiftStarted}
+    <!-- P2-02: floor plan is already blocked by this overlay — pointer-events handled by fixed overlay z-order -->
+    <ShiftStartModal onSkip={markShiftStartedLocally} />
+{/if}
+
+<!-- P1-20: Ghost-occupied table recovery prompt -->
+{#if ghostTable}
+    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="pos-card w-[340px] flex flex-col gap-4 p-6">
+            <div class="flex flex-col gap-1">
+                <h3 class="font-bold text-gray-900">Empty Order Detected</h3>
+                <p class="text-sm text-gray-500">
+                    <strong>{ghostTable.label}</strong> shows as occupied but has no items on its bill.
+                    Free this table to make it available for new guests.
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button
+                    class="btn-ghost flex-1"
+                    onclick={() => ghostTableId = null}
+                >Cancel</button>
+                <button
+                    class="btn-danger flex-1"
+                    onclick={handleFreeGhostTable}
+                >Close &amp; Free Table</button>
+            </div>
+        </div>
+    </div>
 {/if}

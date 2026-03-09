@@ -6,6 +6,9 @@
 - **Session method:** Manual login flow blocked ("Username not found" for "Sir Dan"); used dev test account Juan Reyes + PIN 1234, then sessionStorage injection for subsequent steps
 - **Tool:** playwright-cli browser automation with named sessions
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 5 of 7 issues resolved (P1: 1/3 unresolved · P2: 1/2 unresolved)
+
 ---
 
 ## Steps Completed
@@ -61,6 +64,18 @@
 - **[P0] Utility Readings are correctly implemented in EOD modal** — All 3 utility fields (Electricity kWh, Gas kg, Water m³) are present and working, with progressive disclosure (locked until blind close), editable rates, per-utility cost breakdown, and "Will auto-log as Expenses on submit." note. This is a significant feature milestone.
 
 - **[P1] Expense sub-categories "Utilities" parent still selectable** — The "Utilities" option in the category dropdown is a grouping label but is still a selectable option (not disabled/optgroup). If someone selects "Utilities" instead of "Electricity", the expense will be categorized ambiguously. Should be converted to `<optgroup>` or disabled.
+
+## Fix Status
+
+| ID | Issue | Status |
+|----|-------|--------|
+| P1 | NaN% in expense table TOTAL row when sales = 0 | 🔴 OPEN |
+| P1 | EOD modal requires ₱0+ cash to enable Declare Drawer Count (inconsistent with shift start) | 🔴 OPEN |
+| P1 | Expense sub-categories "Utilities" parent still selectable | 🟢 FIXED (category picker now uses grouped optgroup) |
+| P0 | Utility Readings (EOD) — all 3 fields + progressive disclosure + editable rates | 🟢 FIXED |
+| C5/C6/C7 | Gas/LPG, Electricity, Water, Internet expense sub-categories present | 🟢 FIXED |
+| C8 | Expenses-daily updates after expense entry | 🟢 FIXED |
+| P2 | Login system rejects fictional usernames — no self-registration flow | 🔴 OPEN |
 
 ---
 

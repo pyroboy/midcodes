@@ -7,6 +7,9 @@
 **Viewport:** 1024×768 tablet (all agents)
 **Scenario theme:** Mid-service rush with simultaneous food delivery, water gallon expense, lettuce running out, manager checking reports with branch clarity
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 29 issues resolved (P0: 0/4 · P1: 0/15 · P2: 0/10)
+
 ## Roles
 
 | Agent | Role | Primary pages audited |
@@ -433,3 +436,51 @@ After kitchen marks an item sold out, the toast should read: "Lettuce marked sol
 ## Overall Recommendation
 
 This multi-user flow is **not ready for an unsupervised peak-hour service shift** — P0-3 (void is silent to KDS) and P0-2 (kitchen cannot 86 items) will cause incorrect orders and wasted food prep on every busy evening; P0-1 (All Locations X-Read) is a BIR compliance timebomb that must be closed before the next EOD. The core architecture is sound — RxDB reactive data flow is fast and reliable, the floor plan UX is genuinely efficient, and the reports section is well-organized. Fix the 4 P0s and the 3 high-impact P1 cross-role issues (refill separation, sent-to-kitchen toast, manager sidebar alerts) and this system is defensible for a real Friday night service.
+
+---
+
+## I. Fix Status
+
+### P0
+
+| Code | Issue | Status |
+|---|---|---|
+| P0-1 | Owner · Generate X-Read for All Locations creates invalid BIR record | 🔴 OPEN |
+| P0-2 | Cross-role · Kitchen cannot 86/flag sold-out items | 🔴 OPEN |
+| P0-3 | Cross-role · Void is silent to KDS — item disappears without notification | 🔴 OPEN |
+| P0-4 | Staff · Checkout flow blocked when thermal printer fails | 🔴 OPEN |
+
+### P1
+
+| Code | Issue | Status |
+|---|---|---|
+| P1-1 | Staff · No "sent to kitchen" feedback after order is charged | 🔴 OPEN |
+| P1-2 | Staff · "Void" in sidebar footer voids entire order — label ambiguous | 🔴 OPEN |
+| P1-3 | Kitchen · Refill requests not visually separated from cook-order tickets | 🔴 OPEN |
+| P1-4 | Staff · CheckoutModal ✕ button has `min-height: unset` — below 44px | 🔴 OPEN |
+| P1-5 | Staff · CheckoutModal discount buttons are 32px — below 44px | 🔴 OPEN |
+| P1-6 | Kitchen · Quick Bump button is 32px — below 44px | 🔴 OPEN |
+| P1-7 | Kitchen · Refuse modal ✕ has `min-height: unset` | 🔴 OPEN |
+| P1-8 | Manager · No form draft persistence — delivery/waste form lost on navigation | 🔴 OPEN |
+| P1-9 | Manager · "Log Expense" Quick Action goes to wrong page | 🔴 OPEN |
+| P1-10 | Manager · Sidebar shows no urgency signals | 🔴 OPEN |
+| P1-11 | Kitchen · No ticket count summary in KDS header | 🔴 OPEN |
+| P1-12 | Manager · Item dropdowns in delivery and waste forms have 80+ items with no typeahead | 🔴 OPEN |
+| P1-13 | Owner · X-Read history entries show no branch label | 🔴 OPEN |
+| P1-14 | Owner · Branch Comparison defaults to "Today" (shows ₱0.00 before EOD) | 🔴 OPEN |
+| P1-15 | Staff · No refill badge on floor plan tiles during refill surge | 🔴 OPEN |
+
+### P2
+
+| Code | Issue | Status |
+|---|---|---|
+| P2-1 | Owner · No branch name embedded in report data content (print gap) | 🔴 OPEN |
+| P2-2 | Kitchen · New ticket pulse expires after 3 seconds | 🔴 OPEN |
+| P2-3 | Owner · Owner defaults to "All Locations" on every login | 🔴 OPEN |
+| P2-4 | Staff · PaxModal shows all 12 pax buttons even when table capacity is 4 | 🔴 OPEN |
+| P2-5 | Kitchen · No volume control for new-order audio | 🔴 OPEN |
+| P2-6 | Staff · History badge count not shift-scoped | 🔴 OPEN |
+| P2-7 | Manager · Delivery form has no confirmation step and no success toast | 🔴 OPEN |
+| P2-8 | Manager · Batch/expiry fields not nudged in delivery form | 🔴 OPEN |
+| P2-9 | Staff · "More ▼" in OrderSidebar is not discoverable | 🔴 OPEN |
+| P2-10 | Kitchen · "SOLD OUT" toast doesn't confirm staff impact | 🔴 OPEN |

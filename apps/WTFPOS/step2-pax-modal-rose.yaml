@@ -1,0 +1,93 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e20]
+            - generic [ref=e24]: POS
+      - generic [ref=e25]:
+        - separator [ref=e26]
+        - generic [ref=e28]: A
+        - link "Logout" [ref=e30] [cursor=pointer]:
+          - /url: /
+          - img [ref=e31]
+      - button "Toggle Sidebar" [ref=e34]
+    - main [ref=e35]:
+      - generic [ref=e37]:
+        - img [ref=e38]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e39]
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - button "Toggle Sidebar" [ref=e45] [cursor=pointer]:
+                - img
+                - generic [ref=e46]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e47]
+              - generic [ref=e48]: 0 occ
+              - generic [ref=e49]: 8 free
+            - generic [ref=e50]:
+              - button "Toggle color legend" [ref=e52] [cursor=pointer]:
+                - img [ref=e53]
+              - button "📦 New Takeout" [ref=e54] [cursor=pointer]
+              - button "🧾 History" [ref=e55] [cursor=pointer]
+          - img [ref=e57]:
+            - button "Table T1" [active] [ref=e60] [cursor=pointer]:
+              - generic: T1
+              - generic: cap 4
+            - button "Table T2" [ref=e62] [cursor=pointer]:
+              - generic: T2
+              - generic: cap 4
+            - button "Table T3" [ref=e64] [cursor=pointer]:
+              - generic: T3
+              - generic: cap 4
+            - button "Table T4" [ref=e66] [cursor=pointer]:
+              - generic: T4
+              - generic: cap 4
+            - button "Table T5" [ref=e68] [cursor=pointer]:
+              - generic: T5
+              - generic: cap 4
+            - button "Table T6" [ref=e70] [cursor=pointer]:
+              - generic: T6
+              - generic: cap 4
+            - button "Table T7" [ref=e72] [cursor=pointer]:
+              - generic: T7
+              - generic: cap 2
+            - button "Table T8" [ref=e74] [cursor=pointer]:
+              - generic: T8
+              - generic: cap 2
+        - generic [ref=e77]:
+          - generic [ref=e78]: 🧾
+          - generic [ref=e79]:
+            - generic [ref=e80]: No Table Selected
+            - generic [ref=e81]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e82]:
+            - generic [ref=e83]: Green = available — tap to open
+            - generic [ref=e85]: Orange = occupied — tap to view bill
+      - generic [ref=e88]:
+        - heading "How many guests for T1?" [level=3] [ref=e89]
+        - generic [ref=e90]:
+          - button "1" [ref=e91] [cursor=pointer]
+          - button "2" [ref=e92] [cursor=pointer]
+          - button "3" [ref=e93] [cursor=pointer]
+          - button "4" [ref=e94] [cursor=pointer]
+          - button "5" [disabled] [ref=e95]
+          - button "6" [disabled] [ref=e96]
+          - button "7" [disabled] [ref=e97]
+          - button "8" [disabled] [ref=e98]
+          - button "9" [disabled] [ref=e99]
+          - button "10" [disabled] [ref=e100]
+          - button "11" [disabled] [ref=e101]
+          - button "12" [disabled] [ref=e102]
+        - generic [ref=e103]:
+          - generic [ref=e104]: Other (type number)
+          - generic [ref=e105]:
+            - spinbutton "Other (type number)" [ref=e106]
+            - button "OK" [disabled] [ref=e107] [cursor=pointer]
+        - button "Cancel" [ref=e109] [cursor=pointer]
+  - generic [ref=e110]: WTF! Samgyup POS

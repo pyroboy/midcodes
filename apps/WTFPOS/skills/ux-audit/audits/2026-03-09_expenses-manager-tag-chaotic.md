@@ -8,6 +8,9 @@
 **Audit Mode:** Single-User · Path A
 **Scope:** `/expenses` — ALL expense types, extreme / chaotic edge cases
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 10 of 14 issues resolved (P0: 4/4 · P1: 4/6 · P2: 2/4)
+
 ---
 
 ## A. ASCII Layout Map
@@ -131,22 +134,22 @@ The delete button: he accidentally created a duplicate. Finds the row, squints f
 
 ## D. Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | "Total Recorded (All Time)" is misleading — shows lifetime total not daily | Change total to show today's total (filter by business date = today), add a secondary label for all-time. Alternatively label clearly as "(All Time: ₱38,437 / Today: ₱1,450)" | S | High |
-| **P0** | "Log Expense" sidebar quick action links to wrong page — `/reports/expenses-daily?action=open` instead of `/expenses` | Change the href in AppSidebar quick actions to `/expenses` | S | High |
-| **P0** | Delete button (✕) violates 44px touch target minimum — estimated 28px rendered size | Wrap ✕ in `min-h-[44px] min-w-[44px] flex items-center justify-center` or restructure the delete cell | S | High |
-| **P0** | No success feedback after expense is recorded — form clears silently | Add a brief success toast (2s, green, "Expense recorded") using the existing `alert.svelte.ts` store, or a local flash state | S | High |
-| **P1** | Category dropdown has 12 flat options with no grouping — violates Hick's Law under stress | Group with `<optgroup>`: Overhead (Labor Budget, Wages, Rent) / Procurement (Meat Procurement, Produce & Sides) / Utilities (Utilities, Electricity, Gas/LPG, Water, Internet) / Other (Petty Cash, Miscellaneous) | S | Med |
-| **P1** | "Petty Cash" appears as both a category AND a "Paid By" option — semantically ambiguous | Rename category to "Petty Cash Replenishment" or remove it as a category (petty cash is a payment source, not an expense type). Clarify the distinction in UI labels. | S | Med |
-| **P1** | Expense log shows all-time data with no date filter — 8+ rows of mixed-date data overwhelming a shift review | Add a date filter (Today / This Week / All Time) above the log table. Default to Today. | M | High |
-| **P1** | No inline validation — errors only shown after submit attempt | Add `onblur` validation on Amount (must be > 0) and Description (required). Show inline helper text below each field as user exits. | M | Med |
-| **P1** | Emoji spinner (⏳ animate-spin) is a hack — the ⏳ character does not spin smoothly | Replace with `<Loader2 class="h-4 w-4 animate-spin" />` from lucide-svelte | S | Low |
-| **P1** | No "duplicate last expense" or "quick repeat" feature — forces 5-field form cycle for every entry | Add a "Repeat" button on recent expense rows that pre-fills the form with the same category/paid-by | M | Med |
-| **P2** | Amount field uses red text while editing — red is typically an error indicator | Consider gray text while editing, switching to red only in the log display | S | Low |
-| **P2** | Receipt photo field uses native `<input type="file" capture="environment">` — renders as unstyled thin file picker | Replace with a styled `<button>` + `PhotoCapture.svelte` (which already exists in `src/lib/components/`) | M | Med |
-| **P2** | No row count or summary in Expense Log header — "Expense Log" heading gives no count | Add "Expense Log (8 entries today)" to the header | S | Low |
-| **P2** | The form is `h-fit` (not sticky) — if more fields are added in future, it may scroll out of view | Wrap form in a sticky container or make it a slide-up drawer for better mobile adaptability | L | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | "Total Recorded (All Time)" is misleading — shows lifetime total not daily | Change total to show today's total (filter by business date = today), add a secondary label for all-time. Alternatively label clearly as "(All Time: ₱38,437 / Today: ₱1,450)" | S | High | 🟢 FIXED |
+| **P0** | "Log Expense" sidebar quick action links to wrong page — `/reports/expenses-daily?action=open` instead of `/expenses` | Change the href in AppSidebar quick actions to `/expenses` | S | High | 🟢 FIXED |
+| **P0** | Delete button (✕) violates 44px touch target minimum — estimated 28px rendered size | Wrap ✕ in `min-h-[44px] min-w-[44px] flex items-center justify-center` or restructure the delete cell | S | High | 🟢 FIXED |
+| **P0** | No success feedback after expense is recorded — form clears silently | Add a brief success toast (2s, green, "Expense recorded") using the existing `alert.svelte.ts` store, or a local flash state | S | High | 🟢 FIXED |
+| **P1** | Category dropdown has 12 flat options with no grouping — violates Hick's Law under stress | Group with `<optgroup>`: Overhead (Labor Budget, Wages, Rent) / Procurement (Meat Procurement, Produce & Sides) / Utilities (Utilities, Electricity, Gas/LPG, Water, Internet) / Other (Petty Cash, Miscellaneous) | S | Med | 🟢 FIXED |
+| **P1** | "Petty Cash" appears as both a category AND a "Paid By" option — semantically ambiguous | Rename category to "Petty Cash Replenishment" or remove it as a category (petty cash is a payment source, not an expense type). Clarify the distinction in UI labels. | S | Med | 🟢 FIXED |
+| **P1** | Expense log shows all-time data with no date filter — 8+ rows of mixed-date data overwhelming a shift review | Add a date filter (Today / This Week / All Time) above the log table. Default to Today. | M | High | 🟢 FIXED |
+| **P1** | No inline validation — errors only shown after submit attempt | Add `onblur` validation on Amount (must be > 0) and Description (required). Show inline helper text below each field as user exits. | M | Med | 🟢 FIXED |
+| **P1** | Emoji spinner (⏳ animate-spin) is a hack — the ⏳ character does not spin smoothly | Replace with `<Loader2 class="h-4 w-4 animate-spin" />` from lucide-svelte | S | Low | 🔴 OPEN |
+| **P1** | No "duplicate last expense" or "quick repeat" feature — forces 5-field form cycle for every entry | Add a "Repeat" button on recent expense rows that pre-fills the form with the same category/paid-by | M | Med | 🔴 OPEN |
+| **P2** | Amount field uses red text while editing — red is typically an error indicator | Consider gray text while editing, switching to red only in the log display | S | Low | 🔴 OPEN |
+| **P2** | Receipt photo field uses native `<input type="file" capture="environment">` — renders as unstyled thin file picker | Replace with a styled `<button>` + `PhotoCapture.svelte` (which already exists in `src/lib/components/`) | M | Med | 🟢 FIXED |
+| **P2** | No row count or summary in Expense Log header — "Expense Log" heading gives no count | Add "Expense Log (8 entries today)" to the header | S | Low | 🟢 FIXED |
+| **P2** | The form is `h-fit` (not sticky) — if more fields are added in future, it may scroll out of view | Wrap form in a sticky container or make it a slide-up drawer for better mobile adaptability | L | Low | 🔴 OPEN |
 
 ---
 

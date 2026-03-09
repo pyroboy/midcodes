@@ -8,6 +8,9 @@
 **Viewport:** 1024 x 768 (tablet landscape)
 **States captured:** Order Queue (empty, 0 tickets), All Orders (populated, 23 orders with mixed statuses)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 10 issues resolved (P0: 0/2 · P1: 0/5 · P2: 0/3)
+
 ---
 
 ## A. Text Layout Map
@@ -120,18 +123,18 @@ The **disconnect** between Order Queue and All Orders is the biggest friction. T
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | Relationship between Order Queue and All Orders is unclear -- cook doesn't know which view to use for active work | Add subtitle text: "Order Queue: Items needing kitchen action" and "All Orders: Full order history". Consider merging into one view with an "Active" section pinned at top. | S | High |
-| **P0** | All Orders mixes actionable orders (OPEN, PENDING) with completed ones (PAID, CANCELLED) at equal visual weight -- active orders don't stand out | Make OPEN/PENDING cards visually dominant: accent border, larger text, or elevated card. Dim PAID/CANCELLED cards. Or: auto-filter to "Open + Pending" for kitchen role on load. | M | High |
-| **P1** | No real-time connection indicator on Order Queue -- "orders will appear automatically" but no visible proof the live feed is working | Add a green pulsing dot or "Live" indicator next to the heading. If connection drops, show a red warning. Kitchen staff must trust the auto-update. | S | High |
-| **P1** | No urgency/wait-time visualization on active orders -- Table 5 waiting 4 minutes looks identical to Table 3 just opened | Add wait-time color coding: <2 min = normal, 2-5 min = yellow border, >5 min = red border + pulse. Time is THE critical KDS metric. | M | High |
-| **P1** | Empty queue state uses ~80% of screen as white space -- missed opportunity | In empty state, show useful secondary info: "Last order completed 2m ago" / today's stats (17 orders served, avg time) / stock alerts. Make downtime informative. | M | Med |
-| **P1** | Served count "3/3 served" is small and bottom-right -- this is the kitchen's primary progress metric | Make served count larger and more prominent on active order cards. Consider a progress bar: 2/5 served = partially filled bar. | S | Med |
-| **P1** | 9 filter buttons (5 status + 4 time) consume ~80px before any order data -- excessive for a cook who needs to glance quickly | Reduce to role-appropriate defaults: show "Active" (Open+Pending) by default. Collapse time filters behind a dropdown. Kitchen needs NOW, not "All Time". | M | Med |
-| **P2** | No audio/haptic notification when new order arrives -- kitchen environment is noisy, cook may not be looking at screen | Add optional audio chime when a new ticket appears in the queue. Make it configurable (on/off, volume) in settings. | M | Med |
-| **P2** | Order cards show total (P2,308.00) which is cashier info, not kitchen info -- adds visual noise for the cook | For kitchen role, de-emphasize or hide the order total. Emphasize: table number, meat type, pax count, wait time, served progress. | S | Low |
-| **P2** | No grouping of orders by time period on All Orders -- 23 orders in flat list requires scrolling | Group by "Current Service" / "Earlier Today" / "Previous Days" with collapsible sections. | M | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | Relationship between Order Queue and All Orders is unclear -- cook doesn't know which view to use for active work | Add subtitle text: "Order Queue: Items needing kitchen action" and "All Orders: Full order history". Consider merging into one view with an "Active" section pinned at top. | S | High | 🔴 OPEN |
+| **P0** | All Orders mixes actionable orders (OPEN, PENDING) with completed ones (PAID, CANCELLED) at equal visual weight -- active orders don't stand out | Make OPEN/PENDING cards visually dominant: accent border, larger text, or elevated card. Dim PAID/CANCELLED cards. Or: auto-filter to "Open + Pending" for kitchen role on load. | M | High | 🔴 OPEN |
+| **P1** | No real-time connection indicator on Order Queue -- "orders will appear automatically" but no visible proof the live feed is working | Add a green pulsing dot or "Live" indicator next to the heading. If connection drops, show a red warning. Kitchen staff must trust the auto-update. | S | High | 🔴 OPEN |
+| **P1** | No urgency/wait-time visualization on active orders -- Table 5 waiting 4 minutes looks identical to Table 3 just opened | Add wait-time color coding: <2 min = normal, 2-5 min = yellow border, >5 min = red border + pulse. Time is THE critical KDS metric. | M | High | 🔴 OPEN |
+| **P1** | Empty queue state uses ~80% of screen as white space -- missed opportunity | In empty state, show useful secondary info: "Last order completed 2m ago" / today's stats (17 orders served, avg time) / stock alerts. Make downtime informative. | M | Med | 🔴 OPEN |
+| **P1** | Served count "3/3 served" is small and bottom-right -- this is the kitchen's primary progress metric | Make served count larger and more prominent on active order cards. Consider a progress bar: 2/5 served = partially filled bar. | S | Med | 🔴 OPEN |
+| **P1** | 9 filter buttons (5 status + 4 time) consume ~80px before any order data -- excessive for a cook who needs to glance quickly | Reduce to role-appropriate defaults: show "Active" (Open+Pending) by default. Collapse time filters behind a dropdown. Kitchen needs NOW, not "All Time". | M | Med | 🔴 OPEN |
+| **P2** | No audio/haptic notification when new order arrives -- kitchen environment is noisy, cook may not be looking at screen | Add optional audio chime when a new ticket appears in the queue. Make it configurable (on/off, volume) in settings. | M | Med | 🔴 OPEN |
+| **P2** | Order cards show total (P2,308.00) which is cashier info, not kitchen info -- adds visual noise for the cook | For kitchen role, de-emphasize or hide the order total. Emphasize: table number, meat type, pax count, wait time, served progress. | S | Low | 🔴 OPEN |
+| **P2** | No grouping of orders by time period on All Orders -- 23 orders in flat list requires scrolling | Group by "Current Service" / "Earlier Today" / "Previous Days" with collapsible sections. | M | Low | 🔴 OPEN |
 
 ---
 

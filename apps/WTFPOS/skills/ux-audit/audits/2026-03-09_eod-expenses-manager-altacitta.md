@@ -7,6 +7,9 @@
 **Viewport:** 1024×768 (tablet)
 **Focus question:** Where should electricity, gas, and other operational expenses live in the EOD workflow?
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 3 of 14 issues resolved (P0: 2/3 · P1: 1/8 · P2: 0/3)
+
 ---
 
 ## A. Text Layout Maps
@@ -239,19 +242,19 @@ A confirmation appears: "Z-Read saved. Utilities logged: Electricity ₱660 · G
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | EOD utility readings don't create expense records — estimated costs vanish after Z-Read | After `saveUtilityReading()`, call `addExpense('Electricity', elecCost, ...)` and `addExpense('Gas/LPG', gasCost, ...)` automatically | S | High |
-| **P0** | `NaN%` displayed raw in Expense Ratio card when sales = 0 | `(totalExpenses / current.sales * 100).toFixed(1)` → guard with `current.sales > 0 ? ... : '—'` | S | High |
-| **P0** | `/expenses` and `/reports/expenses-daily` are duplicate entry paths with inconsistent "Paid By" options (`Personal Cash` vs `Owner's Pocket`) | Consolidate into one shared `ExpenseEntryModal` component. Standardize Paid By to: `Cash from Register | GCash | Maya | Personal Cash` | M | High |
-| **P1** | Water meter reading missing from EOD Step 2 — water is a real daily cost | Add `Water (L or cu.m)` field to EOD Step 2 alongside Electricity and Gas. Add `waterPerUnit` to `utilitySettings` | S | High |
-| **P1** | Utility rate settings are hardcoded (`₱12/kWh`, `₱85/kg`) — no UI to change them when Meralco raises rates | Add a "Utility Rates" section in `/admin` or `/reports/eod` settings. Persist to RxDB or localStorage | M | High |
-| **P1** | EOD Step 2 unlocks with no visual confirmation — section looks identical before and after unlock | Add green border + "✓ Unlocked" badge on Step 2 section when `isBlindCloseSubmitted` becomes true | S | Med |
-| **P1** | Utility readings lost silently if manager closes modal before Submit | Warn on modal close if readings are entered but Z-Read not submitted: "You have unsaved meter readings." | S | Med |
-| **P1** | EOD modal has no step progress indicator — 2 unlabeled sequential steps with no order cues | Add a `Step 1 of 3 · Step 2 of 3 · Step 3 of 3` indicator at modal top | S | Med |
-| **P1** | "Utilities" expense category is too broad — mixes electricity, gas, water, internet, phone in one bucket | Add sub-category to expense entries: `Utilities > Electricity`, `Utilities > Gas`, `Utilities > Water`, `Utilities > Internet/Phone`. Show sub-category in expense report table | M | Med |
-| **P1** | Period filter pills use `min-height: unset` — renders ~32px on tablet | Add `style="min-height: 44px"` | S | Med |
-| **P2** | "BLIND CLOSE ACTIVE" text uses `text-status-red text-xs` = 3.7:1 on light bg (fails WCAG AA small text) | Use `text-red-800` | S | Low |
-| **P2** | Variance badge (`text-2xl` Cash Short) alarms before context is visible | Show variance with a collapsible "See breakdown" toggle | S | Low |
-| **P2** | "Live totals" label beside the date is unexplained for new managers | Add a tooltip: "Totals update in real-time as orders are paid." | S | Low |
-| **P2** | `/expenses` legacy standalone page creates confusion | Either redirect `/expenses` → `/reports/expenses-daily` or remove the legacy page entirely | S | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | EOD utility readings don't create expense records — estimated costs vanish after Z-Read | After `saveUtilityReading()`, call `addExpense('Electricity', elecCost, ...)` and `addExpense('Gas/LPG', gasCost, ...)` automatically | S | High | 🔴 OPEN |
+| **P0** | `NaN%` displayed raw in Expense Ratio card when sales = 0 | `(totalExpenses / current.sales * 100).toFixed(1)` → guard with `current.sales > 0 ? ... : '—'` | S | High | 🟢 FIXED |
+| **P0** | `/expenses` and `/reports/expenses-daily` are duplicate entry paths with inconsistent "Paid By" options (`Personal Cash` vs `Owner's Pocket`) | Consolidate into one shared `ExpenseEntryModal` component. Standardize Paid By to: `Cash from Register | GCash | Maya | Personal Cash` | M | High | 🟢 FIXED |
+| **P1** | Water meter reading missing from EOD Step 2 — water is a real daily cost | Add `Water (L or cu.m)` field to EOD Step 2 alongside Electricity and Gas. Add `waterPerUnit` to `utilitySettings` | S | High | 🟢 FIXED |
+| **P1** | Utility rate settings are hardcoded (`₱12/kWh`, `₱85/kg`) — no UI to change them when Meralco raises rates | Add a "Utility Rates" section in `/admin` or `/reports/eod` settings. Persist to RxDB or localStorage | M | High | 🔴 OPEN |
+| **P1** | EOD Step 2 unlocks with no visual confirmation — section looks identical before and after unlock | Add green border + "✓ Unlocked" badge on Step 2 section when `isBlindCloseSubmitted` becomes true | S | Med | 🔴 OPEN |
+| **P1** | Utility readings lost silently if manager closes modal before Submit | Warn on modal close if readings are entered but Z-Read not submitted: "You have unsaved meter readings." | S | Med | 🔴 OPEN |
+| **P1** | EOD modal has no step progress indicator — 2 unlabeled sequential steps with no order cues | Add a `Step 1 of 3 · Step 2 of 3 · Step 3 of 3` indicator at modal top | S | Med | 🔴 OPEN |
+| **P1** | "Utilities" expense category is too broad — mixes electricity, gas, water, internet, phone in one bucket | Add sub-category to expense entries: `Utilities > Electricity`, `Utilities > Gas`, `Utilities > Water`, `Utilities > Internet/Phone`. Show sub-category in expense report table | M | Med | 🟢 FIXED |
+| **P1** | Period filter pills use `min-height: unset` — renders ~32px on tablet | Add `style="min-height: 44px"` | S | Med | 🔴 OPEN |
+| **P2** | "BLIND CLOSE ACTIVE" text uses `text-status-red text-xs` = 3.7:1 on light bg (fails WCAG AA small text) | Use `text-red-800` | S | Low | 🔴 OPEN |
+| **P2** | Variance badge (`text-2xl` Cash Short) alarms before context is visible | Show variance with a collapsible "See breakdown" toggle | S | Low | 🔴 OPEN |
+| **P2** | "Live totals" label beside the date is unexplained for new managers | Add a tooltip: "Totals update in real-time as orders are paid." | S | Low | 🔴 OPEN |
+| **P2** | `/expenses` legacy standalone page creates confusion | Either redirect `/expenses` → `/reports/expenses-daily` or remove the legacy page entirely | S | Low | 🔴 OPEN |

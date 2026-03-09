@@ -229,28 +229,47 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-2 border-b border-border px-6 py-3 overflow-x-auto">
-            <span class="text-xs font-semibold text-gray-500 mr-auto shrink-0">Discount:</span>
-            {#each [
-                { id: 'senior' as const, label: '👴 Senior' },
-                { id: 'pwd' as const, label: '♿ PWD' },
-                { id: 'promo' as const, label: '🎟️ Promo' },
-                { id: 'comp' as const, label: '💯 Comp' },
-                { id: 'service_recovery' as const, label: '❤️ Service Rec' }
-            ] as discount}
-                <button
-                    onclick={() => applyDiscount(discount.id)}
-                    class={cn(
-                        'shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
-                        order.discountType === discount.id
-                            ? 'bg-status-green text-white shadow-md'
-                            : 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
-                    )}
-                    style="min-height: 32px"
-                >
-                    {discount.label}
-                </button>
-            {/each}
+        <div class="flex flex-col gap-2 border-b border-border px-6 py-3">
+            <span class="text-xs font-semibold text-gray-500">Discount:</span>
+            <!-- SC and PWD: primary row — most common discounts, always visible -->
+            <div class="grid grid-cols-2 gap-2">
+                {#each [
+                    { id: 'senior' as const, label: '👴 Senior Citizen (20%)' },
+                    { id: 'pwd' as const, label: '♿ PWD (20%)' }
+                ] as discount}
+                    <button
+                        onclick={() => applyDiscount(discount.id)}
+                        class={cn(
+                            'rounded-xl px-3 font-semibold transition-all text-sm min-h-[44px]',
+                            order.discountType === discount.id
+                                ? 'bg-status-green text-white shadow-md'
+                                : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
+                        )}
+                    >
+                        {discount.label}
+                    </button>
+                {/each}
+            </div>
+            <!-- Secondary discounts: smaller row -->
+            <div class="grid grid-cols-3 gap-2">
+                {#each [
+                    { id: 'promo' as const, label: '🎟️ Promo' },
+                    { id: 'comp' as const, label: '💯 Comp' },
+                    { id: 'service_recovery' as const, label: '❤️ Service Rec' }
+                ] as discount}
+                    <button
+                        onclick={() => applyDiscount(discount.id)}
+                        class={cn(
+                            'rounded-lg px-2 text-xs font-semibold transition-all min-h-[44px]',
+                            order.discountType === discount.id
+                                ? 'bg-status-green text-white shadow-md'
+                                : 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
+                        )}
+                    >
+                        {discount.label}
+                    </button>
+                {/each}
+            </div>
         </div>
 
         {#if showScPwdSection}
@@ -281,7 +300,7 @@
                 </div>
                 <!-- SC/PWD ID inputs -->
                 <div class="flex flex-col gap-2">
-                    <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ID Numbers (optional)</span>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ID Numbers (required to confirm checkout)</span>
                     {#each discountIdsInput as _, i}
                         <div class="flex items-center gap-2">
                             <span class="w-20 shrink-0 text-xs font-semibold text-gray-500">
@@ -360,12 +379,11 @@
                                 <button
                                     onclick={() => selectCashPreset(amount)}
                                     class={cn(
-                                        'rounded-lg py-1.5 font-mono text-xs font-bold transition-all active:scale-95',
+                                        'rounded-lg py-1.5 font-mono text-xs font-bold transition-all active:scale-95 min-h-[44px]',
                                         entry.amount === amount
                                             ? 'bg-accent text-white'
                                             : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
                                     )}
-                                    style="min-height: 32px"
                                 >
                                     ₱{amount.toLocaleString()}
                                 </button>

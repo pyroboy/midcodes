@@ -18,6 +18,18 @@
 	function formatTime(iso: string) {
 		return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
 	}
+
+	function formatDate(iso: string) {
+		return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+	}
+
+	// Build item summary string from order items array
+	function itemsSummary(order: { items?: { name?: string; quantity?: number }[] }): string {
+		if (!order.items || order.items.length === 0) return '—';
+		return order.items
+			.map(i => `${i.quantity ?? 1}x ${i.name ?? 'Item'}`)
+			.join(', ');
+	}
 </script>
 
 <!-- Live indicator -->
@@ -62,7 +74,7 @@
 			</div>
 		</div>
 
-		<!-- P1-25: Per-order voids detail table with Reason column -->
+		<!-- P2-17 + P1-25: Per-order voids detail table with cashier, items, and reason -->
 		{#if summary.voids.items.length > 0}
 			<div class="rounded-xl border border-border bg-white overflow-hidden">
 				<div class="px-5 py-3 border-b border-border">
@@ -71,7 +83,9 @@
 				<table class="w-full text-sm">
 					<thead>
 						<tr class="border-b border-border bg-gray-50">
-							<th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Order / Table</th>
+							<th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Date / Table</th>
+							<th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Items</th>
+							<th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Cashier</th>
 							<th class="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</th>
 							<th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Reason</th>
 						</tr>
@@ -80,7 +94,18 @@
 						{#each summary.voids.items as order (order.id)}
 							<tr class="hover:bg-gray-50">
 								<td class="px-4 py-2.5 text-gray-700 font-medium">
-									{order.tableId ?? 'Takeout'}
+									<div class="flex flex-col gap-0.5">
+										<span>{order.tableId ?? 'Takeout'}</span>
+										{#if order.createdAt}
+											<span class="text-[10px] text-gray-400 font-mono">{formatDate(order.createdAt)} {formatTime(order.createdAt)}</span>
+										{/if}
+									</div>
+								</td>
+								<td class="px-4 py-2.5 text-xs text-gray-500 max-w-[140px]">
+									<span class="line-clamp-2">{itemsSummary(order)}</span>
+								</td>
+								<td class="px-4 py-2.5 text-xs text-gray-600">
+									{order.closedBy ?? <span class="text-gray-400">—</span>}
 								</td>
 								<td class="px-4 py-2.5 text-right font-mono text-status-red">
 									{formatPeso(order.subtotal)}

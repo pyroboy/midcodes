@@ -1,0 +1,145 @@
+- generic [ref=e2]:
+  - generic [ref=e138]:
+    - generic [ref=e142]:
+      - button "Toggle sidebar" [ref=e145] [cursor=pointer]:
+        - generic [ref=e146]: W!
+      - separator [ref=e147]
+      - generic [ref=e149]:
+        - link "Receive Delivery" [ref=e150] [cursor=pointer]:
+          - /url: /stock/deliveries
+          - img [ref=e151]
+          - generic [ref=e152]: Receive Delivery
+        - link "Log Expense" [ref=e153] [cursor=pointer]:
+          - /url: /reports/expenses-daily
+          - img [ref=e154]
+          - generic [ref=e155]: Log Expense
+        - link "Log Waste" [ref=e156] [cursor=pointer]:
+          - /url: /stock/waste
+          - img [ref=e157]
+          - generic [ref=e158]: Log Waste
+        - link "Stock Count" [ref=e159] [cursor=pointer]:
+          - /url: /stock/counts
+          - img [ref=e160]
+          - generic [ref=e161]: Stock Count
+        - link "X-Reading" [ref=e162] [cursor=pointer]:
+          - /url: /reports/x-read
+          - img [ref=e163]
+          - generic [ref=e164]: X-Reading
+        - link "Transfer Stock" [ref=e165] [cursor=pointer]:
+          - /url: /stock/transfers
+          - img [ref=e166]
+          - generic [ref=e167]: Transfer Stock
+        - link "End of Day" [ref=e168] [cursor=pointer]:
+          - /url: /reports/eod
+          - img [ref=e169]
+          - generic [ref=e170]: End of Day
+      - list [ref=e174]:
+        - listitem [ref=e175]:
+          - link "POS" [ref=e176] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e178]
+            - generic [ref=e179]: POS
+        - listitem [ref=e180]:
+          - link "Kitchen" [ref=e181] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e183]
+            - generic [ref=e184]: Kitchen
+        - listitem [ref=e185]:
+          - link "Stock" [ref=e186] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e188]
+            - generic [ref=e189]: Stock
+        - listitem [ref=e190]:
+          - link "Reports" [ref=e191] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e193]
+            - generic [ref=e194]: Reports
+      - generic [ref=e195]:
+        - separator [ref=e196]
+        - generic [ref=e198]: J
+        - link "Logout" [ref=e200] [cursor=pointer]:
+          - /url: /
+          - img [ref=e201]
+      - button "Toggle Sidebar" [ref=e202]
+    - main [ref=e203]:
+      - generic [ref=e204]:
+        - generic [ref=e205]:
+          - img [ref=e206]
+          - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e207]
+        - button "Change Location" [ref=e208] [cursor=pointer]:
+          - img [ref=e209]
+          - text: Change Location
+      - generic [ref=e211]:
+        - generic [ref=e212]:
+          - generic [ref=e213]:
+            - generic [ref=e214]:
+              - button "Toggle Sidebar" [ref=e215] [cursor=pointer]:
+                - img
+                - generic [ref=e216]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e217]
+              - generic [ref=e218]: 0 occ
+              - generic [ref=e219]: 8 free
+            - generic [ref=e220]:
+              - button "Toggle color legend" [ref=e222] [cursor=pointer]:
+                - img [ref=e223]
+              - button "📦 New Takeout" [ref=e224] [cursor=pointer]
+              - button "🧾 History 9" [ref=e225] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e226]: "9"
+          - img [ref=e228]:
+            - button "Table T1" [ref=e231] [cursor=pointer]:
+              - generic: T1
+              - generic: cap 4
+            - button "Table T2" [ref=e233] [cursor=pointer]:
+              - generic: T2
+              - generic: cap 4
+            - button "Table T3" [ref=e235] [cursor=pointer]:
+              - generic: T3
+              - generic: cap 4
+            - button "Table T4" [ref=e237] [cursor=pointer]:
+              - generic: T4
+              - generic: cap 4
+            - button "Table T5" [ref=e239] [cursor=pointer]:
+              - generic: T5
+              - generic: cap 4
+            - button "Table T6" [ref=e241] [cursor=pointer]:
+              - generic: T6
+              - generic: cap 4
+            - button "Table T7" [ref=e243] [cursor=pointer]:
+              - generic: T7
+              - generic: cap 2
+            - button "Table T8" [ref=e245] [cursor=pointer]:
+              - generic: T8
+              - generic: cap 2
+        - generic [ref=e248]:
+          - generic [ref=e249]: 🧾
+          - generic [ref=e250]:
+            - generic [ref=e251]: No Table Selected
+            - generic [ref=e252]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e253]:
+            - generic [ref=e254]: Green = available — tap to open
+            - generic [ref=e256]: Orange = occupied — tap to view bill
+      - generic [ref=e259]:
+        - generic [ref=e260]:
+          - generic [ref=e261]: 🏦
+          - heading "Start Your Shift" [level=2] [ref=e262]
+          - paragraph [ref=e263]:
+            - text: Declare your opening cash float before accessing the POS.
+            - generic [ref=e264]:
+              - text: Logged as
+              - strong [ref=e265]: Juan Reyes
+        - generic [ref=e266]:
+          - generic [ref=e267]: Quick Select
+          - generic [ref=e268]:
+            - button "₱1,000" [ref=e269] [cursor=pointer]
+            - button "₱2,000" [ref=e270] [cursor=pointer]
+            - button "₱3,000" [ref=e271] [cursor=pointer]
+            - button "₱5,000" [ref=e272] [cursor=pointer]
+        - generic [ref=e273]:
+          - generic [ref=e274]: Opening Cash Float (₱)
+          - spinbutton [ref=e275]: "0"
+        - button "Start Shift →" [ref=e276] [cursor=pointer]
+        - paragraph [ref=e277]: You can enter ₱0 if no opening float is provided.
+        - paragraph [ref=e278]: Existing open orders are safe — they will remain open.
+        - button "Continue without starting shift (inventory / delivery staff only)" [ref=e279] [cursor=pointer]
+  - generic [ref=e109]: WTF! Samgyup POS

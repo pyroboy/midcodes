@@ -1,0 +1,158 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+          - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph [ref=e17]: 10:26:04 AM
+    - separator [ref=e18]
+    - generic [ref=e19]:
+      - paragraph [ref=e21]: Quick Actions
+      - generic [ref=e22]:
+        - link "Receive Delivery" [ref=e23] [cursor=pointer]:
+          - /url: /stock/deliveries
+          - img [ref=e24]
+          - generic [ref=e25]: Receive Delivery
+        - link "Log Expense" [ref=e26] [cursor=pointer]:
+          - /url: /reports/expenses-daily
+          - img [ref=e27]
+          - generic [ref=e28]: Log Expense
+        - link "Log Waste" [ref=e29] [cursor=pointer]:
+          - /url: /stock/waste
+          - img [ref=e30]
+          - generic [ref=e31]: Log Waste
+        - link "Stock Count" [ref=e32] [cursor=pointer]:
+          - /url: /stock/counts
+          - img [ref=e33]
+          - generic [ref=e34]: Stock Count
+        - link "X-Reading" [ref=e35] [cursor=pointer]:
+          - /url: /reports/x-read
+          - img [ref=e36]
+          - generic [ref=e37]: X-Reading
+        - link "Transfer Stock" [ref=e38] [cursor=pointer]:
+          - /url: /stock/transfers
+          - img [ref=e39]
+          - generic [ref=e40]: Transfer Stock
+        - link "End of Day" [ref=e41] [cursor=pointer]:
+          - /url: /reports/eod
+          - img [ref=e42]
+          - generic [ref=e43]: End of Day
+    - list [ref=e46]:
+      - listitem [ref=e47]:
+        - link "POS" [ref=e48] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e50]
+          - generic [ref=e54]: POS
+      - listitem [ref=e55]:
+        - link "Kitchen" [ref=e56] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e58]
+          - generic [ref=e59]: Kitchen
+      - listitem [ref=e60]:
+        - link "Stock" [ref=e61] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e63]
+          - generic [ref=e64]: Stock
+      - listitem [ref=e65]:
+        - link "Reports" [ref=e66] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e68]
+          - generic [ref=e69]: Reports
+    - generic [ref=e70]:
+      - separator [ref=e71]
+      - generic [ref=e72]:
+        - generic [ref=e73]: J
+        - generic [ref=e74]:
+          - generic [ref=e75]: Juan Reyes
+          - generic [ref=e76]: manager
+      - button "Change Location" [ref=e78] [cursor=pointer]:
+        - img [ref=e79]
+        - generic [ref=e80]: Change Location
+      - link "Logout" [ref=e82] [cursor=pointer]:
+        - /url: /
+        - img [ref=e83]
+        - generic [ref=e86]: Logout
+    - button "Toggle Sidebar" [ref=e87]
+  - main [ref=e88]:
+    - generic [ref=e89]:
+      - generic [ref=e90]:
+        - img [ref=e91]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e92]
+      - button "Change Location" [ref=e93] [cursor=pointer]:
+        - img [ref=e94]
+        - text: Change Location
+    - generic [ref=e95]:
+      - generic [ref=e96]:
+        - heading "Stock Management" [level=1] [ref=e99]
+        - navigation [ref=e100]:
+          - link "Inventory" [ref=e101] [cursor=pointer]:
+            - /url: /stock/inventory
+            - img [ref=e102]
+            - text: Inventory
+          - link "Deliveries" [ref=e106] [cursor=pointer]:
+            - /url: /stock/deliveries
+            - img [ref=e107]
+            - text: Deliveries
+          - link "Transfers" [ref=e112] [cursor=pointer]:
+            - /url: /stock/transfers
+            - img [ref=e113]
+            - text: Transfers
+          - link "Counts 1" [ref=e116] [cursor=pointer]:
+            - /url: /stock/counts
+            - img [ref=e117]
+            - text: Counts
+            - generic [ref=e121]: "1"
+          - link "Waste Log" [ref=e122] [cursor=pointer]:
+            - /url: /stock/waste
+            - img [ref=e123]
+            - text: Waste Log
+      - generic [ref=e127]:
+        - generic [ref=e128]:
+          - heading "Inter-Branch Stock Transfers" [level=2] [ref=e129]
+          - paragraph [ref=e130]:
+            - text: Move inventory from
+            - strong [ref=e131]: Tagbilaran Branch (Alta Citta)
+            - text: to another branch or warehouse.
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]: "1"
+              - generic [ref=e136]: Select Item
+            - generic [ref=e138]:
+              - generic [ref=e139]: "2"
+              - generic [ref=e140]: Destination
+            - generic [ref=e142]:
+              - generic [ref=e143]: "3"
+              - generic [ref=e144]: Confirm
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - img [ref=e147]
+              - generic [ref=e150]: "Source: Tagbilaran Branch (Alta Citta)"
+            - generic [ref=e151]:
+              - generic [ref=e152]: Item
+              - combobox [ref=e153]:
+                - option "Select an item..." [disabled] [selected]
+            - generic [ref=e154]:
+              - generic [ref=e155]:
+                - generic [ref=e156]: Transfer Quantity
+                - spinbutton [ref=e157]
+              - generic [ref=e158]:
+                - generic [ref=e159]: Unit
+                - textbox [disabled] [ref=e160]: —
+            - generic [ref=e161]:
+              - generic [ref=e162]: Source Inventory
+              - table [ref=e165]:
+                - rowgroup [ref=e166]:
+                  - row "Item Stock Status" [ref=e167]:
+                    - columnheader "Item" [ref=e168]
+                    - columnheader "Stock" [ref=e169]
+                    - columnheader "Status" [ref=e170]
+                - rowgroup
+            - button "Next" [disabled] [ref=e172] [cursor=pointer]:
+              - text: Next
+              - img [ref=e173]

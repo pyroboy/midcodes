@@ -2,6 +2,7 @@
 	import { cn } from '$lib/utils';
 	import { fade, slide } from 'svelte/transition';
 	import { Edit3 } from 'lucide-svelte';
+	import { formatDistanceToNow } from 'date-fns';
 	import type { StockItem, StockStatus } from '$lib/stores/stock.svelte';
 	import CategoryIcon from './CategoryIcon.svelte';
 	import StockLevelBar from './StockLevelBar.svelte';
@@ -65,6 +66,9 @@
 	</td>
 	<td class="px-4 py-3">
 		<p class="font-medium text-gray-900">{item.name}</p>
+		{#if item.updatedAt}
+			<p class="text-[10px] text-gray-400 mt-0.5">{formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}</p>
+		{/if}
 	</td>
 	<td class="px-4 py-3 text-gray-500 font-medium">
 		{item.category}

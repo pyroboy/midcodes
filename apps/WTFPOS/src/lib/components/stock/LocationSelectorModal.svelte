@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fade, fly } from 'svelte/transition';
-	import { session, LOCATIONS, type LocationId, ADMIN_ROLES, ELEVATED_ROLES } from '$lib/stores/session.svelte';
+	import { session, LOCATIONS, type LocationId, ADMIN_ROLES, ELEVATED_ROLES, setLocation } from '$lib/stores/session.svelte';
 	import { MapPin, CheckCircle, Package, AlertCircle, Lock, Globe } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 
@@ -23,7 +23,7 @@
 
 	function selectLocation(id: LocationId) {
 		if (id === 'wh-tag' && !canAccessWarehouse) return; // Guardrail
-		session.locationId = id;
+		setLocation(id);
 		onClose();
 	}
 

@@ -1,0 +1,81 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e20]
+          - generic [ref=e24]: POS
+    - generic [ref=e25]:
+      - separator [ref=e26]
+      - generic [ref=e28]: U
+      - link "Logout" [ref=e30] [cursor=pointer]:
+        - /url: /
+        - img [ref=e31]
+    - button "Toggle Sidebar" [ref=e34]
+  - main [ref=e35]:
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - heading "Stock Management" [level=1] [ref=e40]
+        - navigation [ref=e41]:
+          - link "Inventory" [ref=e42] [cursor=pointer]:
+            - /url: /stock/inventory
+            - img [ref=e43]
+            - text: Inventory
+          - link "Deliveries" [ref=e47] [cursor=pointer]:
+            - /url: /stock/deliveries
+            - img [ref=e48]
+            - text: Deliveries
+          - link "Transfers" [ref=e53] [cursor=pointer]:
+            - /url: /stock/transfers
+            - img [ref=e54]
+            - text: Transfers
+          - link "Counts 1" [ref=e57] [cursor=pointer]:
+            - /url: /stock/counts
+            - img [ref=e58]
+            - text: Counts
+            - generic [ref=e62]: "1"
+          - link "Waste Log" [ref=e63] [cursor=pointer]:
+            - /url: /stock/waste
+            - img [ref=e64]
+            - text: Waste Log
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - heading "Delivery History & Batches" [level=2] [ref=e71]
+            - paragraph [ref=e72]: Track incoming stock batches, FIFO usage, and expiry.
+          - button "Receive Delivery" [ref=e73] [cursor=pointer]:
+            - img [ref=e74]
+            - text: Receive Delivery
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - img
+            - textbox "Search item, supplier, or batch..." [ref=e77]
+          - generic [ref=e78]:
+            - img [ref=e79]
+            - combobox [ref=e81]:
+              - option "All Dates" [selected]
+              - option "Today"
+              - option "Yesterday"
+              - option "Earlier"
+          - generic [ref=e82]:
+            - img [ref=e83]
+            - combobox [ref=e87]:
+              - option "All Items" [selected]
+          - generic [ref=e88] [cursor=pointer]:
+            - checkbox "Show Depleted" [ref=e89]
+            - generic [ref=e90]: Show Depleted
+        - table [ref=e92]:
+          - rowgroup [ref=e93]:
+            - row "Time Item / Supplier Qty Batch & Expiry FIFO Usage" [ref=e94]:
+              - columnheader "Time" [ref=e95]
+              - columnheader "Item / Supplier" [ref=e96]
+              - columnheader "Qty" [ref=e97]
+              - columnheader "Batch & Expiry" [ref=e98]
+              - columnheader "FIFO Usage" [ref=e99]
+          - rowgroup [ref=e100]:
+            - row "No deliveries found matching the filters." [ref=e101]:
+              - cell "No deliveries found matching the filters." [ref=e102]

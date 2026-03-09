@@ -12,7 +12,7 @@ description: >
   WTFPOS design system. Also triggers on "touch targets", "contrast ratio", "too many buttons",
   "feels cluttered", "hard to find", "confusing layout", "simulate kitchen and pos", "multi-device
   test", or "parallel role audit".
-version: 3.0.0
+version: 3.3.0
 ---
 
 # UX Audit — WTFPOS
@@ -217,6 +217,36 @@ with them without taking a snapshot first:
 When navigating to a known page via URL (e.g., `playwright-cli navigate http://localhost:5173/reports/eod`),
 skip the intermediate snapshot — navigate first, then snapshot the destination.
 
+### Rule 6 — Crash Recovery Signal
+
+If an agent detects it's running low on tool calls or encountering repeated failures:
+
+1. **Write current findings immediately** — append everything collected so far to the output file
+2. **Add a `[PARTIAL]` marker** — at the end of the file, write: `[PARTIAL — completed steps 1-N of M, crashed at step N+1]`
+3. **Return what you have** — do not retry failed operations. Return partial results so the orchestrator can decide whether to re-launch.
+
+The orchestrator will parse `[PARTIAL]` markers and offer the user a retry for remaining steps.
+
+---
+
+## Orchestrator Crash Recovery
+
+When a parallel agent returns partial results or times out:
+
+1. **Check for `[PARTIAL]` marker** in the agent's output file
+2. **Identify completed vs remaining steps** from the marker
+3. **Present to user:**
+   ```
+   Agent "Staff-A" completed 3 of 6 steps before crashing.
+   Completed: A1 (PASS), A2 (PASS), A3 (CONCERN)
+   Remaining: A4, A5, A6
+   Retry remaining steps? (y/n)
+   ```
+4. **If retry** — launch a replacement agent with only remaining steps, referencing the partial output file for context
+5. **If declined** — synthesize report using partial data, noting gaps
+
+> **15% of agents crash** (observed across 46 runs). This recovery path ensures no audit data is lost.
+
 ---
 
 ## Audit Workflow
@@ -254,7 +284,8 @@ Before opening the browser, snapshot the exact list of files already in `.playwr
 
 ```bash
 mkdir -p .playwright-cli/
-ls .playwright-cli/ 2>/dev/null | sort > /tmp/ux-audit-before-$$
+_ux_before=$(mktemp /tmp/ux-audit-before.XXXXXX)
+ls .playwright-cli/ 2>/dev/null | sort > "$_ux_before"
 ```
 
 Then open the browser:
@@ -306,14 +337,14 @@ playwright-cli close
 **Immediately after closing, delete only the files THIS session created:**
 
 ```bash
-comm -13 /tmp/ux-audit-before-$$ <(ls .playwright-cli/ 2>/dev/null | sort) \
+comm -13 "$_ux_before" <(ls .playwright-cli/ 2>/dev/null | sort) \
   | grep -E '\.(yml|png)$' \
   | xargs -I{} rm -f ".playwright-cli/{}"
-rm /tmp/ux-audit-before-$$
+rm -f "$_ux_before"
 ```
 
 **Why this pattern is safe for concurrent agents:**
-- `$$` is the shell PID — unique per process, so two concurrent audit sessions never share a before-list file
+- `mktemp` creates a unique temporary file — safe across bash/zsh and concurrent sessions
 - `comm -13` computes the exact diff: files in the current directory that were **not** in the before-snapshot. Only those files are candidates for deletion.
 - `grep -E '\.(yml|png)$'` is a type-gate — even if the diff accidentally included an unexpected file, only known playwright-cli artifact types are deleted
 - Files that existed before this session started (from other running agents, previous sessions, or anything else) are in the before-list and will **never** be deleted
@@ -469,7 +500,8 @@ The user may:
 
 ```bash
 mkdir -p .playwright-cli/
-ls .playwright-cli/ 2>/dev/null | sort > /tmp/ux-audit-before-$$
+_ux_before=$(mktemp /tmp/ux-audit-before.XXXXXX)
+ls .playwright-cli/ 2>/dev/null | sort > "$_ux_before"
 ```
 
 Each role gets its own **parallel Agent** with its own playwright-cli browser session.
@@ -594,10 +626,10 @@ After all agents return their individual reports:
 **After all agents have returned their reports**, delete only the files this session created:
 
 ```bash
-comm -13 /tmp/ux-audit-before-$$ <(ls .playwright-cli/ 2>/dev/null | sort) \
+comm -13 "$_ux_before" <(ls .playwright-cli/ 2>/dev/null | sort) \
   | grep -E '\.(yml|png)$' \
   | xargs -I{} rm -f ".playwright-cli/{}"
-rm /tmp/ux-audit-before-$$
+rm -f "$_ux_before"
 ```
 
 **Critical rules for multi-user cleanup:**
@@ -799,7 +831,15 @@ In addition to per-role recommendations (Section D), add cross-role recommendati
 
 ## Human in the Loop Gates
 
-### 1. Audit Mode Selection (FIRST GATE)
+### 0. Scenario Presentation [FAST-SKIP] (ZEROTH GATE — BEFORE EVERYTHING)
+
+**Trigger:** Every time the ux-audit skill is invoked.
+
+**Action:** Present the user with a scenario summary before proceeding.
+
+**Fast-skip:** Auto-skip when user's invocation already contains a complete scenario specification.
+
+### 1. Audit Mode Selection [FAST-SKIP] (FIRST GATE)
 
 **Trigger:** Every time the ux-audit skill is invoked.
 
@@ -812,7 +852,9 @@ In addition to per-role recommendations (Section D), add cross-role recommendati
 
 **Exception:** If the user's request already clearly specifies the mode (e.g., "audit the POS page as staff" → single-user, "simulate kitchen and POS together" → multi-user), skip this gate and proceed with the implied mode.
 
-### 2. Production URL Check
+**Fast-skip:** Auto-resolve when selected scenario clearly implies single-user or multi-user.
+
+### 2. Production URL Check [HARD-STOP]
 
 **Trigger:** User provides a URL that is not `localhost` or `127.0.0.1`.
 
@@ -830,7 +872,7 @@ In addition to per-role recommendations (Section D), add cross-role recommendati
 
 **Why:** Moving a button that a cashier taps 200 times per shift can cause errors during the adjustment period.
 
-### 4. Scenario Script Approval
+### 4. Scenario Script Approval [HARD-STOP]
 
 **Trigger:** Every multi-user audit, after scenario generation (Step B3).
 
@@ -842,7 +884,7 @@ In addition to per-role recommendations (Section D), add cross-role recommendati
 
 **Why:** Generated scenarios are creative interpretations. The user knows their restaurant better than any AI — they should validate that the scenarios are realistic and test what actually matters. A bad script wastes significant time and produces irrelevant findings.
 
-### 5. Multi-User Resource Warning
+### 5. Multi-User Resource Warning [FAST-SKIP]
 
 **Trigger:** Multi-user audit with 3+ roles OR extreme intensity level.
 
@@ -851,7 +893,9 @@ In addition to per-role recommendations (Section D), add cross-role recommendati
 
 **Why:** Each parallel agent opens a full browser instance. 3+ concurrent sessions or 10+ scenarios per agent on a dev machine may cause performance issues that affect the audit results themselves.
 
-### 6. Fix Selection Gate (POST-AUDIT, EVERY AUDIT)
+**Fast-skip:** Auto-skip for 2-role audits. Only hard-stop for 3+ roles or extreme intensity.
+
+### 6. Fix Selection Gate [HARD-STOP] (POST-AUDIT, EVERY AUDIT)
 
 **Trigger:** Every audit, after presenting the full issue breakdown and overall recommendation.
 
@@ -893,9 +937,48 @@ When the user corrects any finding from this skill:
 2. **Check DESIGN_BIBLE.md** — If the correction reveals a wrong principle interpretation, update the reference
 3. **Check WTFPOS Design Context** — If design tokens, CSS classes, or layout shell have changed, update this SKILL.md
 4. **New pages** — When a new route is added to WTFPOS, add it to the Auditable Pages table
+5. **Track agent crashes** — if an agent crashes, note the step and interaction that caused it.
+   After 3 crashes on the same type of interaction (e.g., "clicking element ref after page nav"),
+   add a workaround to the Agent Performance Rules.
+6. **Track snapshot budget** — if agents consistently use fewer than 5 snapshots, the budget of 10
+   may be too generous (wasting the rule's cognitive overhead). If agents hit 10 and need more,
+   consider raising to 12.
+7. **Track gate skip rate** — if a gate is auto-skipped 5+ times consecutively, consider removing
+   it or merging with another gate.
 
 When `tailwind.config.js` or `app.css` changes:
 - Re-read the files and update the Color Tokens and CSS Classes tables above
+
+---
+
+## User Profile (auto-updated by Self-Improvement Protocol)
+
+Track observed user patterns to optimize gate behavior. Update after each run.
+
+| Pattern | Observed | Gate impact |
+|---|---|---|
+| Scenario spec style | COMPLETE — user always provides full spec | Gate 0: auto-fast-track |
+| Fix preference | ALWAYS — user always wants fixes after audit | Gate 6: auto-invoke fix-audit |
+| Intensity preference | EXTREME/CHAOS — user prefers thorough audits | Gate 5: show warning but don't block |
+| Agent count comfort | HIGH — user comfortable with 4-8 parallel agents | Gate 5: informational only |
+
+> **Rule:** After 3 consecutive runs with the same pattern, upgrade from observation to default.
+> After 1 run that breaks the pattern, reset to neutral.
+
+---
+
+## Run Log
+
+Append one row after every execution. This data drives self-improvement decisions.
+
+| Date | Mode | Roles | Agents | Crashed | Snapshots used | Issues found | Fix invoked? |
+|---|---|---|---|---|---|---|---|
+
+> **Self-improvement triggers:**
+> - Crash rate > 10% across last 5 runs → review Agent Performance Rules
+> - Gate 0 skipped 5+ times → mark as permanent FAST-SKIP
+> - Average snapshots < 5 per agent → reduce budget to 8
+> - Fix always invoked → auto-invoke fix-audit without asking
 
 ---
 
@@ -903,6 +986,7 @@ When `tailwind.config.js` or `app.css` changes:
 
 | Version | Date | Change |
 |---|---|---|
+| 3.3.0 | 2026-03-09 | **Self-assessment overhaul**: (1) Gate classification FAST-SKIP/HARD-STOP for all 7 gates, (2) Agent crash recovery Rule 6 + orchestrator retry, (3) Fix zsh `$$` → `mktemp` for cross-shell safety, (4) Enhanced self-improvement with crash/snapshot/gate tracking, (5) User profile + run log for data-driven optimization |
 | 3.0.0 | 2026-03-09 | **Agent Performance Rules**: Pre-bake auth via sessionStorage injection (skip login UI), hard snapshot budget (max 10), micro-audit pattern (5–7 steps/agent, split large roles), write-as-you-go (partial results survive crashes), known element ref shortcuts. Updated B4/B5/B6 to enforce rules. Updated architecture diagram to show split agents. |
 | 2.4.0 | 2026-03-09 | Harden artifact cleanup: replace time-based `-newer` marker with exact before-snapshot diff (`comm -13`) + `.yml|.png` type-gate; orchestrator-only cleanup in multi-user path; safe for concurrent playwright-cli agents |
 | 2.3.0 | 2026-03-09 | Add full issue breakdown (all findings, no summarising) + overall recommendation sentence + HITL Fix Selection Gate (gate #6) to both single-user and multi-user paths — audits now close the loop into code fixes |

@@ -6,6 +6,9 @@
 **Intensity:** Light (single-user)
 **Viewport:** 1024×768 (tablet)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 2 of 7 issues resolved (P0: 1/3 · P1: 1/2 · P2: 0/2)
+
 ---
 
 ## A. Text Layout Map
@@ -113,12 +116,12 @@ The gap: the current item dropdown requires scrolling through 80+ unsorted items
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | No success feedback after submitting a delivery | Add a toast notification: "✓ [Item] +[Qty] received from [Supplier]" that persists 3 seconds | S | High |
-| **P0** | Item dropdown is a native `<select>` with 80+ unsorted options — unusable on touch | Replace with a searchable combobox (type-to-filter). Group options by category if not implementing search | M | High |
-| **P0** | "Expiring Soon" banner hidden on initial page load — only appears when form is opened | Move the Expiring Soon warning to always render at page top, independent of form state | S | High |
-| **P1** | "Receive Stock" button not visually dominant — same weight as "Cancel" | Style "Receive Stock" as full-width `btn-primary` at bottom of form. Make Cancel a ghost/text link | S | Med |
-| **P1** | Supplier field is plain text with no autocomplete — repeated manual entry | Add recent suppliers as quick-tap chips below the Supplier field (last 5 used) | M | Med |
-| **P2** | FIFO usage % text contrast may be below 4.5:1 | Verify and darken if needed; use `text-gray-700` minimum | S | Low |
-| **P2** | "Expiring Soon" amber badge contrast unverified | Use `text-amber-800 bg-amber-100` to match confirmed-passing contrast pattern from KDS fixes | S | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | No success feedback after submitting a delivery | Add a toast notification: "✓ [Item] +[Qty] received from [Supplier]" that persists 3 seconds | S | High | 🟢 FIXED |
+| **P0** | Item dropdown is a native `<select>` with 80+ unsorted options — unusable on touch | Replace with a searchable combobox (type-to-filter). Group options by category if not implementing search | M | High | 🔴 OPEN |
+| **P0** | "Expiring Soon" banner hidden on initial page load — only appears when form is opened | Move the Expiring Soon warning to always render at page top, independent of form state | S | High | 🔴 OPEN |
+| **P1** | "Receive Stock" button not visually dominant — same weight as "Cancel" | Style "Receive Stock" as full-width `btn-primary` at bottom of form. Make Cancel a ghost/text link | S | Med | 🔴 OPEN |
+| **P1** | Supplier field is plain text with no autocomplete — repeated manual entry | Add recent suppliers as quick-tap chips below the Supplier field (last 5 used) | M | Med | 🟢 FIXED |
+| **P2** | FIFO usage % text contrast may be below 4.5:1 | Verify and darken if needed; use `text-gray-700` minimum | S | Low | 🔴 OPEN |
+| **P2** | "Expiring Soon" amber badge contrast unverified | Use `text-amber-800 bg-amber-100` to match confirmed-passing contrast pattern from KDS fixes | S | Low | 🔴 OPEN |

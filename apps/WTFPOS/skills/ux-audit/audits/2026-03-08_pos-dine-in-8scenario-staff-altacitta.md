@@ -7,6 +7,9 @@
 **Mode:** Multi-user (POS Agent + KDS Agent, shared browser session)
 **Intensity:** Extreme (8 scenarios + chaos events)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 2 of 8 issues resolved (P0: 1/2 · P1: 1/3 · P2: 0/3)
+
 ---
 
 ## Login & Setup Observations
@@ -103,16 +106,16 @@ The best version of this shift feels like this: she taps a table, the sidebar sn
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | Meat items stuck in WEIGHING have no age indicator. Staff cannot distinguish "kitchen is weighing now" from "this was forgotten 20 minutes ago." | Add elapsed time badge next to WEIGHING status in the sidebar (e.g., "WEIGHING 12m"). Animate red if >10 minutes. | S | High |
-| **P0** | Leftover Penalty modal appears before Checkout modal with no preview. Under pressure, staff may not understand why a numpad appeared. No title says "this is about leftover meat." | Add subheading: "AYCE: Enter unconsumed meat weight (g)" and a brief "why" line: "Over 100g = penalty added to bill." | S | High |
-| **P1** | Refill and Add Item buttons have equal visual weight in the AYCE sidebar. For AYCE tables, Refill is the primary action (done every 15-20 minutes); Add Item is secondary. | Make Refill the full-width orange primary button (matching the existing Checkout button prominence). Demote Add Item to secondary/border style. | S | High |
-| **P1** | The "9 requesting" Sides summary in the AYCE sidebar collapses all side status behind one button. A table with 2 sides SERVED and 7 still REQUESTING looks identical to one with 9 REQUESTING. | Show two counts: "X serving, Y served" inline. E.g., "7 requesting · 2 served ▼". | S | Med |
-| **P1** | Touch targets: the "4 pax ✎" pax change button and the "✕" close button both have `min-height: unset`, breaking the 44px rule. Both are used during active service. | Add `style="min-height: 44px"` and sufficient `px-3` padding to both elements. | S | Med |
-| **P2** | Status amber text ("9 requesting", WEIGHING badge text) fails WCAG AA contrast on white at small text sizes (~2.6:1 to ~3.8:1). | Bump to `text-amber-800` for inline text, keep `bg-amber-100` badge for visual identity. | S | Low |
-| **P2** | Checkout discount buttons (Senior, PWD, Promo, Comp, Service Rec) are all equal weight. Senior and PWD account for most discount use cases. | Show Senior and PWD first and slightly larger. Group Promo/Comp/Service Rec in a secondary cluster or collapse them under a "More" toggle. | M | Low |
-| **P2** | Table card shows "PORK" / "BEEF" / "Beef+Pork" as abbreviated text badge — the COMBO label is "Beef+Pork" which truncates awkwardly in small tables. | Replace with a colored dot or icon badge next to the label when table dimensions are too narrow for text. | S | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | Meat items stuck in WEIGHING have no age indicator. Staff cannot distinguish "kitchen is weighing now" from "this was forgotten 20 minutes ago." | Add elapsed time badge next to WEIGHING status in the sidebar (e.g., "WEIGHING 12m"). Animate red if >10 minutes. | S | High | 🟢 FIXED |
+| **P0** | Leftover Penalty modal appears before Checkout modal with no preview. Under pressure, staff may not understand why a numpad appeared. No title says "this is about leftover meat." | Add subheading: "AYCE: Enter unconsumed meat weight (g)" and a brief "why" line: "Over 100g = penalty added to bill." | S | High | 🟢 FIXED |
+| **P1** | Refill and Add Item buttons have equal visual weight in the AYCE sidebar. For AYCE tables, Refill is the primary action (done every 15-20 minutes); Add Item is secondary. | Make Refill the full-width orange primary button (matching the existing Checkout button prominence). Demote Add Item to secondary/border style. | S | High | 🔴 OPEN |
+| **P1** | The "9 requesting" Sides summary in the AYCE sidebar collapses all side status behind one button. A table with 2 sides SERVED and 7 still REQUESTING looks identical to one with 9 REQUESTING. | Show two counts: "X serving, Y served" inline. E.g., "7 requesting · 2 served ▼". | S | Med | 🟢 FIXED |
+| **P1** | Touch targets: the "4 pax ✎" pax change button and the "✕" close button both have `min-height: unset`, breaking the 44px rule. Both are used during active service. | Add `style="min-height: 44px"` and sufficient `px-3` padding to both elements. | S | Med | 🔴 OPEN |
+| **P2** | Status amber text ("9 requesting", WEIGHING badge text) fails WCAG AA contrast on white at small text sizes (~2.6:1 to ~3.8:1). | Bump to `text-amber-800` for inline text, keep `bg-amber-100` badge for visual identity. | S | Low | 🔴 OPEN |
+| **P2** | Checkout discount buttons (Senior, PWD, Promo, Comp, Service Rec) are all equal weight. Senior and PWD account for most discount use cases. | Show Senior and PWD first and slightly larger. Group Promo/Comp/Service Rec in a secondary cluster or collapse them under a "More" toggle. | M | Low | 🔴 OPEN |
+| **P2** | Table card shows "PORK" / "BEEF" / "Beef+Pork" as abbreviated text badge — the COMBO label is "Beef+Pork" which truncates awkwardly in small tables. | Replace with a colored dot or icon badge next to the label when table dimensions are too narrow for text. | S | Low | 🔴 OPEN |
 
 ---
 

@@ -6,6 +6,9 @@
 **App version:** v0.1-alpha
 **Auditor:** Claude (automated UX audit via playwright-cli snapshots)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 13 issues resolved (P0: 0/2 · P1: 0/7 · P2: 0/6) — all POS/owner issues remain open
+
 ---
 
 ## Steps Completed
@@ -303,18 +306,18 @@ At end of day, he goes to Branch Comparison, switches to "This Week" view, and s
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | "Start Shift" modal blocks owner POS observation on every branch switch | Skip shift-start for owner/admin roles OR show POS in read-only observer mode without requiring float declaration | M | High |
-| **P0** | Meat Report redirects to login (session instability under stress/reload) | Add a session restore flow: if sessionStorage is cleared but user navigates to a protected route, redirect to `/` with a "Session expired — please log in again" message (not a silent redirect); alternatively investigate what clears the session | S | High |
-| **P1** | OCC counter mismatch between AllBranches dashboard and individual floor plans | Ensure the occupancy count derives from the same `tables.value` query as the SVG render; add a reactive test | M | High |
-| **P1** | "Infinity%" in Expenses Daily when sales = ₱0 | Guard the division: `sales > 0 ? formatPercent(expenses / sales) : '—'` | S | Med |
-| **P1** | Audit Log branch filter shows "QC" / "MKTI" placeholder names | Replace static location names in the audit log filter with the `LOCATIONS` constant from `session.svelte.ts` | S | Med |
-| **P1** | Branch Comparison defaults to all-zeros "Today" | Default to "This Week" for the branch comparison, OR include in-progress orders in the "Today" view | S | Med |
-| **P1** | Sidebar navigation collapses to staff-only nav when session degrades | Add a session health check: if `session.userName` is empty and the route requires auth, redirect immediately with a clear message; don't attempt to render degraded nav | M | High |
-| **P2** | No visual differentiation between branch floor plans | Add a color-coded top strip (accent-orange for Alta Citta, blue for Alona Beach) or branch badge on the floor plan SVG container | S | Low |
-| **P2** | Location selector modal doesn't show occupancy/revenue summary per branch | Add a compact 1-line stats row to each branch card in the location selector: "X OCC · ₱Y today" | M | Med |
-| **P2** | AllBranches dashboard doesn't show combined totals | Add a summary row above the branch panels: "Combined: ₱X today · Y pax across both branches" | S | Med |
-| **P2** | Branch Comparison table needs active (in-progress) order data for "Today" to be useful | Include orders with status 'open' and 'pending_payment' in the comparison when filtering by Today | M | Med |
-| **P2** | "Change Location" button touch target below 44px | Add `min-h-[44px]` or `py-3` to the Change Location button | S | Low |
-| **P2** | Floor Editor canvas empty for location with POS tables | Investigate whether floor editor and POS floor plan share the same data source; seed floor_elements matching seeded tables | L | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|---|
+| **P0** | "Start Shift" modal blocks owner POS observation on every branch switch | Skip shift-start for owner/admin roles OR show POS in read-only observer mode without requiring float declaration | M | High | 🔴 OPEN |
+| **P0** | Meat Report redirects to login (session instability under stress/reload) | Add a session restore flow: if sessionStorage is cleared but user navigates to a protected route, redirect to `/` with a "Session expired — please log in again" message (not a silent redirect); alternatively investigate what clears the session | S | High | 🔴 OPEN |
+| **P1** | OCC counter mismatch between AllBranches dashboard and individual floor plans | Ensure the occupancy count derives from the same `tables.value` query as the SVG render; add a reactive test | M | High | 🔴 OPEN |
+| **P1** | "Infinity%" in Expenses Daily when sales = ₱0 | Guard the division: `sales > 0 ? formatPercent(expenses / sales) : '—'` | S | Med | 🔴 OPEN |
+| **P1** | Audit Log branch filter shows "QC" / "MKTI" placeholder names | Replace static location names in the audit log filter with the `LOCATIONS` constant from `session.svelte.ts` | S | Med | 🔴 OPEN |
+| **P1** | Branch Comparison defaults to all-zeros "Today" | Default to "This Week" for the branch comparison, OR include in-progress orders in the "Today" view | S | Med | 🔴 OPEN |
+| **P1** | Sidebar navigation collapses to staff-only nav when session degrades | Add a session health check: if `session.userName` is empty and the route requires auth, redirect immediately with a clear message; don't attempt to render degraded nav | M | High | 🔴 OPEN |
+| **P2** | No visual differentiation between branch floor plans | Add a color-coded top strip (accent-orange for Alta Citta, blue for Alona Beach) or branch badge on the floor plan SVG container | S | Low | 🔴 OPEN |
+| **P2** | Location selector modal doesn't show occupancy/revenue summary per branch | Add a compact 1-line stats row to each branch card in the location selector: "X OCC · ₱Y today" | M | Med | 🔴 OPEN |
+| **P2** | AllBranches dashboard doesn't show combined totals | Add a summary row above the branch panels: "Combined: ₱X today · Y pax across both branches" | S | Med | 🔴 OPEN |
+| **P2** | Branch Comparison table needs active (in-progress) order data for "Today" to be useful | Include orders with status 'open' and 'pending_payment' in the comparison when filtering by Today | M | Med | 🔴 OPEN |
+| **P2** | "Change Location" button touch target below 44px | Add `min-h-[44px]` or `py-3` to the Change Location button | S | Low | 🔴 OPEN |
+| **P2** | Floor Editor canvas empty for location with POS tables | Investigate whether floor editor and POS floor plan share the same data source; seed floor_elements matching seeded tables | L | Low | 🔴 OPEN |

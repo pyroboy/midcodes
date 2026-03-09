@@ -1,6 +1,9 @@
 # UX Audit: Kitchen KDS — `/kitchen/orders`
 **Role:** Kitchen (Pedro Cruz) · **Branch:** Alta Citta (Tagbilaran) · **Viewport:** 1024×768 tablet · **Date:** 2026-03-09
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 13 issues resolved (P0: 0/2 · P1: 0/7 · P2: 0/4)
+
 ---
 
 ## A. Kitchen KDS Layout Map (ASCII)

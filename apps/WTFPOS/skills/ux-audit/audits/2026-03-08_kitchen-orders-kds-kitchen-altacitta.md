@@ -6,6 +6,9 @@
 **Scope:** `/kitchen/orders` — full shift simulation (Phases 1–8 from the brief)
 **Intensity:** Extreme (solo agent simulating kitchen + POS handoff cycles)
 
+**Retrospective Update:** 2026-03-09 · post-fix-session review
+**Fix Progress:** 0 of 10 issues resolved (P0: 0/2 · P1: 0/5 · P2: 0/3)
+
 ---
 
 ## Context & Methodology
@@ -136,18 +139,18 @@ At the end of the night, he bumps the last ticket and the KDS returns to the ser
 
 ## D. Prioritized Recommendations
 
-| Priority | Issue | Fix | Effort | Impact |
-|---|---|---|---|---|
-| **P0** | **ALL DONE button unreachable without scroll** — on 12-item tickets the button is ~1,700px below the header. Greasy hands + urgent rush = dangerous scroll requirement. | Make "ALL DONE" sticky at bottom of viewport, OR duplicate a small "✓ Bump" button in the ticket header row. | M | High |
-| **P0** | **Same-table duplicate tickets** — two T1 cards appear when a package (with included items) and an additional item order both create separate KDS records. Kitchen cannot tell them apart at a glance. Observed: #T1--001 + #T1-EAHZ simultaneously. | Merge all KDS items for the same `orderId` into a single ticket record. Prevent duplicate tickets per order. | L | High |
-| **P1** | **Refill badge contrast fails WCAG AA** — amber-600 on amber-100 = ~2.8:1. Under harsh kitchen lighting, this fails. The badge carries critical information (refill vs. new item). | Use `text-amber-800` on `bg-amber-100` (~4.8:1) or add a ↺ icon alongside the REFILL text | S | High |
-| **P1** | **Timer badge (yellow/warning) fails WCAG AA** — white text on `#F59E0B` = 2.1:1. The most time-critical information on the screen (urgency) has the worst contrast. | Use `text-gray-900` on yellow badge, or add ⏱ icon. Consider darker amber (`bg-amber-500`) for the badge at warning level. | S | High |
-| **P1** | **Large tickets require scroll to see all items** — 12-item order spans 2.3 viewports. Kitchen staff lose context of which table/counter the ticket belongs to while scrolling. | Sticky ticket header (table number + timer) while scrolling within a tall card. | M | Med |
-| **P1** | **SIDE REQUESTS items lack expand/refuse capability** — inconsistent with MEATS and DISHES items. If a requested side is unavailable, kitchen has no way to refuse it from the KDS. | Add same expand-to-refuse pattern to SIDE REQUESTS rows | S | Med |
-| **P1** | **Right half of screen unused** — on 1024px viewport with a single ticket, 460px of space is empty. During a 3-ticket rush, the grid uses `auto-fill minmax(320px, 1fr)` which collapses to single-column at sizes that produce only 1 column fit, causing overflow requiring scroll to see ticket 3. | Decrease card min-width from `320px` to `260px`, or set a max-height on ticket cards with internal scroll to allow multiple tickets to show simultaneously | M | High |
-| **P2** | **Session persistence conflict** — switching from Kitchen to Staff login (or navigating to /pos while logged as Kitchen) overwrites the Kitchen session in localStorage. If a kitchen device is accidentally loaded to /pos, the session is hijacked. | Lock Kitchen devices to `/kitchen` routes server-side, or use a PIN confirm before any session switch. | M | Med |
-| **P2** | **"WEIGHING" status is cryptic to new staff** — the blue pulsing WEIGHING badge requires kitchen staff to understand the weigh-station flow. No tooltip or inline explanation. | Add a one-line helper when all items are WEIGHING: "Go to Weigh Station → dispatch meat weight to activate" | S | Low |
-| **P2** | **Category section headers are small** (`text-xs uppercase`) — from 1 meter away with bright kitchen lighting, MEATS / DISHES & DRINKS / SIDE REQUESTS section labels are hard to read quickly. | Increase to `text-sm font-bold` + add a slight background tint to section header rows | S | Low |
+| Priority | Issue | Fix | Effort | Impact | Status |
+|---|---|---|---|---|---|
+| **P0** | **ALL DONE button unreachable without scroll** — on 12-item tickets the button is ~1,700px below the header. Greasy hands + urgent rush = dangerous scroll requirement. | Make "ALL DONE" sticky at bottom of viewport, OR duplicate a small "✓ Bump" button in the ticket header row. | M | High | 🔴 OPEN |
+| **P0** | **Same-table duplicate tickets** — two T1 cards appear when a package (with included items) and an additional item order both create separate KDS records. Kitchen cannot tell them apart at a glance. Observed: #T1--001 + #T1-EAHZ simultaneously. | Merge all KDS items for the same `orderId` into a single ticket record. Prevent duplicate tickets per order. | L | High | 🔴 OPEN |
+| **P1** | **Refill badge contrast fails WCAG AA** — amber-600 on amber-100 = ~2.8:1. Under harsh kitchen lighting, this fails. The badge carries critical information (refill vs. new item). | Use `text-amber-800` on `bg-amber-100` (~4.8:1) or add a ↺ icon alongside the REFILL text | S | High | 🔴 OPEN |
+| **P1** | **Timer badge (yellow/warning) fails WCAG AA** — white text on `#F59E0B` = 2.1:1. The most time-critical information on the screen (urgency) has the worst contrast. | Use `text-gray-900` on yellow badge, or add ⏱ icon. Consider darker amber (`bg-amber-500`) for the badge at warning level. | S | High | 🔴 OPEN |
+| **P1** | **Large tickets require scroll to see all items** — 12-item order spans 2.3 viewports. Kitchen staff lose context of which table/counter the ticket belongs to while scrolling. | Sticky ticket header (table number + timer) while scrolling within a tall card. | M | Med | 🔴 OPEN |
+| **P1** | **SIDE REQUESTS items lack expand/refuse capability** — inconsistent with MEATS and DISHES items. If a requested side is unavailable, kitchen has no way to refuse it from the KDS. | Add same expand-to-refuse pattern to SIDE REQUESTS rows | S | Med | 🔴 OPEN |
+| **P1** | **Right half of screen unused** — on 1024px viewport with a single ticket, 460px of space is empty. During a 3-ticket rush, the grid uses `auto-fill minmax(320px, 1fr)` which collapses to single-column at sizes that produce only 1 column fit, causing overflow requiring scroll to see ticket 3. | Decrease card min-width from `320px` to `260px`, or set a max-height on ticket cards with internal scroll to allow multiple tickets to show simultaneously | M | High | 🔴 OPEN |
+| **P2** | **Session persistence conflict** — switching from Kitchen to Staff login (or navigating to /pos while logged as Kitchen) overwrites the Kitchen session in localStorage. If a kitchen device is accidentally loaded to /pos, the session is hijacked. | Lock Kitchen devices to `/kitchen` routes server-side, or use a PIN confirm before any session switch. | M | Med | 🔴 OPEN |
+| **P2** | **"WEIGHING" status is cryptic to new staff** — the blue pulsing WEIGHING badge requires kitchen staff to understand the weigh-station flow. No tooltip or inline explanation. | Add a one-line helper when all items are WEIGHING: "Go to Weigh Station → dispatch meat weight to activate" | S | Low | 🔴 OPEN |
+| **P2** | **Category section headers are small** (`text-xs uppercase`) — from 1 meter away with bright kitchen lighting, MEATS / DISHES & DRINKS / SIDE REQUESTS section labels are hard to read quickly. | Increase to `text-sm font-bold` + add a slight background tint to section header rows | S | Low | 🔴 OPEN |
 
 ---
 

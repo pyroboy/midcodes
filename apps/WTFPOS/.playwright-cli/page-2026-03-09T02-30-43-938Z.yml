@@ -1,0 +1,227 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+          - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph [ref=e17]: 10:30:43 AM
+    - separator [ref=e18]
+    - generic [ref=e19]:
+      - paragraph [ref=e21]: Quick Actions
+      - generic [ref=e22]:
+        - link "Receive Delivery" [ref=e23] [cursor=pointer]:
+          - /url: /stock/deliveries
+          - img [ref=e24]
+          - generic [ref=e25]: Receive Delivery
+        - link "Log Expense" [ref=e26] [cursor=pointer]:
+          - /url: /reports/expenses-daily
+          - img [ref=e27]
+          - generic [ref=e28]: Log Expense
+        - link "Log Waste" [ref=e29] [cursor=pointer]:
+          - /url: /stock/waste
+          - img [ref=e30]
+          - generic [ref=e31]: Log Waste
+        - link "Stock Count" [ref=e32] [cursor=pointer]:
+          - /url: /stock/counts
+          - img [ref=e33]
+          - generic [ref=e34]: Stock Count
+        - link "X-Reading" [ref=e35] [cursor=pointer]:
+          - /url: /reports/x-read
+          - img [ref=e36]
+          - generic [ref=e37]: X-Reading
+        - link "Transfer Stock" [ref=e38] [cursor=pointer]:
+          - /url: /stock/transfers
+          - img [ref=e39]
+          - generic [ref=e40]: Transfer Stock
+        - link "End of Day" [ref=e41] [cursor=pointer]:
+          - /url: /reports/eod
+          - img [ref=e42]
+          - generic [ref=e43]: End of Day
+    - list [ref=e47]:
+      - listitem [ref=e48]:
+        - link "POS" [ref=e49] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e51]
+          - generic [ref=e55]: POS
+      - listitem [ref=e56]:
+        - link "Kitchen" [ref=e57] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e59]
+          - generic [ref=e60]: Kitchen
+      - listitem [ref=e61]:
+        - link "Stock" [ref=e62] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e64]
+          - generic [ref=e65]: Stock
+      - listitem [ref=e66]:
+        - link "Reports" [ref=e67] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e69]
+          - generic [ref=e70]: Reports
+    - generic [ref=e71]:
+      - separator [ref=e72]
+      - generic [ref=e73]:
+        - generic [ref=e74]: J
+        - generic [ref=e75]:
+          - generic [ref=e76]: Juan Reyes
+          - generic [ref=e77]: manager
+      - button "Change Location" [ref=e79] [cursor=pointer]:
+        - img [ref=e80]
+        - generic [ref=e81]: Change Location
+      - link "Logout" [ref=e83] [cursor=pointer]:
+        - /url: /
+        - img [ref=e84]
+        - generic [ref=e87]: Logout
+    - button "Toggle Sidebar" [ref=e88]
+  - main [ref=e89]:
+    - generic [ref=e90]:
+      - generic [ref=e91]:
+        - img [ref=e92]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e93]
+      - button "Change Location" [ref=e94] [cursor=pointer]:
+        - img [ref=e95]
+        - text: Change Location
+    - generic [ref=e96]:
+      - generic [ref=e97]:
+        - heading "Expenses" [level=1] [ref=e98]
+        - generic [ref=e99]:
+          - paragraph [ref=e100]: Today's Total
+          - paragraph [ref=e101]: ₱44,733.00
+          - paragraph [ref=e102]: "All time: ₱68,809.00"
+      - generic [ref=e103]:
+        - generic [ref=e104]:
+          - heading "Record Expense" [level=2] [ref=e105]
+          - generic [ref=e106]:
+            - generic [ref=e107]: Category
+            - combobox "Category" [ref=e108]:
+              - option "Labor Budget"
+              - option "Wages"
+              - option "Rent"
+              - option "Meat Procurement"
+              - option "Produce & Sides"
+              - option "Electricity"
+              - option "Gas/LPG"
+              - option "Water"
+              - option "Internet"
+              - option "Petty Cash Replenishment"
+              - option "Miscellaneous"
+          - generic [ref=e109]:
+            - generic [ref=e110]: Amount (₱)
+            - spinbutton "Amount (₱)" [active] [ref=e111]
+          - generic [ref=e112]:
+            - generic [ref=e113]: Description
+            - textbox "Description 27/200" [ref=e219]:
+              - /placeholder: e.g., Unbox wet wipes
+              - text: Electricity partial payment
+            - generic [ref=e115]: 27/200
+          - generic [ref=e116]:
+            - generic [ref=e117]: Date
+            - textbox "Date" [ref=e118]: 2026-03-09
+          - generic [ref=e119]:
+            - generic [ref=e120]: Paid By
+            - combobox "Paid By" [ref=e121]:
+              - option "Petty Cash"
+              - option "Cash from Register"
+              - option "Company Card"
+              - option "GCash"
+              - option "Maya"
+              - option "Owner's Pocket"
+          - generic [ref=e122]:
+            - generic [ref=e123]: Receipt Photo (Optional)
+            - button "Add" [ref=e125] [cursor=pointer]:
+              - img [ref=e126]
+              - generic [ref=e129]: Add
+          - button "➕ Record Expense" [disabled] [ref=e130]:
+            - generic [ref=e131]: ➕
+            - text: Record Expense
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - heading "Expense Log (5 today)" [level=2] [ref=e134]
+            - generic [ref=e135]:
+              - button "Today" [ref=e136] [cursor=pointer]
+              - button "This Week" [ref=e137] [cursor=pointer]
+              - button "All Time" [ref=e138] [cursor=pointer]
+          - table [ref=e140]:
+            - rowgroup [ref=e141]:
+              - row "Date Time Category Description Source Amount ⇅" [ref=e142]:
+                - columnheader "Date" [ref=e143]
+                - columnheader "Time" [ref=e144]
+                - columnheader "Category" [ref=e145]
+                - columnheader "Description" [ref=e146]
+                - columnheader "Source" [ref=e147]
+                - columnheader "Amount ⇅" [ref=e148]:
+                  - button "Amount ⇅" [ref=e149] [cursor=pointer]:
+                    - text: Amount
+                    - generic [ref=e150]: ⇅
+                - columnheader [ref=e151]
+            - rowgroup [ref=e152]:
+              - row "2026-03-09 07:00 PM Utilities Electricity partial payment Card ₱441.00 Repeat ✕" [ref=e153]:
+                - cell "2026-03-09" [ref=e154]
+                - cell "07:00 PM" [ref=e155]
+                - cell "Utilities" [ref=e156]
+                - cell "Electricity partial payment" [ref=e157]
+                - cell "Card" [ref=e158]
+                - cell "₱441.00" [ref=e159]
+                - cell "Repeat ✕" [ref=e160]:
+                  - generic [ref=e161]:
+                    - button "Repeat" [ref=e162] [cursor=pointer]:
+                      - img [ref=e163]
+                      - generic [ref=e164]: Repeat
+                    - button "✕" [ref=e165] [cursor=pointer]
+              - row "2026-03-09 06:00 PM Meat Procurement Restock Pork Bones — 11,889g Petty Cash ₱7,292.00 Repeat ✕" [ref=e166]:
+                - cell "2026-03-09" [ref=e167]
+                - cell "06:00 PM" [ref=e168]
+                - cell "Meat Procurement" [ref=e169]
+                - cell "Restock Pork Bones — 11,889g" [ref=e170]
+                - cell "Petty Cash" [ref=e171]
+                - cell "₱7,292.00" [ref=e172]
+                - cell "Repeat ✕" [ref=e173]:
+                  - generic [ref=e174]:
+                    - button "Repeat" [ref=e175] [cursor=pointer]:
+                      - img [ref=e176]
+                      - generic [ref=e177]: Repeat
+                    - button "✕" [ref=e178] [cursor=pointer]
+              - row "2026-03-09 10:28 AM Labor Budget Weekly labor budget allocation for 5 staff Petty Cash ₱25,000.00 Repeat ✕" [ref=e179]:
+                - cell "2026-03-09" [ref=e180]
+                - cell "10:28 AM" [ref=e181]
+                - cell "Labor Budget" [ref=e182]
+                - cell "Weekly labor budget allocation for 5 staff" [ref=e183]
+                - cell "Petty Cash" [ref=e184]
+                - cell "₱25,000.00" [ref=e185]
+                - cell "Repeat ✕" [ref=e186]:
+                  - generic [ref=e187]:
+                    - button "Repeat" [ref=e188] [cursor=pointer]:
+                      - img [ref=e189]
+                      - generic [ref=e190]: Repeat
+                    - button "✕" [ref=e191] [cursor=pointer]
+              - row "2026-03-09 10:23 AM Gas/LPG March gas delivery - LPG 50kg tank refill Petty Cash ₱3,500.00 Repeat ✕" [ref=e192]:
+                - cell "2026-03-09" [ref=e193]
+                - cell "10:23 AM" [ref=e194]
+                - cell "Gas/LPG" [ref=e195]
+                - cell "March gas delivery - LPG 50kg tank refill" [ref=e196]
+                - cell "Petty Cash" [ref=e197]
+                - cell "₱3,500.00" [ref=e198]
+                - cell "Repeat ✕" [ref=e199]:
+                  - generic [ref=e200]:
+                    - button "Repeat" [ref=e201] [cursor=pointer]:
+                      - img [ref=e202]
+                      - generic [ref=e203]: Repeat
+                    - button "✕" [ref=e204] [cursor=pointer]
+              - row "2026-03-09 10:21 AM Meat Procurement Pork belly delivery Petty Cash ₱8,500.00 Repeat ✕" [ref=e205]:
+                - cell "2026-03-09" [ref=e206]
+                - cell "10:21 AM" [ref=e207]
+                - cell "Meat Procurement" [ref=e208]
+                - cell "Pork belly delivery" [ref=e209]
+                - cell "Petty Cash" [ref=e210]
+                - cell "₱8,500.00" [ref=e211]
+                - cell "Repeat ✕" [ref=e212]:
+                  - generic [ref=e213]:
+                    - button "Repeat" [ref=e214] [cursor=pointer]:
+                      - img [ref=e215]
+                      - generic [ref=e216]: Repeat
+                    - button "✕" [ref=e217] [cursor=pointer]

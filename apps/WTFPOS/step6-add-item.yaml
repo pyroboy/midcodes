@@ -1,0 +1,139 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "POS" [ref=e18] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e20]
+          - generic [ref=e24]: POS
+    - generic [ref=e25]:
+      - separator [ref=e26]
+      - generic [ref=e28]: U
+      - link "Logout" [ref=e30] [cursor=pointer]:
+        - /url: /
+        - img [ref=e31]
+    - button "Toggle Sidebar" [ref=e34]
+  - main [ref=e35]:
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - button "Toggle Sidebar" [ref=e41] [cursor=pointer]:
+              - img
+              - generic [ref=e42]: Toggle Sidebar
+            - heading "POS" [level=1] [ref=e43]
+            - generic [ref=e44]: 1 occ
+            - generic [ref=e45]: 7 free
+          - generic [ref=e46]:
+            - button "Toggle color legend" [ref=e48] [cursor=pointer]:
+              - img [ref=e49]
+            - button "📦 New Takeout" [ref=e51] [cursor=pointer]
+            - button "🧾 History 6" [ref=e89] [cursor=pointer]:
+              - text: 🧾 History
+              - generic [ref=e90]: "6"
+        - img [ref=e54]:
+          - button "Table T1" [ref=e91] [cursor=pointer]:
+            - generic: 0m
+            - generic: T1
+            - generic: 2 pax
+          - button "Table T2" [ref=e93] [cursor=pointer]:
+            - generic: T2
+            - generic: cap 4
+          - button "Table T3" [ref=e95] [cursor=pointer]:
+            - generic: T3
+            - generic: cap 4
+          - button "Table T4" [ref=e97] [cursor=pointer]:
+            - generic: T4
+            - generic: cap 4
+          - button "Table T5" [ref=e99] [cursor=pointer]:
+            - generic: T5
+            - generic: cap 4
+          - button "Table T6" [ref=e101] [cursor=pointer]:
+            - generic: T6
+            - generic: cap 4
+          - button "Table T7" [ref=e103] [cursor=pointer]:
+            - generic: T7
+            - generic: cap 2
+          - button "Table T8" [ref=e105] [cursor=pointer]:
+            - generic: T8
+            - generic: cap 2
+      - generic [ref=e57]:
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]: T1
+              - button "2 pax ✎" [ref=e136] [cursor=pointer]
+              - generic [ref=e137]: 0m
+            - button "✕" [ref=e138] [cursor=pointer]
+          - button "+ Add Item" [ref=e139] [cursor=pointer]
+        - generic [ref=e141]:
+          - generic [ref=e142]:
+            - generic [ref=e143]: BILL
+            - generic [ref=e144]: 0 items
+          - generic [ref=e145]: ₱0.00
+        - generic [ref=e146]:
+          - button "Cancel Table" [ref=e147] [cursor=pointer]:
+            - img [ref=e148]
+            - text: Cancel Table
+          - button "⋯ More Options ▼" [ref=e149] [cursor=pointer]
+    - generic [ref=e151]:
+      - generic [ref=e152]:
+        - generic [ref=e153]:
+          - generic [ref=e154]:
+            - heading "➕ Add to Order" [level=2] [ref=e155]
+            - paragraph [ref=e156]: 🔥 Table · 2 pax
+          - button "Close modal" [ref=e157] [cursor=pointer]: ✕
+        - generic [ref=e158]:
+          - button "🎫 Package" [ref=e159] [cursor=pointer]:
+            - generic [ref=e160]: 🎫
+            - generic [ref=e161]: Package
+          - button "🥩 Meats" [ref=e162] [cursor=pointer]:
+            - generic [ref=e163]: 🥩
+            - generic [ref=e164]: Meats
+          - button "🥬 Sides" [ref=e165] [cursor=pointer]:
+            - generic [ref=e166]: 🥬
+            - generic [ref=e167]: Sides
+          - button "🍜 Dishes" [ref=e168] [cursor=pointer]:
+            - generic [ref=e169]: 🍜
+            - generic [ref=e170]: Dishes
+          - button "🥤 Drinks" [ref=e171] [cursor=pointer]:
+            - generic [ref=e172]: 🥤
+            - generic [ref=e173]: Drinks
+        - generic [ref=e175]: FREE — inventory tracked
+        - generic [ref=e177]:
+          - button "Beef Unlimited Beef Unlimited Unlimited Premium USDA Beef ₱599/pax ✓ Unlimited sides, rice, soup" [ref=e178] [cursor=pointer]:
+            - img "Beef Unlimited" [ref=e180]
+            - generic [ref=e181]:
+              - generic [ref=e183]: Beef Unlimited
+              - paragraph [ref=e184]: Unlimited Premium USDA Beef
+              - paragraph [ref=e185]: ₱599/pax
+              - paragraph [ref=e186]: ✓ Unlimited sides, rice, soup
+          - button "Beef + Pork Unlimited Beef + Pork Unlimited Unlimited Premium USDA Beef + Pork ₱499/pax ✓ Unlimited sides, rice, soup" [ref=e187] [cursor=pointer]:
+            - img "Beef + Pork Unlimited" [ref=e189]
+            - generic [ref=e190]:
+              - generic [ref=e192]: Beef + Pork Unlimited
+              - paragraph [ref=e193]: Unlimited Premium USDA Beef + Pork
+              - paragraph [ref=e194]: ₱499/pax
+              - paragraph [ref=e195]: ✓ Unlimited sides, rice, soup
+          - button "Pork Unlimited Pork Unlimited Unlimited pork samgyupsal grill ₱399/pax ✓ Unlimited sides, rice, soup" [ref=e196] [cursor=pointer]:
+            - img "Pork Unlimited" [ref=e198]
+            - generic [ref=e199]:
+              - generic [ref=e201]: Pork Unlimited
+              - paragraph [ref=e202]: Unlimited pork samgyupsal grill
+              - paragraph [ref=e203]: ₱399/pax
+              - paragraph [ref=e204]: ✓ Unlimited sides, rice, soup
+      - generic [ref=e205]:
+        - generic [ref=e206]:
+          - heading "Pending Items" [level=3] [ref=e207]
+          - paragraph [ref=e208]: Review items before pushing to the bill.
+        - generic [ref=e210]: No items yet
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - generic [ref=e213]: PENDING TOTAL
+            - generic [ref=e214]: ₱0.00
+          - generic [ref=e215]:
+            - button "Undo" [ref=e216] [cursor=pointer]
+            - button "⚡ CHARGE (0)" [disabled] [ref=e217]

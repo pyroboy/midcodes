@@ -222,7 +222,15 @@
                 role="button"
                 tabindex="0"
                 aria-label="Table {table.label}"
+                pointer-events="none"
             >
+                <!-- Isolated hit region — 2px inset from table bounds prevents edge-overlap with adjacent tables -->
+                <rect
+                    x={table.x + 2} y={table.y + 2}
+                    width={W - 4} height={H - 4}
+                    fill="transparent"
+                    pointer-events="all"
+                />
                 <!-- Chairs -->
                 {#if table.chairConfig}
                     {#each (['top','bottom','left','right'] as const) as sideName}
@@ -352,7 +360,9 @@
 
                     <!-- Refill count badge (bottom-right) — AYCE only -->
                     {#if isAyce && refills > 0}
-                        <rect x={table.x + W - 26} y={table.y + H - 18} width="22" height="14" rx="7" fill="#8b5cf6" opacity="0.9" />
+                        <rect x={table.x + W - 26} y={table.y + H - 18} width="22" height="14" rx="7" fill="#8b5cf6" opacity="0.9">
+                            <animate attributeName="opacity" values="0.9;0.5;0.9" dur="1.4s" repeatCount="indefinite" />
+                        </rect>
                         <text
                             x={table.x + W - 15} y={table.y + H - 10}
                             text-anchor="middle" dominant-baseline="middle"

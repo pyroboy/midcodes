@@ -162,6 +162,7 @@
 			totalPax: 0,
 			cash: summary.cash,
 			gcash: summary.gcash,
+			maya: summary.maya,
 			card: summary.card,
 			cashExpenses,
 			openingCash,

@@ -1,0 +1,64 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+      - generic [ref=e11]: W!
+    - separator [ref=e12]
+    - list [ref=e16]:
+      - listitem [ref=e17]:
+        - link "Kitchen" [ref=e18] [cursor=pointer]:
+          - /url: /kitchen
+          - img [ref=e20]
+          - generic [ref=e23]: Kitchen
+      - listitem [ref=e24]:
+        - link "Stock" [ref=e25] [cursor=pointer]:
+          - /url: /stock
+          - img [ref=e27]
+          - generic [ref=e28]: Stock
+    - generic [ref=e29]:
+      - separator [ref=e30]
+      - generic [ref=e32]: P
+      - link "Logout" [ref=e34] [cursor=pointer]:
+        - /url: /
+        - img [ref=e35]
+    - button "Toggle Sidebar" [ref=e38]
+  - main [ref=e39]:
+    - generic [ref=e41]:
+      - img [ref=e42]
+      - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e43]
+    - generic [ref=e44]:
+      - navigation [ref=e45]:
+        - link "🧾 All Orders" [ref=e46] [cursor=pointer]:
+          - /url: /kitchen/all-orders
+        - link "📋 Order Queue" [ref=e47] [cursor=pointer]:
+          - /url: /kitchen/orders
+        - link "⚖️ Weigh Station" [ref=e48] [cursor=pointer]:
+          - /url: /kitchen/weigh-station
+      - main [ref=e49]:
+        - generic [ref=e52]: Live
+        - generic [ref=e54]:
+          - generic [ref=e56]:
+            - heading "Kitchen Queue" [level=1] [ref=e57]
+            - paragraph [ref=e58]: Active tickets awaiting kitchen action
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - generic "Alert volume" [ref=e61]: 🔊
+              - slider "Alert volume" [ref=e62] [cursor=pointer]: "0.7"
+            - button "↩ UNDO LAST" [ref=e63] [cursor=pointer]
+            - button "History 58" [ref=e64] [cursor=pointer]:
+              - text: History
+              - generic [ref=e65]: "58"
+        - generic [ref=e66]:
+          - generic [ref=e67]:
+            - generic [ref=e68]: ✅
+            - paragraph [ref=e69]: No pending orders
+            - paragraph [ref=e70]: New orders will appear here automatically
+          - generic [ref=e71]:
+            - generic [ref=e72]:
+              - generic [ref=e73]: "58"
+              - generic [ref=e74]: Served Today
+            - generic [ref=e75]:
+              - generic [ref=e76]: 20m
+              - generic [ref=e77]: Avg Service
+            - generic [ref=e78]:
+              - generic [ref=e79]: just now
+              - generic [ref=e80]: Last Completed
