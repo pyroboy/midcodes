@@ -4,9 +4,10 @@
 	import { formatDisplayId, cn } from '$lib/utils';
 	import YieldCalculatorModal from '$lib/components/kitchen/YieldCalculatorModal.svelte';
 	import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
-	import { btScale } from '$lib/stores/bluetooth-scale.svelte';
+	import { btScale, startScan } from '$lib/stores/bluetooth-scale.svelte';
 	import { stockItems, getCurrentStock } from '$lib/stores/stock.svelte';
-	import { Bluetooth } from 'lucide-svelte';
+	import { printMeatLabel } from '$lib/stores/hardware.svelte';
+	import { Bluetooth, Printer } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
@@ -79,7 +80,7 @@
 	let selectedItem = $state<PendingMeat | null>(null);
 	let weightInput = $state('');
 	let dispatched = $state<
-		{ table: number | null; name: string; weight: number; time: string }[]
+		{ table: number | null; customerName?: string; name: string; weight: number; time: string; printFailed?: boolean }[]
 	>([]);
 	let showYieldCalc = $state(false);
 	let inputMode = $state<'manual' | 'scale'>('manual');
@@ -160,11 +161,23 @@
 
 		await dispatchMeatWeight(selectedItem.orderId, selectedItem.itemId, grams);
 
+		// Auto-print meat label (non-blocking — dispatch succeeds even if print fails)
+		let printFailed = false;
+		const printResult = await printMeatLabel({
+			tableNumber: selectedItem.tableNumber,
+			customerName: selectedItem.customerName,
+			meatName: selectedItem.name,
+			weightGrams: grams
+		});
+		if (!printResult.success) printFailed = true;
+
 		const entry = {
 			table: selectedItem.tableNumber,
+			customerName: selectedItem.customerName,
 			name: selectedItem.name,
 			weight: grams,
-			time: new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
+			time: new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+			...(printFailed && { printFailed: true })
 		};
 		// P2-11: Keep only the last DISPATCH_LOG_MAX entries; persist to localStorage
 		dispatched = [entry, ...dispatched].slice(0, DISPATCH_LOG_MAX);
@@ -178,6 +191,24 @@
 
 		selectedItem = null;
 		weightInput = '';
+	}
+
+	async function reprintLabel(entry: typeof dispatched[number], index: number) {
+		const result = await printMeatLabel({
+			tableNumber: entry.table,
+			customerName: entry.customerName,
+			meatName: entry.name,
+			weightGrams: entry.weight
+		});
+		if (result.success && entry.printFailed) {
+			dispatched[index] = { ...entry, printFailed: false };
+			dispatched = [...dispatched]; // trigger reactivity
+			if (browser) {
+				try {
+					localStorage.setItem(dispatchLogKey(session.locationId), JSON.stringify(dispatched));
+				} catch { /* non-fatal */ }
+			}
+		}
 	}
 
 	const numpadKeys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C', '0', 'DEL'];
@@ -246,7 +277,7 @@
 											? 'bg-accent-light ring-2 ring-inset ring-accent'
 											: 'hover:bg-gray-50'
 									)}
-									style="min-height: 52px"
+									style="min-height: 56px"
 								>
 									<span
 										class={cn(
@@ -270,6 +301,16 @@
 	<div class="flex-1 flex flex-col min-h-0">
 		<!-- Scrollable content area -->
 		<div class="flex-1 overflow-y-auto flex flex-col items-center justify-center gap-6 p-8">
+		{#if !btConnected}
+			<div class="flex items-center gap-3 bg-status-yellow/20 border border-status-yellow rounded-lg px-4 text-gray-900 font-medium w-full max-w-sm" style="min-height: 64px;">
+				<span class="text-xl">⚠</span>
+				<div class="flex-1">
+					<p class="font-semibold text-sm">Bluetooth scale disconnected</p>
+					<p class="text-xs text-gray-600">Weights entered manually won't be scale-verified.</p>
+				</div>
+				<button onclick={startScan} class="rounded-xl bg-accent text-white font-black px-5 active:scale-95 transition-all hover:bg-accent-dark whitespace-nowrap" style="min-height: 48px;">Reconnect →</button>
+			</div>
+		{/if}
 		{#if selectedItem}
 			{@const group = tableGroups.find((g) => g.orderId === selectedItem?.orderId)}
 			<!-- Selected item info -->
@@ -322,7 +363,7 @@
 								? 'bg-white text-gray-900 shadow-sm'
 								: 'text-gray-500 hover:text-gray-700'
 						)}
-						style="min-height: unset"
+						style="min-height: 56px"
 					>
 						Manual
 					</button>
@@ -334,7 +375,7 @@
 								? 'bg-white text-blue-600 shadow-sm'
 								: 'text-gray-500 hover:text-gray-700'
 						)}
-						style="min-height: unset"
+						style="min-height: 56px"
 					>
 						<Bluetooth class="w-4 h-4" />
 						Scale
@@ -481,21 +522,44 @@
 					<p class="text-sm">No items dispatched yet</p>
 				</div>
 			{:else}
-				{#each dispatched as d}
+				{#each dispatched as d, i}
 					<div
-						class="flex items-center justify-between rounded-lg bg-gray-50 border border-border px-4 py-3"
+						class={cn(
+							'flex items-center justify-between rounded-lg border px-4 py-3',
+							d.printFailed
+								? 'bg-amber-50 border-status-yellow'
+								: 'bg-gray-50 border-border'
+						)}
 					>
-						<div>
+						<div class="flex-1 min-w-0">
 							{#if d.table !== null}
 								<span class="text-sm font-bold text-gray-900">T{d.table}</span>
 							{:else}
 								<span class="text-sm font-bold text-purple-600">Takeout</span>
 							{/if}
 							<span class="text-xs text-gray-500 ml-1.5">{d.name}</span>
+							{#if d.printFailed}
+								<span class="block text-[10px] font-bold text-status-yellow mt-0.5">⚠ Label failed</span>
+							{/if}
 						</div>
-						<div class="text-right">
-							<span class="text-sm font-bold text-status-green">{d.weight}g</span>
-							<span class="block text-[10px] text-gray-400">{d.time}</span>
+						<div class="flex items-center gap-2">
+							<div class="text-right">
+								<span class="text-sm font-bold text-status-green">{d.weight}g</span>
+								<span class="block text-[10px] text-gray-400">{d.time}</span>
+							</div>
+							<button
+								onclick={() => reprintLabel(d, i)}
+								class={cn(
+									'flex items-center justify-center rounded-lg transition-all active:scale-95',
+									d.printFailed
+										? 'bg-status-yellow text-white hover:bg-amber-500'
+										: 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+								)}
+								style="min-height: 44px; min-width: 44px"
+								title={d.printFailed ? 'Retry print' : 'Reprint label'}
+							>
+								<Printer class="w-4 h-4" />
+							</button>
 						</div>
 					</div>
 				{/each}

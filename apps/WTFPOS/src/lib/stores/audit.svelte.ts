@@ -240,4 +240,12 @@ export const log = {
 
 	yieldRecorded: (itemName: string, rawWeight: number, cleanedWeight: number, yieldPct: number) =>
 		writeLog('stock', `Yield: ${itemName} — ${rawWeight}g raw → ${cleanedWeight}g cleaned (${yieldPct.toFixed(1)}%)`),
+
+	// ─── Station Responsibility Matrix ─────────────────────────────────────
+
+	meatLabelPrinted: (meatName: string, tableNumber: number | null, weightGrams: number) =>
+		writeLog('order', `Label printed: ${weightGrams}g ${meatName} → ${tableNumber !== null ? `T${tableNumber}` : 'Takeout'}`),
+
+	dispatchOrderCleared: (tableNumber: number | null) =>
+		writeLog('order', `Order cleared by dispatch: ${tableNumber !== null ? `T${tableNumber}` : 'Takeout'}`),
 };

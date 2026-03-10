@@ -6,6 +6,9 @@ Format: `ux-audit, [intensity], [scenario], [roles], [branch]`
 Intensities: **light** · **heavy** · **extreme** · **chaos**
 Modes: **single-user** · **multi-user**
 
+havent proven this
+ux-audit staff extreme, multiple pax mixtures, all senior, 1 adult rest are all kids, 5 seniors 1 adult, etc. up until checkout,  tables may have extra alacarts and takeouts. , others            
+requestiong extra tong's untisils, other ordered alacart with special request, others, returned orders, full chaos    
 ---
 
 ## Single-User — Light

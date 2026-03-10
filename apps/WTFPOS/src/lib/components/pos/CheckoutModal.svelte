@@ -261,7 +261,7 @@
                 </div>
             {/if}
             <div class="flex justify-between text-sm text-gray-500">
-                <span>VAT {order.discountType === 'senior' || order.discountType === 'pwd' ? '(exempt)' : '(inclusive)'}</span>
+                <span>{order.discountType === 'senior' || order.discountType === 'pwd' ? 'VAT (exempt)' : 'Incl. VAT (12%)'}</span>
                 <span class="font-mono">{formatPeso(order.vatAmount)}</span>
             </div>
             <div class="flex justify-between border-t border-border pt-2 mt-1">
@@ -429,7 +429,7 @@
                     {#if entry.method === 'cash'}
                         <!-- Cash preset buttons -->
                         <div class="grid grid-cols-4 gap-1.5">
-                            {#each [20, 50, 100, 200, 500, 1000, 1500, 2000] as amount}
+                            {#each [20, 50, 100, 200, 500, 1000, 2000, 5000] as amount}
                                 <button
                                     onclick={() => selectCashPreset(amount)}
                                     class={cn(

@@ -167,7 +167,7 @@
 						theme="light"
 					/>
 				{:else}
-					<input type="number" bind:value={formQty} placeholder="0" min="0" step="any" class="pos-input font-mono" />
+					<input type="tel" inputmode="numeric" bind:value={formQty} placeholder="0" min="0" step="any" class="pos-input font-mono" style="min-height: 56px; font-size: 18px" />
 				{/if}
 			</div>
 			<div class="flex-1 flex flex-col gap-1.5">

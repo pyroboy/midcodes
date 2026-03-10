@@ -46,19 +46,24 @@
         return `wtfpos_shift_started_${session.locationId}`;
     }
 
+    // Reactive flag so $derived below re-evaluates immediately on skip/start
+    let localShiftStarted = $state(browser ? !!localStorage.getItem(shiftLocalKey()) : false);
+
     function markShiftStartedLocally() {
         if (browser) localStorage.setItem(shiftLocalKey(), '1');
+        localShiftStarted = true;
     }
 
     function clearShiftStartedLocally() {
         if (browser) localStorage.removeItem(shiftLocalKey());
+        localShiftStarted = false;
     }
 
     // Returns true if either RxDB has an active shift OR localStorage says we've already started
     const shiftStarted = $derived(
         !isWarehouseSession() &&
         session.locationId !== 'all' &&
-        (!!getActiveShift() || (browser ? !!localStorage.getItem(shiftLocalKey()) : false))
+        (!!getActiveShift() || localShiftStarted)
     );
 
     // Sync localStorage whenever a real shift becomes active (written by openShift())
@@ -397,8 +402,7 @@
                         <div class="relative">
                             <button
                                 onclick={() => showLegend = !showLegend}
-                                class="flex items-center justify-center rounded-lg border border-border bg-surface p-2 text-gray-500 hover:bg-gray-50 transition-colors"
-                                style="min-height: 40px; min-width: 40px"
+                                class="flex items-center justify-center rounded-lg border border-border bg-surface p-2 text-gray-500 hover:bg-gray-50 transition-colors min-h-[44px] min-w-[44px]"
                                 aria-label="Toggle color legend"
                             >
                                 <Info class="h-4 w-4" />

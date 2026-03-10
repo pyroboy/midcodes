@@ -187,9 +187,12 @@ src/
     ├── test-db/+page.svelte         # Dev RxDB health + data inspector
     ├── kitchen/
     │   ├── +layout.svelte           # Kitchen sub-nav
-    │   ├── +page.svelte             # Redirect → kitchen/orders
-    │   ├── orders/+page.svelte      # KDS queue (active tickets)
+    │   ├── +page.svelte             # Redirect → kitchen/dispatch
+    │   ├── dispatch/+page.svelte    # Dispatch / Expo dashboard (cross-station progress + sides queue)
+    │   ├── stove/+page.svelte       # Stove station (dishes & drinks only)
+    │   ├── orders/+page.svelte      # KDS queue (legacy — all items, removed from nav)
     │   ├── all-orders/+page.svelte  # All open orders list view
+    │   ├── sides-prep/+page.svelte  # Sides prep (legacy — superseded by dispatch, removed from nav)
     │   └── weigh-station/+page.svelte # Bluetooth scale + meat weighing
     ├── stock/
     │   ├── +layout.svelte           # Stock tab nav
@@ -470,7 +473,7 @@ skills/
 ├── neon/           SKILL.md + references/ (NEON_GUIDE, NEON_RXDB_BRIDGE)
 ├── ably/           SKILL.md + references/ (ABLY_WTFPOS_CHANNELS)
 ├── bluetooth/      SKILL.md + references/ (WEB_BLUETOOTH_GUIDE)
-├── ux-audit/       SKILL.md + references/ (DESIGN_BIBLE)
+├── ux-audit/       SKILL.md + references/ (DESIGN_BIBLE, ENVIRONMENT, KNOWN_PATTERNS, PRD_QUICK_REF, BIR_REQUIREMENTS, ROLE_WORKFLOWS) + audits/ (v4+ output) + audits-legacy/ (pre-v4 output)
 ├── user-scenarios/ SKILL.md + references/ (SCENARIO_CONTEXT) + scenarios/ (generated output)
 └── check-maturity/ SKILL.md + references/ (MATURITY_FRAMEWORK) + reports/ (generated output)
 ```

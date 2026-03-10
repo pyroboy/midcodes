@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Order } from '$lib/types';
 	import { formatPeso } from '$lib/utils';
+	import { printReceipt } from '$lib/stores/hardware.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -67,7 +68,7 @@
 					</div>
 				{/if}
 				<div class="flex justify-between text-gray-500 text-xs">
-					<span>VAT {order.discountType !== 'none' ? '(exempt)' : '(inclusive)'}</span>
+					<span>{order.discountType !== 'none' ? 'VAT (exempt)' : 'Incl. VAT (12%)'}</span>
 					<span>{formatPeso(order.vatAmount)}</span>
 				</div>
 				<div class="flex justify-between font-bold text-gray-900 text-base border-t border-gray-200 pt-1">
@@ -102,6 +103,13 @@
 			</div>
 
 			<div class="flex gap-3 px-6 py-4">
+				<button
+					onclick={() => order && printReceipt(order.id)}
+					class="btn-secondary flex-1"
+					style="min-height: 44px"
+				>
+					🖨 Print
+				</button>
 				<button
 					onclick={onClose}
 					class="btn-primary flex-1"

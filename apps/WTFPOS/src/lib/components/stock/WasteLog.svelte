@@ -297,7 +297,7 @@
 			<div class="flex gap-3">
 				<div class="flex-1 flex flex-col gap-1.5">
 					<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Quantity *</span>
-					<input type="number" bind:value={qty} placeholder="0" min="0" step="any" class="pos-input font-mono" />
+					<input type="tel" inputmode="numeric" bind:value={qty} placeholder="0" min="0" step="any" class="pos-input font-mono" style="min-height: 56px; font-size: 18px" />
 				</div>
 				<div class="w-20 flex flex-col gap-1.5">
 					<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Unit</span>

@@ -68,6 +68,19 @@
         <div class="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-2xl pos-card flex flex-col gap-6" onclick={(e) => e.stopPropagation()}>
             <button onclick={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center">✕</button>
             
+            <!-- Step progress indicator -->
+            <div class="flex items-center justify-center gap-2 text-sm">
+                <span class="flex items-center gap-1.5 font-semibold text-accent">
+                    <span class="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-white text-xs font-bold">1</span>
+                    Leftover Check
+                </span>
+                <span class="text-gray-300">→</span>
+                <span class="flex items-center gap-1.5 text-gray-400">
+                    <span class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-gray-300 text-xs font-bold text-gray-400">2</span>
+                    Payment
+                </span>
+            </div>
+
             <div>
                 <div class="flex items-center gap-2">
                     <h2 class="text-xl font-black text-gray-900">Leftover Check</h2>

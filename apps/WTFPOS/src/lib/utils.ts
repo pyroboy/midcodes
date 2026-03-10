@@ -17,7 +17,7 @@ export function formatCountdown(seconds: number): string {
 export function formatTimeAgo(isoString: string): string {
 	const diffMs = Date.now() - new Date(isoString).getTime();
 	const diffMin = Math.floor(diffMs / 60000);
-	if (diffMin < 1) return 'just now';
+	if (diffMin < 1) return '< 1m';
 	if (diffMin < 60) return `${diffMin}m ago`;
 	const diffH = Math.floor(diffMin / 60);
 	return `${diffH}h ago`;

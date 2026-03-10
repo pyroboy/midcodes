@@ -197,6 +197,10 @@
                 <p class="px-6 text-[11px] text-gray-400">Packages and meats are dine-in only</p>
             {/if}
 
+            {#if order.orderType !== 'takeout' && !order.packageId && !hasPkg && (activeCategory === 'meats' || activeCategory === 'sides' || activeCategory === 'dishes')}
+                <p class="text-xs text-amber-600 text-center py-2">A package is required before adding items.</p>
+            {/if}
+
             {#if activeCategory === 'sides' || activeCategory === 'packages'}
                 <div class="flex items-center gap-2 bg-status-green-light px-6 py-2.5">
                     <span class="text-xs font-semibold text-status-green">
@@ -456,6 +460,9 @@
                         ⚡ CHARGE ({pendingItems.length})
                     </button>
                 </div>
+                {#if pendingItems.length === 0 && order.orderType !== 'takeout' && !order.packageId && !hasPkg}
+                    <p class="text-sm text-gray-500 text-center mt-1">Select a package first to enable charging.</p>
+                {/if}
             </div>
         </div>
     </div>

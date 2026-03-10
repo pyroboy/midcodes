@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, recallTicket, REFILL_NOTE } from '$lib/stores/pos.svelte';
+	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, recallTicket, REFILL_NOTE, orders } from '$lib/stores/pos.svelte';
 	import type { KdsTicket, KdsTicketItem } from '$lib/types';
 	import { refuseItem } from '$lib/stores/alert.svelte';
 	import { formatCountdown, formatTimeAgo, formatDisplayId, cn } from '$lib/utils';
@@ -8,25 +8,12 @@
 	import { untrack } from 'svelte';
 	import KdsHistoryModal from '$lib/components/kitchen/KdsHistoryModal.svelte';
 	import RefuseReasonModal from '$lib/components/kitchen/RefuseReasonModal.svelte';
-	import { session } from '$lib/stores/session.svelte';
-
 	// ── UI State ──
 	let showKdsHistory = $state(false);
 	let expandedItemId = $state<string | null>(null);
 
-	// ── Section visibility (focus-aware) ──
-	let showMeats  = $state(true);
+	// ── Section visibility ──
 	let showDishes = $state(true);
-
-	$effect(() => {
-		if (session.kitchenFocus === 'grill') {
-			showMeats = true; showDishes = false;
-		} else if (session.kitchenFocus === 'sides') {
-			showMeats = false; showDishes = true;
-		} else {
-			showMeats = true; showDishes = true;
-		}
-	});
 
 	// ── P1-14: Un-86 confirmation state ──
 	let confirmingUnEighty6 = $state<string | null>(null);
@@ -315,23 +302,31 @@
 	function groupItems(items: KdsTicketItem[]) {
 		const notCancelled = (i: KdsTicketItem) => i.status !== 'cancelled' && i.category !== 'packages';
 		const meats   = items.filter(i => i.category === 'meats' && notCancelled(i));
-		const dishes  = items.filter(i => (i.category === 'dishes' || i.category === 'drinks' || i.category === 'sides') && notCancelled(i));
+		const dishes  = items.filter(i => (i.category === 'dishes' || i.category === 'drinks') && notCancelled(i));
 		const service = items.filter(i => i.category === 'service' && i.status !== 'cancelled');
 		return { meats, dishes, extras: [] as typeof dishes, service };
 	}
 
 	// ── Actions ──
 	function completeAll(ticket: KdsTicket) {
-		const orderId = ticket.orderId;
 		const tableLabel = ticket.tableNumber !== null ? `T${ticket.tableNumber}` : 'Takeout';
 		for (const item of ticket.items) {
-			if (item.status !== 'served' && item.status !== 'cancelled') {
-				markItemServed(orderId, item.id);
-			}
+			if (item.status === 'served' || item.status === 'cancelled') continue;
+			markItemServed(ticket.orderId, item.id);
 		}
 		// P0-4: Show undo toast so accidental bumps can be recovered
-		showToast(`✓ ${tableLabel} — All items served`, () => recallTicket(orderId));
+		showToast(`✓ ${tableLabel} — All items served`, () => recallTicket(ticket.orderId));
 	}
+
+	// [07]: New tables opened in last 10 minutes with no items sent to kitchen yet
+	const newTableCount = $derived.by(() => {
+		const tenMinAgo = Date.now() - 10 * 60_000;
+		return orders.value.filter(o =>
+			o.status === 'open' &&
+			new Date(o.createdAt).getTime() > tenMinAgo &&
+			(!o.items || o.items.length === 0)
+		).length;
+	});
 
 	function toggleExpand(itemId: string) {
 		expandedItemId = expandedItemId === itemId ? null : itemId;
@@ -445,6 +440,12 @@
 		'text-xs font-semibold',
 		isStale ? 'text-status-yellow' : 'text-status-green'
 	)}>{isStale ? '~ Stale' : 'Live'}</span>
+	<!-- [07]: New tables badge -->
+	{#if newTableCount > 0}
+		<span class="bg-accent text-white text-sm font-bold px-3 py-1.5 rounded-lg">
+			🆕 {newTableCount} new table{newTableCount > 1 ? 's' : ''}
+		</span>
+	{/if}
 </div>
 
 <!-- ── Header ── -->
@@ -565,8 +566,7 @@
 					<div class="flex items-center gap-2">
 						<button
 							onclick={() => completeAll(ticket)}
-							class="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-600 active:scale-95 transition-all hover:bg-gray-50"
-							style="min-height: 32px"
+							class="rounded-lg border border-gray-300 bg-white px-6 text-sm font-semibold text-gray-600 active:scale-95 transition-all hover:bg-gray-50 min-h-[56px]"
 							title="Quick bump — mark all items served"
 						>
 							Quick Bump
@@ -604,127 +604,34 @@
 
 				<!-- Items -->
 				<div class="flex flex-col gap-0 divide-y divide-border flex-1">
-					<!-- MEATS -->
-					{#if grouped.meats.length > 0}
-						{@const pendingRefillCount = grouped.meats.filter(i => i.notes === REFILL_NOTE && !i.weight && i.status !== 'served').length}
-						<div class="py-2">
-							<button
-								onclick={() => (showMeats = !showMeats)}
-								class="flex w-full items-center justify-between px-4 py-1.5 hover:bg-gray-50 active:bg-gray-100 transition-colors"
-								style="min-height: unset"
-							>
-								<div class="flex items-center gap-2">
-									<span class="text-xs font-bold uppercase tracking-wider text-red-800">
-										&#129385; MEATS
-									</span>
-									<!-- P2-07: Refill count pill ── -->
-									{#if pendingRefillCount > 0}
-										<span class="rounded-full bg-accent text-white text-xs font-black px-2 py-0.5">
-											&#8635; {pendingRefillCount} refill{pendingRefillCount > 1 ? 's' : ''}
-										</span>
-									{/if}
-									{#if !showMeats}
-										<span class="rounded-full bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5">
-											{grouped.meats.filter(i => i.status !== 'served').length} hidden
-										</span>
-									{/if}
-								</div>
-								<div class="flex items-center gap-2">
-									<span class="text-xs font-mono font-bold text-red-700">
-										{grouped.meats.filter(i => i.status !== 'served').reduce((s: number, i) => s + (i.weight ?? 0), 0)}g
-									</span>
-									<span class="text-gray-400">
-										{#if showMeats}<ChevronUp class="w-3.5 h-3.5" />{:else}<ChevronDown class="w-3.5 h-3.5" />{/if}
-									</span>
-								</div>
-							</button>
-							{#if showMeats}
-							{#each grouped.meats as item (item.id)}
-								{@const isServed = item.status === 'served'}
-								{@const isExpanded = expandedItemId === item.id && !isServed}
-								{@const isRefill = item.notes === REFILL_NOTE && !item.weight}
-								{@const isWeighed = !!item.weight}
-								<div class="border-b border-border/30 last:border-b-0">
-									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-									<div
-										class={cn(
-											'flex items-center gap-2 px-4 py-2 transition-colors',
-											isServed ? 'opacity-50' : 'cursor-pointer active:bg-gray-50'
-										)}
-										onclick={() => !isServed && toggleExpand(item.id)}
-										role={isServed ? undefined : 'button'}
-										tabindex={isServed ? -1 : 0}
-										aria-expanded={isServed ? undefined : isExpanded}
-										aria-label={isServed ? undefined : `${isExpanded ? 'Collapse' : 'Expand'} actions for ${item.menuItemName}`}
-									>
-										<div class="flex-1 flex items-center gap-2 min-w-0">
-											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
-												{item.menuItemName}
-											</span>
-											{#if isRefill}
-												<span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
-													REFILL
-												</span>
-											{:else if isWeighed}
-												<span class={cn(
-													'shrink-0 rounded-full px-2 py-0.5 text-xs font-mono font-bold',
-													isServed ? 'bg-gray-100 text-gray-400' : 'bg-pink-100 text-pink-700'
-												)}>
-													{item.weight}g
-												</span>
-												{#if !isServed}
-													<span class="shrink-0 rounded-full bg-status-green/10 px-2.5 py-0.5 text-xs font-bold text-status-green">
-														READY
-													</span>
-												{/if}
-											{:else if !isServed}
-												<span class="shrink-0 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-600 animate-pulse">
-													WEIGHING {timerText(ticket.createdAt)}
-												</span>
-											{/if}
-										</div>
-										{#if isServed}
-											<span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-status-green/10 text-status-green">
-												<Check class="w-5 h-5" strokeWidth={3} />
-											</span>
-										{:else}
-											<span class="shrink-0 text-gray-400">
-												{#if isExpanded}
-													<ChevronUp class="w-4 h-4" />
-												{:else}
-													<ChevronDown class="w-4 h-4" />
-												{/if}
-											</span>
-											<button
-												onclick={(e) => { e.stopPropagation(); markItemServed(ticket.orderId, item.id); }}
-												class="shrink-0 flex items-center justify-center w-12 h-12 rounded-lg bg-status-green text-white font-bold text-lg active:scale-95 transition-all no-select"
-												style="min-height: 48px"
-											>
-												&#10003;
-											</button>
-										{/if}
-									</div>
-									{#if isExpanded}
-										{@render itemActions(ticket.orderId, ticket.tableNumber, item.menuItemName)}
-									{/if}
-								</div>
-							{/each}
-							{/if}
-						</div>
-					{/if}
-
 					<!-- DISHES & DRINKS -->
 					{#if grouped.dishes.length > 0}
+						{@const pendingDishRefillCount = grouped.dishes.filter(i => i.notes === REFILL_NOTE).length}
+						{@const maxDishRefillRound = (() => {
+							const refills = grouped.dishes.filter(i => i.notes === REFILL_NOTE);
+							if (refills.length === 0) return 0;
+							let maxRound = 0;
+							const byMenuItem: Record<string, number> = {};
+							for (const ri of refills) {
+								byMenuItem[ri.menuItemName] = (byMenuItem[ri.menuItemName] ?? 0) + 1;
+								if (byMenuItem[ri.menuItemName] + 1 > maxRound) maxRound = byMenuItem[ri.menuItemName] + 1;
+							}
+							return maxRound;
+						})()}
 						<div class="py-2">
-							<button
+						<button
 								onclick={() => (showDishes = !showDishes)}
-								class="flex w-full items-center justify-between px-4 py-1.5 hover:bg-gray-50 active:bg-gray-100 transition-colors"
-								style="min-height: unset"
+								class="flex w-full items-center justify-between px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[44px]"
 							>
 								<div class="flex items-center gap-2">
 									<span class="text-xs font-bold uppercase tracking-wider text-status-cyan">
 										&#127836; DISHES & DRINKS
 									</span>
+									{#if pendingDishRefillCount > 0}
+										<span class="rounded-full bg-accent text-white text-xs font-black px-2 py-0.5">
+											&#8635; {pendingDishRefillCount} refill{pendingDishRefillCount > 1 ? 's' : ''}{maxDishRefillRound > 0 ? ' · Rnd ' + maxDishRefillRound : ''}
+										</span>
+									{/if}
 									{#if !showDishes}
 										<span class="rounded-full bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5">
 											{grouped.dishes.filter(i => i.status !== 'served').length} hidden
@@ -739,6 +646,12 @@
 							{#each grouped.dishes as item (item.id)}
 								{@const isServed = item.status === 'served'}
 								{@const isExpanded = expandedItemId === item.id && !isServed}
+								{@const isDishRefill = item.notes === REFILL_NOTE}
+								{@const dishRefillRound = (() => {
+									const refillsForItem = grouped.dishes.filter(i => i.menuItemName === item.menuItemName && i.notes === REFILL_NOTE);
+									const idx = refillsForItem.indexOf(item);
+									return idx >= 0 ? idx + 2 : 0;
+								})()}
 								<div class="border-b border-border/30 last:border-b-0">
 									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 									<div
@@ -753,9 +666,14 @@
 										aria-label={isServed ? undefined : `${isExpanded ? 'Collapse' : 'Expand'} actions for ${item.menuItemName}`}
 									>
 										<div class="flex-1 flex items-center gap-2 min-w-0">
-											<span class={cn('text-sm font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
+											<span class={cn('text-base font-medium truncate', isServed ? 'line-through text-gray-400' : 'text-gray-900')}>
 												{item.menuItemName}
 											</span>
+											{#if isDishRefill}
+												<span class="shrink-0 bg-amber-500 text-white text-sm font-bold animate-pulse px-2 py-0.5 rounded">
+													Rnd {dishRefillRound} · REFILL
+												</span>
+											{/if}
 											{#if item.quantity > 1}
 												<span class={cn(
 													'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold',
@@ -844,7 +762,7 @@
 						class="w-full rounded-xl bg-status-green text-white font-black text-base uppercase tracking-wide active:scale-95 transition-all hover:bg-emerald-600 no-select"
 						style="min-height: 56px"
 					>
-						ALL DONE &#10003;
+						ALL DONE ✓
 					</button>
 				</div>
 			</div>

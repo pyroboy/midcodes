@@ -10,9 +10,10 @@
 	import type { Snippet } from 'svelte';
 
 	const FOCUS_BADGE: Record<NonNullable<KitchenFocus>, { icon: string; label: string; cls: string }> = {
-		grill:   { icon: '🔥', label: 'Grill Station',  cls: 'border-red-200 bg-red-50 text-red-700'       },
-		butcher: { icon: '⚖️', label: 'Butcher Station', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-		sides:   { icon: '🥗', label: 'Sides Prep',      cls: 'border-green-200 bg-green-50 text-green-700' },
+		butcher:  { icon: '⚖️', label: 'Butcher Station', cls: 'border-amber-200 bg-amber-50 text-amber-700'   },
+		sides:    { icon: '🥗', label: 'Sides Prep',      cls: 'border-green-200 bg-green-50 text-green-700'   },
+		dispatch: { icon: '📋', label: 'Dispatch / Expo', cls: 'border-cyan-200 bg-cyan-50 text-cyan-700'      },
+		stove:    { icon: '🍳', label: 'Stove Station',   cls: 'border-orange-200 bg-orange-50 text-orange-700' },
 	};
 
 	const { children }: { children: Snippet } = $props();
@@ -23,14 +24,20 @@
 			? [{ href: '/kitchen/all-orders', label: '🧾 All Orders' }]
 			: [
 					{ href: '/kitchen/all-orders', label: '🧾 All Orders' },
-					{ href: '/kitchen/orders', label: '📋 Order Queue' },
-					{ href: '/kitchen/weigh-station', label: '⚖️ Weigh Station' }
+					{ href: '/kitchen/dispatch', label: '📋 Dispatch' },
+					{ href: '/kitchen/weigh-station', label: '⚖️ Weigh Station' },
+					{ href: '/kitchen/stove', label: '🍳 Stove' }
 				]
 	);
 
-	// P0-1: Staff role is not allowed on kitchen pages — redirect to POS.
+	// P0-1: Auth guard for kitchen pages.
+	// - Unauthenticated sessions (empty userName) redirect to login, not POS.
+	// - Staff role is not allowed on kitchen pages — redirect to POS.
+	// Does NOT write or reset session state; reads are safe across child route navigations.
 	$effect(() => {
-		if (browser && session.role === 'staff') goto('/pos');
+		if (!browser) return;
+		if (!session.userName) { goto('/'); return; }
+		if (session.role === 'staff') goto('/pos');
 	});
 
 	// Push active orders to local server whenever RxDB changes.

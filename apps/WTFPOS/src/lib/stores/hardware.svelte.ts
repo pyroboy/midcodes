@@ -53,6 +53,24 @@ export async function printKitchenOrder(ticketId: string): Promise<{ success: bo
 	});
 }
 
+export async function printMeatLabel(data: {
+	tableNumber: number | null;
+	customerName?: string;
+	meatName: string;
+	weightGrams: number;
+}): Promise<{ success: boolean; error?: string }> {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			if (hardwareState.kitchenPrinter !== 'online') {
+				resolve({ success: false, error: `Kitchen Printer is ${hardwareState.kitchenPrinter.replace('_', ' ')}.` });
+			} else {
+				log.meatLabelPrinted(data.meatName, data.tableNumber, data.weightGrams);
+				resolve({ success: true });
+			}
+		}, 600); // Sticker prints faster than full receipt
+	});
+}
+
 export async function openCashDrawer(reason: string, requestedBy: string = 'Staff'): Promise<{ success: boolean; error?: string }> {
 	// In the real world, this sends an open signal to the hardware
 	return new Promise((resolve) => {

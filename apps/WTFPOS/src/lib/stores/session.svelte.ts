@@ -11,7 +11,7 @@ const SESSION_KEY = 'wtfpos_session';
 export type Role          = 'staff' | 'manager' | 'kitchen' | 'owner' | 'admin';
 export type LocationType  = 'retail' | 'warehouse';
 export type LocationId    = 'tag' | 'pgl' | 'wh-tag' | 'all';
-export type KitchenFocus  = 'grill' | 'butcher' | 'sides' | null;
+export type KitchenFocus  = 'butcher' | 'sides' | 'dispatch' | 'stove' | null;
 
 /** @deprecated Use LocationId */
 export type BranchId = LocationId;
@@ -74,7 +74,7 @@ export const session = $state({
 	locationId:   _persisted.locationId,
 	/** True when the user cannot switch locations */
 	isLocked:     _persisted.isLocked,
-	/** Kitchen sub-role for focused UI — grill/butcher/sides or null */
+	/** Kitchen sub-role for focused UI — butcher/sides/dispatch/stove or null */
 	kitchenFocus: _persisted.kitchenFocus,
 });
 

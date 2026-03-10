@@ -53,15 +53,16 @@
 <div class="relative bt-status-container">
 	<button
 		onclick={toggleOpen}
-		class="p-2 rounded-full hover:bg-gray-100 transition-colors relative"
+		class="relative flex min-h-[56px] min-w-[56px] items-center justify-center gap-1.5 rounded-lg px-3 hover:bg-gray-100 transition-colors"
 		title="Bluetooth Scale"
 	>
-		<Bluetooth class={cn('w-5 h-5', isConnected ? 'text-status-bluetooth' : 'text-gray-400')} />
+		<Bluetooth class={cn('w-5 h-5 shrink-0', isConnected ? 'text-status-bluetooth' : 'text-gray-400')} />
+		<span class="hidden text-xs font-medium sm:inline">{isConnected ? 'Scale' : 'BT Scale'}</span>
 
 		{#if isConnected}
-			<span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-status-bluetooth border-2 border-white"></span>
+			<span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-status-bluetooth border-2 border-white"></span>
 		{:else if isScanning}
-			<span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-status-bluetooth border-2 border-white animate-pulse"></span>
+			<span class="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-status-bluetooth border-2 border-white animate-pulse"></span>
 		{/if}
 	</button>
 
