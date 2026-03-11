@@ -4,6 +4,7 @@
     import { floorLayout } from '$lib/stores/floor-layout.svelte';
     import { session } from '$lib/stores/session.svelte';
     import { getRefillCount } from '$lib/stores/pos.svelte';
+    import { getPkgColors } from '$lib/stores/pos/utils';
 
     interface Props {
         mainTables: Table[];
@@ -35,9 +36,10 @@
             if (order?.status === 'pending_payment') return '#ecfeff';
             return '#fff7ed';
         }
-        if (order?.packageId === 'pkg-pork') return '#fdf2f8';
-        if (order?.packageId === 'pkg-beef') return '#faf5ff';
-        if (order?.packageId === 'pkg-combo') return '#fffbeb';
+        if (order?.packageId) {
+            const c = getPkgColors(order.packageId);
+            if (c) return c.fill;
+        }
         return '#ecfdf5';
     }
 
@@ -50,6 +52,10 @@
         }
         if (t.status === 'critical') return '#ef4444';
         if (t.status === 'warning') return '#eab308';
+        if (order?.packageId) {
+            const c = getPkgColors(order.packageId);
+            if (c) return c.stroke;
+        }
         return '#10b981';
     }
 
@@ -71,10 +77,7 @@
     }
 
     function pkgColor(packageId: string | undefined | null): string {
-        if (packageId === 'pkg-pork') return '#be185d';
-        if (packageId === 'pkg-beef') return '#7c3aed';
-        if (packageId === 'pkg-combo') return '#7c3aed';
-        return '#6b7280';
+        return getPkgColors(packageId)?.label ?? '#6b7280';
     }
 
     // ─── Floor element colors ────────────────────────────────────────────────
@@ -256,10 +259,10 @@
                 <!-- Selection ring -->
                 {#if isSelected}
                     <rect
-                        x={table.x - 4} y={table.y - 4}
-                        width={W + 8} height={H + 8}
-                        rx={rx + 4}
-                        fill="none" stroke="#EA580C" stroke-width="2" stroke-dasharray="6 3" opacity="0.7"
+                        x={table.x - 6} y={table.y - 6}
+                        width={W + 12} height={H + 12}
+                        rx={rx + 6}
+                        fill="none" stroke="#EA580C" stroke-width="4" opacity="0.9"
                     />
                 {/if}
 
@@ -309,8 +312,18 @@
                         fill="#111827" pointer-events="none"
                     >{table.label}</text>
 
-                    <!-- Pax (below label) -->
-                    {#if isOccupied}
+                    <!-- Billing Badge or Pax (below label) -->
+                    {#if table.status === 'billing'}
+                        <rect x={cx - 32} y={cy + 5} width="64" height="20" rx="10" fill="#f97316">
+                            <animate attributeName="opacity" values="1;0.6;1" dur="1.5s" repeatCount="indefinite" />
+                        </rect>
+                        <text
+                            x={cx} y={cy + 15}
+                            text-anchor="middle" dominant-baseline="middle"
+                            font-family="Inter, sans-serif" font-size="11" font-weight="800"
+                            fill="#ffffff" pointer-events="none"
+                        >BILLING</text>
+                    {:else if isOccupied}
                         <text
                             x={cx} y={cy + 10}
                             text-anchor="middle" dominant-baseline="middle"
@@ -336,18 +349,20 @@
                         >{formatPeso(table.billTotal)}</text>
                     {/if}
 
-                    <!-- Unserved count badge (bottom-left) -->
+                    <!-- Unserved count badge (bottom-left) — pill with count + "items" label -->
                     {#if isOccupied && !!order && unservedCount > 0}
-                        <circle cx={table.x + 10} cy={table.y + H - 10} r="9" fill="#f97316" opacity="0.9">
-                            <animate attributeName="r" values="9;10;9" dur="1.2s" repeatCount="indefinite" />
+                        {@const badgeLabel = `${unservedCount} item${unservedCount !== 1 ? 's' : ''}`}
+                        {@const badgeW = badgeLabel.length * 6.5 + 10}
+                        <title>{unservedCount} unserved item{unservedCount !== 1 ? 's' : ''}</title>
+                        <rect x={table.x + 4} y={table.y + H - 18} width={badgeW} height="14" rx="7" fill="#f97316" opacity="0.9">
                             <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1.2s" repeatCount="indefinite" />
-                        </circle>
+                        </rect>
                         <text
-                            x={table.x + 10} y={table.y + H - 9}
+                            x={table.x + 4 + badgeW / 2} y={table.y + H - 10}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="12" font-weight="800"
+                            font-family="Inter, sans-serif" font-size="9" font-weight="800"
                             fill="#ffffff" pointer-events="none"
-                        >{unservedCount}</text>
+                        >{badgeLabel}</text>
                     {:else if isFullyServed}
                         <circle cx={table.x + 10} cy={table.y + H - 10} r="9" fill="#10b981" opacity="0.9" />
                         <text

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { deliveries, getSpoilageAlerts, stockItems } from '$lib/stores/stock.svelte';
 	import { isWarehouseSession, session } from '$lib/stores/session.svelte';
-	import { cn, formatPeso } from '$lib/utils';
+	import { cn, formatPeso, formatDate } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import { Plus, X, AlertTriangle, XCircle, Search, Calendar, Package } from 'lucide-svelte';
 	import ProgressRing from '$lib/components/stock/ProgressRing.svelte';
@@ -209,7 +209,7 @@
 				{#each filteredDeliveries as d (d.id)}
 					{@const usedPct = Math.min(100, ((d.usedQty ?? 0) / Math.max(1, d.qty)) * 100)}
 					<tr class={cn('hover:bg-gray-50 transition-colors', d.depleted && 'opacity-50')}>
-						<td class="px-5 py-3 whitespace-nowrap text-gray-500 text-xs">{new Date(d.receivedAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</td>
+						<td class="px-5 py-3 whitespace-nowrap text-gray-500 text-xs">{formatDate(d.receivedAt)}</td>
 						<td class="px-5 py-3">
 							<div class="flex flex-col gap-0.5">
 								<span class="font-semibold text-gray-900">{d.itemName}</span>
@@ -300,20 +300,15 @@
 <!-- Receive Delivery Modal -->
 {#if showModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="w-[500px] max-h-[90vh] overflow-y-auto rounded-xl shadow-xl">
-			<div class="relative">
-				<button
-					onclick={() => (showModal = false)}
-					class="absolute top-4 right-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-					aria-label="Close"
-				>
-					<X class="w-5 h-5" />
-				</button>
-				<ReceiveDelivery onSaved={handleDeliverySaved} />
-				<div class="px-6 pb-4 bg-white rounded-b-xl">
-					<button class="btn-ghost w-full text-gray-500" onclick={() => (showModal = false)}>Cancel</button>
-				</div>
-			</div>
+		<div class="w-[500px] rounded-xl shadow-xl relative">
+			<button
+				onclick={() => (showModal = false)}
+				class="absolute top-4 right-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+				aria-label="Close"
+			>
+				<X class="w-5 h-5" />
+			</button>
+			<ReceiveDelivery onSaved={handleDeliverySaved} onCancel={() => (showModal = false)} />
 		</div>
 	</div>
 {/if}

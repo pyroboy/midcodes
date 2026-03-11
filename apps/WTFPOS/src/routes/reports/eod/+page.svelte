@@ -11,7 +11,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
-	import { X, AlertTriangle, CheckCircle2, History } from 'lucide-svelte';
+	import { X, AlertTriangle, CheckCircle2, History, Lock } from 'lucide-svelte';
 
 	let showModal = $state(false);
 	// P1-23: Confirmation state before opening the EOD modal
@@ -342,8 +342,8 @@
 		{/if}
 	{:else}
 		<div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
-			<div class="text-4xl mb-3">🙈</div>
-			<h3 class="font-bold text-gray-900 mb-2">Detailed Reports Hidden</h3>
+			<Lock class="w-8 h-8 text-gray-400 mb-3 mx-auto" />
+			<h3 class="font-bold text-gray-900 mb-2">Reports Locked — Blind Count Mode</h3>
 			<p class="text-sm text-gray-500 max-w-[280px]">Click "Start End of Day" to begin your blind cash count and unlock today's detailed sales and variance reports.</p>
 		</div>
 	{/if}

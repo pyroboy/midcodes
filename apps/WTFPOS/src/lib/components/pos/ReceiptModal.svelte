@@ -77,15 +77,38 @@
 				</div>
 
 				<div class="border-t border-dashed border-gray-200 mt-1 pt-2">
-					<div class="flex justify-between">
-						<span class="text-gray-600">Paid via</span>
-						<span class="font-bold text-gray-900">{method}</span>
-					</div>
-					{#if method === 'Cash' && change > 0}
-						<div class="flex justify-between">
-							<span class="text-gray-600">Tendered</span>
-							<span>{formatPeso(order.total + change)}</span>
+					{#if method === 'Split' && order.payments.length >= 2}
+						<div class="flex justify-between mb-1">
+							<span class="text-gray-600">Paid via</span>
+							<span class="font-bold text-gray-900">Split</span>
 						</div>
+						{#each order.payments as p}
+							{@const emoji = p.method === 'cash' ? '💵' : '📱'}
+							{@const label = p.method === 'cash' ? 'Cash' : p.method === 'gcash' ? 'GCash' : p.method === 'maya' ? 'Maya' : p.method === 'card' ? 'Card' : p.method}
+							<div class="flex justify-between text-gray-700">
+								<span>{emoji} {label}</span>
+								<span>{formatPeso(p.amount)}</span>
+							</div>
+						{/each}
+					{:else}
+						<div class="flex justify-between">
+							<span class="text-gray-600">Paid via</span>
+							<span class="font-bold text-gray-900">{method}</span>
+						</div>
+					{/if}
+					{#if change > 0}
+						{@const cashPayment = order.payments.find(p => p.method === 'cash')}
+						{#if cashPayment}
+							<div class="flex justify-between">
+								<span class="text-gray-600">Cash Tendered</span>
+								<span>{formatPeso(cashPayment.amount)}</span>
+							</div>
+						{:else if method === 'Cash'}
+							<div class="flex justify-between">
+								<span class="text-gray-600">Tendered</span>
+								<span>{formatPeso(order.total + change)}</span>
+							</div>
+						{/if}
 						<div class="flex justify-between text-status-green font-bold">
 							<span>Change</span>
 							<span>{formatPeso(change)}</span>

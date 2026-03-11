@@ -33,14 +33,12 @@
 
     const categories: { id: MenuCategory; label: string }[] = [
         { id: 'packages', label: '🎫 Package' },
-        { id: 'meats',    label: '🥩 Meats' },
-        { id: 'sides',    label: '🥬 Sides' },
         { id: 'dishes',   label: '🍜 Dishes' },
         { id: 'drinks',   label: '🥤 Drinks' }
     ];
 
     let activeCategory = $state<MenuCategory>(
-        untrack(() => order.orderType === 'takeout' ? 'sides' : (order.packageId ? 'meats' : 'packages'))
+        untrack(() => order.orderType === 'takeout' ? 'dishes' : (order.packageId ? 'dishes' : 'packages'))
     );
 
     // Pending items staged before pushing to bill
@@ -58,15 +56,17 @@
     const includedMeatCount = $derived(includedItems.filter(p => p.item.category === 'meats').length);
     const includedSideCount = $derived(includedItems.filter(p => p.item.category !== 'meats').length);
 
+    let dishSearch = $state('');
+
     const activePax = $derived(order.pax);
     const activeChildPax = $derived(order.childPax ?? 0);
     const activeFreePax = $derived(order.freePax ?? 0);
     const activeAdultPax = $derived(Math.max(0, activePax - activeChildPax - activeFreePax));
 
-    // Takeout hides "packages" + "meats"; dine-in hides packages if already set
+    // Takeout hides "packages"; dine-in hides packages if already set
     const visibleCategories = $derived(
         order.orderType === 'takeout'
-            ? categories.filter(c => c.id !== 'packages' && c.id !== 'meats')
+            ? categories.filter(c => c.id !== 'packages')
             : (order.packageId
                 ? categories.filter(c => c.id !== 'packages')
                 : categories)
@@ -75,6 +75,7 @@
     const filteredItems = $derived(
         menuItems.value
             .filter((m) => m.category === activeCategory)
+            .filter((m) => activeCategory !== 'dishes' || m.name.toLowerCase().includes(dishSearch.toLowerCase()))
             .sort((a, b) => (a.available === b.available ? 0 : a.available ? -1 : 1))
     );
 
@@ -92,7 +93,9 @@
 
     function tapItem(item: MenuItem) {
         if (item.category === 'packages') {
-            pendingItems = [{ item, qty: 1, forceFree: false }];
+            // Preserve any existing ala carte items, but clear old packages & auto-included items
+            pendingItems = pendingItems.filter(p => p.item.category !== 'packages' && !p.forceFree);
+            pendingItems.push({ item, qty: 1, forceFree: false });
             if (item.meats) {
                 for (const meatId of item.meats) {
                     const meat = menuItems.value.find(m => m.id === meatId);
@@ -112,7 +115,7 @@
                     if (side) pendingItems.push({ item: side, qty: Math.ceil(activePax / 6), forceFree: true });
                 }
             }
-            activeCategory = 'meats';
+            activeCategory = 'dishes';
             return;
         }
         if (item.isWeightBased) { weightScreenItem = item; weightInput = ''; return; }
@@ -194,19 +197,7 @@
             </div>
 
             {#if order.orderType === 'takeout'}
-                <p class="px-6 text-[11px] text-gray-400">Packages and meats are dine-in only</p>
-            {/if}
-
-            {#if order.orderType !== 'takeout' && !order.packageId && !hasPkg && (activeCategory === 'meats' || activeCategory === 'sides' || activeCategory === 'dishes')}
-                <p class="text-xs text-amber-600 text-center py-2">A package is required before adding items.</p>
-            {/if}
-
-            {#if activeCategory === 'sides' || activeCategory === 'packages'}
-                <div class="flex items-center gap-2 bg-status-green-light px-6 py-2.5">
-                    <span class="text-xs font-semibold text-status-green">
-                        {order.orderType === 'takeout' ? 'Complimentary sides' : 'FREE — inventory tracked'}
-                    </span>
-                </div>
+                <p class="px-6 pb-2 text-[11px] text-gray-400">Packages and meats are dine-in only</p>
             {/if}
 
             <div class="flex-1 overflow-y-auto p-6">
@@ -244,6 +235,16 @@
                         </div>
                     </div>
                 {:else}
+                    {#if activeCategory === 'dishes'}
+                        <div class="mb-5">
+                            <input
+                                type="text"
+                                bind:value={dishSearch}
+                                placeholder="Search dishes..."
+                                class="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent shadow-sm"
+                            />
+                        </div>
+                    {/if}
                     <div class="grid grid-cols-3 gap-4">
                         {#each filteredItems as item (item.id)}
                             <button
@@ -381,7 +382,7 @@
                                     {#if order.orderType === 'dine-in'}
                                         <button
                                             onclick={() => p.isTakeout = !p.isTakeout}
-                                            class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
+                                            class={cn('flex items-center justify-center rounded-lg border-2 px-1.5 py-1 text-[10px] font-bold transition-colors min-h-[44px] w-20 shadow-sm', p.isTakeout ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-surface text-gray-600 border-gray-200 hover:border-gray-300 underline decoration-gray-300 underline-offset-2')}
                                         >
                                             {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
                                         </button>
@@ -419,7 +420,7 @@
                                     {#if order.orderType === 'dine-in'}
                                         <button
                                             onclick={() => p.isTakeout = !p.isTakeout}
-                                            class={cn('flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-bold transition-colors w-16', p.isTakeout ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-transparent')}
+                                            class={cn('flex items-center justify-center rounded-lg border-2 px-1.5 py-1 text-[10px] font-bold transition-colors min-h-[44px] w-20 shadow-sm', p.isTakeout ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-surface text-gray-600 border-gray-200 hover:border-gray-300 underline decoration-gray-300 underline-offset-2')}
                                         >
                                             {p.isTakeout ? '📦 To Go' : '🍽 Dine-In'}
                                         </button>
@@ -460,9 +461,7 @@
                         ⚡ CHARGE ({pendingItems.length})
                     </button>
                 </div>
-                {#if pendingItems.length === 0 && order.orderType !== 'takeout' && !order.packageId && !hasPkg}
-                    <p class="text-sm text-gray-500 text-center mt-1">Select a package first to enable charging.</p>
-                {/if}
+
             </div>
         </div>
     </div>

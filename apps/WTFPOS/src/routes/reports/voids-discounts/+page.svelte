@@ -1,8 +1,18 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
 	import { voidsAndDiscountsSummary } from '$lib/stores/reports.svelte';
+	import type { OrderItem } from '$lib/types';
 
-	const summary = $derived(voidsAndDiscountsSummary());
+	type VoidPeriod = 'today' | 'week' | 'all';
+	let period = $state<VoidPeriod>('today');
+
+	const summary = $derived(voidsAndDiscountsSummary(period));
+
+	const headingLabel = $derived(
+		period === 'today' ? "Today's Voids & Discounts" :
+		period === 'week'  ? "This Week's Voids & Discounts" :
+		                     "All Voids & Discounts"
+	);
 
 	// P1-25: Map cancel reason codes to readable labels
 	function reasonLabel(cancelReason: string | undefined | null): string {
@@ -24,21 +34,41 @@
 	}
 
 	// Build item summary string from order items array
-	function itemsSummary(order: { items?: { name?: string; quantity?: number }[] }): string {
+	function itemsSummary(order: { items?: Pick<OrderItem, 'menuItemName' | 'quantity'>[] }): string {
 		if (!order.items || order.items.length === 0) return '—';
 		return order.items
-			.map(i => `${i.quantity ?? 1}x ${i.name ?? 'Item'}`)
+			.map(i => `${i.quantity ?? 1}x ${i.menuItemName ?? 'Item'}`)
 			.join(', ');
 	}
 </script>
 
-<!-- Live indicator -->
-<div class="mb-4 flex items-center gap-2">
-	<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">Today's Voids & Discounts</h2>
-	<span class="flex items-center gap-1.5 text-xs text-status-green">
-		<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-status-green"></span>
-		Live totals
-	</span>
+<!-- Period filter + Live indicator -->
+<div class="mb-4 flex items-center justify-between flex-wrap gap-3">
+	<div class="flex items-center gap-2">
+		<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">{headingLabel}</h2>
+		<span class="flex items-center gap-1.5 text-xs text-status-green">
+			<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-status-green"></span>
+			Live totals
+		</span>
+	</div>
+	<div class="flex items-center gap-1.5">
+		{#each ([
+			{ value: 'today', label: 'Today' },
+			{ value: 'week',  label: 'This Week' },
+			{ value: 'all',   label: 'All Time' },
+		] as const) as opt}
+			<button
+				onclick={() => (period = opt.value)}
+				class={cn(
+					'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+					period === opt.value ? 'bg-accent text-white' : 'border border-border bg-white text-gray-600 hover:bg-gray-50'
+				)}
+				style="min-height: unset"
+			>
+				{opt.label}
+			</button>
+		{/each}
+	</div>
 </div>
 
 <div class="grid grid-cols-2 gap-6">
@@ -105,7 +135,11 @@
 									<span class="line-clamp-2">{itemsSummary(order)}</span>
 								</td>
 								<td class="px-4 py-2.5 text-xs text-gray-600">
-									{order.closedBy ?? <span class="text-gray-400">—</span>}
+									{#if order.closedBy}
+										{order.closedBy}
+									{:else}
+										<span class="text-gray-400">—</span>
+									{/if}
 								</td>
 								<td class="px-4 py-2.5 text-right font-mono text-status-red">
 									{formatPeso(order.subtotal)}
@@ -124,7 +158,6 @@
 									{:else}
 										<!-- void reason not stored on this record -->
 										<span class="text-gray-400">—</span>
-										<!-- TODO: cancelReason is stored on the order document as order.cancelReason -->
 									{/if}
 								</td>
 							</tr>

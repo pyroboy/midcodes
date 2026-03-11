@@ -1,0 +1,151 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e19]
+            - generic: POS
+      - generic [ref=e20]:
+        - separator [ref=e21]
+        - generic [ref=e23]: M
+        - link "Logout" [ref=e25] [cursor=pointer]:
+          - /url: /
+          - img [ref=e26]
+      - button "Toggle Sidebar" [ref=e27]
+    - main [ref=e28]:
+      - generic [ref=e30]:
+        - img [ref=e31]
+        - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e32]
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - generic [ref=e37]:
+              - button "Toggle Sidebar" [ref=e38] [cursor=pointer]:
+                - img
+                - generic [ref=e39]: Toggle Sidebar
+              - heading "POS" [level=1] [ref=e40]
+              - generic [ref=e41]: 0 occ
+              - generic [ref=e42]: 8 free
+            - generic [ref=e43]:
+              - button "Toggle color legend" [ref=e45] [cursor=pointer]:
+                - img [ref=e46]
+              - button "📦 New Takeout" [ref=e47] [cursor=pointer]
+              - button "🧾 History 14" [ref=e48] [cursor=pointer]:
+                - text: 🧾 History
+                - generic [ref=e49]: "14"
+          - img [ref=e51]:
+            - button "Table T1":
+              - generic: T1
+              - generic: cap 4
+            - button "Table T2":
+              - generic: T2
+              - generic: cap 4
+            - button "Table T3":
+              - generic: T3
+              - generic: cap 4
+            - button "Table T4":
+              - generic: T4
+              - generic: cap 4
+            - button "Table T5":
+              - generic: T5
+              - generic: cap 4
+            - button "Table T6":
+              - generic: T6
+              - generic: cap 4
+            - button "Table T7":
+              - generic: T7
+              - generic: cap 2
+            - button "Table T8":
+              - generic: T8
+              - generic: cap 2
+          - generic [ref=e62]:
+            - heading "📦 Takeout Orders 2" [level=2] [ref=e63]:
+              - text: 📦 Takeout Orders
+              - generic [ref=e64]: "2"
+            - generic [ref=e65]:
+              - generic [ref=e66]:
+                - button "#TO01 Ana ₱1,429.00 6 items" [ref=e67] [cursor=pointer]:
+                  - text: "#TO01"
+                  - generic [ref=e68]: Ana
+                  - text: ₱1,429.00
+                  - generic [ref=e69]: 6 items
+                - generic [ref=e70]: PREP
+              - generic [ref=e71]:
+                - button "#TO02 T2 Takeout Add-on ₱0.00 0 items" [ref=e72] [cursor=pointer]:
+                  - text: "#TO02"
+                  - generic [ref=e73]: T2 Takeout Add-on
+                  - text: ₱0.00
+                  - generic [ref=e74]: 0 items
+                - generic [ref=e75]: PREP
+        - generic [ref=e77]:
+          - generic [ref=e78]: 🧾
+          - generic [ref=e79]:
+            - generic [ref=e80]: No Table Selected
+            - generic [ref=e81]: Tap an occupied table on the floor plan to view its running bill here.
+          - generic [ref=e82]:
+            - generic [ref=e83]: Green = available — tap to open
+            - generic [ref=e85]: Orange = occupied — tap to view bill
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - heading "How many guests for T1?" [level=3] [ref=e90]
+          - paragraph [ref=e91]:
+            - text: "Capacity:"
+            - strong [ref=e92]: "4"
+        - generic [ref=e93]:
+          - generic [ref=e94]:
+            - generic [ref=e95]: Adults full price
+            - generic [ref=e96]:
+              - button "−" [ref=e97] [cursor=pointer]
+              - generic [ref=e98]: "4"
+              - button "+" [ref=e99] [cursor=pointer]
+          - generic [ref=e100]:
+            - button "1" [ref=e101] [cursor=pointer]
+            - button "2" [ref=e102] [cursor=pointer]
+            - button "3" [ref=e103] [cursor=pointer]
+            - button "4" [active] [ref=e104] [cursor=pointer]
+            - button "5" [ref=e105] [cursor=pointer]
+            - button "6" [ref=e106] [cursor=pointer]
+            - button "7" [ref=e107] [cursor=pointer]
+            - button "8" [ref=e108] [cursor=pointer]
+        - generic [ref=e110]:
+          - generic [ref=e111]:
+            - generic [ref=e112]: Children ages 6–9 · reduced price
+            - generic [ref=e113]:
+              - button "−" [disabled] [ref=e114] [cursor=pointer]
+              - generic [ref=e115]: "0"
+              - button "+" [ref=e116] [cursor=pointer]
+          - generic [ref=e117]:
+            - button "0" [ref=e118] [cursor=pointer]
+            - button "1" [ref=e119] [cursor=pointer]
+            - button "2" [ref=e120] [cursor=pointer]
+            - button "3" [ref=e121] [cursor=pointer]
+            - button "4" [ref=e122] [cursor=pointer]
+        - generic [ref=e123]:
+          - generic [ref=e124]:
+            - generic [ref=e125]: Free under 5 · no charge
+            - generic [ref=e126]:
+              - button "−" [disabled] [ref=e127] [cursor=pointer]
+              - generic [ref=e128]: "0"
+              - button "+" [ref=e129] [cursor=pointer]
+          - generic [ref=e130]:
+            - button "0" [ref=e131] [cursor=pointer]
+            - button "1" [ref=e132] [cursor=pointer]
+            - button "2" [ref=e133] [cursor=pointer]
+            - button "3" [ref=e134] [cursor=pointer]
+            - button "4" [ref=e135] [cursor=pointer]
+        - generic [ref=e136]:
+          - generic [ref=e137]: Total guests
+          - generic [ref=e138]: "4"
+        - generic [ref=e139]:
+          - button "Cancel" [ref=e140] [cursor=pointer]
+          - button "Confirm" [ref=e141] [cursor=pointer]
+  - generic [ref=e142]: WTF! Samgyup POS
+```

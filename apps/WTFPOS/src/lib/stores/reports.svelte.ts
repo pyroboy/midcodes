@@ -418,18 +418,20 @@ export function staffPerformance() {
 	return Object.values(byStaff).sort((a, b) => b.totalRevenue - a.totalRevenue);
 }
 
-export function voidsAndDiscountsSummary() {
+export function voidsAndDiscountsSummary(period: 'today' | 'week' | 'all' = 'today') {
 	const allOs = getOrders();
-	
+	const filterByPeriod = (o: { createdAt: string }) =>
+		period === 'all' ? true : inPeriod(o.createdAt, period === 'week' ? 'week' : 'today');
+
 	// Voids
-	const voided = allOs.filter(o => o.status === 'cancelled');
+	const voided = allOs.filter(o => o.status === 'cancelled' && filterByPeriod(o));
 	const mistake = voided.filter(o => o.cancelReason === 'mistake' || !o.cancelReason).length;
 	const walkout = voided.filter(o => o.cancelReason === 'walkout').length;
 	const writeOff = voided.filter(o => o.cancelReason === 'write_off').length;
 	const voidTotalValue = voided.reduce((s, o) => s + o.subtotal, 0);
 
 	// Discounts
-	const paidWithDiscounts = allOs.filter(o => o.status === 'paid' && o.discountType !== 'none');
+	const paidWithDiscounts = allOs.filter(o => o.status === 'paid' && o.discountType !== 'none' && filterByPeriod(o));
 	const senior = paidWithDiscounts.filter(o => o.discountType === 'senior').reduce((s, o) => s + o.discountAmount, 0);
 	const pwd = paidWithDiscounts.filter(o => o.discountType === 'pwd').reduce((s, o) => s + o.discountAmount, 0);
 	const promo = paidWithDiscounts.filter(o => o.discountType === 'promo').reduce((s, o) => s + o.discountAmount, 0);
@@ -440,9 +442,9 @@ export function voidsAndDiscountsSummary() {
 
 	return {
 		voids: { count: voided.length, value: voidTotalValue, mistake, walkout, writeOff, items: voided },
-		discounts: { 
-			count: paidWithDiscounts.length, 
-			value: discountTotalValue, 
+		discounts: {
+			count: paidWithDiscounts.length,
+			value: discountTotalValue,
 			breakdown: [
 				{ label: 'Senior', amount: senior },
 				{ label: 'PWD', amount: pwd },

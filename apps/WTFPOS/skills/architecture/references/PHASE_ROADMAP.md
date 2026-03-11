@@ -4,103 +4,91 @@
 
 | Phase | Name | Core Technology Added | Status |
 |---|---|---|---|
-| **Phase 1** | Local-First Foundation | RxDB + SSE bridge | ✅ Active |
-| **Phase 2** | LAN Multi-Device Sync | RxDB HTTP/WS replication | 🔲 Planned |
-| **Phase 3** | Cloud + Real-Time | Neon + Ably | 🔲 Planned |
-| **Phase 4** | Hardware Integration | Bluetooth scale + printer | ⚠️ Partial |
-| **Phase 5** | Full Offline-First | All phases combined + conflict resolution | 🔲 Future |
+| **Phase 1** | Local-First + Thin Client | RxDB + SSE + adapter-node | ✅ Active |
+| **Phase 2** | Cloud + Real-Time | Neon + Ably | 🔲 Planned |
+| **Phase 3** | Hardware Integration | Bluetooth scale + printer | ⚠️ Partial |
+| **Phase 4** | Resilience & Archival | Conflict resolution + Neon archival | 🔲 Future |
 
 ---
 
-## Phase 1 — Local-First Foundation ✅ Active
+## Phase 1 — Local-First + Thin Client ✅ Active
+
+### Core model
+
+One main tablet per branch runs the SvelteKit Node server. All other devices (kitchen screen, extra POS) are just browsers pointed at the main tablet over local WiFi. No sync, no replication, no internet required for operations.
+
+```
+Location: Alta Citta (Tag)
+
+Main Tablet (SvelteKit Node + RxDB)
+  ├── pnpm build → node build (port 3000)
+  ├── owns all branch data in IndexedDB (RxDB)
+  └── serves the app to all devices on local WiFi
+
+Kitchen Tablet
+  └── browser → http://192.168.1.x:3000/kitchen/dispatch
+      reads from same server, same RxDB, instant updates via SSE
+
+Extra POS Tablet (if needed)
+  └── browser → http://192.168.1.x:3000/pos
+```
+
+Every device hits the **same RxDB on the same server** — there is nothing to sync. Kitchen updates are real-time because they're reading the same data source, not a copy.
 
 ### What's implemented
-- RxDB + IndexedDB on every device (fully offline capable)
-- All 16 collections with `locationId` + `updatedAt` on every document
+- RxDB + IndexedDB on the main tablet (fully offline capable)
+- All 17 collections with `locationId` + `updatedAt` on every document
 - `createRxStore()` reactive Svelte 5 bridge
 - Session management with role-based location locking
-- SSE kitchen aggregate view (cross-branch, read-only, owner)
-- Bluetooth scale integration (Web Bluetooth API)
+- SSE kitchen real-time updates (same-branch, same server)
+- SSE kitchen aggregate view (cross-branch, read-only, owner — requires internet)
+- Bluetooth scale integration (Web Bluetooth API, partial)
 - Full POS, KDS, Stock, Reports UI
 
 ### What Phase 1 does NOT have
-- Data sync between devices at the same branch
 - Cloud backup
-- Real-time cross-device events
-- Cross-branch data on the same device (owner sees only one branch's local data)
+- Owner cross-branch analytics (beyond SSE read-only view)
+- Cross-branch real-time events
+- Receipt printer
 
-### SSE Kitchen Aggregate (Phase 1 bridge)
+### SSE Kitchen (Phase 1 — same branch, no internet needed)
 ```
-Owner device's browser → GET /api/sse/aggregate (same-origin)
-  → Owner's SvelteKit server → fetch Tagbilaran server /api/sse/kitchen-orders
-  → Owner's SvelteKit server → fetch Panglao server /api/sse/kitchen-orders
-  → Merges streams → streams to owner browser
+Cashier writes order → RxDB on main tablet
+  → debounce 3s → POST /api/events/kitchen-push
+  → server SSE broadcast
+  → kitchen browser receives event → updates KDS instantly
+```
 
-Branch browsers → watch RxDB orders (open + pending_payment)
-  → debounce 3s → POST /api/events/kitchen-push (local server)
-  → local server broadcasts to SSE clients
+### SSE Aggregate (Phase 1 — owner cross-branch, needs internet)
 ```
-This SSE approach is correct for Phase 1. It will be replaced by Ably in Phase 3.
+Owner browser → GET /api/sse/aggregate
+  → owner's SvelteKit server fetches Tag server /api/sse/kitchen-orders
+  → owner's SvelteKit server fetches Pgl server /api/sse/kitchen-orders
+  → merges streams → owner browser sees both branches
+```
+This SSE aggregate will be replaced by Ably in Phase 2.
 
 ---
 
-## Phase 2 — LAN Multi-Device Sync 🔲 Planned
+## Phase 2 — Cloud + Real-Time 🔲 Planned
 
 ### Goal
-Multiple tablets at the same branch share the same data in real-time without internet.
-- POS tablet creates order → KDS tablet sees it immediately
-- Manager tablet makes menu change → all POS tablets reflect it
-- If main server is offline, tablets queue changes and sync when it returns
-
-### Technology: RxDB HTTP Replication
-
-Each branch has one "main tablet" (SvelteKit adapter-node) that serves as the LAN replication hub.
-
-```
-Client tablets → replicateRxCollection({ pull/push to main server })
-Main tablet    → serves /api/replication/pull and /api/replication/push
-```
-
-### Files to create (from RXDB_REPLICATION_GUIDE.md)
-- `src/lib/db/replication.ts` — startReplication() client setup
-- `src/lib/db/conflict-handlers.ts` — orderConflictHandler, kdsTicketConflictHandler
-- `src/lib/stores/replication-config.svelte.ts` — server URL, isMainServer
-- `src/routes/api/replication/pull/+server.ts`
-- `src/routes/api/replication/push/+server.ts`
-- `src/routes/api/replication/health/+server.ts`
-
-### Conflict resolution required for
-| Collection | Strategy |
-|---|---|
-| `orders` | Merge `items[]` and `payments[]` by ID; take latest scalar |
-| `tables` | Latest `updatedAt` wins |
-| `kds_tickets` | Merge item statuses; prefer "done" > "cooking" > "pending" |
-| All others | Default (master wins) — append-only logs |
-
-### Admin UI needed
-- Server URL input field (admin settings page)
-- "This device is the main server" toggle
-- Connection status badge (LAN server: connected/offline)
-- Pending sync count indicator
-
----
-
-## Phase 3 — Cloud + Real-Time 🔲 Planned
-
-### Goal
-- Owner can see both branches from anywhere without being on the LAN
+- Owner sees both branches from anywhere (not just on their local server)
 - Complex analytics queries run against Neon (not local RxDB)
-- Ably replaces SSE for real-time cross-device events
-- Cross-branch KDS view works without custom SSE infrastructure
+- Ably replaces SSE for cross-branch real-time events
+- Neon provides cloud backup and historical data
 
-### 3a: Neon PostgreSQL (cloud analytics + backup)
+### Why internet is acceptable here
+Same-branch operations (POS ↔ Kitchen) already work in Phase 1 over local WiFi with zero internet. Internet is only needed for the **owner's cross-branch view and analytics** — which the owner always accesses from a connected device anyway.
+
+### 2a: Neon PostgreSQL (cloud analytics + backup)
 
 **Role:** Cloud database for analytics and backup. NOT a replacement for RxDB.
 
 ```
-RxDB (operational truth)
-    ↓ background replication
-Neon (analytical truth + backup)
+RxDB (operational truth, local)
+    ↓ background sync when internet available
+Neon (analytical truth + cloud backup)
     ↑ queried by
 Reports pages, owner dashboard
 ```
@@ -108,24 +96,24 @@ Reports pages, owner dashboard
 **Data flow:**
 - Main tablet RxDB → `startCloudSync()` → POST to Neon API routes
 - Neon tables mirror RxDB schemas (camelCase → snake_case)
-- Reports that need cross-branch data or complex SQL query Neon directly
-- Simple operational data (current orders, tables) still comes from RxDB
+- Reports needing cross-branch data or complex SQL query Neon directly
+- Simple operational data (current orders, tables) still comes from local RxDB
 
 **Read skill:** `skills/neon/SKILL.md`
 
-### 3b: Ably (real-time events)
+### 2b: Ably (real-time cross-branch events)
 
-**Role:** Replaces SSE for all cross-device real-time communication.
+**Role:** Replaces SSE aggregate for cross-branch owner view. Same-branch real-time stays as SSE (Phase 1, already works).
 
 **Channels:**
 ```
-wtfpos:{locationId}:kitchen     — KDS ticket updates
+wtfpos:{locationId}:kitchen     — KDS ticket updates (cross-branch owner view)
 wtfpos:{locationId}:orders      — Order status changes
 wtfpos:{locationId}:stock       — Stock level alerts
 wtfpos:all:alerts               — Manager cross-branch alerts
 ```
 
-**What Ably replaces:**
+**What Ably replaces (SSE aggregate only):**
 - `src/lib/server/kitchen-sse.ts` → delete
 - `src/routes/api/sse/kitchen-orders/+server.ts` → delete
 - `src/routes/api/events/kitchen-push/+server.ts` → delete
@@ -137,7 +125,7 @@ wtfpos:all:alerts               — Manager cross-branch alerts
 
 ---
 
-## Phase 4 — Hardware Integration ⚠️ Partial
+## Phase 3 — Hardware Integration ⚠️ Partial
 
 ### Bluetooth Scale (partially implemented)
 - `src/lib/stores/hardware.svelte.ts` — connection state
@@ -154,25 +142,16 @@ wtfpos:all:alerts               — Manager cross-branch alerts
 
 ---
 
-## Phase 5 — Full Offline-First 🔲 Future
+## Phase 4 — Resilience & Archival 🔲 Future
 
 ### Goal
-The system behaves identically whether online or offline. When connectivity returns, everything syncs automatically with no data loss and no user action required.
+Harden the system for long-term production use. No new features — this is about reliability and data lifecycle management.
 
 ### Requirements
-1. All Phase 1-4 features working together
-2. Tested conflict scenarios: concurrent order edits, offline payments, duplicate sends
-3. Connection status UI communicating clearly (not just a dot — explain what's queued)
-4. Manager PIN-protected merge decisions for unresolvable conflicts
-5. Neon as source of truth for historical data (> 90 days old, archived from RxDB)
-
-### Key risks to resolve
-| Risk | Mitigation |
-|---|---|
-| Two cashiers pay the same order offline | Payment idempotency key on `payments[]` array |
-| Schema migration on a disconnected tablet | Server-first deploy, version guard on replication endpoints |
-| Ably disconnect during busy service | Ably history on reconnect (last 2 minutes) |
-| Neon sync falls behind by days | Neon storage cap alert + archival job |
+1. Neon archival job — orders older than 90 days moved out of RxDB into Neon cold storage
+2. Ably reconnect handling — replay missed messages on reconnect (cross-branch owner view)
+3. Connection status UI — communicate clearly what's queued, not just a dot
+4. Schema migration safety — version guard on server deploy for disconnected tablets
 
 ---
 
@@ -184,14 +163,14 @@ The system behaves identically whether online or offline. When connectivity retu
 - **If unsure:** Start with RxDB. Neon is additive.
 
 ### "Should this use Ably or SSE?"
-- **Phase 1 (now):** SSE (already built)
-- **Phase 3+:** Ably — migrate everything
-- **Never add new SSE endpoints** — Ably will replace them
+- **Same-branch real-time (POS → Kitchen):** SSE — already works in Phase 1, keep it
+- **Cross-branch or owner dashboard:** Ably (Phase 2)
+- **Never add new SSE endpoints** — Ably will replace the cross-branch aggregate
 
-### "Should this use LAN replication or cloud sync?"
-- **Same-branch, same LAN:** LAN replication (Phase 2)
-- **Cross-branch or cloud backup:** Neon cloud sync (Phase 3)
-- **Never use Neon for same-LAN sync** — it's too slow and costs money per query
+### "Do we need LAN replication?"
+- **No.** The thin client model in Phase 1 makes LAN replication unnecessary.
+- All devices at a branch hit the same main tablet server — there is nothing to replicate.
+- Cross-branch owner view uses Ably + Neon (internet required, acceptable).
 
 ---
 
@@ -200,3 +179,4 @@ The system behaves identically whether online or offline. When connectivity retu
 | Date | Change |
 |---|---|
 | 2026-03-07 | Initial creation with Phase 1 marked active |
+| 2026-03-11 | Removed Phase 2 LAN replication — thin client model makes it unnecessary. Renumbered phases. Phase 1 now explicitly documents the main tablet + thin client architecture. |

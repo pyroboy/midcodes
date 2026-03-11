@@ -41,7 +41,7 @@ export const tables = {
 
 // ─── Table Actions ────────────────────────────────────────────────────────────
 
-export async function openTable(tableId: string, pax: number = 4, packageName?: string, childPax: number = 0, freePax: number = 0): Promise<string> {
+export async function openTable(tableId: string, pax: number = 4, packageName?: string, childPax: number = 0, freePax: number = 0, scCount: number = 0, pwdCount: number = 0): Promise<string> {
 	if (isWarehouseSession()) return '';
 	const table = tables.value.find((t) => t.id === tableId);
 	if (!table || table.status !== 'available') return table?.currentOrderId ?? '';
@@ -72,6 +72,8 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 		pax,
 		childPax,
 		freePax,
+		scCount: scCount > 0 ? scCount : undefined,
+		pwdCount: pwdCount > 0 ? pwdCount : undefined,
 		items: [],
 		status: 'open',
 		discountType: 'none',

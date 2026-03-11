@@ -243,7 +243,7 @@ This saves ~2,000 output tokens. Only present the full list if the user needs to
 
 **Trigger:** After all agents complete.
 
-**Action:** Present results as an **ASCII colored summary report** followed by the per-issue validation table. Always render this — never collapse to a plain markdown table.
+**Action:** Present results as an **ASCII colored summary report** followed by the per-issue validation table, then **Block 4 human questions**. Always render all four blocks — never collapse to a plain markdown table or skip the follow-up questions.
 
 ---
 
@@ -307,7 +307,7 @@ If `pnpm check` failed, replace with:
   ──────────────────────────────────────────────────────────────────────────
 ```
 
-**Block 3 — Re-audit prompt (always last):**
+**Block 3 — Re-audit prompt:**
 
 ```
   ── NEXT STEP ─────────────────────────────────────────────────────────────
@@ -315,6 +315,42 @@ If `pnpm check` failed, replace with:
   Suggested prompt: "[paste from AUDIT_PROMPTS.md matching the audited flow]"
   ──────────────────────────────────────────────────────────────────────────
 ```
+
+**Block 4 — Human Questions [ALWAYS RENDERED after Block 3]:**
+
+After the scoreboard and re-audit prompt, ask the user **2–4 smart follow-up questions** drawn from
+the context of this specific run. These are not generic — tailor them to what was actually fixed.
+
+**How to build the questions:**
+
+| Condition | Question to ask |
+|---|---|
+| Any data/store fix landed (e.g., `closedBy`, filter, query) | "These data fixes affect existing records — want to run a `pnpm dev` smoke test to confirm the live data renders correctly?" |
+| Any Visibility of System Status fix landed | "The [issue] fix adds new information to the screen. Should we add a snapshot assertion to the e2e suite to prevent regression?" |
+| 3+ issues share the same root cause (systemic pattern) | "Issues [X], [Y], [Z] share the same root — [describe pattern]. Should I check if this pattern exists in other pages and flag them?" |
+| Any fix touches a page used by multiple roles | "The [page] fix affects [roles]. Want me to run a light audit for [other role] to confirm the change doesn't break their flow?" |
+| All issues FIXED (100% pass rate) | "All [N] issues fixed. Want to commit these changes now?" |
+| Any issue FAILED | "Issue [ID] failed. Should I attempt a manual fix, skip it for now, or open it as a known gap in the audit file?" |
+| Any new UX pattern emerged that isn't in KNOWN_PATTERNS.md | "The [issue] revealed a new recurring pattern ([describe]). Should I add it to `references/KNOWN_PATTERNS.md`?" |
+| SP (Structural Proposal) was fixed | "The [SP] restructured [component]. This is a significant change — should I write a short spec or update the PRD Quick Ref?" |
+
+**Format — render like this after Block 3:**
+
+```
+  ── FOLLOW-UP QUESTIONS ────────────────────────────────────────────────────
+  [Q1] [context-specific question]
+  [Q2] [context-specific question]
+  [Q3] [context-specific question — only if warranted]
+  ──────────────────────────────────────────────────────────────────────────
+```
+
+**Rules:**
+- Ask 2 questions minimum, 4 maximum — do not pad with generic questions
+- Questions must reference specific issue IDs, role names, or file names from this run
+- Ask compound questions only if the two parts are strongly linked (e.g., "commit + re-audit?")
+- If 100% fixed: always include the commit question
+- If any failures: always include the retry/skip question for each failed issue
+- Never ask about things unrelated to the fixes just made
 
 ---
 

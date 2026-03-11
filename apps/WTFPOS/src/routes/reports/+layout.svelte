@@ -2,8 +2,18 @@
 	import { page } from '$app/state';
 	import { cn } from '$lib/utils';
 	import { session, getCurrentLocation } from '$lib/stores/session.svelte';
+	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
+
+	// Auth guard — staff and kitchen roles have no access to reports
+	$effect(() => {
+		if (!browser) return;
+		if (session.role === 'staff' || session.role === 'kitchen') {
+			goto('/stock/inventory');
+		}
+	});
 
 	let currentRoute = $derived(page.url.pathname);
 	const currentLoc = $derived(getCurrentLocation());

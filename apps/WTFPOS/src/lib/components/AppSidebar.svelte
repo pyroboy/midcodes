@@ -20,6 +20,7 @@
 		ROLE_NAV_ACCESS,
 		LOCATIONS,
 		getCurrentLocation,
+		isWarehouseSession,
 		clearSession,
 	} from '$lib/stores/session.svelte';
 	import {
@@ -55,11 +56,16 @@
 		LOCATIONS.find(l => l.id === session.locationId)?.type === 'warehouse'
 	);
 
-	const navItems = $derived(
-		allNavItems
-			.filter(l => ROLE_NAV_ACCESS[session.role]?.includes(l.href))
-			.filter(l => !isWarehouse || !RETAIL_ONLY.has(l.href))
-	);
+	const navItems = $derived.by(() => {
+		const baseAccess = ROLE_NAV_ACCESS[session.role] ?? [];
+		const accessSet = new Set(baseAccess);
+		if (isWarehouseSession() && session.role === 'staff' && !accessSet.has('/stock')) {
+			accessSet.add('/stock');
+		}
+		return allNavItems
+			.filter(l => accessSet.has(l.href))
+			.filter(l => !isWarehouse || !RETAIL_ONLY.has(l.href));
+	});
 
 	const currentLoc = $derived(getCurrentLocation());
 	const tickerLocations = LOCATIONS.filter(l => l.id !== 'all');

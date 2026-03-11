@@ -58,6 +58,31 @@
 	let removePinItemId = $state<string | null>(null);
 	let showRemovePin = $state(false);
 
+	// Void item reason selection (shown after PIN confirmed)
+	let showVoidReasonSelector = $state(false);
+	let voidItemReason = $state<'Mistake' | 'Kitchen Error' | 'Guest Changed Mind' | 'Other' | ''>('');
+	const VOID_REASONS = ['Mistake', 'Kitchen Error', 'Guest Changed Mind', 'Other'] as const;
+
+	// Ticker: increments every second so grace period state re-evaluates reactively
+	let _tick = $state(0);
+	$effect(() => {
+		const interval = setInterval(() => { _tick++; }, 1000);
+		return () => clearInterval(interval);
+	});
+
+	/** Returns true if the item is still within the grace period — re-evaluates each tick */
+	function inGrace(addedAt: string | undefined): boolean {
+		void _tick; // depend on tick so Svelte re-evaluates each second
+		return isWithinGracePeriod(addedAt);
+	}
+
+	/** Returns seconds remaining in grace period (0 if expired) — re-evaluates each tick */
+	function graceSecondsLeft(addedAt: string | undefined): number {
+		void _tick;
+		if (!addedAt) return 0;
+		return Math.max(0, Math.ceil((30_000 - (Date.now() - new Date(addedAt).getTime())) / 1000));
+	}
+
 	// Full-order void PIN gate
 	let showVoidPin = $state(false);
 
@@ -88,7 +113,8 @@
 		if (item.status === 'cancelled') return null;
 		const mi = menuItemsById.get(item.menuItemId);
 		if (mi?.category === 'meats' && item.status === 'pending' && item.weight === null) return 'weighing';
-		if (item.status === 'cooking') return 'cooking';
+		// Meat is served raw — 'cooking' status only applies to dishes/drinks, never meat
+		if (item.status === 'cooking' && mi?.category !== 'meats') return 'cooking';
 		if (item.status === 'served') return 'served';
 		if (item.status === 'pending') return 'pending';
 		return null;
@@ -182,16 +208,18 @@
 {#snippet statusBadge(badge: ReturnType<typeof itemBadge>, isRefill = false)}
 	{#if badge === 'pending'}
 		{#if isRefill}
-			<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">REQUESTING</span>
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-violet-100 text-violet-800 animate-pulse">REQUESTING</span>
 		{:else}
-			<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-600">SENT</span>
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-800">SENT</span>
 		{/if}
 	{:else if badge === 'weighing'}
-		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">WEIGHING {order?.createdAt ? formatTimeAgo(order.createdAt) : ''}</span>
+		{#if session.role === 'manager' || session.role === 'owner'}
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">WEIGHING {order?.createdAt ? formatTimeAgo(order.createdAt) : ''}</span>
+		{/if}
 	{:else if badge === 'cooking'}
-		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">COOKING</span>
+		<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">WEIGHING</span>
 	{:else if badge === 'served'}
-		<span class="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
+		<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
 	{/if}
 {/snippet}
 
@@ -202,16 +230,18 @@
 			<span class="text-[10px] text-gray-400">{counts.totalWeight}g</span>
 		{/if}
 		{#if counts.served > 0}
-			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-600">{counts.served > 1 ? `${counts.served}× ` : ''}✓ SERVED</span>
+			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">{counts.served > 1 ? `${counts.served}× ` : ''}✓ SERVED</span>
 		{/if}
 		{#if counts.cooking > 0}
-			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 text-orange-600">{counts.cooking > 1 ? `${counts.cooking}× ` : ''}COOKING</span>
+			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">{counts.cooking > 1 ? `${counts.cooking}× ` : ''}WEIGHING</span>
 		{/if}
 		{#if counts.weighing > 0}
-			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 animate-pulse">{counts.weighing > 1 ? `${counts.weighing}× ` : ''}WEIGHING</span>
+			{#if session.role === 'manager' || session.role === 'owner'}
+				<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">{counts.weighing > 1 ? `${counts.weighing}× ` : ''}WEIGHING</span>
+			{/if}
 		{/if}
 		{#if counts.pending > 0}
-			<span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-violet-100 text-violet-600 animate-pulse">{counts.pending > 1 ? `${counts.pending}× ` : ''}REQUESTING</span>
+			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-violet-100 text-violet-800 animate-pulse">{counts.pending > 1 ? `${counts.pending}× ` : ''}REQUESTING</span>
 		{/if}
 	</div>
 {/snippet}
@@ -253,11 +283,29 @@
 				<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
 			{/if}
 			{#if item.status === 'pending' && order}
+				{@const grace = inGrace(item.addedAt)}
+				{@const secsLeft = grace ? graceSecondsLeft(item.addedAt) : 0}
 				<button
 					onclick={() => handleRemoveItem(item)}
-					class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors shrink-0"
-					title={isWithinGracePeriod(item.addedAt) ? 'Remove (grace period)' : 'Remove (PIN required)'}
-				>✕</button>
+					class={cn(
+						'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-colors shrink-0 relative',
+						grace
+							? 'text-emerald-600 hover:bg-emerald-50 ring-1 ring-emerald-300'
+							: 'text-gray-400 hover:bg-red-50 hover:text-red-500'
+					)}
+					title={grace ? `Within grace period — ${secsLeft}s remaining, tap to remove instantly` : 'Manager PIN required to remove'}
+				>
+					{#if grace}
+						<span class="flex flex-col items-center leading-none gap-0.5">
+							<span class="text-sm">✕</span>
+							<span class="text-[10px] font-mono text-gray-400">{Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, '0')}</span>
+						</span>
+					{:else}
+						<span class="flex flex-col items-center leading-none gap-0.5">
+							<span class="text-sm">🔒</span>
+						</span>
+					{/if}
+				</button>
 			{/if}
 		</div>
 	</div>
@@ -454,7 +502,7 @@
 							>
 								<span class="flex items-center gap-2 text-xs">
 									{#if sidesRequesting > 0}
-										<span class="text-amber-600 font-semibold">{sidesRequesting} requesting</span>
+										<span class="text-gray-500 font-semibold">{sidesRequesting} pending</span>
 									{/if}
 									{#if sidesServed > 0}
 										<span class="text-status-green font-semibold">{sidesServed} served</span>
@@ -537,11 +585,13 @@
 					</button>
 				{/if}
 			{:else}
+				<!-- Secondary actions row: Print + Void (smaller, less prominent) -->
 				<div class="flex gap-2">
-					<button onclick={() => printBill(order.id)} disabled={activeItemCount === 0} class={cn('btn-secondary px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Print</button>
-					<button onclick={() => showVoidPin = true} disabled={activeItemCount === 0} class={cn('btn-danger px-3 text-sm', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
-					<button onclick={oncheckout} disabled={activeItemCount === 0} class={cn('btn-success flex-1 text-sm bg-emerald-600 hover:bg-emerald-700 text-white', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Checkout</button>
+					<button onclick={() => printBill(order.id)} disabled={activeItemCount === 0} class={cn('btn-secondary flex-1 px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Print</button>
+					<button onclick={() => showVoidPin = true} disabled={activeItemCount === 0} class={cn('btn-ghost flex-1 px-3 text-sm border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Void</button>
 				</div>
+				<!-- Primary CTA: Checkout — full width, visually dominant -->
+				<button onclick={oncheckout} disabled={activeItemCount === 0} class={cn('w-full rounded-xl text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 56px">✓ Checkout</button>
 			{/if}
 			{/if}
 
@@ -583,17 +633,60 @@
 
 <ManagerPinModal
 	isOpen={showRemovePin}
-	title="Remove Item"
-	description="Grace period has expired. Enter Manager PIN to remove this item."
-	confirmLabel="Remove"
+	title="Void Item"
+	description="Grace period has expired. Enter Manager PIN to void this item."
+	confirmLabel="Void"
 	confirmClass="btn-danger"
 	onClose={() => { showRemovePin = false; removePinItemId = null; }}
 	onConfirm={() => {
-		if (order && removePinItemId) removeOrderItem(order.id, removePinItemId);
 		showRemovePin = false;
-		removePinItemId = null;
+		voidItemReason = '';
+		showVoidReasonSelector = true;
 	}}
 />
+
+<!-- Void Item Reason Selector (shown after PIN confirmed) -->
+{#if showVoidReasonSelector}
+	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+		<div class="pos-card w-[340px] flex flex-col gap-4">
+			<div class="flex flex-col gap-1">
+				<h3 class="text-lg font-bold text-gray-900">Void Reason</h3>
+				<p class="text-sm text-gray-500">Select the reason for voiding this item.</p>
+			</div>
+			<div class="flex flex-col gap-2">
+				{#each VOID_REASONS as reason}
+					<button
+						onclick={() => { voidItemReason = reason; }}
+						class={cn(
+							'rounded-xl border-2 px-4 py-3 text-sm font-semibold text-left transition-colors',
+							voidItemReason === reason
+								? 'border-status-red bg-red-50 text-status-red'
+								: 'border-border bg-surface text-gray-700 hover:border-red-300 hover:bg-red-50'
+						)}
+					>{reason}</button>
+				{/each}
+			</div>
+			<div class="flex gap-2 mt-1">
+				<button
+					class="btn-ghost flex-1"
+					style="min-height: 44px"
+					onclick={() => { showVoidReasonSelector = false; removePinItemId = null; voidItemReason = ''; }}
+				>Cancel</button>
+				<button
+					class="btn-danger flex-1 disabled:opacity-40"
+					style="min-height: 44px"
+					disabled={!voidItemReason}
+					onclick={() => {
+						if (order && removePinItemId) removeOrderItem(order.id, removePinItemId, voidItemReason || undefined);
+						showVoidReasonSelector = false;
+						removePinItemId = null;
+						voidItemReason = '';
+					}}
+				>Void Item</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <ManagerPinModal
 	isOpen={showVoidPin}

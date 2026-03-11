@@ -6,12 +6,11 @@
 		type CountPeriod
 	} from '$lib/stores/stock.svelte';
 	import { session } from '$lib/stores/session.svelte';
-	import { Clock, CheckCircle, AlertCircle } from 'lucide-svelte';
+	import { Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import QuickNumberInput from './QuickNumberInput.svelte';
 	import VarianceBar from './VarianceBar.svelte';
 
 	let activePeriod = $state<CountPeriod>('pm10');
-	let activeCategory = $state<string>('Meats');
 
 	// Only show items for the current branch (no cross-branch editing)
 	const branchItems = $derived(
@@ -20,23 +19,65 @@
 		)
 	);
 
-	// Distinct categories from branch items — Meats first, others alphabetically
-	const availableCategories = $derived((() => {
-		const cats = [...new Set(branchItems.map(s => s.category ?? 'Other'))];
-		const meats = cats.includes('Meats') ? ['Meats'] : [];
-		const others = cats.filter(c => c !== 'Meats').sort();
-		return [...meats, ...others];
+	// Category order: Meats first, then known categories, then alphabetical
+	const CATEGORY_ORDER = ['Meats', 'Sides', 'Dishes', 'Drinks', 'Pantry'];
+
+	// Group items by category, sorted by CATEGORY_ORDER
+	const grouped = $derived((() => {
+		const map = new Map<string, typeof branchItems>();
+		for (const item of branchItems) {
+			const cat = item.category ?? 'Other';
+			if (!map.has(cat)) map.set(cat, []);
+			map.get(cat)!.push(item);
+		}
+		return [...map.entries()].sort(([a], [b]) => {
+			const ai = CATEGORY_ORDER.indexOf(a);
+			const bi = CATEGORY_ORDER.indexOf(b);
+			if (ai !== -1 && bi !== -1) return ai - bi;
+			if (ai !== -1) return -1;
+			if (bi !== -1) return 1;
+			return a.localeCompare(b);
+		});
 	})());
 
-	// Items filtered by active category tab (or all items when 'All')
-	const displayedItems = $derived(
-		activeCategory === 'All'
-			? branchItems
-			: branchItems.filter(s => (s.category ?? 'Other') === activeCategory)
-	);
+	// Collapse state per category (default: all open)
+	let collapsed = $state(new Map<string, boolean>());
+
+	function toggleCategory(cat: string) {
+		collapsed.set(cat, !collapsed.get(cat));
+		collapsed = new Map(collapsed);
+	}
 
 	const activePeriodData = $derived(countPeriods.find(p => p.id === activePeriod));
 	const isPending = $derived(activePeriodData?.status === 'pending');
+
+	// Count progress: items that have a non-null counted value for the active period
+	const enteredCount = $derived((() => {
+		let n = 0;
+		for (const item of branchItems) {
+			const count = stockCounts.value.find(c => c.stockItemId === item.id);
+			if (count && count.counted[activePeriod] !== null) n++;
+		}
+		return n;
+	})());
+
+	// Compliance deadline display
+	const deadlineInfo = $derived((() => {
+		const deadlines: Record<CountPeriod, { label: string; deadline: string; hour: number; minute: number }> = {
+			am10:  { label: 'Morning count',   deadline: '10:15 AM', hour: 10, minute: 15 },
+			pm4:   { label: 'Afternoon count', deadline: '4:15 PM',  hour: 16, minute: 15 },
+			pm10:  { label: 'Evening count',   deadline: '10:15 PM', hour: 22, minute: 15 },
+		};
+		const info = deadlines[activePeriod];
+		const now = new Date();
+		const deadlineDate = new Date();
+		deadlineDate.setHours(info.hour, info.minute, 0, 0);
+		const minsLeft = (deadlineDate.getTime() - now.getTime()) / 60000;
+		let urgency: 'normal' | 'warning' | 'overdue' = 'normal';
+		if (minsLeft < 0) urgency = 'overdue';
+		else if (minsLeft <= 15) urgency = 'warning';
+		return { ...info, urgency };
+	})());
 
 	// Variance summary for completed periods
 	const driftEntries = $derived(
@@ -64,11 +105,19 @@
 <!-- P0-10: Sticky top save bar — visible above fold so staff don't have to scroll to submit -->
 {#if isPending}
 	<div class="sticky top-0 z-20 mb-4 flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent-light px-4 py-2.5 shadow-sm">
-		<p class="text-sm font-semibold text-accent">
-			Enter counts for each item, then tap Save.
-		</p>
+		<div class="flex flex-col gap-0.5">
+			<p class="text-sm font-semibold text-accent">
+				{deadlineInfo.label} — submit by {deadlineInfo.deadline}
+				{#if deadlineInfo.urgency === 'overdue'}
+					<span class="ml-1 text-status-red">⚠ Overdue</span>
+				{:else if deadlineInfo.urgency === 'warning'}
+					<span class="ml-1 text-status-yellow">⚠</span>
+				{/if}
+			</p>
+			<p class="text-xs text-accent/70">{enteredCount} / {branchItems.length} items entered</p>
+		</div>
 		<button onclick={handleSubmitCount} class="btn-primary text-sm px-5">
-			Save Counts
+			Submit Count
 		</button>
 	</div>
 {/if}
@@ -137,48 +186,71 @@
 			</tr>
 		</thead>
 		<tbody class="divide-y divide-border">
-			{#each branchItems as item (item.id)}
-				{@const count = stockCounts.value.find(c => c.stockItemId === item.id)}
-				{@const counted = count?.counted[activePeriod] ?? null}
-				{@const expected = getCurrentStock(item.id)}
-				{@const drift = getDrift(item.id, activePeriod)}
-				<tr class={cn('hover:bg-gray-50', drift !== null && Math.abs(drift) / Math.max(1, expected) > 0.1 && 'bg-status-red-light/20')}>
-					<td class="px-4 py-3 font-medium text-gray-900">{item.name}</td>
-					<td class="px-4 py-3 text-right font-mono text-gray-500">{expected.toLocaleString()} {item.unit}</td>
-					<td class="px-4 py-3 text-right">
-						{#if isPending}
-							<QuickNumberInput 
-								value={counted} 
-								onChange={(val) => submitCount(item.id, activePeriod, val)}
-							/>
-						{:else if counted !== null}
-							<span class="font-mono font-semibold text-gray-900">{counted.toLocaleString()} {item.unit}</span>
-						{:else}
-							<span class="text-gray-300">—</span>
-						{/if}
-					</td>
-					<td class={cn('px-4 py-3 text-right', varianceClass(item, drift))}>
-						{#if drift === null}
-							<span class="text-gray-300">—</span>
-						{:else}
-							<div class="flex flex-col gap-1 w-full max-w-[120px] ml-auto">
-								<VarianceBar expected={expected} drift={drift} />
-								<div class="text-[10px] font-mono leading-none">
-									{#if drift > 0}
-										<span class="flex items-center justify-end gap-0.5">
-											<AlertCircle class="w-3 h-3" />
-											−{drift.toLocaleString()} {item.unit}
-										</span>
-									{:else if drift < 0}
-										+{Math.abs(drift).toLocaleString()} {item.unit}
-									{:else}
-										<span class="text-status-green">✓ 0</span>
-									{/if}
-								</div>
-							</div>
-						{/if}
+			{#each grouped as [cat, items] (cat)}
+				<!-- Category header row -->
+				<tr class="bg-gray-50 border-b border-border">
+					<td colspan="4" class="px-4 py-2">
+						<button
+							onclick={() => toggleCategory(cat)}
+							class="flex w-full items-center gap-2 text-left min-h-[36px]"
+						>
+							<span class="text-xs font-bold uppercase tracking-wider text-gray-500">{cat}</span>
+							<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">{items.length}</span>
+							<span class="ml-auto text-gray-400">
+								{#if collapsed.get(cat)}
+									<ChevronDown class="w-4 h-4" />
+								{:else}
+									<ChevronUp class="w-4 h-4" />
+								{/if}
+							</span>
+						</button>
 					</td>
 				</tr>
+				{#if !collapsed.get(cat)}
+					{#each items as item (item.id)}
+						{@const count = stockCounts.value.find(c => c.stockItemId === item.id)}
+						{@const counted = count?.counted[activePeriod] ?? null}
+						{@const expected = getCurrentStock(item.id)}
+						{@const drift = getDrift(item.id, activePeriod)}
+						<tr class={cn('hover:bg-gray-50', drift !== null && Math.abs(drift) / Math.max(1, expected) > 0.1 && 'bg-status-red-light/20')}>
+							<td class="px-4 py-3 font-medium text-gray-900">{item.name}</td>
+							<td class="px-4 py-3 text-right font-mono text-gray-500">{expected.toLocaleString()} {item.unit}</td>
+							<td class="px-4 py-3 text-right">
+								{#if isPending}
+									<QuickNumberInput
+										value={counted}
+										onChange={(val) => submitCount(item.id, activePeriod, val)}
+									/>
+								{:else if counted !== null}
+									<span class="font-mono font-semibold text-gray-900">{counted.toLocaleString()} {item.unit}</span>
+								{:else}
+									<span class="text-gray-300">—</span>
+								{/if}
+							</td>
+							<td class={cn('px-4 py-3 text-right', varianceClass(item, drift))}>
+								{#if drift === null}
+									<span class="text-gray-300">—</span>
+								{:else}
+									<div class="flex flex-col gap-1 w-full max-w-[120px] ml-auto">
+										<VarianceBar expected={expected} drift={drift} />
+										<div class="text-[10px] font-mono leading-none">
+											{#if drift > 0}
+												<span class="flex items-center justify-end gap-0.5">
+													<AlertCircle class="w-3 h-3" />
+													−{drift.toLocaleString()} {item.unit}
+												</span>
+											{:else if drift < 0}
+												+{Math.abs(drift).toLocaleString()} {item.unit}
+											{:else}
+												<span class="text-status-green">✓ 0</span>
+											{/if}
+										</div>
+									</div>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				{/if}
 			{/each}
 			{#if branchItems.length === 0}
 				<tr>

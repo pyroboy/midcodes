@@ -135,6 +135,17 @@ export interface OrderItem {
 	addedAt?: string;
 }
 
+export interface DiscountEntry {
+	pax: number;
+	ids: string[];
+	idPhotos: string[][];
+	discountPax?: number;
+	discountIds?: string[];
+	discountIdPhotos?: string[];
+	authorizedAt?: string;
+	authorizedBy?: string;
+}
+
 export type DiscountType = 'none' | 'senior' | 'pwd' | 'promo' | 'comp' | 'service_recovery';
 export type OrderType = 'dine-in' | 'takeout';
 export type PaymentMethod = 'cash' | 'card' | 'gcash' | 'maya';
@@ -175,6 +186,7 @@ export interface Order {
 	items: OrderItem[];
 	status: 'open' | 'pending_payment' | 'paid' | 'cancelled';
 	discountType: DiscountType;
+	discountEntries?: Partial<Record<DiscountType, DiscountEntry>>;
 	discountPax?: number;   // qualifying SC/PWD persons (defaults to pax if unset)
 	discountIds?: string[]; // SC/PWD ID numbers, one per qualifying person
 	subtotal: number;
@@ -190,6 +202,8 @@ export interface Order {
 	closedBy?: string;              // staff who finalized the payment
 	originalPax?: number;           // tracks original pax before mid-service changes
 	leftoverPenaltyAmount?: number; // penalty for AYCE leftover waste
+	scCount?: number;               // number of Senior Citizen pax (set at table open)
+	pwdCount?: number;              // number of PWD pax (set at table open)
 	pendingPaymentMethod?: PaymentMethod; // method held for delayed e-wallet confirmation
 	takeoutStatus?: TakeoutStatus;  // only for takeout orders
 	splitType?: SplitType;

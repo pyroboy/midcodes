@@ -58,40 +58,55 @@
 	const avgTicket = $derived(totals.pax > 0 ? Math.round(totals.netSales / totals.pax) : 0);
 </script>
 
-<!-- Period toggle + P1-22: Quick date range filter -->
-<div class="mb-5 flex items-center gap-2 flex-wrap">
-	{#each (['daily', 'weekly'] as const) as p}
-		<button
-			onclick={() => (period = p)}
-			class={cn(
-				'rounded-md px-4 py-1.5 text-sm font-semibold transition-colors',
-				period === p ? 'bg-accent text-white' : 'border border-border bg-white text-gray-600 hover:bg-gray-50'
-			)}
-			style="min-height: unset"
-		>
-			{p === 'daily' ? 'Daily' : 'Weekly'}
-		</button>
-	{/each}
+<!-- Period toggle + P1-22: Quick date range filter — two labeled groups -->
+<div class="mb-5 flex items-center gap-0 flex-wrap">
+	<!-- GROUP: VIEW (granularity) -->
+	<div class="flex flex-col gap-1 mr-0">
+		<span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">View</span>
+		<div class="flex items-center gap-1.5">
+			{#each (['daily', 'weekly'] as const) as p}
+				<button
+					onclick={() => (period = p)}
+					class={cn(
+						'rounded-md px-4 py-1.5 text-sm font-semibold transition-colors',
+						period === p ? 'bg-accent text-white' : 'border border-border bg-white text-gray-600 hover:bg-gray-50'
+					)}
+					style="min-height: unset"
+				>
+					{p === 'daily' ? 'Daily' : 'Weekly'}
+				</button>
+			{/each}
+		</div>
+	</div>
 
-	<div class="mx-2 h-4 w-px bg-border"></div>
+	<!-- Vertical divider -->
+	<div class="mx-4 self-stretch flex items-end pb-0">
+		<div class="h-8 w-px bg-gray-200"></div>
+	</div>
 
-	{#each ([
-		{ value: 'all', label: 'All' },
-		{ value: 'today', label: 'Today' },
-		{ value: 'week', label: 'This Week' },
-		{ value: 'month', label: 'This Month' },
-	] as const) as opt}
-		<button
-			onclick={() => (quickRange = opt.value)}
-			class={cn(
-				'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-				quickRange === opt.value ? 'bg-gray-900 text-white' : 'border border-border bg-white text-gray-500 hover:bg-gray-50'
-			)}
-			style="min-height: unset"
-		>
-			{opt.label}
-		</button>
-	{/each}
+	<!-- GROUP: RANGE -->
+	<div class="flex flex-col gap-1">
+		<span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Range</span>
+		<div class="flex items-center gap-1.5">
+			{#each ([
+				{ value: 'today', label: 'Today' },
+				{ value: 'week', label: 'This Week' },
+				{ value: 'month', label: 'This Month' },
+				{ value: 'all', label: 'All' },
+			] as const) as opt}
+				<button
+					onclick={() => (quickRange = opt.value)}
+					class={cn(
+						'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+						quickRange === opt.value ? 'bg-accent text-white' : 'border border-border bg-white text-gray-500 hover:bg-gray-50'
+					)}
+					style="min-height: unset"
+				>
+					{opt.label}
+				</button>
+			{/each}
+		</div>
+	</div>
 
 	<span class="ml-auto flex items-center gap-1.5 text-xs text-status-green">
 		<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-status-green"></span>

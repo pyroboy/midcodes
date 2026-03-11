@@ -69,6 +69,13 @@
 	// P1-3: Refill round counter
 	const refillCount = $derived(getRefillCount(order));
 
+	// Block duplicate refill taps — set of meat menuItemIds with an active (not yet served) refill
+	const pendingRefillMeatIds = $derived(new Set(
+		order?.items
+			.filter(i => i.tag === 'FREE' && i.notes === REFILL_NOTE && i.status !== 'served' && i.status !== 'cancelled')
+			.map(i => i.menuItemId) ?? []
+	));
+
 	async function requestMeat(meat: MenuItem) {
 		if (!order) return;
 		await addRefillRequest(order.id, meat);
@@ -88,11 +95,17 @@
 	async function repeatLastRound() {
 		if (!order) return;
 		for (const meat of lastRoundMeats) {
+			if (pendingRefillMeatIds.has(meat.id)) continue; // skip already-pending
 			await addRefillRequest(order.id, meat);
 		}
 		repeatConfirmed = true;
 		setTimeout(() => { repeatConfirmed = false; }, 1500);
 	}
+
+	// Repeat button is fully blocked only when every last-round meat already has a pending refill
+	const allLastRoundPending = $derived(
+		lastRoundMeats.length > 0 && lastRoundMeats.every(m => pendingRefillMeatIds.has(m.id))
+	);
 </script>
 
 {#if isOpen && order}
@@ -128,11 +141,16 @@
 					<p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Meats</p>
 					<div class="grid grid-cols-3 gap-2">
 						{#each refillMeats as meat (meat.id)}
+							{@const isPending = pendingRefillMeatIds.has(meat.id)}
 							<!-- P0-1: tap feedback overlay + relative/overflow-hidden -->
 							<button
 								onclick={() => requestMeat(meat)}
+								disabled={isPending}
 								class={cn(
-									'relative flex flex-col rounded-lg border border-border bg-surface text-left transition-all active:scale-95 hover:border-accent hover:bg-accent-light overflow-hidden',
+									'relative flex flex-col rounded-lg border border-border bg-surface text-left transition-all overflow-hidden',
+									isPending
+										? 'opacity-60 cursor-not-allowed'
+										: 'active:scale-95 hover:border-accent hover:bg-accent-light',
 									meat.protein === 'beef' ? '!border-l-red-500 !border-l-[3px]' : '',
 									meat.protein === 'pork' ? '!border-l-orange-500 !border-l-[3px]' : '',
 									meat.protein === 'chicken' ? '!border-l-yellow-500 !border-l-[3px]' : ''
@@ -146,6 +164,9 @@
 								<div class={cn('px-2 pb-2', meat.image ? 'pt-1' : 'pt-2')}>
 									<!-- P2-3: meat name 11px → 12px -->
 									<span class="text-xs font-bold text-gray-900 leading-tight line-clamp-2">{meat.name}</span>
+									{#if isPending}
+										<span class="block text-[10px] font-semibold text-status-yellow mt-0.5">⏳ Pending...</span>
+									{/if}
 								</div>
 								{#if addedItemId === meat.id}
 									<div class="absolute inset-0 flex items-center justify-center rounded-lg bg-status-green/90 transition-opacity">
@@ -258,15 +279,22 @@
 				<!-- P0-2: repeat confirmation feedback + P1-1: 44px touch target -->
 				<button
 					onclick={repeatLastRound}
+					disabled={allLastRoundPending}
 					class={cn(
-						'w-full rounded-lg border-2 border-dashed py-2.5 text-xs font-bold transition-all active:scale-95',
-						repeatConfirmed
-							? 'border-status-green/60 bg-status-green/10 text-status-green'
-							: 'border-accent/40 bg-accent-light text-accent hover:bg-accent/10 hover:border-accent'
+						'w-full rounded-lg border-2 border-dashed py-2.5 text-xs font-bold transition-all',
+						allLastRoundPending
+							? 'opacity-50 cursor-not-allowed border-status-yellow/40 bg-status-yellow/5 text-status-yellow'
+							: repeatConfirmed
+								? 'border-status-green/60 bg-status-green/10 text-status-green active:scale-95'
+								: 'border-accent/40 bg-accent-light text-accent hover:bg-accent/10 hover:border-accent active:scale-95'
 					)}
 					style="min-height: 44px"
 				>
-					{repeatConfirmed ? '✓ Sent!' : `Repeat Last — ${lastRoundMeats.map(m => m.name).join(' + ')}`}
+					{#if allLastRoundPending}
+						⏳ Pending — {lastRoundMeats.map(m => m.name).join(' + ')}
+					{:else}
+						{repeatConfirmed ? '✓ Sent!' : `Repeat Last — ${lastRoundMeats.map(m => m.name).join(' + ')}`}
+					{/if}
 				</button>
 			{/if}
 			<!-- P1-1: Done button 36px → 44px -->

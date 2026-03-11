@@ -2,7 +2,7 @@
  * POS Orders — Order state, item management, table operations, and lifecycle.
  * Imports closeTable from tables (no circular dep since tables doesn't import orders).
  */
-import type { Order, MenuItem, TakeoutStatus, SubBill, DiscountType } from '$lib/types';
+import type { Order, MenuItem, TakeoutStatus, SubBill, DiscountType, DiscountEntry, KdsTicket } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { deductFromStock, restoreStock } from '$lib/stores/stock.svelte';
 import { log } from '$lib/stores/audit.svelte';
@@ -27,8 +27,9 @@ export function isWithinGracePeriod(addedAt: string | undefined): boolean {
 	return Date.now() - new Date(addedAt).getTime() < 30_000;
 }
 
-/** Remove a pending item from an order (must be pending status only) */
-export async function removeOrderItem(orderId: string, itemId: string): Promise<void> {
+/** Remove a pending item from an order (must be pending status only).
+ *  @param reason  Void reason from manager-gated flow; omit for grace-period removals. */
+export async function removeOrderItem(orderId: string, itemId: string, reason?: string): Promise<void> {
 	if (!browser) return;
 	const db = await getDb();
 	const orderDoc = await db.orders.findOne(orderId).exec();
@@ -54,6 +55,12 @@ export async function removeOrderItem(orderId: string, itemId: string): Promise<
 	const restoreQty = item.weight ?? item.quantity;
 	if (restoreQty > 0) await restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
 
+	// Write audit log entry when a reason is provided (manager-gated void)
+	if (reason) {
+		const tableLabel = getOrderLabel(order);
+		log.itemVoided(item.menuItemName, tableLabel, reason);
+	}
+
 	// Remove from KDS ticket
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 	if (ticket) {
@@ -70,6 +77,17 @@ export async function removeOrderItem(orderId: string, itemId: string): Promise<
 
 export function getRefillCount(order: Order | null | undefined): number {
 	return order?.items.filter(i => i.tag === 'FREE' && i.notes === REFILL_NOTE && i.status !== 'cancelled').length ?? 0;
+}
+
+/** Returns how many refill requests have been made for a specific meat cut on this order. */
+export function getRefillCountForMeat(order: Order | null | undefined, menuItemId: string): number {
+	if (!menuItemId) return 0;
+	return order?.items.filter(i =>
+		i.menuItemId === menuItemId &&
+		i.tag === 'FREE' &&
+		i.notes === REFILL_NOTE &&
+		i.status !== 'cancelled'
+	).length ?? 0;
 }
 
 async function updateTableBillTotal(tableId: string | null | undefined, amount: number): Promise<void> {
@@ -188,7 +206,7 @@ export async function addItemToOrder(orderId: string, item: MenuItem, qty: numbe
 
 export async function recalcOrder(
 	order: Order,
-	overrides?: { discountType?: DiscountType; discountPax?: number; discountIds?: string[]; discountIdPhotos?: string[] }
+	overrides?: { discountType?: DiscountType; discountEntries?: Partial<Record<DiscountType, DiscountEntry>> | null; discountPax?: number; discountIds?: string[]; discountIdPhotos?: string[] }
 ) {
 	if (!browser) return;
 	const db = await getDb();
@@ -199,6 +217,7 @@ export async function recalcOrder(
 	await orderDoc.incrementalModify((doc: Order) => {
 		doc.items = order.items;
 		doc.discountType = overrides?.discountType ?? order.discountType;
+		if (overrides?.discountEntries !== undefined) doc.discountEntries = overrides.discountEntries ?? undefined;
 		doc.discountPax   = overrides?.discountPax  ?? order.discountPax;
 		doc.discountIds   = overrides?.discountIds  ?? order.discountIds;
 		if (overrides?.discountIdPhotos !== undefined) doc.discountIdPhotos = overrides.discountIdPhotos;
@@ -212,7 +231,7 @@ export async function recalcOrder(
 	await updateTableBillTotal(order.tableId, finalTotal);
 }
 
-export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'write_off') {
+export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' | 'write_off', closedBy?: string) {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.status === 'paid' || order.status === 'cancelled') return;
 
@@ -228,6 +247,7 @@ export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' 
 			);
 			doc.status = 'cancelled';
 			doc.cancelReason = reason;
+			doc.closedBy = closedBy ?? undefined;
 			doc.closedAt = new Date().toISOString();
 			if (doc.orderType === 'takeout') doc.takeoutStatus = 'new';
 			doc.updatedAt = new Date().toISOString();
@@ -752,7 +772,8 @@ export async function addServiceRequest(orderId: string, requestText: string): P
 
 /**
  * Called from the weigh station when meat is weighed and dispatched.
- * Writes actual weight to the order item, deducts stock, updates KDS to 'cooking'.
+ * Writes actual weight to the order item, deducts stock, and immediately
+ * advances the item to 'served' + bumps the KDS ticket (fixes [05]+[CR-01]).
  */
 export async function dispatchMeatWeight(orderId: string, itemId: string, weightGrams: number): Promise<void> {
 	if (!browser) return;
@@ -762,16 +783,13 @@ export async function dispatchMeatWeight(orderId: string, itemId: string, weight
 	const item = order.items.find(i => i.id === itemId);
 	if (!item) return;
 
-	// `order` snapshot is used only for read-only metadata (tableId, tableNumber, logging).
-	// The DB write uses a fresh orderDoc fetch to avoid stale-write risk.
+	// Write weight AND advance directly to 'served' — meat is served the moment it is dispatched.
 	const orderDoc = await db.orders.findOne(orderId).exec();
 	if (orderDoc) {
 		await orderDoc.incrementalModify((doc: Order) => {
 			doc.items = doc.items.map(i =>
-				i.id === itemId ? { ...i, weight: weightGrams, status: 'cooking' as const } : i
+				i.id === itemId ? { ...i, weight: weightGrams, status: 'served' as const } : i
 			);
-			// Totals are not recalculated: weight/status changes don't affect price
-			// (refill meats are FREE, unitPrice=0). The billing total is unchanged.
 			doc.updatedAt = new Date().toISOString();
 			return doc;
 		});
@@ -782,17 +800,38 @@ export async function dispatchMeatWeight(orderId: string, itemId: string, weight
 		await deductFromStock(item.menuItemId, weightGrams, order.tableId ?? 'takeout', orderId, mi?.trackInventory ?? true);
 	}
 
+	// Update KDS ticket item to 'served' with weight, bump ticket to history if all items done.
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 	if (ticket) {
 		const tDoc = await db.kds_tickets.findOne(ticket.id).exec();
 		if (tDoc) {
+			let allServed = false;
+			let snapshotItems: KdsTicket['items'] = [];
 			await tDoc.incrementalModify((doc: any) => {
 				doc.items = doc.items.map((i: any) =>
-					i.id === itemId ? { ...i, weight: weightGrams, status: 'cooking' } : i
+					i.id === itemId ? { ...i, weight: weightGrams, status: 'served' } : i
 				);
+				allServed = doc.items.every((i: any) => i.status === 'served' || i.status === 'cancelled');
+				snapshotItems = doc.items;
 				doc.updatedAt = new Date().toISOString();
 				return doc;
 			});
+
+			// Bump the ticket to history if all items are now served
+			if (allServed) {
+				await tDoc.incrementalPatch({
+					items: snapshotItems,
+					bumpedAt: new Date().toISOString(),
+					bumpedBy: session.userName || 'Weigh Station',
+					updatedAt: new Date().toISOString()
+				});
+
+				if (order.orderType === 'takeout' && order.status === 'open') {
+					const oDoc = await db.orders.findOne(orderId).exec();
+					if (oDoc) await oDoc.incrementalPatch({ takeoutStatus: 'ready', updatedAt: new Date().toISOString() });
+					log.takeoutAdvanced(order.customerName ?? 'Walk-in', 'ready');
+				}
+			}
 		}
 	}
 

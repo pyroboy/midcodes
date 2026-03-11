@@ -11,12 +11,21 @@
 	import { initDbHealthCheck } from '$lib/stores/db-health.svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { isWarehouseSession } from '$lib/stores/session.svelte';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
 
 	// Don't show sidebar on the login page
 	const showSidebar = $derived(page.url.pathname !== '/');
+
+	const RETAIL_ONLY_PREFIXES = ['/pos', '/kitchen'];
+	$effect(() => {
+		if (browser && isWarehouseSession() && RETAIL_ONLY_PREFIXES.some(p => page.url.pathname === p || page.url.pathname.startsWith(p + '/'))) {
+			goto('/stock/inventory');
+		}
+	});
 
 	// Default sidebar collapsed; read cookie for persisted state
 	let sidebarOpen = $state(browser ? document.cookie.match(/sidebar:state=(\w+)/)?.[1] === 'true' : false);

@@ -72,7 +72,7 @@ export const floorElementSchema: RxJsonSchema<any> = {
 // ─── Order ───────────────────────────────────────────────────────────────────
 export const orderSchema: RxJsonSchema<any> = {
 	title: 'order schema',
-	version: 9,
+	version: 12,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -87,6 +87,8 @@ export const orderSchema: RxJsonSchema<any> = {
 		pax: { type: 'number' },
 		childPax: { type: 'number' },
 		freePax: { type: 'number' },
+		scCount: { type: 'number' },
+		pwdCount: { type: 'number' },
 		items: {
 			type: 'array',
 			items: {
@@ -110,6 +112,24 @@ export const orderSchema: RxJsonSchema<any> = {
 		},
 		status: { type: 'string', maxLength: 50 },
 		discountType: { type: ['string', 'null'] },
+		discountEntries: {
+			type: ['object', 'null'],
+			additionalProperties: {
+				type: 'object',
+				properties: {
+					// v12+ canonical fields
+					pax:      { type: 'number' },
+					ids:      { type: 'array', items: { type: 'string' } },
+					idPhotos: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+					// legacy fields (v10/v11 — kept optional for backwards compat)
+					discountPax:      { type: 'number' },
+					discountIds:      { type: 'array', items: { type: 'string' } },
+					discountIdPhotos: { type: 'array', items: { type: 'string' } },
+					authorizedAt:     { type: 'string' },
+					authorizedBy:     { type: 'string' }
+				}
+			}
+		},
 		discountPax: { type: 'number' },
 		discountIds: { type: 'array', items: { type: 'string' } },
 		subtotal: { type: 'number' },

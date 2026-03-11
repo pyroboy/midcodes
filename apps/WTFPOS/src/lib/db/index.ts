@@ -127,7 +127,25 @@ export async function getDb() {
 							freePax: d.freePax ?? 0,
 							items: d.items ? d.items.map((item: any) => ({ ...item, childUnitPrice: item.childUnitPrice ?? null })) : d.items
 						}),
-						9: (d: any) => ({ ...d, discountIdPhotos: d.discountIdPhotos ?? [] }) // v8→v9: +discountIdPhotos for BIR audit trail
+						9: (d: any) => ({ ...d, discountIdPhotos: d.discountIdPhotos ?? [] }), // v8→v9: +discountIdPhotos for BIR audit trail
+						10: (d: any) => ({ ...d, discountEntries: d.discountEntries ?? null }), // v9→v10: +discountEntries for multi-discount stacking
+						11: (d: any) => ({ ...d, scCount: d.scCount ?? 0, pwdCount: d.pwdCount ?? 0 }), // v10→v11: +scCount, +pwdCount (SC/PWD headcount from PaxModal)
+						12: (d: any) => { // v11→v12: migrate discountEntries from old field names to canonical pax/ids/idPhotos
+							if (d.discountEntries) {
+								const migrated: Record<string, any> = {};
+								for (const [type, entry] of Object.entries(d.discountEntries as Record<string, any>)) {
+									if (entry && typeof entry === 'object') {
+										migrated[type] = {
+											pax:      entry.pax      ?? entry.discountPax ?? 1,
+											ids:      entry.ids      ?? entry.discountIds ?? [],
+											idPhotos: entry.idPhotos ?? (entry.discountIdPhotos ?? []).map((p: string) => p ? [p] : [])
+										};
+									}
+								}
+								d.discountEntries = migrated;
+							}
+							return d;
+						}
 					}
 				},
 				menu_items: {

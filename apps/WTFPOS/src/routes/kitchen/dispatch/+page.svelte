@@ -4,6 +4,7 @@
 	import { log } from '$lib/stores/audit.svelte';
 	import type { KdsTicketItem } from '$lib/types';
 	import { formatCountdown, cn } from '$lib/utils';
+	import { getPkgColors } from '$lib/stores/pos/utils';
 	import { untrack } from 'svelte';
 
 	// ── Live timer ──
@@ -42,6 +43,8 @@
 		tableNumber: number | null;
 		customerName?: string;
 		pax: number;
+		scCount: number;
+		pwdCount: number;
 		createdAt: string;
 		meats: { total: number; done: number; allDone: boolean };
 		dishes: { total: number; done: number; allDone: boolean };
@@ -98,12 +101,16 @@
 
 				const order = orderMap.get(ticket.orderId);
 				const pax = order?.pax ?? 0;
+				const scCount = order?.scCount ?? 0;
+				const pwdCount = order?.pwdCount ?? 0;
 
 				return {
 					orderId: ticket.orderId,
 					tableNumber: ticket.tableNumber,
 					customerName: ticket.customerName,
 					pax,
+					scCount,
+					pwdCount,
 					createdAt: ticket.createdAt,
 					meats,
 					dishes,
@@ -333,32 +340,24 @@
 
 <div class="flex flex-col gap-4 pb-6">
 
-	<!-- ── Section A: New Tables ─────────────────────────────────────────────── -->
+	<!-- ── Section A: New Tables — compact chip row ([CR-03]) ───────────────── -->
 	{#if unacknowledgedNewTables.length > 0}
-		<div class="rounded-xl bg-accent px-4 py-3 text-white shadow-sm">
-			<p class="mb-2 text-xs font-bold uppercase tracking-wide opacity-80">&#127381; New Tables — Stage Utensils</p>
-			<div class="flex flex-wrap gap-2">
+		<div>
+			<p class="text-xs text-gray-400 mb-1">Setup</p>
+			<div class="flex gap-2 flex-wrap">
 				{#each unacknowledgedNewTables as order (order.id)}
-					<div class="flex items-center gap-2 rounded-lg bg-white/20 px-3 py-2">
+					<div class="bg-accent-light border border-accent/20 text-accent text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
 						<span class="font-bold">T{order.tableNumber}</span>
-						<span class="text-sm opacity-80">&middot; {order.pax ?? '?'} pax &middot; {timeAgo(order.createdAt)}</span>
+						<span class="opacity-70">— Stage Utensils</span>
+						<span class="opacity-60">&middot; {timeAgo(order.createdAt)}</span>
 						<button
 							onclick={() => acknowledgeTable(order.id)}
-							class={cn(
-								'ml-1 rounded-lg bg-white/30 px-3 font-semibold text-white hover:bg-white/50 active:scale-95 transition-all',
-								'min-h-[56px]'
-							)}
-						>
-							&#10003; Staged
-						</button>
+							class="ml-1 rounded-full bg-accent text-white font-bold px-2 py-0.5 text-[10px] hover:bg-accent-dark active:scale-95 transition-all"
+							style="min-height: 22px"
+						>&#10003; Staged</button>
 					</div>
 				{/each}
 			</div>
-		</div>
-	{:else}
-		<div class="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm text-gray-400 min-h-[48px]">
-			<span class="text-base">&#127381;</span>
-			<span>New table alerts will appear here when a table opens</span>
 		</div>
 	{/if}
 
@@ -384,6 +383,8 @@
 				{#each dispatchCards as card (card.orderId)}
 					{@const urgency = urgencyLevel(card.createdAt)}
 					{@const elapsedMin = Math.floor((now - new Date(card.createdAt).getTime()) / 60_000)}
+					{@const cardOrder = orders.value.find(o => o.id === card.orderId)}
+					{@const cardPkg = getPkgColors(cardOrder?.packageId)}
 
 					<div class={cn(
 						'flex flex-col rounded-xl border-2 overflow-hidden shadow-sm',
@@ -393,7 +394,8 @@
 								? 'border-status-red animate-border-pulse-red bg-surface'
 								: urgency === 'warning'
 									? 'border-status-yellow bg-surface'
-									: 'border-border bg-surface'
+									: 'border-border bg-surface',
+						cardPkg?.accent ?? ''
 					)}>
 						<!-- Card Header -->
 						<div class="flex items-center justify-between px-4 py-3">
@@ -409,33 +411,52 @@
 								{#if card.pax > 0}
 									<span class="text-sm text-gray-400">{card.pax} pax</span>
 								{/if}
+								{#if card.scCount > 0 || card.pwdCount > 0}
+									<span class="bg-accent-light text-accent text-xs px-1.5 py-0.5 rounded font-semibold">{[card.scCount > 0 ? `${card.scCount} SC` : '', card.pwdCount > 0 ? `${card.pwdCount} PWD` : ''].filter(Boolean).join(' · ')}</span>
+								{/if}
 							</div>
 							<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
 								{timerText(card.createdAt)}
 							</span>
 						</div>
 
+						<!-- Package Row -->
+						<div class={cn(
+							'flex items-center justify-between px-4 py-2 border-b text-xs',
+							cardPkg ? `${cardPkg.bg} ${cardPkg.border}` : 'bg-amber-50 border-amber-100'
+						)}>
+							<span class={cn('font-semibold', cardPkg?.text ?? 'text-amber-700')}>
+								{cardOrder?.packageName ?? 'Ala-carte'}
+							</span>
+						</div>
+
 						<!-- Station Progress Rows -->
 						<div class="flex flex-col divide-y divide-border/40 border-t border-border/40 px-4">
-							<!-- Meat row (read-only) -->
+							<!-- Meat row — deep link to Weigh Station when pending ([09]+[SP-01]) -->
 							<div class={cn('flex items-center gap-3 py-2.5', stationStatusCls(card.meats.allDone, card.meats.total))}>
 								<span class="text-lg w-7 text-center" aria-hidden="true">&#129385;</span>
 								<span class="flex-1 text-sm font-semibold">Meat</span>
 								{#if card.meats.total === 0}
 									<span class="text-xs text-gray-300">N/A</span>
 								{:else}
+									{#if !card.meats.allDone}
+										<a href="/kitchen/weigh-station" class="text-xs text-accent underline font-semibold hover:text-accent-dark transition-colors px-1">&#8594; Weigh Station</a>
+									{/if}
 									<span class="font-mono text-sm font-bold">{card.meats.done}/{card.meats.total}</span>
 									<span class="text-base">{@html stationStatusIcon(card.meats.allDone, card.meats.total)}</span>
 								{/if}
 							</div>
 
-							<!-- Dishes row (read-only) -->
+							<!-- Dishes row — deep link to Stove when pending ([09]+[SP-01]) -->
 							<div class={cn('flex items-center gap-3 py-2.5', stationStatusCls(card.dishes.allDone, card.dishes.total))}>
 								<span class="text-lg w-7 text-center" aria-hidden="true">&#127859;</span>
 								<span class="flex-1 text-sm font-semibold">Dishes</span>
 								{#if card.dishes.total === 0}
 									<span class="text-xs text-gray-300">N/A</span>
 								{:else}
+									{#if !card.dishes.allDone}
+										<a href="/kitchen/stove" class="text-xs text-accent underline font-semibold hover:text-accent-dark transition-colors px-1">&#8594; Stove</a>
+									{/if}
 									<span class="font-mono text-sm font-bold">{card.dishes.done}/{card.dishes.total}</span>
 									<span class="text-base">{@html stationStatusIcon(card.dishes.allDone, card.dishes.total)}</span>
 								{/if}

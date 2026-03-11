@@ -21,6 +21,7 @@
 	let editDesc      = $state(untrack(() => (editItem as any).description ?? ''));
 	let editImage     = $state<File | null>(null);
 	let editImageUrl  = $state<string | undefined>(untrack(() => (editItem as any).image));
+	let editMinLevel  = $state(untrack(() => editItem.minLevel ?? 0));
 
 	async function handleConfirm() {
 		if (!editName.trim()) return;
@@ -28,6 +29,7 @@
 		const updates = {
 			name: editName.trim(),
 			description: editDesc,
+			minLevel: Math.max(0, Number(editMinLevel) || 0),
 			...(editImageUrl !== undefined && { image: editImageUrl })
 		};
 
@@ -55,6 +57,18 @@
 			<label class="flex flex-col gap-1.5">
 				<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Description (Optional)</span>
 				<textarea bind:value={editDesc} class="pos-input resize-none h-20" placeholder="e.g. For cooking use"></textarea>
+			</label>
+
+			<label class="flex flex-col gap-1.5">
+				<span class="block text-xs font-medium text-gray-500 uppercase tracking-wide">
+					Minimum Stock ({editItem.unit ?? 'units'})
+				</span>
+				<input
+					type="number"
+					min="0"
+					bind:value={editMinLevel}
+					class="pos-input w-full"
+				/>
 			</label>
 
 			<label class="flex flex-col gap-1.5">

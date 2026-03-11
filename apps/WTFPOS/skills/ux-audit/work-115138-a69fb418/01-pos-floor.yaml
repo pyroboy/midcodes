@@ -1,0 +1,37 @@
+- generic [ref=e3]:
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+          - generic [ref=e11]: W!
+        - generic [ref=e12]:
+          - generic [ref=e13]: WTF! SAMGYUP
+          - generic [ref=e14]: POS System
+      - generic [ref=e15]:
+        - paragraph [ref=e16]: Alta Citta (Tagbilaran)
+        - paragraph [ref=e17]: 11:52:24 AM
+    - separator [ref=e18]
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - link "POS" [ref=e24] [cursor=pointer]:
+          - /url: /pos
+          - img [ref=e25]
+          - generic [ref=e29]: POS
+    - generic [ref=e30]:
+      - separator [ref=e31]
+      - generic [ref=e32]:
+        - generic [ref=e33]: A
+        - generic [ref=e34]:
+          - generic [ref=e35]: Ate Rose
+          - generic [ref=e36]: staff
+      - link "Logout" [ref=e38] [cursor=pointer]:
+        - /url: /
+        - img [ref=e39]
+        - generic [ref=e42]: Logout
+    - button "Toggle Sidebar" [ref=e43]
+  - main [ref=e44]:
+    - generic [ref=e46]:
+      - img [ref=e47]
+      - heading "ALTA CITTA (TAGBILARAN)" [level=2] [ref=e48]
+    - heading "500" [level=1] [ref=e49]
+    - paragraph [ref=e50]: Internal Error

@@ -41,6 +41,25 @@ export function formatTime(isoTimestamp: string): string {
 	});
 }
 
+/**
+ * Format an ISO timestamp with date context:
+ * - Today    → "Today, 6:00 AM"
+ * - Yesterday → "Yesterday, 6:00 AM"
+ * - Older    → "Mar 9, 6:00 AM"
+ */
+export function formatDate(iso: string): string {
+	const d = new Date(iso);
+	const now = new Date();
+	const isToday = d.toDateString() === now.toDateString();
+	const yesterday = new Date(now);
+	yesterday.setDate(yesterday.getDate() - 1);
+	const isYesterday = d.toDateString() === yesterday.toDateString();
+	const timeStr = d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
+	if (isToday) return `Today, ${timeStr}`;
+	if (isYesterday) return `Yesterday, ${timeStr}`;
+	return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) + ', ' + timeStr;
+}
+
 /** Format pesos */
 export function formatPeso(amount: number): string {
 	return new Intl.NumberFormat('en-PH', {

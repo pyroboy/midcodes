@@ -3,7 +3,7 @@
 	import {
 		stockItems, wasteEntries, logWaste, WASTE_REASONS,
 	} from '$lib/stores/stock.svelte';
-	import { session } from '$lib/stores/session.svelte';
+	import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 	import { Flame, Droplets, Clock, Ban, Scissors, HelpCircle, Trash2, Plus, X } from 'lucide-svelte';
 	import ManagerPinModal from '$lib/components/pos/ManagerPinModal.svelte';
 	import { isToday } from 'date-fns';
@@ -22,7 +22,7 @@
 	});
 
 	// Quick-tap reason config with icons
-	const reasonConfig: { label: string; icon: typeof Flame; color: string }[] = [
+	const allReasonConfig: { label: string; icon: typeof Flame; color: string }[] = [
 		{ label: 'Dropped / Spilled',   icon: Droplets, color: 'border-orange-200 text-orange-600 bg-orange-50 hover:bg-orange-100' },
 		{ label: 'Expired',             icon: Clock,    color: 'border-status-red/30 text-status-red bg-status-red-light hover:bg-red-100' },
 		{ label: 'Unusable (damaged)',   icon: Ban,      color: 'border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100' },
@@ -30,6 +30,12 @@
 		{ label: 'Trimming (bone/fat)',  icon: Scissors, color: 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100' },
 		{ label: 'Other',               icon: HelpCircle,color: 'border-gray-200 text-gray-500 bg-gray-50 hover:bg-gray-100' },
 	];
+	// "Overcooked" is kitchen-specific — not applicable in warehouse (bulk raw meat, no cooking)
+	const reasonConfig = $derived(
+		isWarehouseSession()
+			? allReasonConfig.filter(rc => rc.label !== 'Overcooked')
+			: allReasonConfig
+	);
 
 	const reasonBadgeColor: Record<string, string> = {
 		'Dropped / Spilled':   'bg-orange-50 text-orange-600',

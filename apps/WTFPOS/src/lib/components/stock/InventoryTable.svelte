@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { slide } from 'svelte/transition';
+	import { slide, fade } from 'svelte/transition';
 	import {
 		stockItems, getCurrentStock, getStockStatus,
 		type StockStatus, type StockCategory, type StockItem
 	} from '$lib/stores/stock.svelte';
 	import { menuItems, toggleMenuItemAvailability } from '$lib/stores/pos.svelte';
-	import { session } from '$lib/stores/session.svelte';
+	import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 	import { Search } from 'lucide-svelte';
 	import { STOCK_IMAGES } from '$lib/stores/stock.images';
 	import AllLocationsInventory from './AllLocationsInventory.svelte';
@@ -28,8 +28,23 @@
 	import InventoryItemRow from './InventoryItemRow.svelte';
 
 	// Kitchen staff can make stock adjustments (Add/Deduct) but cannot edit item details or toggle 86
+	// Warehouse staff (role=staff at wh-tag) also cannot toggle 86 — it only affects the POS menu
 	const isReadonly = $derived(false);
 	const canEditDetails = $derived(session.role !== 'kitchen');
+	const can86 = $derived(canEditDetails && !(isWarehouseSession() && session.role === 'staff'));
+
+	// ─── 86 Toast ─────────────────────────────────────────────────────────────
+	let toast86Msg = $state<string | null>(null);
+	let toast86Timer: ReturnType<typeof setTimeout> | null = null;
+
+	function handle86Toggle(menuItemId: string, itemName: string, currentlyAvailable: boolean) {
+		toggleMenuItemAvailability(menuItemId);
+		if (toast86Timer) clearTimeout(toast86Timer);
+		toast86Msg = currentlyAvailable
+			? `${itemName} marked sold out (86'd)`
+			: `${itemName} restored to menu`;
+		toast86Timer = setTimeout(() => { toast86Msg = null; toast86Timer = null; }, 3000);
+	}
 
 	// ─── View / Search / Filter ───────────────────────────────────────────────
 	let viewMode     = $state<'grid' | 'list'>('list');
@@ -330,7 +345,7 @@
 											onHover={(id) => hoveredItemId = id}
 											animate={true}
 											menuAvailable={menuItemsById.get(item.menuItemId)?.available ?? true}
-											onToggle86={canEditDetails ? () => toggleMenuItemAvailability(item.menuItemId) : undefined}
+											onToggle86={can86 ? () => handle86Toggle(item.menuItemId, item.name, menuItemsById.get(item.menuItemId)?.available ?? true) : undefined}
 										/>
 									{/each}
 								{/if}
@@ -348,7 +363,7 @@
 									onEditClick={openEditModalClick}
 									readonly={!canEditDetails}
 									menuAvailable={menuItemsById.get(item.menuItemId)?.available ?? true}
-									onToggle86={canEditDetails ? () => toggleMenuItemAvailability(item.menuItemId) : undefined}
+									onToggle86={can86 ? () => handle86Toggle(item.menuItemId, item.name, menuItemsById.get(item.menuItemId)?.available ?? true) : undefined}
 								/>
 							{/each}
 						{/if}
@@ -374,4 +389,17 @@
 	/>
 {/if}
 
+{/if}
+
+<!-- ─── 86 Toast ─────────────────────────────────────────────────────────────── -->
+{#if toast86Msg}
+	<div
+		class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl bg-gray-900 px-5 py-3.5 text-white shadow-xl"
+		transition:fade={{ duration: 200 }}
+	>
+		<svg class="w-5 h-5 shrink-0 text-status-yellow" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 3h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+		</svg>
+		<span class="text-sm font-semibold">{toast86Msg}</span>
+	</div>
 {/if}

@@ -411,16 +411,20 @@ import ShoppingCart from '@lucide/svelte/icons/shopping-cart';
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  PHASE 1 — LOCAL-FIRST FOUNDATION                  (ACTIVE) ║
+║  PHASE 1 — LOCAL-FIRST + THIN CLIENT               (ACTIVE) ║
 ║                                                              ║
-║  Data:       RxDB + IndexedDB only (fully offline)          ║
-║  Cross-branch: SSE kitchen aggregate (read-only, owner)     ║
-║  Hardware:   Bluetooth scale (partial)                       ║
+║  Model:    1 main tablet per branch runs node build          ║
+║            All other devices = browsers on local WiFi        ║
+║            No replication — same server, same RxDB           ║
+║  Data:     RxDB + IndexedDB on main tablet (fully offline)  ║
+║  Realtime: SSE POS→Kitchen (same branch, no internet)       ║
+║  Cross-branch: SSE aggregate (owner only, needs internet)   ║
+║  Hardware: Bluetooth scale (partial)                         ║
 ║                                                              ║
 ║  NOT YET ACTIVE:                                            ║
-║  • Phase 2 — LAN multi-device replication                   ║
-║  • Phase 3 — Neon cloud DB + Ably real-time                 ║
-║  • Phase 4 — Full offline-first + conflict resolution       ║
+║  • Phase 2 — Neon cloud DB + Ably real-time (owner dash)    ║
+║  • Phase 3 — Hardware completion (printer, scale reconnect) ║
+║  • Phase 4 — Resilience & archival                          ║
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
@@ -447,6 +451,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | Bluetooth scale, GATT, weight parsing, hardware | `skills/bluetooth/SKILL.md` |
 | E2E tests, browser automation, UI interaction | `.claude/skills/playwright-cli/SKILL.md` |
 | UX audit, design review, usability check, layout assessment | `skills/ux-audit/SKILL.md` |
+| Pre-flight code check before UX audit, scenario viability, trace data flow | `skills/code-audit/SKILL.md` (sub-skill of ux-audit, auto-runs at Gate 0.5) |
 | Generate role scenarios, implementation assessment, user journeys | `skills/user-scenarios/SKILL.md` |
 | Maturity check, PRD alignment, feature completeness, progress report | `skills/check-maturity/SKILL.md` |
 
@@ -461,6 +466,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | "Ably", "real-time", "pub/sub", "channels", "replace SSE", "live" | ably |
 | "Bluetooth", "scale", "weight", "GATT", "hardware", "printer" | bluetooth |
 | "UX", "usability", "layout", "design review", "audit", "heuristic", "accessibility check" | ux-audit |
+| "code audit", "pre-check", "code viability", "trace the flow", "will this work", "dry run" | code-audit (auto-invoked by ux-audit Gate 0.5) |
 | "user scenarios", "create scenarios", "generate scenarios", "role journeys", "as manager", "as staff" | user-scenarios |
 | "maturity", "PRD alignment", "how complete", "how mature", "what's missing", "progress report", "readiness" | check-maturity |
 
@@ -473,7 +479,8 @@ skills/
 ├── neon/           SKILL.md + references/ (NEON_GUIDE, NEON_RXDB_BRIDGE)
 ├── ably/           SKILL.md + references/ (ABLY_WTFPOS_CHANNELS)
 ├── bluetooth/      SKILL.md + references/ (WEB_BLUETOOTH_GUIDE)
-├── ux-audit/       SKILL.md + references/ (DESIGN_BIBLE, ENVIRONMENT, KNOWN_PATTERNS, PRD_QUICK_REF, BIR_REQUIREMENTS, ROLE_WORKFLOWS) + audits/ (v4+ output) + audits-legacy/ (pre-v4 output)
+├── code-audit/     SKILL.md (v1.0.0 — sub-skill of ux-audit) + references/ (TRACE_TEMPLATES, MISSED_PATTERNS)
+├── ux-audit/       SKILL.md (v5.1.0 — uses playwright-cli) + references/ (DESIGN_BIBLE, ENVIRONMENT, KNOWN_PATTERNS, PRD_QUICK_REF, BIR_REQUIREMENTS, ROLE_WORKFLOWS) + audits/ (v4+ output) + audits-legacy/ (pre-v4 output)
 ├── user-scenarios/ SKILL.md + references/ (SCENARIO_CONTEXT) + scenarios/ (generated output)
 └── check-maturity/ SKILL.md + references/ (MATURITY_FRAMEWORK) + reports/ (generated output)
 ```

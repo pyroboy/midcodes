@@ -66,8 +66,18 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-2xl pos-card flex flex-col gap-6" onclick={(e) => e.stopPropagation()}>
-            <button onclick={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center">✕</button>
+            <button onclick={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg">✕</button>
             
+            <!-- Table / order orientation anchor -->
+            <div class="flex items-center justify-center">
+                <span class="rounded-md bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent tracking-wide">
+                    {order.orderType === 'takeout'
+                        ? `Takeout${order.customerName ? ` — ${order.customerName}` : ''}`
+                        : order.tableId ?? 'Table'}
+                    {order.pax ? ` · ${order.pax} pax` : ''}
+                </span>
+            </div>
+
             <!-- Step progress indicator -->
             <div class="flex items-center justify-center gap-2 text-sm">
                 <span class="flex items-center gap-1.5 font-semibold text-accent">
@@ -86,8 +96,7 @@
                     <h2 class="text-xl font-black text-gray-900">Leftover Check</h2>
                     <button
                         onclick={() => showPolicyTip = !showPolicyTip}
-                        class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500 hover:bg-gray-200 transition-colors"
-                        style="min-height: unset"
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500 hover:bg-gray-200 transition-colors"
                         aria-label="Show leftover policy"
                     >ℹ</button>
                 </div>
@@ -122,15 +131,20 @@
                 <button onclick={handleBackspace} class="rounded-xl border border-gray-200 bg-gray-100 py-4 text-xl font-bold shadow-sm active:scale-95">⌫</button>
             </div>
 
-            <div class="flex gap-2">
+            <div class="flex flex-col gap-2">
                 {#if weightGrams > 0}
-                    <button onclick={handleSkip} class="btn-ghost flex-1 py-3 text-xs">Waive (Manager)</button>
-                    <button onclick={handleApply} class="btn-primary flex-[2] py-3 text-sm shadow-xl shadow-orange-500/20">
-                        Apply & Checkout
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick={handleSkip} class="btn-ghost flex-1 py-3 text-xs">Manager Override (no weigh)</button>
+                        <button onclick={handleApply} class="btn-primary flex-[2] py-3 text-sm shadow-xl shadow-orange-500/20">
+                            Apply & Checkout
+                        </button>
+                    </div>
                 {:else}
                     <button onclick={onPreCheckout} class="btn-success w-full py-3 text-sm font-bold shadow-xl text-white bg-status-green hover:bg-emerald-600">
                         ✓ No Leftovers — Proceed to Checkout
+                    </button>
+                    <button onclick={handleSkip} class="btn-ghost w-full py-2 text-xs text-gray-400 hover:text-gray-600">
+                        Manager Override (no weigh) →
                     </button>
                 {/if}
             </div>

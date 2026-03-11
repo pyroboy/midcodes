@@ -6,6 +6,22 @@
 	import { ArrowRight, CheckCircle, AlertCircle, ChevronLeft, MapPin } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { isToday, isYesterday, format } from 'date-fns';
+
+	function formatTransferDate(iso: string): string {
+		const d = new Date(iso);
+		const time = format(d, 'h:mm a');
+		if (isToday(d)) return `Today, ${time}`;
+		if (isYesterday(d)) return `Yesterday, ${time}`;
+		return `${format(d, 'MMM d')}, ${time}`;
+	}
+
+	function getDateGroup(iso: string): 'Today' | 'Yesterday' | 'Earlier' {
+		const d = new Date(iso);
+		if (isToday(d)) return 'Today';
+		if (isYesterday(d)) return 'Yesterday';
+		return 'Earlier';
+	}
 
 	// Clean up ?action=open query param (wizard is the action itself)
 	$effect(() => {
@@ -143,8 +159,24 @@
 
 	// ─── Recent transfers ───────────────────────────────────────────────────────
 	const recentTransfers = $derived(
-		adjustments.value.filter(a => a.reason?.startsWith('Transfer')).slice(0, 20)
+		adjustments.value
+			.filter(a => a.reason?.startsWith('Transfer') && a.locationId === sourceLocationId)
+			.slice(0, 20)
 	);
+
+	const groupedTransfers = $derived(() => {
+		const groups: { label: string; items: typeof recentTransfers }[] = [];
+		let currentGroup = '';
+		for (const a of recentTransfers) {
+			const group = getDateGroup(a.loggedAt);
+			if (group !== currentGroup) {
+				currentGroup = group;
+				groups.push({ label: group, items: [] });
+			}
+			groups[groups.length - 1].items.push(a);
+		}
+		return groups;
+	});
 
 	// ─── Step indicator data ────────────────────────────────────────────────────
 	const steps = [
@@ -229,6 +261,9 @@
 							class={cn('pos-input font-mono', availableStock !== null && parsedQty > availableStock && 'border-status-red focus:border-status-red')}
 							min="0" step="any" placeholder="0.0"
 						/>
+						{#if selectedSourceItem && parsedQty === 0}
+							<p class="text-amber-600 text-sm">Enter a quantity to continue</p>
+						{/if}
 					</div>
 					<div class="flex flex-col gap-1.5 w-20">
 						<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</span>
@@ -297,7 +332,7 @@
 				</div>
 
 				<!-- Next button -->
-				<div class="flex justify-end pt-2">
+				<div class="sticky bottom-0 bg-white border-t border-gray-100 pt-3 mt-4 flex justify-end">
 					<button
 						onclick={nextStep}
 						disabled={!canProceedToStep2}
@@ -374,7 +409,7 @@
 				</div>
 
 				<!-- Back / Next -->
-				<div class="flex justify-between pt-2">
+				<div class="sticky bottom-0 bg-white border-t border-gray-100 pt-3 mt-4 flex justify-between">
 					<button onclick={prevStep} class="btn-secondary flex items-center gap-2 px-5">
 						<ChevronLeft class="w-4 h-4" /> Back
 					</button>
@@ -466,7 +501,7 @@
 				</div>
 
 				<!-- Back / Confirm -->
-				<div class="flex justify-between pt-2">
+				<div class="sticky bottom-0 bg-white border-t border-gray-100 pt-3 mt-4 flex justify-between">
 					<button onclick={prevStep} class="btn-secondary flex items-center gap-2 px-5">
 						<ChevronLeft class="w-4 h-4" /> Back
 					</button>
@@ -512,14 +547,19 @@
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-border">
-						{#each recentTransfers as a (a.id)}
-							<tr class="hover:bg-gray-50">
-								<td class="px-4 py-2.5 text-xs text-gray-400">{a.loggedAt}</td>
-								<td class="px-4 py-2.5 font-medium text-gray-900">{a.itemName}</td>
-								<td class="px-4 py-2.5 text-right font-mono text-gray-700">{a.qty} {a.unit}</td>
-								<td class="px-4 py-2.5 text-xs text-gray-500">{a.reason}</td>
-								<td class="px-4 py-2.5 text-right text-xs text-gray-400">{a.loggedBy}</td>
+						{#each groupedTransfers() as group}
+							<tr>
+								<td colspan="5" class="px-4 py-2 bg-gray-50 text-xs font-bold uppercase tracking-wider text-gray-400">{group.label}</td>
 							</tr>
+							{#each group.items as a (a.id)}
+								<tr class="hover:bg-gray-50">
+									<td class="px-4 py-2.5 text-xs text-gray-400">{formatTransferDate(a.loggedAt)}</td>
+									<td class="px-4 py-2.5 font-medium text-gray-900">{a.itemName}</td>
+									<td class="px-4 py-2.5 text-right font-mono text-gray-700">{a.qty} {a.unit}</td>
+									<td class="px-4 py-2.5 text-xs text-gray-500">{a.reason}</td>
+									<td class="px-4 py-2.5 text-right text-xs text-gray-400">{a.loggedBy}</td>
+								</tr>
+							{/each}
 						{/each}
 					</tbody>
 				</table>

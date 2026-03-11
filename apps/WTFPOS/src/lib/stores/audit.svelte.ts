@@ -102,6 +102,12 @@ export const log = {
 	orderVoided: (tableLabel: string, total: number, reason?: string, durationSeconds?: number) =>
 		writeLog('payment', `VOIDED: ${tableLabel} — ₱${total.toFixed(2)}${reason ? ` (${reason})` : ''}${formatAuditDuration(durationSeconds, true)}`),
 
+	/** POS: single item voided with manager PIN + reason */
+	itemVoided: (itemName: string, tableLabel: string, reason: string) =>
+		writeLog('order', `VOIDED ITEM: ${itemName} on ${tableLabel} — ${reason}`, {
+			meta: { reason },
+		}),
+
 	/** Stock: transfer logged */
 	stockTransferred: (itemName: string, qty: number, unit: string, fromBranch: string, toBranch: string) =>
 		writeLog('stock', `Transfer: ${qty}${unit} ${itemName} — ${fromBranch.toUpperCase()} → ${toBranch.toUpperCase()}`),

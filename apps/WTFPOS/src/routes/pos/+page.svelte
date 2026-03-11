@@ -22,9 +22,9 @@
     import MergeTablesModal from '$lib/components/pos/MergeTablesModal.svelte';
     import AttachTakeoutModal from '$lib/components/pos/AttachTakeoutModal.svelte';
     import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
-    import ShiftStartModal from '$lib/components/pos/ShiftStartModal.svelte';
-    import { getActiveShift } from '$lib/stores/pos/shifts.svelte';
+    import { getActiveShift, openShift } from '$lib/stores/pos/shifts.svelte';
     import { session, isWarehouseSession } from '$lib/stores/session.svelte';
+    import { formatPeso } from '$lib/utils';
     import { Info } from 'lucide-svelte';
     import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
     import { onMount } from 'svelte';
@@ -70,6 +70,14 @@
     $effect(() => {
         if (getActiveShift()) {
             markShiftStartedLocally();
+        }
+    });
+
+    // Auto-open a shift with ₱0 float on mount if none is active.
+    // Keeps EOD reconciliation records intact while removing the blocking float input modal.
+    $effect(() => {
+        if (!isWarehouseSession() && session.locationId !== 'all' && !getActiveShift() && !localShiftStarted) {
+            openShift(0).then(() => markShiftStartedLocally());
         }
     });
 
@@ -175,6 +183,16 @@
         kitchenToastTimer = setTimeout(() => { kitchenToastCount = 0; }, 2500);
     }
 
+    // ─── Checkout Success Toast ────────────────────────────────────────────
+    let checkoutToastMsg = $state('');
+    let checkoutToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function showCheckoutToast(label: string, total: number, method: string) {
+        checkoutToastMsg = `${label} paid ${formatPeso(total)} via ${method}`;
+        if (checkoutToastTimer) clearTimeout(checkoutToastTimer);
+        checkoutToastTimer = setTimeout(() => { checkoutToastMsg = ''; }, 3000);
+    }
+
     // ─── Closed/Orphaned Orders for History ──────────────────────────────────
     const closedOrders = $derived(
         orders.filter(o =>
@@ -216,6 +234,7 @@
         if (table.status === 'maintenance') return; // Can't interact with maintenance tables
         if (table.status === 'available') {
             paxModalTable = table;
+            selectedTableId = table.id; // show ring immediately while PaxModal is open
         } else {
             // P1-20: Detect ghost-occupied table (occupied status but empty order)
             const order = table.currentOrderId
@@ -241,7 +260,7 @@
             ? allOrders.value.find(o => o.id === tbl.currentOrderId)
             : undefined;
         if (order) {
-            await voidOrder(order.id, 'mistake');
+            await voidOrder(order.id, 'mistake', session.userName);
         } else {
             await closeTable(tbl.id);
         }
@@ -261,11 +280,11 @@
         showAddItem = false;
     }
 
-    async function confirmPax(pax: number, childPax: number, freePax: number) {
+    async function confirmPax(pax: number, childPax: number, freePax: number, scCount: number = 0, pwdCount: number = 0) {
         if (paxModalTable) {
             const tableId = paxModalTable.id;
             paxModalTable = null; // clear before await to prevent double-click
-            await openTable(tableId, pax, undefined, childPax, freePax);
+            await openTable(tableId, pax, undefined, childPax, freePax, scCount, pwdCount);
             selectedTableId = tableId;
             // Only auto-open AddItemModal if the order has no items yet
             const table = allTables.value.find(t => t.id === tableId);
@@ -285,7 +304,7 @@
     function handleVoidConfirm(reason: 'mistake' | 'walkout' | 'write_off') {
         const order = currentActiveOrder;
         if (!order) return;
-        voidOrder(order.id, reason);
+        voidOrder(order.id, reason, session.userName);
         showVoidConfirm = false;
         closeBill();
     }
@@ -315,7 +334,7 @@
         if (!currentActiveOrder || !selectedTable) return;
         const activeItems = currentActiveOrder.items.filter(i => i.status !== 'cancelled');
         if (activeItems.length > 0) return; // Safety: only cancel truly empty tables
-        await voidOrder(currentActiveOrder.id, 'mistake');
+        await voidOrder(currentActiveOrder.id, 'mistake', session.userName);
         closeBill();
     }
 
@@ -323,6 +342,11 @@
         receiptOrder = paidOrder;
         receiptChange = change;
         receiptMethod = methodLabel;
+
+        const label = paidOrder.orderType === 'takeout'
+            ? `Takeout ${paidOrder.customerName ?? ''}`
+            : (selectedTable?.label ?? 'Order');
+        showCheckoutToast(label, paidOrder.total, methodLabel);
 
         showReceipt = true;
         showCheckout = false;
@@ -387,8 +411,8 @@
     {#if session.locationId === 'all'}
         <AllBranchesDashboard allTables={allTables.value} allOrders={allOrders.value} />
     {:else}
-        <!-- P2-02: inert disables all interaction (clicks, focus, keyboard) on the floor when shift modal is blocking -->
-        <div class="flex flex-1 overflow-hidden" inert={(!isWarehouseSession() && !shiftStarted) ? true : undefined}>
+        <!-- Floor plan wrapper -->
+        <div class="flex flex-1 overflow-hidden">
             <div class="flex flex-1 flex-col overflow-hidden min-h-0 p-6 gap-5">
                 <!-- Header -->
                 <div class="flex items-center justify-between shrink-0">
@@ -426,9 +450,9 @@
                                             <text x="65" y="60" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="9" font-weight="600" fill="#6b7280">4 pax</text>
                                             <!-- Bill total (bottom-center) -->
                                             <text x="65" y="92" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="9" font-weight="700" fill="#111827">P1,996.00</text>
-                                            <!-- Unserved badge (bottom-left) -->
-                                            <circle cx="15" cy="95" r="8" fill="#f97316" opacity="0.9" />
-                                            <text x="15" y="96" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="8" font-weight="800" fill="#ffffff">5</text>
+                                            <!-- Unserved badge (bottom-left) — pill with count+items -->
+                                            <rect x="4" y="88" width="36" height="12" rx="6" fill="#f97316" opacity="0.9" />
+                                            <text x="22" y="95" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="7" font-weight="800" fill="#ffffff">5 items</text>
                                             <!-- Refill badge (bottom-right) -->
                                             <rect x="99" y="88" width="20" height="12" rx="6" fill="#8b5cf6" opacity="0.9" />
                                             <text x="109" y="95" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="7" font-weight="800" fill="#ffffff">R3</text>
@@ -439,7 +463,7 @@
                                             <span><b class="text-gray-900">T1</b> — table name</span>
                                             <span><b class="text-gray-500">4 pax</b> — guests seated</span>
                                             <span><b class="text-gray-900">P1,996</b> — running bill</span>
-                                            <span><span class="inline-block h-3 w-3 rounded-full bg-orange-500 align-middle"></span> <b>5</b> — unserved items</span>
+                                            <span><span class="inline-flex h-3 px-1 rounded-full bg-orange-500 align-middle text-[7px] text-white font-bold items-center">5 items</span> — unserved items</span>
                                             <span><span class="inline-block h-3 w-5 rounded-full bg-purple-500 align-middle text-[8px] text-white font-bold text-center leading-3">R3</span> — refills (AYCE)</span>
                                         </div>
                                     </div>
@@ -463,7 +487,7 @@
                                     <!-- Badge meanings -->
                                     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-3 mb-2">Badges</p>
                                     <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-gray-600">
-                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white">5</span>Unserved items</span>
+                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 px-1.5 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white">5 items</span>Unserved items</span>
                                         <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">✓</span>All served</span>
                                         <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-6 items-center justify-center rounded-full bg-purple-500 text-[8px] font-bold text-white">R3</span>Refill count</span>
                                     </div>
@@ -552,19 +576,47 @@
     </div>
 {/if}
 
-{#if showCheckout && checkoutOrder}
-    <CheckoutModal
-        order={checkoutOrder}
-        table={selectedTable}
-        onclose={() => { showCheckout = false; checkoutOrder = null; }}
-        onsuccess={handleCheckoutSuccess}
-    />
+<!-- Checkout success toast (KP-05 fix) -->
+{#if checkoutToastMsg}
+    <div class="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 pointer-events-none">
+        <div class="flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <span class="text-status-green text-lg">✓</span>
+            <span class="text-sm font-semibold">{checkoutToastMsg}</span>
+        </div>
+    </div>
+{/if}
+
+{#if checkoutOrder}
+    <div class:hidden={!showCheckout}>
+        {#key checkoutOrder.id}
+            <CheckoutModal
+                order={checkoutOrder}
+                table={selectedTable}
+                onclose={() => { showCheckout = false; checkoutOrder = null; }}
+                onhold={() => { showCheckout = false; }}
+                onsuccess={handleCheckoutSuccess}
+            />
+        {/key}
+    </div>
+
+    {#if !showCheckout}
+        <div class="fixed bottom-6 left-1/2 z-[80] -translate-x-1/2">
+            <button
+                onclick={() => showCheckout = true}
+                class="flex items-center gap-3 rounded-full bg-orange-600 px-6 py-3 text-white shadow-xl hover:bg-orange-700 transition-all font-bold group animate-in slide-in-from-bottom-5"
+            >
+                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-xs">⏸</span>
+                Resume Checkout for {selectedTable?.label || checkoutOrder.tableNumber || 'Takeout'}
+                <span class="font-mono bg-white/20 px-2 py-0.5 rounded text-sm">{formatPeso(checkoutOrder.total)}</span>
+            </button>
+        </div>
+    {/if}
 {/if}
 
 <PaxModal 
     table={paxModalTable}
     onconfirm={confirmPax}
-    oncancel={() => paxModalTable = null}
+    oncancel={() => { paxModalTable = null; selectedTableId = null; }}
 />
 
 <NewTakeoutModal
@@ -686,10 +738,6 @@
     />
 {/if}
 
-{#if !isWarehouseSession() && session.locationId !== 'all' && !shiftStarted}
-    <!-- P2-02: floor plan is already blocked by this overlay — pointer-events handled by fixed overlay z-order -->
-    <ShiftStartModal onSkip={markShiftStartedLocally} />
-{/if}
 
 <!-- P1-20: Ghost-occupied table recovery prompt -->
 {#if ghostTable}
@@ -704,9 +752,9 @@
             </div>
             <div class="flex gap-3">
                 <button
-                    class="btn-ghost flex-1"
+                    class="btn-ghost flex-1 border border-border"
                     onclick={() => ghostTableId = null}
-                >Cancel</button>
+                >Keep Table Open</button>
                 <button
                     class="btn-danger flex-1"
                     onclick={handleFreeGhostTable}

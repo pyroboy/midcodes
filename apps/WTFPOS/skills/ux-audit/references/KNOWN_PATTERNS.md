@@ -11,7 +11,7 @@ Last updated: 2026-03-10 (based on 15 representative audits across all modules �
 
 ## KP-01 — Touch Target Violations (style="min-height: unset")
 
-**Frequency:** 14/15 audits (systemic)
+**Frequency:** 15/16 audits (systemic)
 **Principle:** Fitts's Law + WCAG Touch Targets
 **Root cause:** Inline `style="min-height: unset"` or Tailwind `min-h-[32px]` overrides on
 buttons, explicitly bypassing the `app.css` base layer rule of `min-height: 44px`.
@@ -177,7 +177,7 @@ be rewritten in user-facing language.
 
 ## KP-11 — Scroll-Hidden Primary Actions
 
-**Frequency:** 6/12 audits
+**Frequency:** 7/16 audits
 **Principle:** Fitts's Law + Information Visibility
 **Root cause:** Primary action buttons (All DONE, Complete, Submit) positioned below content
 that may require 1–2 viewport scrolls to reach.
@@ -185,6 +185,7 @@ that may require 1–2 viewport scrolls to reach.
 - KDS ticket with 12+ items — "All DONE" button unreachable without 1,700px scroll
 - Running bill with refill items below fold — staff can't confirm refill without scrolling
 - Long forms (delivery, stock count) with submit at bottom
+- **CheckoutModal "Confirm Payment"** — hidden below fold on 1024×768 at every checkout
 **Fix pattern:** Pin primary action buttons to viewport bottom (`sticky bottom-0`) or use a
 floating action button. Critical actions must be reachable without scrolling regardless of
 content length.
