@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { formatPeso, cn } from '$lib/utils';
 	import {
-		eodSummary, utilitySettings, getPreviousUtilityReading, saveUtilityReading,
+		eodSummary, salesSummary, utilitySettings, getPreviousUtilityReading, saveUtilityReading,
 		zReadHistory, saveZRead
 	} from '$lib/stores/reports.svelte';
-	import { allExpenses, addExpense } from '$lib/stores/expenses.svelte';
+	import ReportBarChart from '$lib/components/reports/ReportBarChart.svelte';
+	import KpiCard from '$lib/components/reports/KpiCard.svelte';
+	import ReportShell from '$lib/components/reports/ReportShell.svelte';
+	import { allExpenses, addExpense, allTemplates, getCategoryIcon } from '$lib/stores/expenses.svelte';
+	import type { ExpenseTemplate } from '$lib/stores/expenses.svelte';
 	import { tables } from '$lib/stores/pos.svelte';
 	import { session, getCurrentLocation } from '$lib/stores/session.svelte';
 	import { getActiveShift, closeShift } from '$lib/stores/pos/shifts.svelte';
@@ -26,9 +30,9 @@
 	});
 
 	const summary = $derived(eodSummary());
+	const sales = $derived(salesSummary());
 
 	// ─── Open-table guard ───────────────────────────────────────────────────────
-	// A table is "open" if it has an active session (not available or maintenance)
 	const openTablesCount = $derived(
 		tables.value.filter(t =>
 			(session.locationId === 'all' || t.locationId === session.locationId) &&
@@ -37,7 +41,6 @@
 	);
 
 	// ─── Stale-shift detection ──────────────────────────────────────────────────
-	// Warn if yesterday has no Z-Read at this location
 	const yesterdayKey = (() => {
 		const d = new Date();
 		d.setDate(d.getDate() - 1);
@@ -130,8 +133,62 @@
 	const waterCost = $derived(waterUsed * rateWater);
 	const totalUtilCost = $derived(elecCost + gasCost + waterCost);
 
+	// ─── Daily Fixed Costs ─────────────────────────────────────────────────────
+	const dailyTemplates = $derived(
+		allTemplates.value.filter(t =>
+			t.isActive &&
+			(t.recurrence === 'daily' || t.recurrence === 'monthly') &&
+			(session.locationId === 'all' || t.locationId === session.locationId)
+		)
+	);
+
+	// Track checked state and editable amounts for each template
+	let fixedCostChecks = $state<Record<string, boolean>>({});
+	let fixedCostAmounts = $state<Record<string, number>>({});
+
+	// Initialize checks/amounts when templates change
+	$effect(() => {
+		const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+		for (const tpl of dailyTemplates) {
+			if (!(tpl.id in fixedCostChecks)) fixedCostChecks[tpl.id] = true;
+			if (!(tpl.id in fixedCostAmounts)) {
+				fixedCostAmounts[tpl.id] = tpl.recurrence === 'monthly'
+					? Math.round(tpl.defaultAmount / daysInMonth * 100) / 100
+					: tpl.defaultAmount;
+			}
+		}
+	});
+
+	const totalFixedCosts = $derived(
+		dailyTemplates.reduce((sum, tpl) =>
+			sum + (fixedCostChecks[tpl.id] ? (fixedCostAmounts[tpl.id] ?? 0) : 0), 0)
+	);
+
 	let eodSubmitted = $state(false);
 	let submitError = $state('');
+
+	// 7-day Z-read trend chart
+	const zReadTrendChart = $derived.by(() => {
+		const todayIso = new Date().toISOString().slice(0, 10);
+		const days: { key: string; label: string }[] = [];
+		for (let i = 6; i >= 0; i--) {
+			const d = new Date();
+			d.setDate(d.getDate() - i);
+			const key = d.toISOString().slice(0, 10);
+			days.push({ key, label: d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) });
+		}
+		const locId = session.locationId;
+		return days.map(({ key, label }) => {
+			const zread = zReadHistory.value.find(z =>
+				z.date === key && (locId === 'all' || z.locationId === locId)
+			);
+			return {
+				label,
+				primary: zread?.grossSales ?? 0,
+				highlight: key === todayIso,
+			};
+		});
+	});
 
 	async function submitEOD() {
 		if (openTablesCount > 0) {
@@ -147,8 +204,17 @@
 			// P0-1: Auto-create expense records so utility costs appear in expense reports
 			const paidBy = session.userName || 'Manager';
 			if (elecCost  > 0) await addExpense('Electricity', elecCost,  `EOD Electricity (${elecUsed} kWh × ₱${rateElec}/kWh)`,  paidBy);
-			if (gasCost   > 0) await addExpense('Gas/LPG',     gasCost,   `EOD Gas/LPG (${gasUsed} kg × ₱${rateGas}/kg)`,           paidBy);
+			if (gasCost   > 0) await addExpense('Gas / LPG',   gasCost,   `EOD Gas/LPG (${gasUsed} kg × ₱${rateGas}/kg)`,           paidBy);
 			if (waterCost > 0) await addExpense('Water',        waterCost, `EOD Water (${waterUsed} m³ × ₱${rateWater}/m³)`,          paidBy);
+		}
+		// Auto-log checked daily fixed costs as expenses
+		const fixedPaidBy = session.userName || 'Manager';
+		for (const tpl of dailyTemplates) {
+			if (fixedCostChecks[tpl.id] && (fixedCostAmounts[tpl.id] ?? 0) > 0) {
+				const amt = fixedCostAmounts[tpl.id];
+				const suffix = tpl.recurrence === 'monthly' ? ' (daily prorate)' : '';
+				await addExpense(tpl.category, amt, `EOD: ${tpl.description}${suffix}`, tpl.paidBy || fixedPaidBy);
+			}
 		}
 		await saveZRead({
 			date: todayKey,
@@ -173,222 +239,6 @@
 		eodSubmitted = true;
 	}
 </script>
-
-<!-- ALL-location guard: EOD must be run per branch -->
-{#if session.locationId === 'all'}
-	<div class="mb-4 flex items-start gap-3 rounded-xl border border-status-red/30 bg-status-red-light px-4 py-3">
-		<AlertTriangle class="w-4 h-4 text-status-red flex-shrink-0 mt-0.5" />
-		<div>
-			<p class="text-sm font-bold text-status-red">Select a Branch First</p>
-			<p class="text-xs text-red-700 mt-0.5">End of Day must be run per branch. You are currently viewing <strong>All Locations</strong>. Use the location switcher above to select Alta Citta or Alona Beach before closing the day.</p>
-		</div>
-	</div>
-{/if}
-
-<!-- Stale-shift warning -->
-{#if !hasYesterdayZRead && zReadHistory.value.length === 0}
-	<!-- No Z-Read history at all — first day, no warning needed -->
-{:else if !hasYesterdayZRead}
-	<div class="mb-4 flex items-start gap-3 rounded-xl border border-status-yellow/30 bg-status-yellow-light px-4 py-3">
-		<AlertTriangle class="w-4 h-4 text-status-yellow flex-shrink-0 mt-0.5" />
-		<div>
-			<p class="text-sm font-bold text-status-yellow">Stale Shift Detected</p>
-			<p class="text-xs text-yellow-700 mt-0.5">No Z-Read was submitted yesterday ({yesterdayKey}). The previous shift may still be open. Verify yesterday's records before closing today.</p>
-		</div>
-	</div>
-{/if}
-
-<!-- Open-table warning -->
-{#if openTablesCount > 0}
-	<div class="mb-4 flex items-start gap-3 rounded-xl border border-status-red/20 bg-status-red-light px-4 py-3">
-		<AlertTriangle class="w-4 h-4 text-status-red flex-shrink-0 mt-0.5" />
-		<div>
-			<p class="text-sm font-bold text-status-red">{openTablesCount} Table{openTablesCount > 1 ? 's' : ''} Still Open</p>
-			<p class="text-xs text-red-700 mt-0.5">All tables must be closed before submitting the EOD Z-Read. Go to POS to settle remaining bills.</p>
-		</div>
-	</div>
-{/if}
-
-<!-- Already submitted today -->
-{#if todayZRead}
-	<div class="mb-4 flex items-center gap-3 rounded-xl border border-status-green/20 bg-status-green-light px-4 py-3">
-		<CheckCircle2 class="w-4 h-4 text-status-green flex-shrink-0" />
-		<div>
-			<p class="text-sm font-bold text-status-green">Z-Read Submitted for {todayZRead.date}</p>
-			<p class="text-xs text-green-700">By {todayZRead.submittedBy} at {new Date(todayZRead.submittedAt ?? '').toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</p>
-		</div>
-	</div>
-{/if}
-
-<!-- Live indicator + Open EOD button -->
-<div class="mb-4 flex items-center justify-between">
-	<div class="flex items-center gap-2">
-		<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">{summary.date}</h2>
-		<span class="flex items-center gap-1.5 text-xs text-status-green">
-			<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-status-green"></span>
-			Live totals
-		</span>
-	</div>
-	{#if !eodSubmitted && !todayZRead}
-		{#if showEodConfirm}
-			<!-- P1-23: Inline confirmation before opening EOD modal -->
-			<div class="flex items-center gap-3 rounded-lg border border-status-red/20 bg-status-red-light px-4 py-3">
-				<div class="flex-1">
-					<p class="text-sm font-bold text-status-red">
-						Close business day for {session.locationId === 'all' ? 'this branch' : (getCurrentLocation()?.name ?? 'this branch')}?
-					</p>
-					<p class="text-xs text-red-700 mt-0.5">
-						This action cannot be undone. Today's gross: <strong>{formatPeso(summary.grossSales)}</strong>
-					</p>
-				</div>
-				<button
-					onclick={() => { showEodConfirm = false; showModal = true; }}
-					class="btn-danger flex items-center gap-2 text-sm"
-					disabled={openTablesCount > 0 || session.locationId === 'all'}
-				>
-					Close Day
-				</button>
-				<button onclick={() => (showEodConfirm = false)} class="btn-ghost text-sm">
-					Cancel
-				</button>
-			</div>
-		{:else}
-			<button
-				onclick={() => (showEodConfirm = true)}
-				class="btn-primary flex items-center gap-2 shadow-sm"
-				disabled={openTablesCount > 0 || session.locationId === 'all'}
-			>
-				Start End of Day
-			</button>
-		{/if}
-	{/if}
-</div>
-
-<!-- Page background: Sales data (always visible once blind close is done) -->
-<div class="flex flex-col gap-4">
-	{#if isBlindCloseSubmitted}
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-			<!-- Sales summary -->
-			<div class="rounded-xl border border-border bg-white p-5">
-				<h2 class="mb-4 font-bold text-gray-900">Sales Summary</h2>
-				<div class="flex flex-col gap-2">
-					{#each salesItems as item}
-						<div class={cn('flex items-center justify-between', item.style)}>
-							<span class="text-sm text-gray-600">{item.label}</span>
-							<span class={cn('font-mono text-sm', item.value < 0 ? 'text-status-red' : '')}>
-								{item.value < 0 ? `−${formatPeso(-item.value)}` : formatPeso(item.value)}
-							</span>
-						</div>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Payment breakdown -->
-			<div class="rounded-xl border border-border bg-white p-5">
-				<h2 class="mb-4 font-bold text-gray-900">Payment Breakdown</h2>
-				<div class="flex flex-col gap-3">
-					{#each payments as p}
-						<div class="flex items-center gap-3 rounded-lg border border-border bg-gray-50 px-4 py-3">
-							<span class="text-xl">{p.icon}</span>
-							<div class="flex-1">
-								<p class="text-xs font-medium text-gray-400">{p.label}</p>
-								<p class="font-mono text-lg font-bold text-gray-900">{formatPeso(p.amount)}</p>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Cash reconciliation -->
-			<div class="rounded-xl border border-border bg-white p-5">
-				<h2 class="mb-4 font-bold text-gray-900">Cash Reconciliation</h2>
-				<div class="flex flex-col gap-2">
-					{#each cashRecon as item}
-						<div class={cn('flex items-center justify-between', item.style)}>
-							<span class="text-sm text-gray-600">{item.label}</span>
-							<span class={cn('font-mono text-sm', item.value < 0 ? 'text-status-red' : 'text-gray-900')}>
-								{item.value < 0 ? `−${formatPeso(-item.value)}` : formatPeso(item.value)}
-							</span>
-						</div>
-					{/each}
-				</div>
-
-				<!-- Variance inline -->
-				<div class={cn(
-					'mt-4 rounded-lg border px-4 py-3',
-					closingActual === 0 ? 'border-gray-200 bg-gray-50'
-						: cashVariance === 0 ? 'border-status-green/20 bg-status-green-light'
-						: cashVariance > 0  ? 'border-status-yellow/30 bg-status-yellow-light'
-						: 'border-status-red/20 bg-status-red-light'
-				)}>
-					<p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-						{closingActual === 0 ? 'No cash declared' : cashVariance === 0 ? 'Balanced' : cashVariance > 0 ? 'Cash Over' : 'Cash Short'}
-					</p>
-					{#if closingActual !== 0}
-						<p class={cn('mt-0.5 font-mono text-2xl font-bold',
-							cashVariance === 0 ? 'text-status-green' : cashVariance > 0 ? 'text-status-yellow' : 'text-status-red'
-						)}>
-							{cashVariance > 0 ? `+${formatPeso(cashVariance)}` : cashVariance < 0 ? `−${formatPeso(-cashVariance)}` : '₱0.00'}
-						</p>
-					{/if}
-				</div>
-			</div>
-		</div>
-
-		{#if eodSubmitted}
-			<div class="rounded-xl border border-status-green/30 bg-status-green-light p-4 text-center">
-				<p class="text-sm font-bold text-status-green">EOD Report Submitted</p>
-			</div>
-		{/if}
-	{:else}
-		<div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
-			<Lock class="w-8 h-8 text-gray-400 mb-3 mx-auto" />
-			<h3 class="font-bold text-gray-900 mb-2">Reports Locked — Blind Count Mode</h3>
-			<p class="text-sm text-gray-500 max-w-[280px]">Click "Start End of Day" to begin your blind cash count and unlock today's detailed sales and variance reports.</p>
-		</div>
-	{/if}
-</div>
-
-<!-- ─── Z-Read History ────────────────────────────────────────────────────── -->
-{#if zReadHistory.value.length > 0}
-	<div class="mt-6">
-		<div class="flex items-center gap-2 mb-3">
-			<History class="w-4 h-4 text-gray-400" />
-			<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">Z-Read History</h2>
-		</div>
-		<div class="overflow-hidden rounded-xl border border-border bg-white">
-			<table class="w-full text-sm">
-				<thead>
-					<tr class="border-b border-border bg-gray-50">
-						<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Date</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Gross Sales</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Discounts</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Net Sales</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">VAT</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Variance</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">By</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-border">
-					{#each zReadHistory.value.slice(0, 30) as z (z.id)}
-						{@const variance = z.cashVariance ?? 0}
-						<tr class="hover:bg-gray-50">
-							<td class="px-4 py-3 font-mono text-xs text-gray-700">{z.date}</td>
-							<td class="px-4 py-3 text-right font-mono text-xs text-gray-700">{formatPeso(z.grossSales)}</td>
-							<td class="px-4 py-3 text-right font-mono text-xs text-status-red">−{formatPeso(z.discounts)}</td>
-							<td class="px-4 py-3 text-right font-mono text-xs font-semibold text-gray-900">{formatPeso(z.netSales)}</td>
-							<td class="px-4 py-3 text-right font-mono text-xs text-gray-500">{formatPeso(z.vatAmount)}</td>
-							<td class="px-4 py-3 text-right font-mono text-xs {variance === 0 ? 'text-status-green' : variance > 0 ? 'text-status-yellow' : 'text-status-red'}">
-								{variance > 0 ? `+${formatPeso(variance)}` : variance < 0 ? `−${formatPeso(-variance)}` : '₱0.00'}
-							</td>
-							<td class="px-4 py-3 text-right text-xs text-gray-400">{z.submittedBy}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	</div>
-{/if}
 
 <!-- ─── EOD Modal ───────────────────────────────────────────────────────────── -->
 {#if showModal}
@@ -445,6 +295,52 @@
 					</div>
 				{/if}
 			</div>
+
+			<!-- Daily Fixed Costs (enabled after blind close) -->
+			{#if dailyTemplates.length > 0}
+				<div class={cn(
+					'rounded-xl border border-border bg-surface-secondary p-4 flex flex-col gap-3 transition-opacity',
+					!isBlindCloseSubmitted && 'opacity-40 pointer-events-none'
+				)}>
+					<div>
+						<h4 class="font-bold text-gray-900">Daily Fixed Costs</h4>
+						<p class="text-xs text-gray-500 mt-0.5">Confirm recurring costs. Uncheck to skip. Amounts are editable.</p>
+					</div>
+					<div class="flex flex-col gap-2">
+						{#each dailyTemplates as tpl (tpl.id)}
+							<div class="flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2.5">
+								<input
+									type="checkbox"
+									bind:checked={fixedCostChecks[tpl.id]}
+									disabled={eodSubmitted}
+									class="h-5 w-5 rounded border-gray-300 text-accent accent-accent"
+								/>
+								<span class="text-sm flex-1">
+									<span class="mr-1.5">{getCategoryIcon(tpl.category)}</span>
+									{tpl.description}
+									{#if tpl.recurrence === 'monthly'}
+										<span class="text-[10px] text-gray-400 ml-1">(prorated)</span>
+									{/if}
+								</span>
+								<input
+									type="number"
+									bind:value={fixedCostAmounts[tpl.id]}
+									disabled={eodSubmitted || !fixedCostChecks[tpl.id]}
+									class="pos-input w-24 text-right font-mono text-sm py-1.5"
+									min="0"
+									step="1"
+								/>
+							</div>
+						{/each}
+					</div>
+					{#if totalFixedCosts > 0}
+						<div class="flex justify-between text-sm font-semibold border-t border-border pt-2">
+							<span class="text-gray-600">Fixed Costs Total</span>
+							<span class="font-mono text-status-red">{formatPeso(totalFixedCosts)}</span>
+						</div>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Step 2: Utility Readings (enabled after blind close) -->
 			<div class={cn(
@@ -563,3 +459,240 @@
 		</div>
 	</div>
 {/if}
+
+<ReportShell>
+	{#snippet alerts()}
+		<div class="flex flex-col gap-2">
+			{#if session.locationId === 'all'}
+				<div class="flex items-start gap-3 rounded-xl border border-status-red/30 bg-status-red-light px-4 py-3">
+					<AlertTriangle class="w-4 h-4 text-status-red flex-shrink-0 mt-0.5" />
+					<div>
+						<p class="text-sm font-bold text-status-red">Select a Branch First</p>
+						<p class="text-xs text-red-700 mt-0.5">End of Day must be run per branch. Use the location switcher to select Alta Citta or Alona Beach.</p>
+					</div>
+				</div>
+			{/if}
+
+			{#if !hasYesterdayZRead && zReadHistory.value.length === 0}
+				<!-- No Z-Read history at all — first day, no warning needed -->
+			{:else if !hasYesterdayZRead}
+				<div class="flex items-start gap-3 rounded-xl border border-status-yellow/30 bg-status-yellow-light px-4 py-3">
+					<AlertTriangle class="w-4 h-4 text-status-yellow flex-shrink-0 mt-0.5" />
+					<div>
+						<p class="text-sm font-bold text-status-yellow">Stale Shift Detected</p>
+						<p class="text-xs text-yellow-700 mt-0.5">No Z-Read was submitted yesterday ({yesterdayKey}). Verify yesterday's records before closing today.</p>
+					</div>
+				</div>
+			{/if}
+
+			{#if openTablesCount > 0}
+				<div class="flex items-start gap-3 rounded-xl border border-status-red/20 bg-status-red-light px-4 py-3">
+					<AlertTriangle class="w-4 h-4 text-status-red flex-shrink-0 mt-0.5" />
+					<div>
+						<p class="text-sm font-bold text-status-red">{openTablesCount} Table{openTablesCount > 1 ? 's' : ''} Still Open</p>
+						<p class="text-xs text-red-700 mt-0.5">All tables must be closed before submitting the EOD Z-Read.</p>
+					</div>
+				</div>
+			{/if}
+
+			{#if todayZRead}
+				<div class="flex items-center gap-3 rounded-xl border border-status-green/20 bg-status-green-light px-4 py-3">
+					<CheckCircle2 class="w-4 h-4 text-status-green flex-shrink-0" />
+					<div>
+						<p class="text-sm font-bold text-status-green">Z-Read Submitted for {todayZRead.date}</p>
+						<p class="text-xs text-green-700">By {todayZRead.submittedBy} at {new Date(todayZRead.submittedAt ?? '').toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</p>
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/snippet}
+
+	{#snippet filter()}
+		<div class="flex items-center gap-2">
+			<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">{summary.date}</h2>
+			<span class="flex items-center gap-1.5 text-xs text-status-green">
+				<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-status-green"></span>
+				Live totals
+			</span>
+			{#if !eodSubmitted && !todayZRead}
+				<div class="ml-auto flex items-center gap-2">
+					{#if showEodConfirm}
+						<span class="text-xs font-semibold text-status-red">Close day?</span>
+						<button
+							onclick={() => { showEodConfirm = false; showModal = true; }}
+							class="btn-danger flex items-center gap-2 text-sm"
+							disabled={openTablesCount > 0 || session.locationId === 'all'}
+						>
+							Close Day
+						</button>
+						<button onclick={() => (showEodConfirm = false)} class="btn-ghost text-sm">
+							Cancel
+						</button>
+					{:else}
+						<button
+							onclick={() => (showEodConfirm = true)}
+							class="btn-primary flex items-center gap-2 shadow-sm"
+							disabled={openTablesCount > 0 || session.locationId === 'all'}
+						>
+							Start End of Day
+						</button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{/snippet}
+
+	{#snippet kpis()}
+		<div class="grid grid-cols-4 gap-4 flex-1">
+			<KpiCard label="Gross Sales" value={isBlindCloseSubmitted ? formatPeso(summary.grossSales) : '—'} variant="accent" />
+			<KpiCard label="Net Sales" value={isBlindCloseSubmitted ? formatPeso(summary.netSales) : '—'} variant="success" />
+			<KpiCard label="Cash Variance" value={isBlindCloseSubmitted && closingActual > 0 ? formatPeso(cashVariance) : '—'} variant={cashVariance === 0 ? 'success' : cashVariance > 0 ? 'default' : 'danger'} />
+			<KpiCard label="Today's Pax" value={isBlindCloseSubmitted ? String(sales.totalPax ?? 0) : '—'} />
+		</div>
+	{/snippet}
+
+	{#snippet chart()}
+		<!-- 7-day Z-read trend -->
+		<div class="flex-1 flex flex-col rounded-xl border border-border bg-white p-4">
+			<p class="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400">7-Day Gross Sales Trend (Z-Reads)</p>
+			<div class="relative">
+				<ReportBarChart
+					data={zReadTrendChart}
+					yUnit="₱"
+					height={200}
+					showSecondary={false}
+					primaryColor="#EA580C"
+					formatValue={(v) => v === 0 ? 'No Z-Read' : `₱${v.toLocaleString()}`}
+				/>
+			</div>
+		</div>
+	{/snippet}
+
+	{#snippet content()}
+		<!-- Page background: Sales data (always visible once blind close is done) -->
+		<div class="flex flex-col gap-4">
+			{#if isBlindCloseSubmitted}
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+					<!-- Sales summary -->
+					<div class="rounded-xl border border-border bg-white p-5">
+						<h2 class="mb-4 font-bold text-gray-900">Sales Summary</h2>
+						<div class="flex flex-col gap-2">
+							{#each salesItems as item}
+								<div class={cn('flex items-center justify-between', item.style)}>
+									<span class="text-sm text-gray-600">{item.label}</span>
+									<span class={cn('font-mono text-sm', item.value < 0 ? 'text-status-red' : '')}>
+										{item.value < 0 ? `−${formatPeso(-item.value)}` : formatPeso(item.value)}
+									</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Payment breakdown -->
+					<div class="rounded-xl border border-border bg-white p-5">
+						<h2 class="mb-4 font-bold text-gray-900">Payment Breakdown</h2>
+						<div class="flex flex-col gap-3">
+							{#each payments as p}
+								<div class="flex items-center gap-3 rounded-lg border border-border bg-gray-50 px-4 py-3">
+									<span class="text-xl">{p.icon}</span>
+									<div class="flex-1">
+										<p class="text-xs font-medium text-gray-400">{p.label}</p>
+										<p class="font-mono text-lg font-bold text-gray-900">{formatPeso(p.amount)}</p>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Cash reconciliation -->
+					<div class="rounded-xl border border-border bg-white p-5">
+						<h2 class="mb-4 font-bold text-gray-900">Cash Reconciliation</h2>
+						<div class="flex flex-col gap-2">
+							{#each cashRecon as item}
+								<div class={cn('flex items-center justify-between', item.style)}>
+									<span class="text-sm text-gray-600">{item.label}</span>
+									<span class={cn('font-mono text-sm', item.value < 0 ? 'text-status-red' : 'text-gray-900')}>
+										{item.value < 0 ? `−${formatPeso(-item.value)}` : formatPeso(item.value)}
+									</span>
+								</div>
+							{/each}
+						</div>
+
+						<!-- Variance inline -->
+						<div class={cn(
+							'mt-4 rounded-lg border px-4 py-3',
+							closingActual === 0 ? 'border-gray-200 bg-gray-50'
+								: cashVariance === 0 ? 'border-status-green/20 bg-status-green-light'
+								: cashVariance > 0  ? 'border-status-yellow/30 bg-status-yellow-light'
+								: 'border-status-red/20 bg-status-red-light'
+						)}>
+							<p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+								{closingActual === 0 ? 'No cash declared' : cashVariance === 0 ? 'Balanced' : cashVariance > 0 ? 'Cash Over' : 'Cash Short'}
+							</p>
+							{#if closingActual !== 0}
+								<p class={cn('mt-0.5 font-mono text-2xl font-bold',
+									cashVariance === 0 ? 'text-status-green' : cashVariance > 0 ? 'text-status-yellow' : 'text-status-red'
+								)}>
+									{cashVariance > 0 ? `+${formatPeso(cashVariance)}` : cashVariance < 0 ? `−${formatPeso(-cashVariance)}` : '₱0.00'}
+								</p>
+							{/if}
+						</div>
+					</div>
+				</div>
+
+				{#if eodSubmitted}
+					<div class="rounded-xl border border-status-green/30 bg-status-green-light p-4 text-center">
+						<p class="text-sm font-bold text-status-green">EOD Report Submitted</p>
+					</div>
+				{/if}
+			{:else}
+				<div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
+					<Lock class="w-8 h-8 text-gray-400 mb-3 mx-auto" />
+					<h3 class="font-bold text-gray-900 mb-2">Reports Locked — Blind Count Mode</h3>
+					<p class="text-sm text-gray-500 max-w-[280px]">Click "Start End of Day" to begin your blind cash count and unlock today's detailed sales and variance reports.</p>
+				</div>
+			{/if}
+		</div>
+
+		<!-- ─── Z-Read History ────────────────────────────────────────────────────── -->
+		{#if zReadHistory.value.length > 0}
+			<div class="mt-6">
+				<div class="flex items-center gap-2 mb-3">
+					<History class="w-4 h-4 text-gray-400" />
+					<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">Z-Read History</h2>
+				</div>
+				<div class="overflow-hidden rounded-xl border border-border bg-white">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b border-border bg-gray-50">
+								<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Date</th>
+								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Gross Sales</th>
+								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Discounts</th>
+								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Net Sales</th>
+								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">VAT</th>
+								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Variance</th>
+								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">By</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-border">
+							{#each zReadHistory.value.slice(0, 30) as z (z.id)}
+								{@const variance = z.cashVariance ?? 0}
+								<tr class="hover:bg-gray-50">
+									<td class="px-4 py-3 font-mono text-xs text-gray-700">{z.date}</td>
+									<td class="px-4 py-3 text-right font-mono text-xs text-gray-700">{formatPeso(z.grossSales)}</td>
+									<td class="px-4 py-3 text-right font-mono text-xs text-status-red">−{formatPeso(z.discounts)}</td>
+									<td class="px-4 py-3 text-right font-mono text-xs font-semibold text-gray-900">{formatPeso(z.netSales)}</td>
+									<td class="px-4 py-3 text-right font-mono text-xs text-gray-500">{formatPeso(z.vatAmount)}</td>
+									<td class="px-4 py-3 text-right font-mono text-xs {variance === 0 ? 'text-status-green' : variance > 0 ? 'text-status-yellow' : 'text-status-red'}">
+										{variance > 0 ? `+${formatPeso(variance)}` : variance < 0 ? `−${formatPeso(-variance)}` : '₱0.00'}
+									</td>
+									<td class="px-4 py-3 text-right text-xs text-gray-400">{z.submittedBy}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		{/if}
+	{/snippet}
+</ReportShell>

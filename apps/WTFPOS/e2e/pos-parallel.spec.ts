@@ -45,9 +45,9 @@ async function checkout(page: Page) {
 }
 
 async function skipLeftover(page: Page) {
-  const modal = page.getByText('Leftover Penalty?');
+  const modal = page.getByText('Leftover Check');
   if (await modal.isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: /Skip/i }).click();
+    await page.locator('button', { hasText: 'No Leftovers' }).click();
   }
 }
 

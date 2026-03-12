@@ -106,16 +106,16 @@ async function addDrink(page: Page, tableLabel: string) {
 
 async function openCheckoutSkipLeftover(page: Page) {
   await page.locator('button', { hasText: 'Checkout' }).click();
-  const leftover = page.locator('h2', { hasText: /Leftover Penalty/i });
+  const leftover = page.locator('h2', { hasText: /Leftover Check/i });
   if (await leftover.isVisible({ timeout: 4000 }).catch(() => false)) {
-    await page.locator('button', { hasText: /Skip.*Checkout|No Penalty/i }).first().click();
+    await page.locator('button', { hasText: 'No Leftovers' }).click();
   }
   await expect(page.locator('.pos-card', { hasText: /Checkout/i }).first()).toBeVisible({ timeout: 8000 });
 }
 
 async function openCheckoutWithLeftover(page: Page, penaltyAmount: number) {
   await page.locator('button', { hasText: 'Checkout' }).click();
-  const leftover = page.locator('h2', { hasText: /Leftover Penalty/i });
+  const leftover = page.locator('h2', { hasText: /Leftover Check/i });
   if (await leftover.isVisible({ timeout: 4000 }).catch(() => false)) {
     // Try to enter penalty amount
     const penaltyInput = page.locator('input[type="number"]').first();
@@ -814,11 +814,11 @@ test.describe.serial('UX Audit — Multi-user handoff — tag branch', () => {
     }
 
     // Handle leftover penalty modal
-    const leftoverModal = page.locator('h2', { hasText: /Leftover Penalty/i });
+    const leftoverModal = page.locator('h2', { hasText: /Leftover Check/i });
     if (await leftoverModal.isVisible({ timeout: 4000 }).catch(() => false)) {
       await page.screenshot({ path: ss('p8a-01-leftover-modal') });
       await auditButtonHeights(page, { title: 'P8a Leftover modal' });
-      await page.locator('button', { hasText: /Skip.*Checkout|No Penalty/i }).first().click();
+      await page.locator('button', { hasText: 'No Leftovers' }).click();
     }
 
     // CheckoutModal
@@ -882,9 +882,9 @@ test.describe.serial('UX Audit — Multi-user handoff — tag branch', () => {
     }
     await checkoutBtn.click();
 
-    const leftoverModal = page.locator('h2', { hasText: /Leftover Penalty/i });
+    const leftoverModal = page.locator('h2', { hasText: /Leftover Check/i });
     if (await leftoverModal.isVisible({ timeout: 4000 }).catch(() => false)) {
-      await page.locator('button', { hasText: /Skip.*Checkout|No Penalty/i }).first().click();
+      await page.locator('button', { hasText: 'No Leftovers' }).click();
     }
 
     await expect(page.locator('.pos-card', { hasText: /Checkout/i }).first()).toBeVisible({ timeout: 8000 });
@@ -975,7 +975,7 @@ test.describe.serial('UX Audit — Multi-user handoff — tag branch', () => {
     await checkoutBtn.click();
 
     // Leftover penalty modal — this time ENTER a penalty
-    const leftoverModal = page.locator('h2', { hasText: /Leftover Penalty/i });
+    const leftoverModal = page.locator('h2', { hasText: /Leftover Check/i });
     if (await leftoverModal.isVisible({ timeout: 4000 }).catch(() => false)) {
       await page.screenshot({ path: ss('p8c-03-leftover-penalty-modal') });
       await auditButtonHeights(page, { title: 'P8c LeftoverPenaltyModal' });
@@ -1006,7 +1006,7 @@ test.describe.serial('UX Audit — Multi-user handoff — tag branch', () => {
         await applyBtn.click();
       } else {
         // Skip if can't apply
-        await page.locator('button', { hasText: /Skip|No Penalty/i }).first().click();
+        await page.locator('button', { hasText: 'No Leftovers' }).first().click();
       }
     }
 
@@ -1069,9 +1069,9 @@ test.describe.serial('UX Audit — Multi-user handoff — tag branch', () => {
         const checkoutBtn = page.locator('button', { hasText: 'Checkout' });
         if (await checkoutBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
           await checkoutBtn.click();
-          const leftoverModal = page.locator('h2', { hasText: /Leftover Penalty/i });
+          const leftoverModal = page.locator('h2', { hasText: /Leftover Check/i });
           if (await leftoverModal.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await page.locator('button', { hasText: /Skip|No Penalty/i }).first().click();
+            await page.locator('button', { hasText: 'No Leftovers' }).first().click();
           }
           await expect(page.locator('.pos-card', { hasText: /Checkout/i }).first()).toBeVisible({ timeout: 8000 });
           await page.screenshot({ path: ss('p8d-04-takeout-checkout-modal') });

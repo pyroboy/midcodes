@@ -24,6 +24,9 @@ export async function seedHistory(db: RxDatabase) {
     const deliveries = [];
     const expenses = [];
     const xReads = [];
+    const zReads = [];
+    const shifts = [];
+    const transferEvents = [];
     const kdsHistoryTickets = [];
     const auditEntries = [];
 
@@ -55,7 +58,7 @@ export async function seedHistory(db: RxDatabase) {
             let dailyPax = 0;
             let dailyVoids = 0;
             let dailyDiscountCount = 0;
-            let dailyPayments = { cash: 0, gcash: 0, card: 0 };
+            let dailyPayments = { cash: 0, gcash: 0, maya: 0, card: 0 };
             let orderCounter = 0;
 
             // Generate 5-15 orders per branch per day
@@ -145,12 +148,13 @@ export async function seedHistory(db: RxDatabase) {
                         subtotal += price * qty;
                     }
 
-                    // Stock deductions for inventory-tracked items
-                    if (item.trackInventory && !isFree && !isVoided) {
+                    // Stock deductions for inventory-tracked items (including FREE — kitchen still weighs them)
+                    if (item.trackInventory && !isVoided) {
                         const stockItemId = getStockItemId(item.id, branch);
                         if (stockItemId) {
                             deductions.push({
                                 id: nanoid(),
+                                locationId: branch,
                                 stockItemId,
                                 qty: weight || qty,
                                 tableId: isTakeout ? 'takeout' : `${branch.toUpperCase()}-T${(orderCounter % 8) + 1}`,
@@ -190,10 +194,11 @@ export async function seedHistory(db: RxDatabase) {
                 const total = subtotal - discountAmount;
 
                 // Determine payment method
-                let paymentMethod: 'cash' | 'gcash' | 'card' = 'cash';
+                let paymentMethod: 'cash' | 'gcash' | 'maya' | 'card' = 'cash';
                 const methodRoll = Math.random();
-                if (methodRoll < 0.5) paymentMethod = 'cash';
-                else if (methodRoll < 0.8) paymentMethod = 'gcash';
+                if (methodRoll < 0.45) paymentMethod = 'cash';
+                else if (methodRoll < 0.7) paymentMethod = 'gcash';
+                else if (methodRoll < 0.85) paymentMethod = 'maya';
                 else paymentMethod = 'card';
 
                 const payments = (orderStatus === 'paid' || orderStatus === 'pending_payment') && total > 0
@@ -353,7 +358,11 @@ export async function seedHistory(db: RxDatabase) {
             }
 
             // Generate X-Read for the day
-            const xReadTime = new Date(date.getTime() + 14 * 3600000); // Around midnight
+            const dailyVoidAmount = orders
+                .filter(o => o.locationId === branch && o.status === 'cancelled' && new Date(o.createdAt).toDateString() === date.toDateString())
+                .reduce((s, o) => s + (o.total ?? 0), 0);
+
+            const xReadTime = new Date(date.getTime() + 14 * 3600000); // Around 2 PM
             xReads.push({
                 id: nanoid(),
                 type: 'x-read' as const,
@@ -366,8 +375,10 @@ export async function seedHistory(db: RxDatabase) {
                 totalPax: dailyPax,
                 cash: dailyPayments.cash,
                 gcash: dailyPayments.gcash,
+                maya: dailyPayments.maya,
                 card: dailyPayments.card,
                 voidCount: dailyVoids,
+                voidAmount: dailyVoidAmount,
                 discountCount: dailyDiscountCount,
                 generatedBy: 'Manager',
                 updatedAt: xReadTime.toISOString()
@@ -385,82 +396,210 @@ export async function seedHistory(db: RxDatabase) {
                 branch: branchLabel,
             });
 
-            // Generate Deliveries every 2-3 days
-            if (d % 3 === 0 || d % 2 === 0) {
-                const meatItems = STOCK_ITEMS_LIST.filter(s => s.category === 'Meats' && s.locationId === branch);
-                if (meatItems.length > 0) {
-                    const item = meatItems[Math.floor(Math.random() * meatItems.length)];
-                    const stockItemId = getStockItemId(item.menuItemId, branch);
-                    if (stockItemId) {
-                        const qty = 5000 + Math.floor(Math.random() * 10000);
-                        const amount = 3000 + Math.floor(Math.random() * 7000);
-                        const deliveryTime = new Date(date.getTime() + 8 * 3600000); // 8 AM
-                        const suppliers = ['Metro Meat Co.', 'Prime Cuts Trading', 'Fresh Farm Supply', 'Golden Meat Suppliers'];
-                        const supplier = suppliers[Math.floor(Math.random() * suppliers.length)];
-                        
-                        const delId = nanoid();
-                        deliveries.push({
-                            id: delId,
-                            stockItemId,
-                            itemName: item.name,
-                            qty,
-                            unit: 'g',
-                            supplier,
-                            notes: `Regular restocking - ${dayName}`,
-                            receivedAt: deliveryTime.toISOString(),
-                            batchNo: `B-${d}-${branch.toUpperCase()}-${Math.floor(Math.random() * 100)}`,
-                            expiryDate: new Date(date.getTime() + 7 * 86400000).toISOString().split('T')[0],
-                            usedQty: Math.floor(qty * 0.3),
-                            depleted: false,
-                            updatedAt: deliveryTime.toISOString()
-                        });
+            // Generate Z-Read (EOD close) for past days (not today)
+            if (d > 0) {
+                const cashExpensesDay = expenses
+                    .filter(e => e.locationId === branch && e.paidBy === 'Cash from Register' && new Date(e.createdAt).toDateString() === date.toDateString())
+                    .reduce((s, e) => s + e.amount, 0);
+                const openingFloat = 10000 + Math.floor(Math.random() * 5000);
+                const expectedClosing = openingFloat + dailyPayments.cash - cashExpensesDay;
+                // Slight variance: ±200
+                const variance = Math.floor(Math.random() * 401) - 200;
+                const actualClosing = expectedClosing + variance;
 
-                        // Delivery expense
-                        expenses.push({
-                            id: nanoid(),
-                            category: 'Meat Procurement',
-                            amount,
-                            description: `Restock ${item.name} — ${qty.toLocaleString()}g`,
-                            paidBy: 'Petty Cash',
-                            locationId: branch,
-                            createdBy: 'Manager',
-                            createdAt: deliveryTime.toISOString(),
-                            updatedAt: deliveryTime.toISOString()
-                        });
+                const zReadTime = new Date(date.getTime() + 14 * 3600000 + 3600000); // 1 hour after X-Read
+                const dateStr2 = date.toISOString().slice(0, 10);
 
-                        // Delivery received audit
-                        auditEntries.push({
-                            id: nanoid(),
-                            isoTimestamp: deliveryTime.toISOString(),
-                            timestamp: formatTime(deliveryTime),
-                            user: 'Pedro Cruz',
-                            role: 'kitchen',
-                            action: 'stock' as const,
-                            description: `Received ${qty.toLocaleString()}g ${item.name} — ${supplier}`,
-                            branch: branchLabel,
-                        });
-                    }
+                zReads.push({
+                    id: nanoid(),
+                    type: 'z-read' as const,
+                    locationId: branch,
+                    date: dateStr2,
+                    grossSales: dailyGrossSales,
+                    discounts: dailyDiscounts,
+                    netSales: dailyGrossSales - dailyDiscounts,
+                    vatAmount: dailyVat,
+                    totalPax: dailyPax,
+                    cash: dailyPayments.cash,
+                    gcash: dailyPayments.gcash,
+                    maya: dailyPayments.maya,
+                    card: dailyPayments.card,
+                    submittedAt: zReadTime.toISOString(),
+                    submittedBy: ['Juan Reyes', 'Maria Santos'][Math.floor(Math.random() * 2)],
+                    cashExpenses: cashExpensesDay,
+                    openingCash: openingFloat,
+                    closingActual: actualClosing,
+                    cashVariance: variance,
+                    updatedAt: zReadTime.toISOString()
+                });
+
+                // Closed shift for this day
+                shifts.push({
+                    id: nanoid(),
+                    locationId: branch,
+                    cashierName: ['Maria Santos', 'Juan Reyes', 'Ana Reyes'][Math.floor(Math.random() * 3)],
+                    openingFloat,
+                    startedAt: new Date(date.getTime() + 0.5 * 3600000).toISOString(), // 10:30 AM
+                    endedAt: zReadTime.toISOString(),
+                    closingCash: actualClosing,
+                    status: 'closed',
+                    updatedAt: zReadTime.toISOString()
+                });
+            } else {
+                // Today: active shift (no Z-Read)
+                const openingFloat = 10000 + Math.floor(Math.random() * 5000);
+                shifts.push({
+                    id: nanoid(),
+                    locationId: branch,
+                    cashierName: ['Maria Santos', 'Juan Reyes', 'Ana Reyes'][Math.floor(Math.random() * 3)],
+                    openingFloat,
+                    startedAt: new Date(date.getTime() + 0.5 * 3600000).toISOString(),
+                    endedAt: null,
+                    closingCash: null,
+                    status: 'active',
+                    updatedAt: new Date().toISOString()
+                });
+            }
+
+            // Generate warehouse→branch transfers (every other day)
+            if (d % 2 === 0) {
+                const transferTime = new Date(date.getTime() + 7 * 3600000); // 5 PM
+                const meatCuts = STOCK_ITEMS_LIST.filter(s => s.category === 'Meats' && s.locationId === 'wh-tag');
+                const selectedCuts = meatCuts.sort(() => Math.random() - 0.5).slice(0, 3 + Math.floor(Math.random() * 3));
+
+                for (const cut of selectedCuts) {
+                    const whStockId = getStockItemId(cut.menuItemId, 'wh-tag');
+                    const branchStockId = getStockItemId(cut.menuItemId, branch);
+                    if (!whStockId || !branchStockId) continue;
+
+                    const tfrQty = 2000 + Math.floor(Math.random() * 6000);
+
+                    // Outbound: warehouse deduction
+                    transferEvents.push({
+                        id: nanoid(),
+                        locationId: 'wh-tag',
+                        stockItemId: whStockId,
+                        itemName: cut.name,
+                        type: 'deduct' as const,
+                        qty: tfrQty,
+                        unit: 'g',
+                        reason: `Transfer to ${branch} — ${dayName} dispatch`,
+                        loggedBy: 'Noel R.',
+                        loggedAt: transferTime.toISOString(),
+                        updatedAt: transferTime.toISOString(),
+                    });
+
+                    // Inbound: branch delivery
+                    deliveries.push({
+                        id: nanoid(),
+                        locationId: branch,
+                        stockItemId: branchStockId,
+                        itemName: cut.name,
+                        qty: tfrQty,
+                        unit: 'g',
+                        supplier: 'Transfer from wh-tag',
+                        notes: `${dayName} dispatch from warehouse`,
+                        receivedAt: new Date(transferTime.getTime() + 30 * 60000).toISOString(),
+                        batchNo: `TFR-${d}-${branch.toUpperCase()}-${nanoid(4)}`,
+                        expiryDate: new Date(date.getTime() + 5 * 86400000).toISOString().split('T')[0],
+                        usedQty: 0,
+                        depleted: false,
+                        updatedAt: new Date(transferTime.getTime() + 30 * 60000).toISOString(),
+                    });
                 }
             }
 
-            // Generate operational expenses (not every day)
-            if (Math.random() < 0.4) {
-                const expenseTime = new Date(date.getTime() + 9 * 3600000);
-                const expenseTypes = [
-                    { category: 'Produce & Sides', amount: 500 + Math.floor(Math.random() * 1500), desc: 'Morning market run for vegetables' },
-                    { category: 'Utilities', amount: 200 + Math.floor(Math.random() * 300), desc: 'Electricity partial payment' },
-                    { category: 'Petty Cash', amount: 150 + Math.floor(Math.random() * 400), desc: 'Dish soap, trash bags, cleaning agents' },
-                    { category: 'Miscellaneous', amount: 500 + Math.floor(Math.random() * 2000), desc: 'Grill maintenance and parts' },
-                    { category: 'Labor Budget', amount: 300 + Math.floor(Math.random() * 500), desc: 'Employee meal allowance' }
-                ];
-                const expense = expenseTypes[Math.floor(Math.random() * expenseTypes.length)];
-                
+            // Generate Deliveries — 3-5 meat cuts delivered per day
+            {
+                const meatItems = STOCK_ITEMS_LIST.filter(s => s.category === 'Meats' && s.locationId === branch);
+                const deliveryCount = 3 + Math.floor(Math.random() * 3); // 3-5 cuts per day
+                const shuffledMeats = [...meatItems].sort(() => Math.random() - 0.5).slice(0, deliveryCount);
+                const suppliers = ['Metro Meat Co.', 'Prime Cuts Trading', 'Fresh Farm Supply', 'Golden Meat Suppliers'];
+                const supplier = suppliers[d % suppliers.length];
+                let totalDeliveryExpense = 0;
+
+                for (let mi = 0; mi < shuffledMeats.length; mi++) {
+                    const item = shuffledMeats[mi];
+                    const stockItemId = getStockItemId(item.menuItemId, branch);
+                    if (!stockItemId) continue;
+
+                    const qty = 3000 + Math.floor(Math.random() * 8000);
+                    const deliveryTime = new Date(date.getTime() + (7 + mi * 0.5) * 3600000); // staggered morning
+                    const costPerKg = item.menuItemId.includes('beef') ? 550 : item.menuItemId.includes('chicken') ? 180 : 320;
+                    const amount = Math.round((qty / 1000) * costPerKg);
+                    totalDeliveryExpense += amount;
+
+                    deliveries.push({
+                        id: nanoid(),
+                        locationId: branch,
+                        stockItemId,
+                        itemName: item.name,
+                        qty,
+                        unit: 'g',
+                        supplier,
+                        notes: `Regular restocking - ${dayName}`,
+                        receivedAt: deliveryTime.toISOString(),
+                        batchNo: `B-${d}-${branch.toUpperCase()}-${mi}-${Math.floor(Math.random() * 100)}`,
+                        expiryDate: new Date(date.getTime() + 7 * 86400000).toISOString().split('T')[0],
+                        usedQty: Math.floor(qty * (0.2 + Math.random() * 0.4)),
+                        depleted: false,
+                        updatedAt: deliveryTime.toISOString()
+                    });
+                }
+
+                // Single consolidated delivery expense per day
+                const deliveryExpTime = new Date(date.getTime() + 8 * 3600000);
+                expenses.push({
+                    id: nanoid(),
+                    category: 'Meat & Protein',
+                    amount: totalDeliveryExpense,
+                    description: `Restock ${shuffledMeats.length} meat cuts — ${supplier}`,
+                    paidBy: 'Cash from Register',
+                    locationId: branch,
+                    createdBy: 'Manager',
+                    createdAt: deliveryExpTime.toISOString(),
+                    updatedAt: deliveryExpTime.toISOString()
+                });
+
+                // Delivery received audit
+                auditEntries.push({
+                    id: nanoid(),
+                    isoTimestamp: deliveryExpTime.toISOString(),
+                    timestamp: formatTime(deliveryExpTime),
+                    user: 'Pedro Cruz',
+                    role: 'kitchen',
+                    action: 'stock' as const,
+                    description: `Received ${shuffledMeats.length} meat cuts from ${supplier}`,
+                    branch: branchLabel,
+                });
+            }
+
+            // Generate 2-4 operational expenses per branch per day across diverse categories
+            const dailyExpenseCount = 2 + Math.floor(Math.random() * 3);
+            const allExpenseTypes = [
+                { category: 'Sides & Supplies', amount: 500 + Math.floor(Math.random() * 1500), desc: 'Morning market run for vegetables & kimchi' },
+                { category: 'Electricity', amount: 200 + Math.floor(Math.random() * 400), desc: 'Daily electricity estimate' },
+                { category: 'Gas / LPG', amount: 150 + Math.floor(Math.random() * 350), desc: 'LPG usage for grill stations' },
+                { category: 'Water', amount: 80 + Math.floor(Math.random() * 120), desc: 'Daily water usage' },
+                { category: 'Other / Miscellaneous', amount: 150 + Math.floor(Math.random() * 400), desc: 'Dish soap, trash bags, cleaning agents' },
+                { category: 'Repairs & Maintenance', amount: 500 + Math.floor(Math.random() * 2000), desc: 'Grill maintenance and parts' },
+                { category: 'Staff Meals', amount: 300 + Math.floor(Math.random() * 500), desc: 'Employee meal allowance' },
+                { category: 'Daily Wages', amount: 3000 + Math.floor(Math.random() * 2000), desc: 'Daily labor budget' },
+                { category: 'Transport / Delivery', amount: 200 + Math.floor(Math.random() * 500), desc: 'Grab/delivery runs for supplies' },
+                { category: 'Rent', amount: Math.round(80000 / 30), desc: 'Daily rent prorate' },
+                { category: 'Internet', amount: 100, desc: 'Monthly internet prorate' },
+                { category: 'Marketing / Promos', amount: 300 + Math.floor(Math.random() * 700), desc: 'FB ads / flyer printing' },
+            ];
+            const shuffled = allExpenseTypes.sort(() => Math.random() - 0.5);
+            for (let ei = 0; ei < dailyExpenseCount; ei++) {
+                const expense = shuffled[ei % shuffled.length];
+                const expenseTime = new Date(date.getTime() + (8 + ei) * 3600000);
                 expenses.push({
                     id: nanoid(),
                     category: expense.category,
                     amount: expense.amount,
                     description: expense.desc,
-                    paidBy: ['Petty Cash', 'GCash', 'Card'][Math.floor(Math.random() * 3)],
+                    paidBy: ['Cash from Register', 'GCash', 'Maya', 'Personal Cash'][Math.floor(Math.random() * 4)],
                     locationId: branch,
                     createdBy: 'Manager',
                     createdAt: expenseTime.toISOString(),
@@ -518,6 +657,7 @@ export async function seedHistory(db: RxDatabase) {
 
                 wasteEntries.push({
                     id: nanoid(),
+                    locationId: branch,
                     stockItemId,
                     itemName: item.name,
                     type: 'waste' as const,
@@ -532,40 +672,52 @@ export async function seedHistory(db: RxDatabase) {
         }
     }
 
-    // Generate utility readings as audit log entries (one per day for the past 7 days)
-    // Stored in audit_logs with description='EOD Utility Reading' and meta=JSON({electricity,gas})
+    // Generate utility readings as audit log entries (one per day per branch for the past 7 days)
+    // Stored in audit_logs with description='EOD Utility Reading' and meta=JSON({electricity,gas,water})
     const utilityAuditEntries: LogEntry[] = [];
     for (let d = 6; d >= 0; d--) {
         const date = new Date(now);
         date.setDate(date.getDate() - d);
         date.setHours(22, 0, 0, 0);
-        const electricity = 80 + Math.floor(Math.random() * 60); // 80-140 kWh
-        const gas = 8 + Math.floor(Math.random() * 12);          // 8-20 kg
 
-        utilityAuditEntries.push({
-            id: nanoid(),
-            isoTimestamp: date.toISOString(),
-            timestamp: date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
-            user: 'Manager',
-            role: 'manager',
-            action: 'admin',
-            description: 'EOD Utility Reading',
-            branch: 'TAG',
-            meta: JSON.stringify({ electricity, gas }),
-        });
+        for (const branch of branches) {
+            // Cumulative meter readings (increase day over day)
+            const baseElec = branch === 'tag' ? 5000 : 4200;
+            const baseGas = branch === 'tag' ? 300 : 250;
+            const baseWater = branch === 'tag' ? 800 : 650;
+            const dayOffset = 6 - d; // 0 for oldest day, 6 for today
+            const electricity = baseElec + dayOffset * (80 + Math.floor(Math.random() * 60));  // ~80-140 kWh/day
+            const gas = baseGas + dayOffset * (8 + Math.floor(Math.random() * 12));             // ~8-20 kg/day
+            const water = baseWater + dayOffset * (2 + Math.floor(Math.random() * 4));          // ~2-6 m³/day
+
+            utilityAuditEntries.push({
+                id: nanoid(),
+                isoTimestamp: date.toISOString(),
+                timestamp: date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+                user: 'Manager',
+                role: 'manager',
+                action: 'admin',
+                description: 'EOD Utility Reading',
+                branch: branch === 'tag' ? 'TAG' : 'PGL',
+                meta: JSON.stringify({ electricity, gas, water }),
+            });
+        }
     }
 
     // Insert all data into RxDB
     // JSON round-trip strips undefined values that would fail schema validation
     const clean = <T>(arr: T[]): T[] => JSON.parse(JSON.stringify(arr));
+    const allReadings = [...xReads, ...zReads];
+    const allStockEvents = [...wasteEntries, ...transferEvents];
     await Promise.all([
         db.orders.bulkInsert(clean(orders)),
         db.deductions.bulkInsert(clean(deductions)),
         db.deliveries.bulkInsert(clean(deliveries)),
         db.expenses.bulkInsert(clean(expenses)),
-        db.readings.bulkInsert(clean(xReads)),
+        db.readings.bulkInsert(clean(allReadings)),
         db.kds_tickets.bulkInsert(clean(kdsHistoryTickets)),
-        db.stock_events.bulkInsert(clean(wasteEntries)),
+        db.stock_events.bulkInsert(clean(allStockEvents)),
+        db.shifts.bulkInsert(clean(shifts)),
     ]);
 
     // Insert audit log entries (including utility readings) into RxDB
@@ -580,9 +732,12 @@ export async function seedHistory(db: RxDatabase) {
     console.log(`  - ${orders.length} orders (${orders.filter(o => o.status === 'cancelled').length} voided)`);
     console.log(`  - ${deductions.length} stock deductions`);
     console.log(`  - ${xReads.length} X-Read reports`);
-    console.log(`  - ${deliveries.length} deliveries`);
+    console.log(`  - ${zReads.length} Z-Read reports`);
+    console.log(`  - ${shifts.length} shifts`);
+    console.log(`  - ${deliveries.length} deliveries (${deliveries.filter(d => d.supplier === 'Transfer from wh-tag').length} transfers)`);
     console.log(`  - ${expenses.length} expenses`);
     console.log(`  - ${wasteEntries.length} waste entries`);
+    console.log(`  - ${transferEvents.length} transfer stock events`);
     console.log(`  - ${utilityAuditEntries.length} utility readings (in audit_logs)`);
     console.log(`  - ${kdsHistoryTickets.length} KDS history entries`);
     console.log(`  - ${auditEntries.length} audit log entries`);

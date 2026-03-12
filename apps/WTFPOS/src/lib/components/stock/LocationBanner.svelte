@@ -59,6 +59,7 @@
 
 	{#if canChangeLocation}
 	<button
+		data-testid="location-change-btn"
 		onclick={() => isModalOpen = true}
 		class="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 active:scale-95"
 	>

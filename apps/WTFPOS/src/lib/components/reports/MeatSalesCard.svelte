@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { cn, formatKg } from '$lib/utils';
 	import type { MeatReport, MeatReportPeriod } from '$lib/stores/reports.svelte';
-	import { PERIOD_LABELS } from '$lib/stores/reports.svelte';
+	import { PERIOD_LABELS, meatReportComparison } from '$lib/stores/reports.svelte';
+	import KpiCard from '$lib/components/reports/KpiCard.svelte';
 
 	interface Props {
 		report: MeatReport;
@@ -10,31 +11,59 @@
 
 	let { report, period }: Props = $props();
 
+	const comparison = $derived(meatReportComparison(period));
+
 	const avgVariance = $derived(
 		report.rows.length > 0
 			? (report.rows.reduce((s, r) => s + r.variancePct, 0) / report.rows.length).toFixed(1)
 			: '0.0'
 	);
 
-	const metrics = $derived([
-		{ label: 'Total Sold', value: formatKg(report.totalMeatSoldGrams), sub: PERIOD_LABELS[period], color: 'text-gray-900', bg: 'bg-white', border: 'border-border' },
-		{ label: 'Avg / Head', value: `${report.avgMeatPerHead}g`, sub: `${report.totalPaxServed} pax`, color: 'text-accent', bg: 'bg-accent-light', border: 'border-accent/20' },
-		{ label: 'Pork / Head', value: `${report.avgPorkPerHead}g`, sub: `${report.byProtein['pork']?.pctOfTotal ?? 0}%`, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
-		{ label: 'Beef / Head', value: `${report.avgBeefPerHead}g`, sub: `${report.byProtein['beef']?.pctOfTotal ?? 0}%`, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
-		{ label: 'Chicken / Head', value: `${report.avgChickenPerHead}g`, sub: `${report.byProtein['chicken']?.pctOfTotal ?? 0}%`, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
-		{ label: 'Pax Served', value: String(report.totalPaxServed), sub: PERIOD_LABELS[period], color: 'text-gray-900', bg: 'bg-white', border: 'border-border' },
-		{ label: 'Avg Variance', value: `${parseFloat(avgVariance) >= 0 ? '+' : ''}${avgVariance}%`, sub: '', color: 'text-status-yellow', bg: 'bg-status-yellow-light', border: 'border-status-yellow/30' },
-	]);
+	// Protein mix summary: "Pork 45% / Beef 40% / Chicken 15%"
+	const proteinMix = $derived.by(() => {
+		const parts: string[] = [];
+		for (const [p, label] of [['pork', 'Pk'], ['beef', 'Bf'], ['chicken', 'Ch']] as const) {
+			const pct = report.byProtein[p]?.pctOfTotal ?? 0;
+			if (pct > 0) parts.push(`${label} ${pct}%`);
+		}
+		return parts.length > 0 ? parts.join(' / ') : 'No data';
+	});
 </script>
 
-<div class="grid grid-cols-7 gap-2">
-	{#each metrics as m (m.label)}
-		<div class={cn('rounded-lg border px-2.5 py-2', m.bg, m.border)}>
-			<p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 truncate">{m.label}</p>
-			<p class={cn('mt-0.5 text-lg font-bold leading-tight', m.color)}>{m.value}</p>
-			{#if m.sub}
-				<p class="text-[10px] text-gray-400">{m.sub}</p>
-			{/if}
-		</div>
-	{/each}
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
+	<KpiCard
+		label="Total Sold"
+		value={formatKg(report.totalMeatSoldGrams)}
+		change={comparison?.totalSold.changePct ?? null}
+		prevValue={comparison ? formatKg(comparison.totalSold.previous) : null}
+		changeLabel="vs prev period"
+		sub={PERIOD_LABELS[period]}
+	/>
+	<KpiCard
+		label="Avg / Head"
+		value={formatKg(report.avgMeatPerHead)}
+		change={comparison?.avgPerHead.changePct ?? null}
+		prevValue={comparison ? formatKg(comparison.avgPerHead.previous) : null}
+		changeLabel="vs prev period"
+		sub="{report.totalPaxServed} pax"
+		variant="accent"
+	/>
+	<KpiCard
+		label="Protein Mix"
+		value={proteinMix}
+		sub="Pk=Pork Bf=Beef Ch=Chicken"
+	/>
+	<KpiCard
+		label="Pax Served"
+		value={String(report.totalPaxServed)}
+		change={comparison?.paxServed.changePct ?? null}
+		prevValue={comparison ? String(comparison.paxServed.previous) : null}
+		changeLabel="vs prev period"
+		sub={PERIOD_LABELS[period]}
+	/>
+	<KpiCard
+		label="Avg Variance"
+		value="{parseFloat(avgVariance) >= 0 ? '+' : ''}{avgVariance}%"
+		variant={parseFloat(avgVariance) < -15 ? 'danger' : parseFloat(avgVariance) > 15 ? 'danger' : 'default'}
+	/>
 </div>

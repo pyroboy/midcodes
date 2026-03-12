@@ -181,7 +181,7 @@ test.describe('Bluetooth Scale (Simulated)', () => {
 
     // Start checkout
     await page.locator('button', { hasText: 'Checkout' }).click();
-    await expect(page.locator('h2', { hasText: 'Leftover Penalty?' })).toBeVisible();
+    await expect(page.locator('h2', { hasText: 'Leftover Check' })).toBeVisible();
 
     // With BT scale connected, the BluetoothWeightInput should be visible
     // Focus the weight input to register as receiver — scale should auto-fill 250g
@@ -221,7 +221,7 @@ test.describe('Bluetooth Scale (Simulated)', () => {
 
     // Start checkout
     await page.locator('button', { hasText: 'Checkout' }).click();
-    await expect(page.locator('h2', { hasText: 'Leftover Penalty?' })).toBeVisible();
+    await expect(page.locator('h2', { hasText: 'Leftover Check' })).toBeVisible();
 
     // Type 300g using numpad (no BT input should be visible)
     await page.locator('.pos-card button', { hasText: /^3$/ }).first().click();

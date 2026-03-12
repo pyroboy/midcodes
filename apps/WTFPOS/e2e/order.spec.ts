@@ -14,12 +14,17 @@ async function login(page: Page, username: string, dest: string) {
   await expect(page.locator('[aria-label="Table T1"]')).toBeVisible({ timeout: 15000 });
 }
 
-/** Open an available table by label, pick pax count */
+/** Open an available table by label, pick pax count via stepper */
 async function openTableWithPax(page: Page, tableLabel: string, pax: number) {
   await page.locator(`[aria-label="Table ${tableLabel}"]`).click();
-  await expect(page.locator('h3', { hasText: 'How many guests' })).toBeVisible();
-  await page.locator('.pos-card button', { hasText: new RegExp(`^${pax}$`) }).click();
-  await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible();
+  await expect(page.locator('h3', { hasText: 'How many guests' })).toBeVisible({ timeout: 8000 });
+  // New PaxModal uses stepper — click + for Adults pax times
+  const adultPlusBtn = page.locator('.pos-card button').filter({ hasText: /^\+$/ }).first();
+  for (let i = 0; i < pax; i++) {
+    await adultPlusBtn.click();
+  }
+  await page.locator('.pos-card button', { hasText: 'Confirm' }).click();
+  await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible({ timeout: 8000 });
 }
 
 /** Select a package by name in AddItemModal (auto-switches to Meats tab) */
@@ -39,8 +44,8 @@ async function chargeItems(page: Page) {
 
 /** Skip the leftover penalty modal (no unconsumed meat) */
 async function skipLeftoverPenalty(page: Page) {
-  await expect(page.locator('h2', { hasText: 'Leftover Penalty?' })).toBeVisible();
-  await page.locator('button', { hasText: 'Skip / Checkout' }).click();
+  await expect(page.locator('h2', { hasText: 'Leftover Check' })).toBeVisible();
+  await page.locator('button', { hasText: 'No Leftovers' }).click();
 }
 
 /** Complete checkout with exact cash and close the receipt modal */
@@ -64,12 +69,12 @@ async function enterManagerPin(page: Page, pin = '1234') {
 
 // ─── Scenario 1: Basic dine-in — package + drink, exact cash ─────────────────
 
-test('Scenario 1: Dine-in — open table, pick Unli Pork + Iced Tea, pay exact cash', async ({ page }) => {
+test('Scenario 1: Dine-in — open table, pick Pork Unlimited + Iced Tea, pay exact cash', async ({ page }) => {
   await login(page, 'maria', '/pos');
   await openTableWithPax(page, 'T1', 2);
 
-  // Pick Unli Pork (auto-adds meats + sides as FREE, switches to Meats tab)
-  await selectPackage(page, 'Unli Pork');
+  // Pick Pork Unlimited (auto-adds meats + sides as FREE, switches to Meats tab)
+  await selectPackage(page, 'Pork Unlimited');
 
   // Add a drink
   await switchCategory(page, 'Drinks');
@@ -111,8 +116,10 @@ test('Scenario 2: Takeout — Bibimbap + Soju, pay via GCash', async ({ page }) 
   const checkout = page.locator('.pos-card', { hasText: 'Checkout' }).first();
   await expect(checkout).toBeVisible();
   await page.locator('button', { hasText: 'GCash' }).click();
+  // Fill exact amount for GCash (toggles GCash in; Exact sets it to order total)
+  await page.locator('button', { hasText: 'Exact' }).last().click();
 
-  // Confirm (no cash tendered needed for e-wallet)
+  // Confirm
   const confirmBtn = page.locator('button', { hasText: 'Confirm Payment' });
   await expect(confirmBtn).toBeEnabled();
   await confirmBtn.click({ force: true });
@@ -123,12 +130,12 @@ test('Scenario 2: Takeout — Bibimbap + Soju, pay via GCash', async ({ page }) 
 
 // ─── Scenario 3: Senior Citizen discount — 4 pax, SC for 1 ──────────────────
 
-test('Scenario 3: Dine-in — 4 pax Unli Pork, Senior discount 1 pax, pay cash', async ({ page }) => {
+test('Scenario 3: Dine-in — 4 pax Pork Unlimited, Senior discount 1 pax, pay cash', async ({ page }) => {
   await login(page, 'maria', '/pos');
   await openTableWithPax(page, 'T2', 4);
 
   // Package + extras
-  await selectPackage(page, 'Unli Pork');
+  await selectPackage(page, 'Pork Unlimited');
   await switchCategory(page, 'Drinks');
   await page.locator('button', { hasText: 'Soju' }).first().click();
   await page.locator('button', { hasText: 'Iced Tea' }).click();
@@ -141,8 +148,12 @@ test('Scenario 3: Dine-in — 4 pax Unli Pork, Senior discount 1 pax, pay cash',
   const checkout = page.locator('.pos-card', { hasText: 'Checkout' }).first();
   await expect(checkout).toBeVisible();
 
-  // Apply Senior Citizen discount (defaults to 1 qualifying pax)
+  // Apply Senior Citizen discount (requires manager PIN authorization)
   await checkout.locator('button', { hasText: 'Senior' }).click();
+  // ManagerPinModal appears for discount authorization — enter PIN
+  await expect(page.locator('h3', { hasText: 'Authorize Senior Citizen' })).toBeVisible({ timeout: 5000 });
+  await enterManagerPin(page);
+  await page.locator('button', { hasText: 'Authorize' }).click();
 
   // Wait for SC/PWD section to render, then fill SC ID
   const scIdInput = page.locator('input[placeholder="e.g. 12345678"]').first();
@@ -168,16 +179,16 @@ test('Scenario 4: Void — open table, add items, void entire order with manager
   await openTableWithPax(page, 'T3', 2);
 
   // Add a package and charge
-  await selectPackage(page, 'Unli Pork');
+  await selectPackage(page, 'Pork Unlimited');
   await chargeItems(page);
 
-  // Click Void in the sidebar
+  // Click Void in the sidebar — opens ManagerPinModal for authorization
   await page.locator('button', { hasText: 'Void' }).click();
-  await expect(page.locator('h3', { hasText: 'Void Order' })).toBeVisible();
+  await expect(page.locator('h3', { hasText: 'Void Entire Order' })).toBeVisible({ timeout: 5000 });
 
-  // Reason defaults to "Mistake" — enter manager PIN 1234
+  // Enter manager PIN 1234
   await enterManagerPin(page);
-  await page.locator('button', { hasText: 'Confirm Void' }).click();
+  await page.locator('button', { hasText: 'Void Order' }).click();
 
   // T3 should be freed
   await expect(page.locator('[aria-label="Table T3"]')).toBeVisible();
@@ -189,12 +200,14 @@ test('Scenario 5: Add extras — charge initial order, then add more items later
   await login(page, 'maria', '/pos');
   await openTableWithPax(page, 'T4', 3);
 
-  // Initial order: Unli Beef
-  await selectPackage(page, 'Unli Beef');
+  // Initial order: Beef Unlimited
+  await selectPackage(page, 'Beef Unlimited');
   await chargeItems(page);
 
-  // Re-open AddItemModal via "+ More" button in sidebar (AYCE dine-in shows "+ More")
-  await page.locator('button', { hasText: '+ More' }).click();
+  // Re-open AddItemModal via "+ Add Item" button in sidebar
+  const addItemBtn = page.locator('button', { hasText: '+ Add Item' });
+  await addItemBtn.waitFor({ state: 'visible', timeout: 8000 });
+  await addItemBtn.click();
   await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible();
 
   // Add a dish and drinks

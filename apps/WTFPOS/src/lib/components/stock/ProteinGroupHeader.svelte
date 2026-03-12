@@ -2,8 +2,7 @@
   import { ChevronDown, ChevronRight, AlertCircle } from 'lucide-svelte';
   import { cn } from '$lib/utils';
   import { proteinConfig, type MeatProtein } from '$lib/stores/stock.svelte';
-  import ProteinDonutChart from './ProteinDonutChart.svelte';
-  
+
   interface Props {
     protein: MeatProtein;
     itemCount: number;
@@ -18,13 +17,13 @@
     noBorder?: boolean;
     noBg?: boolean;
   }
-  
-  let { 
-    protein, 
-    itemCount, 
-    criticalCount, 
-    lowCount, 
-    expanded, 
+
+  let {
+    protein,
+    itemCount,
+    criticalCount,
+    lowCount,
+    expanded,
     onToggle,
     chartData = [],
     hoveredItemId = null,
@@ -33,21 +32,37 @@
     noBg = false
   }: Props = $props();
   const config = $derived(proteinConfig[protein]);
-  
+
   // Sort data by value for both chart and legend
   const sortedData = $derived([...chartData].sort((a, b) => b.value - a.value));
   const totalStock = $derived(chartData.reduce((sum, item) => sum + item.value, 0));
-  
+
   // Format total stock for display (e.g., "12.5k" or "450")
   const formattedTotal = $derived(() => {
     if (totalStock >= 1000) return (totalStock / 1000).toFixed(1) + 'k';
     return Math.round(totalStock).toString();
   });
 
+  // Format individual values compactly
+  function formatCompact(val: number): string {
+    if (val >= 1000) return (val / 1000).toFixed(0) + 'k';
+    return Math.round(val).toString();
+  }
+
   const opacities = [1, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15];
+
+  // Map protein to bar segment bg colors (matching proteinConfig text colors)
+  const barColorMap: Record<MeatProtein, string> = {
+    beef: 'bg-red-600',
+    pork: 'bg-orange-600',
+    chicken: 'bg-yellow-600',
+    other: 'bg-gray-600'
+  };
+
+  const barColor = $derived(barColorMap[protein]);
 </script>
 
-<button 
+<button
   onclick={onToggle}
   class="w-full grid grid-cols-3 items-center px-4 py-3 outline-none transition-all hover:brightness-95 focus:ring-2 focus:ring-{config.borderColor.replace('border-', '')}/50 {!noBorder ? `rounded-xl border-l-4 sh-border-class ${config.borderColor}` : ''} {!noBg ? config.bgLight : 'bg-transparent'}"
 >
@@ -77,52 +92,55 @@
     </div>
   </div>
 
-  <!-- Middle: Donut Chart & Legend -->
-  <div class="flex items-center gap-6 justify-self-center pointer-events-auto">
-    <!-- Donut Container -->
-    <div class="w-16 h-16 flex-shrink-0 relative flex items-center justify-center">
-      {#if chartData.length > 0}
-        <ProteinDonutChart 
-          data={sortedData} 
-          size={64} 
-          strokeWidth={10} 
-          proteinColorClass={config.color} 
-          {hoveredItemId} 
-          {onHover} 
-        >
-          <div class="flex flex-col items-center justify-center leading-none">
-            <span class="text-[11px] font-bold text-gray-900">{formattedTotal()}</span>
-            <span class="text-[8px] font-medium text-gray-400 uppercase">Total</span>
-          </div>
-        </ProteinDonutChart>
-      {/if}
-    </div>
+  <!-- Middle: Horizontal Stacked Bar -->
+  <div class="flex flex-col items-center gap-1.5 justify-self-center w-full max-w-[220px] pointer-events-auto">
+    {#if chartData.length > 0}
+      <!-- Total label -->
+      <span class="text-[11px] font-bold text-gray-900">{formattedTotal()} <span class="text-[9px] font-medium text-gray-400 uppercase">total</span></span>
 
-    <!-- Variant Legend (Top 3-4 variants) -->
-    <div class="hidden lg:flex flex-col gap-1 min-w-[120px]">
-      {#each sortedData.slice(0, 3) as item, index}
-        <div 
-          role="presentation"
-          class="flex items-center gap-2 transition-all"
-          class:opacity-100={hoveredItemId === item.id || !hoveredItemId}
-          class:opacity-40={hoveredItemId && hoveredItemId !== item.id}
-          onmouseenter={() => onHover(item.id)}
-          onmouseleave={() => onHover(null)}
-        >
-          <div 
-            class="w-2 h-2 rounded-full {config.color} flex-shrink-0 transition-transform"
-            style="opacity: {opacities[index % opacities.length]}; transform: scale({hoveredItemId === item.id ? 1.5 : 1})"
+      <!-- Stacked bar -->
+      <div class="w-full h-3 rounded-full bg-gray-100 flex overflow-hidden">
+        {#each sortedData as item, index}
+          {@const pct = totalStock > 0 ? (item.value / totalStock) * 100 : 0}
+          <div
+            role="presentation"
+            class={cn(
+              barColor,
+              'h-full transition-all duration-150',
+              hoveredItemId && hoveredItemId !== item.id && 'brightness-50'
+            )}
+            style="width: {pct}%; opacity: {opacities[index % opacities.length]};"
+            onmouseenter={() => onHover(item.id)}
+            onmouseleave={() => onHover(null)}
           ></div>
-          <span class="text-[10px] font-semibold text-gray-700 truncate max-w-[80px]">{item.label}</span>
-          <span class="text-[10px] font-mono text-gray-400 ml-auto whitespace-nowrap">{Math.round(item.value).toLocaleString()}</span>
-        </div>
-      {/each}
-      {#if sortedData.length > 3}
-        <span class="text-[9px] text-gray-400 font-medium pl-4">+ {sortedData.length - 3} more</span>
-      {/if}
-    </div>
+        {/each}
+      </div>
+
+      <!-- Top 3 variant labels -->
+      <div class="hidden lg:flex items-center gap-1 text-[10px] text-gray-500 font-medium truncate max-w-full">
+        {#each sortedData.slice(0, 3) as item, index}
+          {#if index > 0}
+            <span class="text-gray-300">&middot;</span>
+          {/if}
+          <span
+            role="presentation"
+            class={cn(
+              'truncate transition-opacity',
+              hoveredItemId === item.id ? 'text-gray-900 font-semibold' : '',
+              hoveredItemId && hoveredItemId !== item.id ? 'opacity-40' : ''
+            )}
+            onmouseenter={() => onHover(item.id)}
+            onmouseleave={() => onHover(null)}
+          >{item.label} {formatCompact(item.value)}</span>
+        {/each}
+        {#if sortedData.length > 3}
+          <span class="text-gray-300">&middot;</span>
+          <span class="text-gray-400">+{sortedData.length - 3}</span>
+        {/if}
+      </div>
+    {/if}
   </div>
-  
+
   <!-- Right Side: Expand Indicator -->
   <div class="flex items-center gap-2 justify-self-end">
     <div class="hidden md:flex flex-col items-end mr-2">

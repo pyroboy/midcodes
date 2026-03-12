@@ -371,7 +371,7 @@ export const deviceSchema: RxJsonSchema<any> = {
 // ─── Expense ─────────────────────────────────────────────────────────────────
 export const expenseSchema: RxJsonSchema<any> = {
 	title: 'expense schema',
-	version: 5,
+	version: 6,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -533,5 +533,28 @@ export const kitchenAlertSchema: RxJsonSchema<any> = {
 	},
 	required: ['id', 'orderId', 'itemName', 'reason', 'createdAt', 'updatedAt'],
 	indexes: ['orderId', 'updatedAt']
+};
+
+// ─── Expense Template ───────────────────────────────────────────────────────
+export const expenseTemplateSchema: RxJsonSchema<any> = {
+	title: 'expense template schema',
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
+		category: { type: 'string', maxLength: 100 },
+		description: { type: 'string' },
+		defaultAmount: { type: 'number' },
+		paidBy: { type: 'string' },
+		recurrence: { type: 'string', maxLength: 10 },
+		isActive: { type: 'boolean' },
+		createdBy: { type: 'string' },
+		createdAt: { type: 'string', maxLength: 30 },
+		updatedAt: { type: 'string', maxLength: 30 }
+	},
+	required: ['id', 'locationId', 'category', 'description', 'defaultAmount', 'paidBy', 'recurrence', 'isActive', 'createdBy', 'createdAt', 'updatedAt'],
+	indexes: ['locationId', 'recurrence', ['locationId', 'recurrence'], 'updatedAt']
 };
 

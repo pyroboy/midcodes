@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
+	import { cn, formatWeight } from '$lib/utils';
 	import { fade } from 'svelte/transition';
 	import { Edit3 } from 'lucide-svelte';
 	import type { StockItem, StockStatus } from '$lib/stores/stock.svelte';
@@ -53,6 +53,7 @@
 
 	const isHovered = $derived(hoveredItemId === item.id);
 	const display = $derived(getStatusDisplay(item.status, item.currentStock, item.minLevel));
+	const weight = $derived(formatWeight(item.currentStock, item.unit));
 </script>
 
 <svelte:element
@@ -95,21 +96,14 @@
 		<p class="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 mt-2">{item.name}</p>
 
 		<p class="font-mono text-xl font-bold text-gray-900 mt-1">
-			{item.currentStock.toLocaleString()}
-			<span class="text-xs font-normal text-gray-400">{item.unit}</span>
+			{weight.display}
+			<span class="text-xs font-normal text-gray-400">{weight.unit}</span>
 		</p>
 
 		<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} class="mt-1" />
 
-		<div class="flex items-center gap-1.5 mt-1 text-xs">
-			<span class={cn('h-2 w-full flex-shrink-0 rounded-full w-2', display.dotClass)}></span>
-			<span class={cn(
-				'font-semibold',
-				item.status === 'ok' ? 'text-status-green' : item.status === 'low' ? 'text-status-yellow' : 'text-status-red'
-			)}>
-				{display.label}
-			</span>
-			<span class="text-gray-400 ml-auto">Min: {item.minLevel.toLocaleString()}</span>
+		<div class="flex items-center justify-between mt-1 text-xs">
+			<span class="text-gray-400">Min: {item.minLevel.toLocaleString()}</span>
 		</div>
 
 		{#if !readonly}

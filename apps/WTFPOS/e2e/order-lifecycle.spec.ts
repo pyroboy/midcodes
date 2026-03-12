@@ -53,9 +53,9 @@ async function enterPin(page: Page, pin = '1234') {
 }
 
 async function skipLeftoverPenalty(page: Page) {
-  const penaltyHeader = page.locator('h2', { hasText: 'Leftover Penalty?' });
+  const penaltyHeader = page.locator('h2', { hasText: 'Leftover Check' });
   if (await penaltyHeader.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await page.locator('button', { hasText: 'Skip / Checkout' }).click();
+    await page.locator('button', { hasText: 'No Leftovers' }).click();
   }
 }
 

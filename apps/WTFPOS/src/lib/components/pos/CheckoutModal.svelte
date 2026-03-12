@@ -31,10 +31,11 @@
     let paymentEntries = $state<PaymentEntry[]>([{ method: 'cash', amount: 0 }]);
 
     // Reset payment amounts to 0 whenever the modal opens for a new order.
-    // Keeps the selected methods intact but clears any stale amounts from a prior session.
+    // Depend only on order.id so field mutations (discounts, pax) don't re-zero amounts.
     $effect(() => {
-        if (order) {
-            paymentEntries = untrack(() => paymentEntries.map(e => ({ ...e, amount: 0 })));
+        const _id = order?.id;
+        if (_id) {
+            untrack(() => { paymentEntries = paymentEntries.map(e => ({ ...e, amount: 0 })); });
         }
     });
 
@@ -59,13 +60,7 @@
     }
 
     function exactCash() {
-        if (paymentEntries.length === 1) {
-            setAmount(paymentEntries[0].method, order.total);
-        } else {
-            // Fill remaining on cash
-            const otherTotal = paymentEntries.filter(e => e.method !== 'cash').reduce((s, e) => s + (e.amount || 0), 0);
-            setAmount('cash', Math.max(0, order.total - otherTotal));
-        }
+        exactForMethod('cash');
     }
 
     function selectCashPreset(amount: number) {
@@ -84,10 +79,12 @@
 
     // Manager PIN grace period state
     let pinGraceUntil = $state<number>(0);
-    const hasPinGrace = $derived(Date.now() < pinGraceUntil);
 
     // Reactive countdown for the PIN grace window (updates every second via effect)
     let pinGraceSecondsLeft = $state(0);
+    // NOTE: Do NOT use Date.now() in $derived — it's evaluated once and becomes stale.
+    // Derive from pinGraceSecondsLeft which is kept current by the setInterval below.
+    const hasPinGrace = $derived(pinGraceSecondsLeft > 0);
     $effect(() => {
         if (pinGraceUntil === 0) { pinGraceSecondsLeft = 0; return; }
         function tick() {
@@ -129,6 +126,24 @@
             return entry.ids.length === entry.pax && entry.ids.every(id => id.trim() !== '');
         })
     );
+
+    // Human-readable reason why Confirm is blocked — shown as a hint above the button.
+    const checkoutBlockReason = $derived.by((): string | null => {
+        if (canConfirmCheckout) return null;
+        if (!hasItems) return 'No active items on this order.';
+        const missingIds = activeScPwdTypes.filter(type => {
+            const entry = localDiscountEntries[type]!;
+            return entry.ids.some(id => id.trim() === '');
+        });
+        if (missingIds.length > 0) {
+            const labels = missingIds.map(t => t === 'senior' ? 'SC' : 'PWD').join(' & ');
+            return `Enter all ${labels} ID numbers above to confirm.`;
+        }
+        if (totalPaid < order.total) {
+            return `Still short by ${formatPeso(order.total - totalPaid)} — add more payment.`;
+        }
+        return null;
+    });
 
     function recalcWithEntries() {
         recalcOrder(order, { discountEntries: JSON.parse(JSON.stringify(localDiscountEntries)) });
@@ -262,7 +277,7 @@
             .filter(e => (e.amount || 0) > 0)
             .map(e => ({ method: e.method, amount: e.amount }));
 
-        if (activePayments.length === 0) {
+        if (activePayments.length === 0 && order.total > 0) {
             checkoutError = 'Enter a payment amount to continue.';
             checkoutLoading = false;
             return;
@@ -279,7 +294,8 @@
 
         const snapshot: Order = { ...order, payments: [...order.payments], items: [...order.items], closedAt: order.closedAt ?? new Date().toISOString() };
 
-        const methodLabel = activePayments.length === 1
+        const methodLabel = activePayments.length === 0 ? 'Comp'
+            : activePayments.length === 1
             ? (activePayments[0].method === 'gcash' ? 'GCash' : activePayments[0].method === 'maya' ? 'Maya' : 'Cash')
             : 'Split';
         const actualChange = cashEntry ? Math.max(0, cashChange) : 0;
@@ -476,7 +492,7 @@
         {/each}
 
         <!-- Payment method toggles + amount inputs -->
-        <div class="flex flex-col gap-3 border-b border-border px-6 py-4">
+        <div class="flex flex-col gap-3 px-6 py-4">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Payment Method</span>
                 <span class="text-xs text-gray-400">Tap to add/remove</span>
@@ -561,10 +577,9 @@
                 </div>
             {/each}
         </div>
-        </div>
-        
-        <div class="shrink-0 flex flex-col gap-3 px-6 py-4 bg-surface border-t border-border shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-10">
-            <!-- Running totals -->
+
+        <!-- Running totals — inside scroll area so they don't crowd the footer -->
+        <div class="flex flex-col gap-2 px-6 py-4 border-t border-border">
             <div class="flex items-center justify-between rounded-lg bg-surface px-3 py-2 border border-border">
                 <span class="text-sm font-semibold text-gray-600">Total Paid</span>
                 <span class={cn('font-mono text-lg font-extrabold', totalPaid >= order.total ? 'text-status-green' : 'text-gray-900')}>
@@ -582,7 +597,10 @@
                     <span class="text-xs font-semibold text-status-red">Short by {formatPeso(order.total - totalPaid)}</span>
                 </div>
             {/if}
+        </div>
+        </div>
 
+        <div class="shrink-0 flex flex-col gap-3 px-6 py-4 bg-surface border-t border-border shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-10">
             {#if checkoutError}
                 <div class="bg-red-50 border border-red-200 rounded-xl flex flex-col items-center text-center gap-2 p-4">
                     <p class="text-sm font-bold text-red-700">Hardware Error</p>
@@ -591,6 +609,13 @@
                         <button class="btn-secondary flex-1 border-red-200 hover:bg-red-100 text-red-700 font-semibold" onclick={skipReceipt}>Skip Receipt</button>
                         <button class="btn-primary flex-1 bg-red-600 hover:bg-red-700" onclick={confirmCheckout}>Retry Print</button>
                     </div>
+                </div>
+            {/if}
+
+            {#if checkoutBlockReason && !checkoutError}
+                <div class="flex items-center gap-2 rounded-lg bg-status-yellow/10 border border-status-yellow/30 px-3 py-2">
+                    <span class="text-status-yellow text-sm leading-none shrink-0">⚠</span>
+                    <span class="text-xs font-semibold text-yellow-700">{checkoutBlockReason}</span>
                 </div>
             {/if}
 
@@ -611,9 +636,9 @@
                             class="btn-secondary flex-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
                             style="min-height: 48px"
                             disabled={!hasItems || checkoutLoading}
-                            title="Pause payment entry — manager required to resume."
+                            title="Mark order as pending e-wallet confirmation — cashier will confirm once payment clears."
                         >
-                            ⏸ Hold for Manager
+                            ⏸ Pending {paymentEntries[0].method === 'maya' ? 'Maya' : 'GCash'}
                         </button>
                     {/if}
                     <button

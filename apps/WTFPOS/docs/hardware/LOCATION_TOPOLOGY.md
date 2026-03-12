@@ -4,9 +4,6 @@
 **Prepared by:** Arturo Jose T. Magno
 **Client:** WTF! Corporation (Christopher Samonte, CEO)
 
----
-
-## Architecture Principle
 
 Each location runs one **Mini PC as the SvelteKit Node server** — the single source of truth for that branch. All other devices (cashier tablet, kitchen screens) are **thin clients**: Android tablets running Chrome browser, pointed at the mini PC over local WiFi. No data replication, no sync — every device reads and writes to the same server.
 
@@ -214,19 +211,3 @@ Owner's browser (anywhere with internet)
     → owner sees both branches in real-time
 ```
 
-This requires both branch servers to be reachable from the internet (port forwarding on branch routers, or a cloud relay — to be decided in Phase 2).
-
----
-
-## Startup Checklist (per branch, daily)
-
-```
-□ Mini PC is powered on
-□ Node server auto-started (check: http://192.168.1.10:3000 loads)
-□ Router is on, POS WiFi network visible
-□ Cashier tablet connects to POS WiFi, loads /pos
-□ Kitchen tablets connect, load their routes
-□ Receipt printer is on and paper loaded
-□ Cash drawer is closed and locked
-□ Bluetooth scale is on (meat station only)
-```

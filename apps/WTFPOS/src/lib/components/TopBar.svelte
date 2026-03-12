@@ -6,13 +6,11 @@
 	import HardwareStatus from '$lib/components/HardwareStatus.svelte';
 	import BluetoothScaleStatus from '$lib/components/BluetoothScaleStatus.svelte';
 	import NoSaleModal from '$lib/components/NoSaleModal.svelte';
-	import ExpensesModal from '$lib/components/ExpensesModal.svelte';
 	import { ScanBarcode, MapPin, ChevronDown } from 'lucide-svelte';
 	import { APP_VERSION, BUILD_DATE } from '$lib/version';
 	import { format } from 'date-fns';
 
 	let isNoSaleOpen = $state(false);
-	let isExpensesOpen = $state(false);
 	let locationDropdownOpen = $state(false);
 
 	const canSeeLocations = $derived(!session.isLocked && ELEVATED_ROLES.includes(session.role));
@@ -107,21 +105,16 @@
 				{link.label}
 			</a>
 		{/each}
-		<!-- Expenses Modal Button -->
+		<!-- Expenses Link (modal removed — use full page) -->
 		{#if canAccessExpenses}
-			<button
-				onclick={() => { isExpensesOpen = true; }}
-				class={cn(
-					'flex items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors no-select',
-					isExpensesOpen
-						? 'bg-accent-light text-accent'
-						: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-				)}
+			<a
+				href="/expenses"
+				class="flex items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors no-select text-gray-600 hover:bg-gray-100 hover:text-gray-900"
 				style="min-height:36px"
 			>
 				<span class="text-sm leading-none">💸</span>
 				Expenses
-			</button>
+			</a>
 		{/if}
 	</nav>
 
@@ -221,4 +214,3 @@
 </header>
 
 <NoSaleModal isOpen={isNoSaleOpen} onClose={() => { isNoSaleOpen = false; }} />
-<ExpensesModal isOpen={isExpensesOpen} onClose={() => { isExpensesOpen = false; }} />

@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
+	import { cn, formatWeightStr, formatTimeAgo } from '$lib/utils';
 	import { slide, fade } from 'svelte/transition';
 	import {
-		stockItems, getCurrentStock, getStockStatus,
+		stockItems, getCurrentStock, getStockStatus, getSpoilageAlerts, getApproachingLowItems,
 		type StockStatus, type StockCategory, type StockItem
 	} from '$lib/stores/stock.svelte';
 	import { menuItems, toggleMenuItemAvailability } from '$lib/stores/pos.svelte';
 	import { session, isWarehouseSession } from '$lib/stores/session.svelte';
-	import { Search } from 'lucide-svelte';
+	import { Search, AlertTriangle, Clock } from 'lucide-svelte';
 	import { STOCK_IMAGES } from '$lib/stores/stock.images';
 	import AllLocationsInventory from './AllLocationsInventory.svelte';
 
@@ -51,7 +51,7 @@
 	let searchQuery  = $state('');
 	let filterStatus = $state<'all' | 'ok' | 'low' | 'critical'>('all');
 
-	type SortColumn = 'name' | 'stock' | 'status';
+	type SortColumn = 'name' | 'stock';
 	let sortColumn = $state<SortColumn>('name');
 	let sortDesc   = $state(false);
 
@@ -79,6 +79,16 @@
 			})
 	);
 
+	// ─── [06] Spoilage alerts ──────────────────────────────────────────────────
+	const spoilageAlerts = $derived(getSpoilageAlerts());
+
+	// ─── [10] Needs Attention items ────────────────────────────────────────────
+	const lowItems = $derived(items.filter(i => i.status === 'low'));
+	const criticalItems = $derived(items.filter(i => i.status === 'critical'));
+	const approachingLow = $derived(getApproachingLowItems());
+	const hasAttentionItems = $derived(lowItems.length > 0 || criticalItems.length > 0 || spoilageAlerts.length > 0 || approachingLow.length > 0);
+	let attentionExpanded = $state(true);
+
 	const filteredAndSorted = $derived.by(() => {
 		const filtered = items.filter(s => {
 			const matchStatus = filterStatus === 'all' || s.status === filterStatus;
@@ -91,10 +101,6 @@
 			let cmp = 0;
 			if (sortColumn === 'name') cmp = a.name.localeCompare(b.name);
 			else if (sortColumn === 'stock') cmp = a.currentStock - b.currentStock;
-			else if (sortColumn === 'status') {
-				const map = { critical: 0, low: 1, ok: 2 };
-				cmp = map[a.status] - map[b.status];
-			}
 			return sortDesc ? -cmp : cmp;
 		});
 	});
@@ -107,8 +113,19 @@
 		lowCount: number;
 	}
 
+	// ─── [04] Default groups collapsed; auto-expand only those with low/critical ──
 	const expandedGroups = $state<Record<string, boolean>>({
-		beef: true, pork: true, chicken: true, other: true,
+		beef: false, pork: false, chicken: false, other: false,
+	});
+
+	// Auto-expand groups with low/critical items on data change
+	$effect(() => {
+		const allGrouped = items.filter(i => i.category === 'Meats');
+		for (const protein of ['beef', 'pork', 'chicken', 'other'] as MeatProtein[]) {
+			const groupItems = allGrouped.filter(i => (i.proteinType || 'other') === protein);
+			const hasIssues = groupItems.some(i => i.status === 'low' || i.status === 'critical');
+			if (hasIssues) expandedGroups[protein] = true;
+		}
 	});
 
 	let hoveredItemId = $state<string | null>(null);
@@ -209,6 +226,91 @@
 	<StockHealthStrip bind:activeFilter={filterStatus} onFilterClick={(s) => filterStatus = s} />
 </div>
 
+<!-- ─── [06][10] Needs Attention Section ──────────────────────────────────── -->
+{#if hasAttentionItems}
+	<div class="mb-5 rounded-xl border border-status-yellow/30 bg-status-yellow-light/20 overflow-hidden" transition:slide={{ duration: 250 }}>
+		<button
+			class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-status-yellow-light/30 transition-colors"
+			onclick={() => attentionExpanded = !attentionExpanded}
+		>
+			<div class="flex items-center gap-2">
+				<AlertTriangle class="w-4 h-4 text-status-yellow" />
+				<span class="text-sm font-bold text-gray-900">Needs Attention</span>
+				<span class="text-xs text-gray-500">
+					{criticalItems.length + lowItems.length + spoilageAlerts.length + approachingLow.length} item{criticalItems.length + lowItems.length + spoilageAlerts.length + approachingLow.length !== 1 ? 's' : ''}
+				</span>
+			</div>
+			<span class="text-xs text-gray-400">{attentionExpanded ? 'Hide' : 'Show'}</span>
+		</button>
+
+		{#if attentionExpanded}
+			<div class="px-4 pb-3 flex flex-col gap-2" transition:slide={{ duration: 200 }}>
+				{#each criticalItems as item}
+					<button
+						class="flex items-center justify-between rounded-lg bg-status-red-light/40 border border-status-red/20 px-3 py-2 text-left hover:bg-status-red-light/60 transition-colors"
+						onclick={() => openItemModal(item)}
+					>
+						<div class="flex items-center gap-2">
+							<span class="h-2 w-2 rounded-full bg-status-red"></span>
+							<span class="text-sm font-semibold text-gray-900">{item.name}</span>
+							<span class="text-xs font-bold text-status-red">CRITICAL</span>
+						</div>
+						<span class="text-sm font-mono text-gray-700">{formatWeightStr(item.currentStock, item.unit)}</span>
+					</button>
+				{/each}
+
+				{#each lowItems as item}
+					<button
+						class="flex items-center justify-between rounded-lg bg-status-yellow-light/40 border border-status-yellow/20 px-3 py-2 text-left hover:bg-status-yellow-light/60 transition-colors"
+						onclick={() => openItemModal(item)}
+					>
+						<div class="flex items-center gap-2">
+							<span class="h-2 w-2 rounded-full bg-status-yellow"></span>
+							<span class="text-sm font-semibold text-gray-900">{item.name}</span>
+							<span class="text-xs font-bold text-status-yellow">LOW</span>
+						</div>
+						<span class="text-sm font-mono text-gray-700">{formatWeightStr(item.currentStock, item.unit)}</span>
+					</button>
+				{/each}
+
+				{#each spoilageAlerts as alert}
+					<div class="flex items-center justify-between rounded-lg bg-orange-50 border border-orange-200 px-3 py-2">
+						<div class="flex items-center gap-2">
+							<Clock class="w-3.5 h-3.5 text-orange-500" />
+							<span class="text-sm font-semibold text-gray-900">{alert.itemName}</span>
+							<span class="text-xs font-bold text-orange-600">
+								{alert.daysLeft <= 0 ? 'EXPIRED' : `Expires in ${alert.daysLeft}d`}
+							</span>
+						</div>
+						{#if alert.batchNo}
+							<span class="text-xs text-gray-500">Batch {alert.batchNo}</span>
+						{/if}
+					</div>
+				{/each}
+
+				{#each approachingLow as item}
+					<button
+						class="flex items-center justify-between rounded-lg bg-amber-50/50 border border-amber-200/50 px-3 py-2 text-left hover:bg-amber-50 transition-colors"
+						onclick={() => openItemModal(item)}
+					>
+						<div class="flex items-center gap-2">
+							<span class="h-2 w-2 rounded-full bg-amber-400"></span>
+							<span class="text-sm text-gray-700">{item.name}</span>
+							<span class="text-[10px] text-amber-600 font-medium">Near threshold ({Math.round(item.pctAboveMin)}% above min)</span>
+						</div>
+						<span class="text-sm font-mono text-gray-500">{formatWeightStr(item.currentStock, item.unit)}</span>
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</div>
+{:else}
+	<div class="mb-5 rounded-xl border border-status-green/20 bg-status-green-light/10 px-4 py-3 flex items-center gap-2">
+		<span class="h-2 w-2 rounded-full bg-status-green"></span>
+		<span class="text-sm text-gray-600">All items within healthy ranges.</span>
+	</div>
+{/if}
+
 <InventoryToolbar
 	bind:searchQuery
 	bind:viewMode
@@ -305,10 +407,6 @@
 							Current / Min
 							<span class="ml-1 inline-block w-2 text-gray-400">{sortColumn === 'stock' ? (sortDesc ? '↓' : '↑') : ''}</span>
 						</th>
-						<th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide cursor-pointer hover:bg-gray-100/50 transition-colors" onclick={() => toggleSort('status')}>
-							Status
-							<span class="ml-1 inline-block w-2 text-gray-400">{sortColumn === 'status' ? (sortDesc ? '↓' : '↑') : ''}</span>
-						</th>
 						<th class="w-16 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"></th>
 					</tr>
 				</thead>
@@ -318,7 +416,7 @@
 							{#each catGroup.proteinGroups as group}
 								{@const config = proteinConfig[group.protein]}
 								<tr class="{config.bgLight} border-l-4 {config.borderColor}">
-									<td colspan="6" class="p-0">
+									<td colspan="5" class="p-0">
 										<ProteinGroupHeader
 											protein={group.protein}
 											itemCount={group.items.length}
@@ -344,6 +442,7 @@
 											readonly={!canEditDetails}
 											onHover={(id) => hoveredItemId = id}
 											animate={true}
+											hideCategory={true}
 											menuAvailable={menuItemsById.get(item.menuItemId)?.available ?? true}
 											onToggle86={can86 ? () => handle86Toggle(item.menuItemId, item.name, menuItemsById.get(item.menuItemId)?.available ?? true) : undefined}
 										/>
@@ -352,7 +451,7 @@
 							{/each}
 						{:else}
 							<tr class="bg-gray-50/50">
-								<td colspan="6" class="px-4 py-1.5">
+								<td colspan="5" class="px-4 py-1.5">
 									<span class="text-xs font-bold uppercase tracking-wide text-gray-400">{catGroup.category}</span>
 								</td>
 							</tr>

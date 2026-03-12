@@ -27,20 +27,20 @@
 				{ href: '/reports/table-sales',   label: 'Table Sales' },
 				{ href: '/reports/voids-discounts',label: 'Voids & Discounts' },
 				{ href: '/reports/x-read',        label: 'X-Read' },
-				{ href: '/reports/eod',           label: 'End of Day' },
-				{ href: '/reports/staff-performance', label: 'Staff Perf.' }
+				{ href: '/reports/eod',           label: 'End of Day' }
 			]
 		},
 		{
 			label: 'Expenses',
 			tabs: [
-				{ href: '/reports/expenses-daily',   label: 'Daily' },
-				{ href: '/reports/expenses-monthly', label: 'Monthly' }
+				{ href: '/reports/expenses-daily', label: 'Expenses' },
+				{ href: '/reports/utilities', label: 'Utilities' }
 			]
 		},
 		{
 			label: 'Revenue & Sales',
 			tabs: [
+				{ href: '/reports/transaction-log', label: 'Transaction Log' },
 				{ href: '/reports/sales-summary', label: 'Sales Summary' },
 				{ href: '/reports/best-sellers',  label: 'Best Sellers' },
 				{ href: '/reports/peak-hours',    label: 'Peak Hours' }

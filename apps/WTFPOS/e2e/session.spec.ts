@@ -18,8 +18,8 @@ async function loginAsOwner(page: Page) {
   await page.locator('#password').fill('chris');
   await page.locator('button', { hasText: 'LOGIN' }).click();
   await page.waitForURL('**/pos', { timeout: 10000 });
-  // Owner sees AllBranchesDashboard — wait for branch names (not individual table cards)
-  await expect(page.locator('text=/Alta Citta|Tagbilaran Branch|Alona Beach|Panglao/i').first()).toBeVisible({ timeout: 15000 });
+  // Owner (elevated role) sees "Change Location" button in LocationBanner
+  await expect(page.locator('[data-testid="location-change-btn"]')).toBeVisible({ timeout: 15000 });
 }
 
 async function loginAsManager(page: Page) {
@@ -39,10 +39,11 @@ async function loginAsManager(page: Page) {
 
 async function loginAsKitchen(page: Page) {
   await page.goto('/');
-  await page.locator('#username').fill('pedro');
-  await page.locator('#password').fill('pedro');
+  // corazon is the dispatch kitchen user (dest: /kitchen/dispatch)
+  await page.locator('#username').fill('corazon');
+  await page.locator('#password').fill('corazon');
   await page.locator('button', { hasText: 'LOGIN' }).click();
-  await page.waitForURL('**/kitchen', { timeout: 10000 });
+  await page.waitForURL('**/kitchen/**', { timeout: 10000 });
 }
 
 // ─── Role-Based Nav Visibility ─────────────────────────────────────────────────
@@ -60,8 +61,9 @@ test.describe('Session — Role-Based Navigation', () => {
 
   test('staff (maria) only sees POS nav — no Admin or Reports', async ({ page }) => {
     await loginAsStaff(page);
-    const navText = await page.locator('nav').first().textContent();
-    expect(navText).not.toMatch(/Admin|Reports/i);
+    // Sidebar uses data-sidebar="sidebar" divs, not a <nav> element
+    const sidebarText = await page.locator('[data-sidebar="sidebar"]').first().textContent();
+    expect(sidebarText).not.toMatch(/Admin|Reports/i);
   });
 
   test('owner (chris) sees Admin nav link', async ({ page }) => {
@@ -104,15 +106,14 @@ test.describe('Session — Branch Switching', () => {
 
   test('owner (chris) sees branch selector with location names', async ({ page }) => {
     await loginAsOwner(page);
-    // AllBranchesDashboard or TopBar shows branch names for owner
-    await expect(page.locator('text=/Alta Citta|Alona Beach/i').first()).toBeVisible();
+    // AllBranchesDashboard has a unique heading visible in the main content area
+    await expect(page.locator('text=ALL BRANCHES — LIVE')).toBeVisible();
   });
 
-  test('owner (chris) TopBar shows location switcher buttons', async ({ page }) => {
+  test('owner (chris) LocationBanner shows Change Location button', async ({ page }) => {
     await loginAsOwner(page);
-    // Owner has locationId='all' so TopBar shows "All Locations" as the switcher button
-    const locationBtn = page.locator('button', { hasText: /All Locations|Alta Citta|Alona Beach/i }).first();
-    await expect(locationBtn).toBeVisible({ timeout: 5000 });
+    // Owner (elevated role) sees "Change Location" button in LocationBanner
+    await expect(page.locator('[data-testid="location-change-btn"]')).toBeVisible({ timeout: 5000 });
   });
 
   test('owner switching to Panglao changes the floor to Panglao tables', async ({ page }) => {

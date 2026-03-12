@@ -41,8 +41,8 @@ async function enterPin(page: Page, pin = '1234', scope?: ReturnType<Page['locat
 }
 
 async function skipLeftoverPenalty(page: Page) {
-  await expect(page.locator('h2', { hasText: 'Leftover Penalty?' })).toBeVisible();
-  await page.locator('button', { hasText: 'Skip / Checkout' }).click();
+  await expect(page.locator('h2', { hasText: 'Leftover Check' })).toBeVisible();
+  await page.locator('button', { hasText: 'No Leftovers' }).click();
 }
 
 async function checkoutExactCash(page: Page) {
@@ -211,7 +211,7 @@ test('Scenario 10: Leftover penalty — 200g unconsumed meat, then checkout', as
   await page.locator('button', { hasText: 'Checkout' }).click();
 
   // LeftoverPenaltyModal — enter 200g
-  await expect(page.locator('h2', { hasText: 'Leftover Penalty?' })).toBeVisible();
+  await expect(page.locator('h2', { hasText: 'Leftover Check' })).toBeVisible();
 
   // Type 200 using numpad
   await page.locator('.pos-card button', { hasText: /^2$/ }).first().click();

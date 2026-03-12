@@ -245,8 +245,8 @@ export const INITIAL_DEDUCTIONS: Deduction[] = [];
 export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => ({
 	stockItemId: s.id,
 	counted: {
-		am10: getMorningCount(s.menuItemId),
-		pm4: getAfternoonCount(s.menuItemId),
+		am10: getMorningCount(s.menuItemId, s.locationId),
+		pm4: getAfternoonCount(s.menuItemId, s.locationId),
 		pm10: null,
 	},
 	updatedAt: new Date().toISOString(),
@@ -344,6 +344,138 @@ export function getDrift(stockItemId: string, period: CountPeriod): number | nul
 	return expected - counted; // positive = missing
 }
 
+/** Variance report periods — broader than count-time slots */
+export type VariancePeriod = 'today' | 'week' | 'month';
+
+/** Get the date bounds for a variance period */
+function getVarianceBounds(period: VariancePeriod): { start: Date; end: Date } {
+	const now = new Date();
+	const end = now;
+	const start = new Date(now);
+	if (period === 'today') {
+		start.setHours(0, 0, 0, 0);
+	} else if (period === 'week') {
+		start.setDate(start.getDate() - 7);
+		start.setHours(0, 0, 0, 0);
+	} else {
+		start.setDate(start.getDate() - 30);
+		start.setHours(0, 0, 0, 0);
+	}
+	return { start, end };
+}
+
+/** Compute variance for a stock item over a time period.
+ *  Uses opening stock + period deliveries - period deductions - period waste as "expected",
+ *  then compares against the latest physical count. */
+export function getPeriodVariance(stockItemId: string, period: VariancePeriod): {
+	delivered: number;
+	sold: number;
+	waste: number;
+	expected: number;
+	counted: number | null;
+	drift: number | null;
+	driftPct: number | null;
+} {
+	const item = stockItems.value.find(s => s.id === stockItemId);
+	if (!item) return { delivered: 0, sold: 0, waste: 0, expected: 0, counted: null, drift: null, driftPct: null };
+
+	const { start, end } = getVarianceBounds(period);
+	const inRange = (iso: string) => { const d = new Date(iso); return d >= start && d <= end; };
+
+	const delivered = deliveries.value
+		.filter(d => d.stockItemId === stockItemId && inRange(d.receivedAt))
+		.reduce((s, d) => s + d.qty, 0);
+
+	const sold = deductions.value
+		.filter(d => d.stockItemId === stockItemId && inRange(d.timestamp))
+		.reduce((s, d) => s + d.qty, 0);
+
+	const waste = stockEvents.value
+		.filter(e => e.stockItemId === stockItemId && e.type === 'waste' && inRange(e.loggedAt))
+		.reduce((s, e) => s + e.qty, 0);
+
+	const expected = item.openingStock + delivered - sold - waste;
+
+	// Latest physical count — use pm4 if available, else am10
+	const countDoc = stockCounts.value.find(c => c.stockItemId === stockItemId);
+	const counted = countDoc?.counted.pm4 ?? countDoc?.counted.am10 ?? null;
+
+	const drift = counted !== null ? expected - counted : null;
+	const base = item.openingStock + delivered;
+	const driftPct = drift !== null && base > 0 ? (drift / base) * 100 : null;
+
+	return { delivered, sold, waste, expected, counted, drift, driftPct };
+}
+
+/** Compute comparison data for stock variance KPIs vs previous period.
+ *  Returns shortage count and worst drift for current vs previous period. */
+export function stockVarianceComparison(period: VariancePeriod): {
+	shortageCount: { current: number; previous: number; changePct: number | null };
+	worstDrift: { current: number; previous: number; changePct: number | null };
+} | null {
+	if (period === 'month') return null; // no previous month bounds easily available
+
+	const prevPeriodMap: Record<VariancePeriod, VariancePeriod | null> = {
+		today: 'today',
+		week: 'week',
+		month: null,
+	};
+	if (!prevPeriodMap[period]) return null;
+
+	// Current period — reuse getPeriodVariance
+	const locItems = session.locationId === 'all'
+		? stockItems.value.filter(s => s.locationId !== 'wh-tag')
+		: stockItems.value.filter(s => s.locationId === session.locationId);
+
+	const currentRows = locItems.map(item => getPeriodVariance(item.id, period));
+	const currWithDrift = currentRows.filter(r => r.drift !== null);
+	const currShortage = currWithDrift.filter(r => (r.drift ?? 0) > 0).length;
+	const currWorstDrift = currWithDrift.length > 0
+		? Math.max(...currWithDrift.map(r => Math.abs(r.driftPct ?? 0)))
+		: 0;
+
+	// Previous period — shift bounds backward
+	const { start: currStart } = getVarianceBounds(period);
+	const duration = Date.now() - currStart.getTime();
+	const prevEnd = new Date(currStart);
+	const prevStart = new Date(currStart.getTime() - duration);
+
+	const inPrevRange = (iso: string) => { const d = new Date(iso); return d >= prevStart && d < prevEnd; };
+
+	// Compute previous-period variance for each item (simplified — uses same counted values since counts don't have period history)
+	let prevShortage = 0;
+	let prevWorstDrift = 0;
+
+	for (const item of locItems) {
+		const delivered = deliveries.value
+			.filter(d => d.stockItemId === item.id && inPrevRange(d.receivedAt))
+			.reduce((s, d) => s + d.qty, 0);
+		const sold = deductions.value
+			.filter(d => d.stockItemId === item.id && inPrevRange(d.timestamp))
+			.reduce((s, d) => s + d.qty, 0);
+		const waste = stockEvents.value
+			.filter(e => e.stockItemId === item.id && e.type === 'waste' && inPrevRange(e.loggedAt))
+			.reduce((s, e) => s + e.qty, 0);
+		const expected = item.openingStock + delivered - sold - waste;
+		const countDoc = stockCounts.value.find(c => c.stockItemId === item.id);
+		const counted = countDoc?.counted.pm4 ?? countDoc?.counted.am10 ?? null;
+		if (counted === null) continue;
+		const drift = expected - counted;
+		const base = item.openingStock + delivered;
+		const driftPct = base > 0 ? (drift / base) * 100 : null;
+		if (drift > 0) prevShortage++;
+		if (driftPct !== null) prevWorstDrift = Math.max(prevWorstDrift, Math.abs(driftPct));
+	}
+
+	const shortChangePct = prevShortage > 0 ? ((currShortage - prevShortage) / prevShortage) * 100 : null;
+	const driftChangePct = prevWorstDrift > 0 ? ((currWorstDrift - prevWorstDrift) / prevWorstDrift) * 100 : null;
+
+	return {
+		shortageCount: { current: currShortage, previous: prevShortage, changePct: shortChangePct },
+		worstDrift: { current: currWorstDrift, previous: prevWorstDrift, changePct: driftChangePct },
+	};
+}
+
 export function getSpoilageAlerts() {
 	const now = new Date();
 	const alerts = [];
@@ -364,6 +496,43 @@ export function getSpoilageAlerts() {
 	}
 	
 	return alerts;
+}
+
+/** Get the last meaningful stock event for an item (delivery, deduction, or waste).
+ *  Returns { type, timestamp } or null if no events exist. */
+export function getLastStockEvent(stockItemId: string): { type: 'delivery' | 'deduction' | 'waste'; timestamp: string } | null {
+	let latest: { type: 'delivery' | 'deduction' | 'waste'; timestamp: string } | null = null;
+
+	for (const d of deliveries.value) {
+		if (d.stockItemId === stockItemId && d.receivedAt) {
+			if (!latest || d.receivedAt > latest.timestamp) latest = { type: 'delivery', timestamp: d.receivedAt };
+		}
+	}
+	for (const d of deductions.value) {
+		if (d.stockItemId === stockItemId && d.timestamp) {
+			if (!latest || d.timestamp > latest.timestamp) latest = { type: 'deduction', timestamp: d.timestamp };
+		}
+	}
+	for (const w of wasteEntries.value) {
+		if (w.stockItemId === stockItemId && w.loggedAt) {
+			if (!latest || w.loggedAt > latest.timestamp) latest = { type: 'waste', timestamp: w.loggedAt };
+		}
+	}
+	return latest;
+}
+
+/** Get items approaching low threshold (within 20% above minLevel) but still "ok" status. */
+export function getApproachingLowItems(): (StockItem & { currentStock: number; status: StockStatus; pctAboveMin: number })[] {
+	return stockItems.value
+		.filter(s => session.locationId === 'all' || s.locationId === session.locationId)
+		.map(s => {
+			const currentStock = getCurrentStock(s.id);
+			const status = getStockStatus(s.id);
+			const pctAboveMin = s.minLevel > 0 ? ((currentStock - s.minLevel) / s.minLevel) * 100 : 999;
+			return { ...s, currentStock, status, pctAboveMin };
+		})
+		.filter(s => s.status === 'ok' && s.pctAboveMin <= 20 && s.pctAboveMin >= 0)
+		.sort((a, b) => a.pctAboveMin - b.pctAboveMin);
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -677,14 +846,29 @@ function getOpeningStock(menuItemId: string, locationId: string): number {
 	return item ? Math.round(item.minLevel * 1.5) : 0;
 }
 
-function getMorningCount(menuItemId: string): number | null {
-	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId || 'tag'));
-	return item ? Math.round(item.minLevel * 1.45) : null;
+function getMorningCount(menuItemId: string, locationId: string): number | null {
+	if (locationId === 'wh-tag') return null; // warehouse doesn't do physical counts
+	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === locationId);
+	if (!item) return null;
+	// Simulate realistic variance: counted is ±3-12% off from expected
+	const jitter = 1 + (hashCode(menuItemId + locationId + 'am') % 20 - 10) / 100; // -10% to +10%
+	return Math.round(item.minLevel * 1.45 * jitter);
 }
 
-function getAfternoonCount(menuItemId: string): number | null {
-	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === (session.locationId || 'tag'));
-	return item ? Math.round(item.minLevel * 0.8) : null;
+function getAfternoonCount(menuItemId: string, locationId: string): number | null {
+	if (locationId === 'wh-tag') return null;
+	const item = STOCK_ITEMS_LIST.find(s => s.menuItemId === menuItemId && s.locationId === locationId);
+	if (!item) return null;
+	// Afternoon counts typically show more shrinkage (busy lunch/dinner service)
+	const jitter = 1 + (hashCode(menuItemId + locationId + 'pm') % 25 - 15) / 100; // -15% to +10%
+	return Math.round(item.minLevel * 0.8 * jitter);
+}
+
+/** Deterministic hash for reproducible seed jitter */
+function hashCode(s: string): number {
+	let h = 0;
+	for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+	return Math.abs(h);
 }
 
 export async function updateStockItem(id: string, updates: Partial<StockItem>) {

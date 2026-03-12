@@ -62,12 +62,12 @@
 	let statusFilter = $state<StatusFilter>(session.role === 'kitchen' ? 'open' : 'all');
 	let timeFilter = $state<TimeFilter>('today');
 
-	const startOfToday = $derived.by(() => {
-		void now;
+	// Computed once at page load — only changes at midnight, no need to recompute every second
+	const startOfToday = (() => {
 		const d = new Date();
 		d.setHours(0, 0, 0, 0);
 		return d.getTime();
-	});
+	})();
 
 	function matchesTimeFilter(createdAt: string): boolean {
 		if (timeFilter === 'all') return true;

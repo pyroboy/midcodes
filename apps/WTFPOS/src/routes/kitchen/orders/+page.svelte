@@ -249,21 +249,28 @@
 	});
 
 	// ── Auto-print incoming tickets ──
+	// Use local state to track print results — activeTickets are plain JS objects
+	// derived from RxDB and cannot be mutated directly.
+	let localPrintStatus = $state(new Map<string, 'success' | 'failed'>());
+
 	$effect(() => {
-		const toPrint = activeTickets.filter(t => !t.printStatus || t.printStatus === 'pending');
+		const toPrint = activeTickets.filter(
+			(t) => !localPrintStatus.has(t.orderId) && (!t.printStatus || t.printStatus === 'pending')
+		);
+		if (!toPrint.length) return;
 		for (const ticket of toPrint) {
-			ticket.printStatus = 'success';
-			printKitchenOrder(ticket.orderId).then(res => {
-				if (!res.success) ticket.printStatus = 'failed';
+			// Optimistically mark as success to prevent re-triggering on the next activeTickets update
+			localPrintStatus = new Map(localPrintStatus).set(ticket.orderId, 'success');
+			printKitchenOrder(ticket.orderId).then((res) => {
+				if (!res.success) {
+					localPrintStatus = new Map(localPrintStatus).set(ticket.orderId, 'failed');
+				}
 			});
 		}
 	});
 
-	function retryPrint(ticket: KdsTicket) {
-		ticket.printStatus = 'success';
-		printKitchenOrder(ticket.orderId).then(res => {
-			if (!res.success) ticket.printStatus = 'failed';
-		});
+	function retryPrint(orderId: string) {
+		localPrintStatus = new Map([...localPrintStatus].filter(([k]) => k !== orderId));
 	}
 
 	// ── Urgency Styling ──
@@ -533,10 +540,11 @@
 			{@const progress = ticketProgress(ticket)}
 			{@const isNew = newTicketIds.has(ticket.orderId)}
 			{@const urgency = urgencyLevel(ticket.createdAt)}
+			{@const printFailed = localPrintStatus.get(ticket.orderId) === 'failed'}
 
 			<div class={cn(
 				'flex flex-col rounded-xl border-2 overflow-hidden transition-all',
-				ticket.printStatus === 'failed' ? 'border-red-500 bg-red-50' : ticketBorderClass(urgency),
+				printFailed ? 'border-red-500 bg-red-50' : ticketBorderClass(urgency),
 				isNew && 'animate-pulse'
 			)}>
 				<!-- Card Header -->
@@ -552,9 +560,9 @@
 						{/if}
 						<span class="font-mono text-xs font-bold text-gray-400">{formatDisplayId(ticket.orderId, ticket.tableNumber)}</span>
 
-						{#if ticket.printStatus === 'failed'}
+						{#if printFailed}
 							<button
-								onclick={() => retryPrint(ticket)}
+								onclick={() => retryPrint(ticket.orderId)}
 								class="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-100 px-2.5 py-1.5 rounded-lg active:scale-95 transition-colors"
 								style="min-height: 44px"
 							>

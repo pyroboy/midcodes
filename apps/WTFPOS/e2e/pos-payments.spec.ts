@@ -14,9 +14,14 @@ async function login(page: Page) {
 
 async function openTableWithPax(page: Page, tableLabel: string, pax: number) {
   await page.locator(`[aria-label="Table ${tableLabel}"]`).click();
-  await expect(page.locator('h3', { hasText: 'How many guests' })).toBeVisible();
-  await page.locator('.pos-card button', { hasText: new RegExp(`^${pax}$`) }).click();
-  await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible();
+  await expect(page.locator('h3', { hasText: 'How many guests' })).toBeVisible({ timeout: 8000 });
+  // New PaxModal uses stepper — click + for Adults pax times
+  const adultPlusBtn = page.locator('.pos-card button').filter({ hasText: /^\+$/ }).first();
+  for (let i = 0; i < pax; i++) {
+    await adultPlusBtn.click();
+  }
+  await page.locator('.pos-card button', { hasText: 'Confirm' }).click();
+  await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible({ timeout: 8000 });
 }
 
 async function selectPackageAndCharge(page: Page, packageName: string) {
@@ -25,8 +30,8 @@ async function selectPackageAndCharge(page: Page, packageName: string) {
 }
 
 async function skipLeftoverPenalty(page: Page) {
-  await expect(page.locator('h2', { hasText: 'Leftover Penalty?' })).toBeVisible();
-  await page.locator('button', { hasText: 'Skip / Checkout' }).click();
+  await expect(page.locator('h2', { hasText: 'Leftover Check' })).toBeVisible();
+  await page.locator('button', { hasText: 'No Leftovers' }).click();
 }
 
 async function openCheckout(page: Page) {
@@ -37,13 +42,15 @@ async function openCheckout(page: Page) {
 
 // ─── Card Payment ─────────────────────────────────────────────────────────────
 
-test('Payment: Card — Unli Pork 2 pax, pay via Card', async ({ page }) => {
+test('Payment: GCash — Pork Unlimited 2 pax, pay via GCash', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T1', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
 
-  await page.locator('button', { hasText: 'Card' }).click();
+  // Toggle GCash on (adds to entries) then set exact amount
+  await page.locator('button', { hasText: 'GCash' }).click();
+  await page.locator('button', { hasText: 'Exact' }).last().click();
   const confirmBtn = page.locator('button', { hasText: 'Confirm Payment' });
   await expect(confirmBtn).toBeEnabled({ timeout: 5000 });
   await confirmBtn.click({ force: true });
@@ -54,13 +61,15 @@ test('Payment: Card — Unli Pork 2 pax, pay via Card', async ({ page }) => {
 
 // ─── Maya Payment ─────────────────────────────────────────────────────────────
 
-test('Payment: Maya — Unli Beef 2 pax, pay via Maya', async ({ page }) => {
+test('Payment: Maya — Beef Unlimited 2 pax, pay via Maya', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T2', 2);
-  await selectPackageAndCharge(page, 'Unli Beef');
+  await selectPackageAndCharge(page, 'Beef Unlimited');
   await openCheckout(page);
 
+  // Toggle Maya on (adds to entries) then set exact amount
   await page.locator('button', { hasText: 'Maya' }).click();
+  await page.locator('button', { hasText: 'Exact' }).last().click();
   const confirmBtn = page.locator('button', { hasText: 'Confirm Payment' });
   await expect(confirmBtn).toBeEnabled({ timeout: 5000 });
   await confirmBtn.click({ force: true });
@@ -74,7 +83,7 @@ test('Payment: Maya — Unli Beef 2 pax, pay via Maya', async ({ page }) => {
 test('Payment: Cash — custom tendered amount shows correct change', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T3', 2);
-  await selectPackageAndCharge(page, 'Unli Pork'); // ₱499 x 2 = ₱998
+  await selectPackageAndCharge(page, 'Pork Unlimited'); // ₱499 x 2 = ₱998
   await openCheckout(page);
 
   // Select Cash method
@@ -101,7 +110,7 @@ test('Payment: Cash — custom tendered amount shows correct change', async ({ p
 test('Payment: Partial tender — pay half cash, half GCash', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T4', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
 
   // Add a cash partial payment
@@ -111,7 +120,7 @@ test('Payment: Partial tender — pay half cash, half GCash', async ({ page }) =
     await cashInput.fill('500');
     const addPaymentBtn = page.locator('button', { hasText: /Add|Apply partial/i }).first();
     if (await addPaymentBtn.count() > 0) {
-      await addPaymentBtn.click();
+      await addPaymentBtn.click({ force: true });
     }
   }
 
@@ -128,12 +137,12 @@ test('Payment: Partial tender — pay half cash, half GCash', async ({ page }) =
 
 // ─── Combo Package + All Payment Methods ──────────────────────────────────────
 
-test('Payment: Combo package — Unli Pork & Beef, exact cash', async ({ page }) => {
+test('Payment: Combo package — Beef + Pork Unlimited, exact cash', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T5', 2);
 
   // Select combo — includes all 6 meats
-  await selectPackageAndCharge(page, 'Unli Pork & Beef');
+  await selectPackageAndCharge(page, 'Beef + Pork Unlimited');
   await openCheckout(page);
 
   // Pay exact cash
@@ -151,10 +160,12 @@ test('Payment: Combo package — Unli Pork & Beef, exact cash', async ({ page })
 test('Split Bill: by-item — assign items to 2 guests, pay each separately', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T6', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
 
   // Add extra items
-  await page.locator('button', { hasText: '+ ADD' }).click();
+  const addItemBtn2 = page.locator('button', { hasText: '+ Add Item' });
+  await addItemBtn2.waitFor({ state: 'visible', timeout: 8000 });
+  await addItemBtn2.click();
   await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible();
   await page.locator('button', { hasText: 'Drinks' }).first().click();
   await page.locator('button', { hasText: 'Soju' }).first().click();
@@ -197,7 +208,7 @@ test('X-Read: generate X-reading from POS', async ({ page }) => {
   await login(page);
   // Place and complete one order so the X-read has data
   await openTableWithPax(page, 'T7', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
   await page.locator('button', { hasText: 'Exact' }).click();
   await page.locator('button', { hasText: 'Confirm Payment' }).click({ force: true });

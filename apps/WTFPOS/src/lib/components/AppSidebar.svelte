@@ -37,6 +37,7 @@
 		ClipboardCheck,
 		FileText,
 		ArrowLeftRight,
+		Gauge,
 	} from 'lucide-svelte';
 	import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
 	import { orders } from '$lib/stores/pos.svelte';
@@ -171,6 +172,7 @@
 		{@const quickActions = [
 			{ href: '/stock/deliveries', label: 'Receive Delivery', Icon: Truck },
 			{ href: '/reports/expenses-daily', label: 'Log Expense', Icon: Receipt },
+			{ href: '/reports/utilities?action=open', label: 'Log Utility', Icon: Gauge },
 			{ href: '/stock/waste', label: 'Log Waste', Icon: Trash2 },
 			{ href: '/stock/counts', label: 'Stock Count', Icon: ClipboardCheck },
 			{ href: '/reports/x-read', label: 'X-Reading', Icon: FileText },

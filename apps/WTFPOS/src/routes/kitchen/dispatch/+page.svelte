@@ -3,7 +3,7 @@
 	import { orders, markItemServed } from '$lib/stores/pos.svelte';
 	import { log } from '$lib/stores/audit.svelte';
 	import type { KdsTicketItem } from '$lib/types';
-	import { formatCountdown, cn } from '$lib/utils';
+	import { formatCountdown, formatTimeAgo, cn } from '$lib/utils';
 	import { getPkgColors } from '$lib/stores/pos/utils';
 	import { untrack } from 'svelte';
 
@@ -45,6 +45,8 @@
 		pax: number;
 		scCount: number;
 		pwdCount: number;
+		packageId?: string | null;
+		packageName?: string | null;
 		createdAt: string;
 		meats: { total: number; done: number; allDone: boolean };
 		dishes: { total: number; done: number; allDone: boolean };
@@ -111,6 +113,8 @@
 					pax,
 					scCount,
 					pwdCount,
+					packageId: order?.packageId,
+					packageName: order?.packageName ?? null,
 					createdAt: ticket.createdAt,
 					meats,
 					dishes,
@@ -383,8 +387,7 @@
 				{#each dispatchCards as card (card.orderId)}
 					{@const urgency = urgencyLevel(card.createdAt)}
 					{@const elapsedMin = Math.floor((now - new Date(card.createdAt).getTime()) / 60_000)}
-					{@const cardOrder = orders.value.find(o => o.id === card.orderId)}
-					{@const cardPkg = getPkgColors(cardOrder?.packageId)}
+					{@const cardPkg = getPkgColors(card.packageId)}
 
 					<div class={cn(
 						'flex flex-col rounded-xl border-2 overflow-hidden shadow-sm',
@@ -426,7 +429,7 @@
 							cardPkg ? `${cardPkg.bg} ${cardPkg.border}` : 'bg-amber-50 border-amber-100'
 						)}>
 							<span class={cn('font-semibold', cardPkg?.text ?? 'text-amber-700')}>
-								{cardOrder?.packageName ?? 'Ala-carte'}
+								{card.packageName ?? 'Ala-carte'}
 							</span>
 						</div>
 

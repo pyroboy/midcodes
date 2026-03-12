@@ -112,9 +112,9 @@
 	function itemBadge(item: Order['items'][number]): 'pending' | 'weighing' | 'cooking' | 'served' | null {
 		if (item.status === 'cancelled') return null;
 		const mi = menuItemsById.get(item.menuItemId);
-		if (mi?.category === 'meats' && item.status === 'pending' && item.weight === null) return 'weighing';
-		// Meat is served raw — 'cooking' status only applies to dishes/drinks, never meat
-		if (item.status === 'cooking' && mi?.category !== 'meats') return 'cooking';
+		// Meats: pending+no weight = awaiting scale; cooking = refill being prepped (still "weighing" phase visually)
+		if (mi?.category === 'meats' && (item.status === 'cooking' || (item.status === 'pending' && item.weight === null))) return 'weighing';
+		if (item.status === 'cooking') return 'cooking'; // dishes/drinks only
 		if (item.status === 'served') return 'served';
 		if (item.status === 'pending') return 'pending';
 		return null;
@@ -192,14 +192,17 @@
 	// Fix 4: Flash BILL total when order total changes after pax update
 	let billFlash = $state(false);
 	let prevTotal: number | undefined;
+	let billFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
 	$effect(() => {
 		const total = order?.total;
 		if (prevTotal !== undefined && total !== undefined && total !== prevTotal) {
 			billFlash = true;
-			setTimeout(() => { billFlash = false; }, 500);
+			if (billFlashTimer) clearTimeout(billFlashTimer);
+			billFlashTimer = setTimeout(() => { billFlash = false; billFlashTimer = null; }, 500);
 		}
 		prevTotal = total;
+		return () => { if (billFlashTimer) clearTimeout(billFlashTimer); };
 	});
 
 </script>
@@ -217,7 +220,7 @@
 			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">WEIGHING {order?.createdAt ? formatTimeAgo(order.createdAt) : ''}</span>
 		{/if}
 	{:else if badge === 'cooking'}
-		<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">WEIGHING</span>
+		<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">COOKING</span>
 	{:else if badge === 'served'}
 		<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
 	{/if}
@@ -233,7 +236,7 @@
 			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">{counts.served > 1 ? `${counts.served}× ` : ''}✓ SERVED</span>
 		{/if}
 		{#if counts.cooking > 0}
-			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">{counts.cooking > 1 ? `${counts.cooking}× ` : ''}WEIGHING</span>
+			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">{counts.cooking > 1 ? `${counts.cooking}× ` : ''}COOKING</span>
 		{/if}
 		{#if counts.weighing > 0}
 			{#if session.role === 'manager' || session.role === 'owner'}

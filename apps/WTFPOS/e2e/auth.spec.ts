@@ -49,10 +49,11 @@ test.describe('Auth — Login', () => {
     await expect(page.locator('[aria-label="Table T1"]')).toBeVisible({ timeout: 15000 });
   });
 
-  test('kitchen (pedro) logs in and lands on /kitchen', async ({ page }) => {
-    await fillLogin(page, 'pedro', 'pedro');
+  test('kitchen (corazon) logs in and lands on /kitchen/dispatch', async ({ page }) => {
+    await fillLogin(page, 'corazon', 'corazon');
     await submitLogin(page);
-    await page.waitForURL('**/kitchen', { timeout: 10000 });
+    // Kitchen dispatch user goes directly to /kitchen/dispatch
+    await page.waitForURL('**/kitchen/**', { timeout: 10000 });
     await expect(page).toHaveURL(/\/kitchen/);
   });
 
@@ -60,11 +61,8 @@ test.describe('Auth — Login', () => {
     await fillLogin(page, 'chris', 'chris');
     await submitLogin(page);
     await page.waitForURL('**/pos', { timeout: 10000 });
-    // Owner sees the location picker button in TopBar (MapPin + ChevronDown)
-    // The button shows location name: "All Locations", "Alta Citta", etc.
-    await expect(
-      page.locator('button', { hasText: /All Locations|Alta Citta|Alona Beach \(Panglao\)/i }).first()
-    ).toBeVisible({ timeout: 15000 });
+    // Owner sees the "Change Location" button in the LocationBanner (elevated role only)
+    await expect(page.locator('[data-testid="location-change-btn"]')).toBeVisible({ timeout: 15000 });
   });
 
   test('manager (juan) requires PIN after credentials', async ({ page }) => {
@@ -117,15 +115,16 @@ test.describe('Auth — Branch Scoping', () => {
     await fillLogin(page, 'chris', 'chris');
     await submitLogin(page);
     await page.waitForURL('**/pos', { timeout: 10000 });
-    // Owner's location picker button is visible in TopBar
-    const locBtn = page.locator('button', { hasText: /All Locations|Alta Citta|Alona Beach \(Panglao\)/i }).first();
+    // Owner's LocationBanner shows "Change Location" button (elevated role only)
+    const locBtn = page.locator('[data-testid="location-change-btn"]');
     await expect(locBtn).toBeVisible({ timeout: 15000 });
-    // Click it to open the dropdown
+    // Click to open LocationSelectorModal
     await locBtn.click();
-    // Dropdown shows other locations
-    await expect(page.locator('text=Alta Citta (Tagbilaran)')).toBeVisible({ timeout: 3000 });
+    // Modal shows location buttons — use role selector to target only the button, not hidden sidebar text
+    const tagBtn = page.getByRole('button', { name: 'Alta Citta (Tagbilaran)' });
+    await expect(tagBtn).toBeVisible({ timeout: 3000 });
     // Switch to Alta Citta (Tagbilaran)
-    await page.locator('button', { hasText: 'Alta Citta (Tagbilaran)' }).last().click();
+    await tagBtn.click();
     // Now tables from Tagbilaran should be visible
     await expect(page.locator('[aria-label="Table T1"]')).toBeVisible({ timeout: 15000 });
   });

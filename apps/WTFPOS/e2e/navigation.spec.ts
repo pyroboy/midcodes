@@ -13,15 +13,14 @@ async function loginAs(page: Page, username: string, dest: string) {
 
 async function loginAsOwner(page: Page) {
   await loginAs(page, 'chris', '/pos');
-  // Owner has locationId 'all' — wait for the location picker button (not table cards)
-  await expect(
-    page.locator('button', { hasText: /All Locations|Alta Citta|Alona Beach/i }).first()
-  ).toBeVisible({ timeout: 15000 });
+  // Owner sees LocationBanner with "Change Location" button (data-testid for stability)
+  await expect(page.locator('[data-testid="location-change-btn"]')).toBeVisible({ timeout: 15000 });
 }
 
 async function loginAsKitchen(page: Page) {
-  await loginAs(page, 'pedro', '/kitchen');
-  await page.waitForTimeout(2000);
+  // corazon is the dispatch kitchen user (dest: /kitchen/dispatch)
+  await loginAs(page, 'corazon', '/kitchen/dispatch');
+  await page.waitForTimeout(500);
 }
 
 // ─── POS / Floor routes ───────────────────────────────────────────────────────
@@ -138,7 +137,8 @@ test.describe('Navigation — Admin routes', () => {
   test('/admin/users loads user table', async ({ page }) => {
     await loginAsOwner(page);
     await page.goto('/admin/users');
-    await expect(page.locator('text=Users')).toBeVisible({ timeout: 10000 });
+    // Use heading role to avoid strict mode with nav tab "👤 Users"
+    await expect(page.getByRole('heading', { name: /Users/ })).toBeVisible({ timeout: 10000 });
   });
 
   test('/admin/menu loads menu items table', async ({ page }) => {

@@ -104,10 +104,10 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
 
                 {
                     id: nanoid(),
-                    category: 'Meat Procurement',
+                    category: 'Meat & Protein',
                     amount: 8500,
                     description: 'Pork belly delivery',
-                    paidBy: 'Petty Cash',
+                    paidBy: 'Cash from Register',
                     locationId: 'tag',
                     createdBy: 'Manager',
                     createdAt: new Date().toISOString(),
@@ -115,10 +115,10 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
                 },
                 {
                     id: nanoid(),
-                    category: 'Produce & Sides',
+                    category: 'Sides & Supplies',
                     amount: 1250,
                     description: 'Morning market run for lettuce',
-                    paidBy: 'Petty Cash',
+                    paidBy: 'Cash from Register',
                     locationId: 'pgl',
                     createdBy: 'Manager',
                     createdAt: new Date().toISOString(),
@@ -131,6 +131,21 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
             const auditTs = (minutesAgo: number) => new Date(auditNow - minutesAgo * 60 * 1000).toISOString();
             const auditFmt = (minutesAgo: number) => new Date(auditNow - minutesAgo * 60 * 1000)
                 .toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+
+            // 4b. Seed Expense Templates in localStorage (stays within RxDB 16-collection limit)
+            if (typeof window !== 'undefined' && !localStorage.getItem('wtfpos_expense_templates')) {
+                const tplNow = new Date().toISOString();
+                localStorage.setItem('wtfpos_expense_templates', JSON.stringify([
+                    { id: nanoid(), locationId: 'tag', category: 'Rent', description: 'Monthly Rent', defaultAmount: 80000, paidBy: 'Company Card', recurrence: 'monthly', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                    { id: nanoid(), locationId: 'pgl', category: 'Rent', description: 'Monthly Rent', defaultAmount: 80000, paidBy: 'Company Card', recurrence: 'monthly', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                    { id: nanoid(), locationId: 'tag', category: 'Daily Wages', description: 'Daily Labor Budget', defaultAmount: 8500, paidBy: 'Cash from Register', recurrence: 'daily', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                    { id: nanoid(), locationId: 'pgl', category: 'Daily Wages', description: 'Daily Labor Budget', defaultAmount: 8500, paidBy: 'Cash from Register', recurrence: 'daily', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                    { id: nanoid(), locationId: 'tag', category: 'Internet', description: 'Monthly Internet', defaultAmount: 3000, paidBy: 'Company Card', recurrence: 'monthly', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                    { id: nanoid(), locationId: 'pgl', category: 'Internet', description: 'Monthly Internet', defaultAmount: 3000, paidBy: 'Company Card', recurrence: 'monthly', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                    { id: nanoid(), locationId: 'tag', category: 'Meat & Protein', description: 'Meat Procurement', defaultAmount: 8000, paidBy: 'Cash from Register', recurrence: 'adhoc', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                    { id: nanoid(), locationId: 'tag', category: 'Gas / LPG', description: 'LPG Refill', defaultAmount: 2500, paidBy: 'Cash from Register', recurrence: 'adhoc', isActive: true, createdBy: 'System', createdAt: tplNow, updatedAt: tplNow },
+                ]));
+            }
 
             await db.audit_logs.bulkInsert([
                 { id: 'l-1',  isoTimestamp: auditTs(5),   timestamp: auditFmt(5),   user: 'Maria Santos',   role: 'staff',   action: 'order',   description: 'Added 250g Pork Sliced to T3',                 branch: 'TAG', updatedAt: auditTs(5) },

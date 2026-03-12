@@ -81,29 +81,6 @@
 | **Grand Total** | **15 tablets, 3 mini PCs, 3 routers, 3 printers, 2 cash drawers, 2 scales** | **₱109,000** |
 
 ---
-
-## Notes & Open Items
-
-### What's NOT included (client-provided or separate)
-- GCash / Maya QR stands — client uses separate devices, no integration needed
-- Credit card terminal — not in scope
-- Customer WiFi — separate router, not shared with POS network
-- Internet connection per branch — client arranges ISP (required for owner dashboard + cloud backup in Phase 2)
-- Tablet cases / screen protectors — recommended especially for kitchen tablets near heat/moisture
-
-### Codebase work required for hardware
-| Hardware | Phase | Status |
-|---|---|---|
-| Bluetooth scale | Phase 1 | ⚠️ Partial — connection works, needs auto-reconnect |
-| Receipt printer (USB ESC/POS) | Phase 3 | 🔲 Not started |
-| Cash drawer trigger | Phase 3 | 🔲 Not started — triggered via printer RJ11 |
-| Transfer/delivery slip printer | Phase 3 | 🔲 Not started |
-
-### Recommended purchases
-- Buy **1 extra Android tablet** as a spare per branch — if a kitchen tablet breaks mid-service, swap immediately
-- Add **₱1,000 per branch** for cable management (velcro ties, cable clips, countertop routing)
-- Get **thermal paper rolls in bulk** — Epson 80mm, ~₱50/roll, 20 rolls per branch to start
-
 ### Spare / Buffer recommendation
 
 | Item | Extra Qty | Cost |

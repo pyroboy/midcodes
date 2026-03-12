@@ -57,6 +57,11 @@
     const includedSideCount = $derived(includedItems.filter(p => p.item.category !== 'meats').length);
 
     let dishSearch = $state('');
+    // Clear search when leaving dishes tab so stale query doesn't persist on return.
+    $effect(() => { if (activeCategory !== 'dishes') dishSearch = ''; });
+
+    // O(1) lookup Map — avoids O(n) .find() scans inside tapItem() for each package meat/side
+    const menuItemsById = $derived(new Map(menuItems.value.map(m => [m.id, m])));
 
     const activePax = $derived(order.pax);
     const activeChildPax = $derived(order.childPax ?? 0);
@@ -98,20 +103,20 @@
             pendingItems.push({ item, qty: 1, forceFree: false });
             if (item.meats) {
                 for (const meatId of item.meats) {
-                    const meat = menuItems.value.find(m => m.id === meatId);
+                    const meat = menuItemsById.get(meatId);
                     if (meat) pendingItems.push({ item: meat, qty: 1, forceFree: true });
                 }
             }
             if (item.autoSides) {
                 for (const sideId of item.autoSides) {
-                    const side = menuItems.value.find(m => m.id === sideId);
+                    const side = menuItemsById.get(sideId);
                     if (side) pendingItems.push({ item: side, qty: 1, forceFree: true });
                 }
             }
             // Pax-scaled sides: ceil(pax/6) — e.g. 1 ice tea pitcher per 6 pax
             if (item.scaledAutoSides) {
                 for (const sideId of item.scaledAutoSides) {
-                    const side = menuItems.value.find(m => m.id === sideId);
+                    const side = menuItemsById.get(sideId);
                     if (side) pendingItems.push({ item: side, qty: Math.ceil(activePax / 6), forceFree: true });
                 }
             }

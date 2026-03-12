@@ -21,6 +21,7 @@ import {
 	floorElementSchema,
 	shiftsSchema
 } from './schemas';
+import { LEGACY_CATEGORY_MAP } from '$lib/stores/expenses.utils';
 
 import { dev } from '$app/environment';
 import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
@@ -203,6 +204,12 @@ export async function getDb() {
 						3: (d: any) => addUpdatedAt(d, 'createdAt'), // v2→v3: +updatedAt
 						4: (d: any) => ({ ...d, expenseDate: d.expenseDate ?? null }), // v3→v4: +expenseDate
 						5: (d: any) => d, // v4→v5: schema fix for DB6
+						6: (d: any) => { // v5→v6: category simplification — map legacy categories to new names
+							if (d.category && LEGACY_CATEGORY_MAP[d.category]) {
+								d.category = LEGACY_CATEGORY_MAP[d.category];
+							}
+							return d;
+						},
 					}
 				},
 				stock_counts: {

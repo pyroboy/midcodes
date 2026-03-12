@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
+	import { cn, formatWeight, formatTimeAgo } from '$lib/utils';
 	import { fade, slide } from 'svelte/transition';
 	import { Edit3 } from 'lucide-svelte';
-	import { formatDistanceToNow } from 'date-fns';
 	import type { StockItem, StockStatus } from '$lib/stores/stock.svelte';
+	import { getLastStockEvent } from '$lib/stores/stock.svelte';
 	import CategoryIcon from './CategoryIcon.svelte';
 	import StockLevelBar from './StockLevelBar.svelte';
 
@@ -13,17 +13,11 @@
 		image?: string;
 	}
 
-	function getStatusDisplay(status: StockStatus, currentStock: number, minLevel: number): { label: string; badgeClass: string; dotClass: string } {
-		if (status === 'ok' && currentStock <= 2 * minLevel) {
-			return { label: 'Adequate', badgeClass: 'bg-emerald-50 text-emerald-500 border-emerald-200', dotClass: 'bg-emerald-400' };
-		}
-		const configs: Record<StockStatus, { label: string; badgeClass: string; dotClass: string }> = {
-			ok:       { label: 'Well-Stocked', badgeClass: 'bg-status-green-light text-status-green border-status-green/20',    dotClass: 'bg-status-green' },
-			low:      { label: 'Low Stock',    badgeClass: 'bg-status-yellow-light text-status-yellow border-status-yellow/30', dotClass: 'bg-status-yellow' },
-			critical: { label: 'Critical',     badgeClass: 'bg-status-red-light text-status-red border-status-red/20',          dotClass: 'bg-status-red' },
-		};
-		return configs[status];
-	}
+	const EVENT_LABELS: Record<string, string> = {
+		delivery: 'Delivery',
+		deduction: 'Sold',
+		waste: 'Waste',
+	};
 
 	interface Props {
 		item: InventoryItem;
@@ -35,10 +29,14 @@
 		menuAvailable?: boolean;
 		animate?: boolean;
 		readonly?: boolean;
+		/** When true, suppress category column (already shown in group header) */
+		hideCategory?: boolean;
 	}
 
-	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, onToggle86, menuAvailable = true, animate = false, readonly = false }: Props = $props();
-	const display = $derived(getStatusDisplay(item.status, item.currentStock, item.minLevel));
+	let { item, hoveredItemId = null, onOpenModal, onEditClick, onHover, onToggle86, menuAvailable = true, animate = false, readonly = false, hideCategory = false }: Props = $props();
+
+	const lastEvent = $derived(getLastStockEvent(item.id));
+	const weight = $derived(formatWeight(item.currentStock, item.unit));
 </script>
 
 <tr
@@ -66,25 +64,22 @@
 	</td>
 	<td class="px-4 py-3">
 		<p class="font-medium text-gray-900">{item.name}</p>
-		{#if item.updatedAt}
-			<p class="text-[10px] text-gray-400 mt-0.5">{formatDistanceToNow(new Date(item.updatedAt), { addSuffix: true })}</p>
+		{#if lastEvent}
+			<p class="text-[10px] text-gray-400 mt-0.5">{EVENT_LABELS[lastEvent.type]}: {formatTimeAgo(lastEvent.timestamp)}</p>
 		{/if}
 	</td>
-	<td class="px-4 py-3 text-gray-500 font-medium">
-		{item.category}
-	</td>
+	{#if !hideCategory}
+		<td class="px-4 py-3 text-gray-500 font-medium">
+			{item.category}
+		</td>
+	{/if}
 	<td class="px-4 py-3 w-36">
 		<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} />
 	</td>
 	<td class="px-4 py-3 text-right">
-		<span class="font-mono font-semibold text-gray-900">{item.currentStock.toLocaleString()} {item.unit}</span>
+		<span class="font-mono font-semibold text-gray-900">{weight.display} {weight.unit}</span>
 		<br />
 		<span class="text-xs text-gray-400">Min: {item.minLevel.toLocaleString()}</span>
-	</td>
-	<td class="px-4 py-3 text-center">
-		<span class={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', display.badgeClass)}>
-			{display.label}
-		</span>
 	</td>
 	<td class="px-4 py-3 text-right">
 		{#if !readonly}

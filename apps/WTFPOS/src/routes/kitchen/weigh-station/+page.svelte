@@ -9,7 +9,6 @@
 	import { stockItems, getCurrentStock } from '$lib/stores/stock.svelte';
 	import { printMeatLabel } from '$lib/stores/hardware.svelte';
 	import { Bluetooth, Printer } from 'lucide-svelte';
-	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
 	const SUGGESTED_GRAMS_PER_PAX = 150;
@@ -131,18 +130,7 @@
 		return `wtfpos_dispatched_log_${locationId}`;
 	}
 
-	// P2-11: Restore dispatched log from localStorage on mount
-	onMount(() => {
-		if (!browser) return;
-		try {
-			const raw = localStorage.getItem(dispatchLogKey(session.locationId));
-			if (raw) dispatched = JSON.parse(raw);
-		} catch {
-			dispatched = [];
-		}
-	});
-
-	// Reset dispatched log and selection when location changes (e.g. owner switching branch)
+	// Restore dispatched log from localStorage; also resets on location change for owners
 	$effect(() => {
 		const locId = session.locationId;
 		selectedItem = null;

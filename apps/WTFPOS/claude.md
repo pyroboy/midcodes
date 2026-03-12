@@ -454,6 +454,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | Pre-flight code check before UX audit, scenario viability, trace data flow | `skills/code-audit/SKILL.md` (sub-skill of ux-audit, auto-runs at Gate 0.5) |
 | Generate role scenarios, implementation assessment, user journeys | `skills/user-scenarios/SKILL.md` |
 | Maturity check, PRD alignment, feature completeness, progress report | `skills/check-maturity/SKILL.md` |
+| Report audit, data audit, analytics review, chart check, KPI review | `skills/report-audit/SKILL.md` |
 
 ### By technology keyword
 
@@ -469,6 +470,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | "code audit", "pre-check", "code viability", "trace the flow", "will this work", "dry run" | code-audit (auto-invoked by ux-audit Gate 0.5) |
 | "user scenarios", "create scenarios", "generate scenarios", "role journeys", "as manager", "as staff" | user-scenarios |
 | "maturity", "PRD alignment", "how complete", "how mature", "what's missing", "progress report", "readiness" | check-maturity |
+| "report audit", "data audit", "chart check", "KPI review", "analytics review", "is this chart correct", "wrong chart type", "misleading axis" | report-audit |
 
 ### Skill file locations
 
@@ -482,7 +484,8 @@ skills/
 ├── code-audit/     SKILL.md (v1.0.0 — sub-skill of ux-audit) + references/ (TRACE_TEMPLATES, MISSED_PATTERNS)
 ├── ux-audit/       SKILL.md (v5.1.0 — uses playwright-cli) + references/ (DESIGN_BIBLE, ENVIRONMENT, KNOWN_PATTERNS, PRD_QUICK_REF, BIR_REQUIREMENTS, ROLE_WORKFLOWS) + audits/ (v4+ output) + audits-legacy/ (pre-v4 output)
 ├── user-scenarios/ SKILL.md + references/ (SCENARIO_CONTEXT) + scenarios/ (generated output)
-└── check-maturity/ SKILL.md + references/ (MATURITY_FRAMEWORK) + reports/ (generated output)
+├── check-maturity/ SKILL.md + references/ (MATURITY_FRAMEWORK) + reports/ (generated output)
+└── report-audit/   SKILL.md (v1.0.0 — uses playwright-cli + DATA_ANALYTICS_BIBLE) + audits/ (generated output)
 ```
 
 > **Self-Improvement rule:** When the user corrects something a skill states, update the skill

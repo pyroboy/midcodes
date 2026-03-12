@@ -7,8 +7,13 @@ import { getDb } from '$lib/db';
 import { createRxStore } from '$lib/stores/sync.svelte';
 import { browser } from '$app/environment';
 import { log } from '$lib/stores/audit.svelte';
-export { expenseCategories, expenseCategoryGroups, getCategoryBadgeClass, getCategoryGroup, validateExpense } from '$lib/stores/expenses.utils';
-import { expenseCategories } from '$lib/stores/expenses.utils';
+export {
+    expenseCategories, expenseCategoryGroups,
+    getCategoryBadgeClass, getCategoryGroup, getCategoryIcon,
+    getGroupBorderColor, PAID_BY_OPTIONS, LEGACY_CATEGORY_MAP, resolveCategory,
+    validateExpense
+} from '$lib/stores/expenses.utils';
+import { expenseCategories, validateExpense } from '$lib/stores/expenses.utils';
 
 export interface Expense {
     id: string;
@@ -24,6 +29,20 @@ export interface Expense {
     updatedAt: string;
 }
 
+export interface ExpenseTemplate {
+    id: string;
+    locationId: string;
+    category: string;
+    description: string;
+    defaultAmount: number;
+    paidBy: string;
+    recurrence: 'daily' | 'monthly' | 'adhoc';
+    isActive: boolean;
+    createdBy: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 // Replaces the static array with a reactive RxDB query wrapped in a $derived
 const dbQuery = createRxStore<Expense>('expenses', db => db.expenses.find({ sort: [{ createdAt: 'desc' }] }));
 
@@ -34,44 +53,85 @@ export const allExpenses = {
     }
 };
 
-function validateExpense(category: string, amount: number, description: string, paidBy: string): string | null {
-    if (!category || category.trim() === '') return 'Category is required';
-    if (!expenseCategories.includes(category)) return 'Invalid category';
-    if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) return 'Amount must be a positive number';
-    if (amount > 999999999) return 'Amount exceeds maximum allowed';
-    if (!description || description.trim() === '') return 'Description is required';
-    if (description.length > 500) return 'Description is too long (max 500 characters)';
-    if (!paidBy || paidBy.trim() === '') return 'Paid by is required';
-    if (paidBy.length > 100) return 'Paid by name is too long (max 100 characters)';
-    return null;
+// ─── Templates (localStorage-backed to stay within RxDB 16-collection limit) ─
+const TEMPLATES_KEY = 'wtfpos_expense_templates';
+
+function loadTemplates(): ExpenseTemplate[] {
+    if (!browser) return [];
+    try {
+        const raw = localStorage.getItem(TEMPLATES_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
 }
 
+function saveTemplates(templates: ExpenseTemplate[]) {
+    if (!browser) return;
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+}
+
+let _templates = $state<ExpenseTemplate[]>(loadTemplates());
+
+export const allTemplates = {
+    get value(): ExpenseTemplate[] {
+        return _templates;
+    }
+};
+
+export async function addTemplate(
+    template: Omit<ExpenseTemplate, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<{ success: boolean; error?: string; id?: string }> {
+    if (!browser) return { success: false, error: 'Not in browser environment' };
+
+    const now = new Date().toISOString();
+    const doc: ExpenseTemplate = {
+        ...template,
+        id: nanoid(),
+        createdAt: now,
+        updatedAt: now,
+    };
+
+    _templates = [doc, ..._templates];
+    saveTemplates(_templates);
+    return { success: true, id: doc.id };
+}
+
+export async function updateTemplate(
+    id: string,
+    updates: Partial<Omit<ExpenseTemplate, 'id' | 'createdAt'>>
+): Promise<{ success: boolean; error?: string }> {
+    if (!browser) return { success: false, error: 'Not in browser environment' };
+
+    const idx = _templates.findIndex(t => t.id === id);
+    if (idx === -1) return { success: false, error: 'Template not found' };
+
+    _templates[idx] = { ..._templates[idx], ...updates, updatedAt: new Date().toISOString() };
+    _templates = [..._templates];
+    saveTemplates(_templates);
+    return { success: true };
+}
+
+export async function deleteTemplate(id: string): Promise<{ success: boolean; error?: string }> {
+    if (!browser) return { success: false, error: 'Not in browser environment' };
+
+    _templates = _templates.filter(t => t.id !== id);
+    saveTemplates(_templates);
+    return { success: true };
+}
+
+// ─── Expense CRUD ─────────────────────────────────────────────────────────────
 export async function addExpense(category: string, amount: number, description: string, paidBy: string, receiptPhoto?: string, expenseDate?: string): Promise<{ success: boolean; error?: string; id?: string }> {
-    console.log('[EXPENSE_DEBUG] addExpense called:', { category, amount, description, paidBy, receiptPhoto });
-    
     if (!browser) {
-        console.error('[EXPENSE_DEBUG] Not in browser environment');
         return { success: false, error: 'Not in browser environment' };
     }
-    
+
     // Validate inputs
     const validationError = validateExpense(category, amount, description, paidBy);
     if (validationError) {
-        console.error('[EXPENSE_DEBUG] Validation failed:', validationError);
         return { success: false, error: validationError };
     }
-    
-    // DEBUG: Check if receiptPhoto is a blob URL that won't persist
-    if (receiptPhoto) {
-        console.warn('[EXPENSE_DEBUG] Receipt photo provided:', receiptPhoto.substring(0, 100) + '...');
-        if (receiptPhoto.startsWith('blob:')) {
-            console.error('[EXPENSE_DEBUG] CRITICAL: Blob URL will not persist after page reload!');
-        }
-    }
-    
+
     const locationId = session.locationId === 'all' ? 'tag' : session.locationId;
-    console.log('[EXPENSE_DEBUG] Using locationId:', locationId, '(session.locationId:', session.locationId + ')');
-    
+
     const expense: Expense = {
         id: nanoid(),
         category: category.trim(),
@@ -85,19 +145,17 @@ export async function addExpense(category: string, amount: number, description: 
         ...(expenseDate && { expenseDate }),
         ...(receiptPhoto && { receiptPhoto })
     };
-    
+
     try {
         const db = await getDb();
         await db.expenses.insert(expense);
-        
-        console.log('[EXPENSE_DEBUG] Expense saved successfully:', expense.id);
-        
+
         // Log to audit
         log.expenseLogged(category, amount, description);
-        
+
         return { success: true, id: expense.id };
     } catch (err) {
-        console.error('[EXPENSE_DEBUG] Failed to add expense:', err);
+        console.error('[EXPENSE] Failed to add expense:', err);
         return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
     }
 }
@@ -105,7 +163,7 @@ export async function addExpense(category: string, amount: number, description: 
 export async function deleteExpense(id: string, _snapshot?: unknown): Promise<{ success: boolean; error?: string }> {
     if (!browser) return { success: false, error: 'Not in browser environment' };
     if (!id || typeof id !== 'string') return { success: false, error: 'Invalid expense ID' };
-    
+
     try {
         const db = await getDb();
         const doc = await db.expenses.findOne(id).exec();
@@ -119,4 +177,3 @@ export async function deleteExpense(id: string, _snapshot?: unknown): Promise<{ 
         return { success: false, error: err instanceof Error ? err.message : 'Unknown error occurred' };
     }
 }
-

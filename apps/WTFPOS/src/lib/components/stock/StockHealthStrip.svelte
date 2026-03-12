@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
-	import { stockItems, getStockStatus, type StockStatus } from '$lib/stores/stock.svelte';
+	import { stockItems, getStockStatus, getCurrentStock, getSpoilageAlerts, type StockStatus } from '$lib/stores/stock.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { Package, CheckCircle, AlertTriangle, AlertOctagon } from 'lucide-svelte';
 
@@ -20,6 +20,25 @@
 	const okCount = $derived(itemsWithStatus.filter(s => s === 'ok').length);
 	const lowCount = $derived(itemsWithStatus.filter(s => s === 'low').length);
 	const criticalCount = $derived(itemsWithStatus.filter(s => s === 'critical').length);
+
+	/** Items with 'ok' status but currentStock <= 1.5x minLevel — approaching low threshold */
+	const approachingLow = $derived(
+		items.filter((s, i) => {
+			if (itemsWithStatus[i] !== 'ok') return false;
+			const current = getCurrentStock(s.id);
+			return current <= s.minLevel * 1.5;
+		}).length
+	);
+
+	/** Total weight of all meat items (unit === 'g') in kg */
+	const totalMeatWeightKg = $derived(
+		items
+			.filter(s => s.unit === 'g')
+			.reduce((sum, s) => sum + getCurrentStock(s.id), 0) / 1000
+	);
+
+	/** Spoilage alerts (batches expiring within 3 days) */
+	const spoilageCount = $derived(getSpoilageAlerts().length);
 </script>
 
 <div class="flex items-stretch gap-3 w-full shrink-0">
@@ -37,6 +56,9 @@
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total Items</p>
 				<p class="text-xl font-black text-gray-900 leading-none mt-1">{total}</p>
+				{#if totalMeatWeightKg > 0}
+					<p class="text-[10px] text-gray-400 mt-0.5">{totalMeatWeightKg.toFixed(1)} kg meat on hand</p>
+				{/if}
 			</div>
 		</div>
 	</button>
@@ -57,6 +79,9 @@
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-wider text-status-green/70">OK</p>
 				<p class="text-xl font-black text-status-green leading-none mt-1">{okCount}</p>
+				{#if approachingLow > 0}
+					<p class="text-[10px] text-status-yellow mt-0.5">{approachingLow} approaching low</p>
+				{/if}
 			</div>
 		</div>
 	</button>
@@ -77,6 +102,11 @@
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-wider text-status-yellow/70">Low Stock</p>
 				<p class="text-xl font-black text-status-yellow leading-none mt-1">{lowCount}</p>
+				{#if lowCount === 0 && approachingLow > 0}
+					<p class="text-[10px] text-status-yellow/70 mt-0.5">{approachingLow} nearing threshold</p>
+				{:else if lowCount === 0}
+					<p class="text-[10px] text-gray-400 mt-0.5">None — all healthy</p>
+				{/if}
 			</div>
 		</div>
 	</button>
@@ -97,6 +127,11 @@
 			<div>
 				<p class="text-[10px] font-bold uppercase tracking-wider text-status-red/70">Critical</p>
 				<p class="text-xl font-black text-status-red leading-none mt-1">{criticalCount}</p>
+				{#if spoilageCount > 0}
+					<p class="text-[10px] text-status-red/70 mt-0.5">{spoilageCount} batch{spoilageCount > 1 ? 'es' : ''} expiring</p>
+				{:else if criticalCount === 0}
+					<p class="text-[10px] text-gray-400 mt-0.5">No alerts</p>
+				{/if}
 			</div>
 		</div>
 	</button>

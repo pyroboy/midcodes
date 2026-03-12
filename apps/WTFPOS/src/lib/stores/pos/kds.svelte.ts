@@ -1,7 +1,7 @@
 /**
  * POS KDS — Kitchen Display System state and ticket management.
  */
-import type { KdsTicket } from '$lib/types';
+import type { KdsTicket, KdsTicketItem } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { log } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
@@ -42,7 +42,7 @@ export async function recallTicket(orderId: string) {
 	if (!historyDoc) return;
 
 	const entry = historyDoc.toJSON();
-	const restoredItems = entry.items.map((i: any) => i.status === 'served' ? { ...i, status: 'pending' } : i);
+	const restoredItems = entry.items.map((i: KdsTicketItem) => i.status === 'served' ? { ...i, status: 'pending' as const } : i);
 
 	const existingTicket = await db.kds_tickets.findOne({ selector: { orderId, bumpedAt: null } }).exec();
 	if (existingTicket) {
@@ -61,7 +61,7 @@ export async function recallTicket(orderId: string) {
 	const orderDoc = await db.orders.findOne(orderId).exec();
 	if (orderDoc) {
 		await orderDoc.incrementalModify((doc: any) => {
-			doc.items = doc.items.map((i: any) => i.status === 'served' ? { ...i, status: 'pending' } : i);
+			doc.items = doc.items.map((i: KdsTicketItem) => i.status === 'served' ? { ...i, status: 'pending' as const } : i);
 			doc.updatedAt = new Date().toISOString();
 			return doc;
 		});
@@ -71,6 +71,7 @@ export async function recallTicket(orderId: string) {
 }
 
 export async function recallLastTicket() {
-	if (kdsTicketHistory.value.length === 0) return;
-	await recallTicket(kdsTicketHistory.value[0].orderId);
+	const first = kdsTicketHistory.value[0];
+	if (!first) return;
+	await recallTicket(first.orderId);
 }

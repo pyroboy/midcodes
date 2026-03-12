@@ -9,6 +9,7 @@
 	import { initConnectionMonitor } from '$lib/stores/connection.svelte';
 	import { initDeviceHeartbeat } from '$lib/stores/device.svelte';
 	import { initDbHealthCheck } from '$lib/stores/db-health.svelte';
+	import { pruneOldData } from '$lib/db/cleanup';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -39,6 +40,7 @@
 		initConnectionMonitor();
 		initDeviceHeartbeat();
 		initDbHealthCheck();
+		pruneOldData(); // background cleanup — non-blocking
 
 		if (!import.meta.env.DEV) return;
 

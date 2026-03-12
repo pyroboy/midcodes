@@ -26,7 +26,8 @@
             capacity: 4,
             x: 0,
             y: 0,
-            status: 'available'
+            status: 'available',
+            updatedAt: new Date().toISOString()
         });
 
         newTableName = '';

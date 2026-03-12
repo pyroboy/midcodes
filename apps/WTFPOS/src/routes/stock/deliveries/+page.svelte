@@ -277,7 +277,7 @@
 <!-- Issue 16: Procurement expense CTA (shown after delivery with unit cost) -->
 {#if lastSavedDelivery}
 	{@const procurementParams = new URLSearchParams({
-		category: 'Meat Procurement',
+		category: 'Meat & Protein',
 		amount: String(lastSavedDelivery.totalCost),
 		description: `${lastSavedDelivery.itemName} ${lastSavedDelivery.qty}${lastSavedDelivery.unit}`
 	})}

@@ -14,9 +14,14 @@ async function login(page: Page) {
 
 async function openTableWithPax(page: Page, tableLabel: string, pax: number) {
   await page.locator(`[aria-label="Table ${tableLabel}"]`).click();
-  await expect(page.locator('h3', { hasText: 'How many guests' })).toBeVisible();
-  await page.locator('.pos-card button', { hasText: new RegExp(`^${pax}$`) }).click();
-  await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible();
+  await expect(page.locator('h3', { hasText: 'How many guests' })).toBeVisible({ timeout: 8000 });
+  // New PaxModal uses stepper — click + for Adults pax times
+  const adultPlusBtn = page.locator('.pos-card button').filter({ hasText: /^\+$/ }).first();
+  for (let i = 0; i < pax; i++) {
+    await adultPlusBtn.click();
+  }
+  await page.locator('.pos-card button', { hasText: 'Confirm' }).click();
+  await expect(page.locator('h2', { hasText: 'Add to Order' })).toBeVisible({ timeout: 8000 });
 }
 
 async function selectPackageAndCharge(page: Page, packageName: string) {
@@ -25,8 +30,14 @@ async function selectPackageAndCharge(page: Page, packageName: string) {
 }
 
 async function skipLeftoverPenalty(page: Page) {
-  await expect(page.locator('h2', { hasText: 'Leftover Penalty?' })).toBeVisible();
-  await page.locator('button', { hasText: 'Skip / Checkout' }).click();
+  await expect(page.locator('h2', { hasText: 'Leftover Check' })).toBeVisible();
+  await page.locator('button', { hasText: 'No Leftovers' }).click();
+}
+
+async function enterManagerPin(page: Page, pin = '1234') {
+  for (const digit of pin) {
+    await page.locator('.pos-card button', { hasText: new RegExp(`^${digit}$`) }).click();
+  }
 }
 
 async function openCheckout(page: Page) {
@@ -50,15 +61,16 @@ async function confirmExactCash(page: Page) {
 test('Discount: Promo — apply promo discount at checkout', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T1', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
 
-  // Apply promo discount
+  // Apply promo discount — requires manager PIN
   const promoBtn = page.locator('button', { hasText: /Promo/i });
   if (await promoBtn.count() > 0) {
     await promoBtn.click();
-    // Discount amount should change
-    await expect(page.locator('text=/Discount|discount/i').first()).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('h3', { hasText: /Authorize Promo/i })).toBeVisible({ timeout: 5000 });
+    await enterManagerPin(page);
+    await page.locator('button', { hasText: 'Authorize' }).click();
   }
 
   await confirmExactCash(page);
@@ -69,13 +81,15 @@ test('Discount: Promo — apply promo discount at checkout', async ({ page }) =>
 test('Discount: Comp — apply complimentary (write-off) discount', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T2', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
 
   const compBtn = page.locator('button', { hasText: /Comp|Complimentary/i });
   if (await compBtn.count() > 0) {
     await compBtn.click();
-    await expect(page.locator('body')).not.toContainText('Error');
+    await expect(page.locator('h3', { hasText: /Authorize Comp/i })).toBeVisible({ timeout: 5000 });
+    await enterManagerPin(page);
+    await page.locator('button', { hasText: 'Authorize' }).click();
   }
 
   await confirmExactCash(page);
@@ -86,13 +100,15 @@ test('Discount: Comp — apply complimentary (write-off) discount', async ({ pag
 test('Discount: Service Recovery — apply service recovery discount', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T3', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
 
   const srBtn = page.locator('button', { hasText: /Service Recovery|Recovery/i });
   if (await srBtn.count() > 0) {
     await srBtn.click();
-    await expect(page.locator('body')).not.toContainText('Error');
+    await expect(page.locator('h3', { hasText: /Authorize Service/i })).toBeVisible({ timeout: 5000 });
+    await enterManagerPin(page);
+    await page.locator('button', { hasText: 'Authorize' }).click();
   }
 
   await confirmExactCash(page);
@@ -103,12 +119,15 @@ test('Discount: Service Recovery — apply service recovery discount', async ({ 
 test('Discount: Senior Citizen — 4 pax, 3 qualifying SC, pay cash', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T4', 4);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
 
-  // Apply SC discount
+  // Apply SC discount — requires manager PIN authorization
   const checkout = page.locator('.pos-card', { hasText: 'Checkout' }).first();
   await checkout.locator('button', { hasText: 'Senior' }).click();
+  await expect(page.locator('h3', { hasText: 'Authorize Senior Citizen' })).toBeVisible({ timeout: 5000 });
+  await enterManagerPin(page);
+  await page.locator('button', { hasText: 'Authorize' }).click();
 
   // Adjust qualifying pax count to 3
   const paxInput = page.locator('input[type="number"]').first();
@@ -131,11 +150,14 @@ test('Discount: Senior Citizen — 4 pax, 3 qualifying SC, pay cash', async ({ p
 test('Discount: PWD — 3 pax, 2 qualifying PWD, pay cash', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T5', 3);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
   await openCheckout(page);
 
   const checkout = page.locator('.pos-card', { hasText: 'Checkout' }).first();
   await checkout.locator('button', { hasText: 'PWD' }).click();
+  await expect(page.locator('h3', { hasText: 'Authorize PWD' })).toBeVisible({ timeout: 5000 });
+  await enterManagerPin(page);
+  await page.locator('button', { hasText: 'Authorize' }).click();
 
   // Adjust qualifying pax to 2
   const paxInput = page.locator('input[type="number"]').first();
@@ -157,23 +179,15 @@ test('Discount: PWD — 3 pax, 2 qualifying PWD, pay cash', async ({ page }) => 
 test('Void: walkout — open table, add package, void with walkout reason', async ({ page }) => {
   await login(page);
   await openTableWithPax(page, 'T6', 2);
-  await selectPackageAndCharge(page, 'Unli Pork');
+  await selectPackageAndCharge(page, 'Pork Unlimited');
 
-  // Click Void
+  // Click Void — opens ManagerPinModal for authorization
   await page.locator('button', { hasText: 'Void' }).click();
-  await expect(page.locator('h3', { hasText: 'Void Order' })).toBeVisible();
-
-  // Select Walkout reason
-  const walkoutOption = page.locator('button, label', { hasText: /Walkout/i });
-  if (await walkoutOption.count() > 0) {
-    await walkoutOption.click();
-  }
+  await expect(page.locator('h3', { hasText: 'Void Entire Order' })).toBeVisible({ timeout: 5000 });
 
   // Enter PIN and confirm
-  for (const digit of '1234') {
-    await page.locator('.pos-card button', { hasText: new RegExp(`^${digit}$`) }).click();
-  }
-  await page.locator('button', { hasText: 'Confirm Void' }).click();
+  await enterManagerPin(page);
+  await page.locator('button', { hasText: 'Void Order' }).click();
   await expect(page.locator('[aria-label="Table T6"]')).toBeVisible();
 });
 

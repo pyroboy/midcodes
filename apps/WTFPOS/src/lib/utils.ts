@@ -34,6 +34,26 @@ export function formatKg(grams: number): string {
 	return grams >= 1000 ? `${(grams / 1000).toFixed(1)}kg` : `${grams}g`;
 }
 
+/**
+ * Format stock weight with auto-promotion: g → kg at ≥1000g.
+ * Returns { display, unit } for flexible rendering.
+ * Examples: formatWeight(38191, 'g') → { display: '38.2', unit: 'kg' }
+ *           formatWeight(500, 'g')   → { display: '500', unit: 'g' }
+ *           formatWeight(36, 'bottles') → { display: '36', unit: 'bottles' }
+ */
+export function formatWeight(value: number, unit: string): { display: string; unit: string } {
+	if (unit === 'g' && value >= 1000) {
+		return { display: (value / 1000).toFixed(1), unit: 'kg' };
+	}
+	return { display: value.toLocaleString(), unit };
+}
+
+/** Format stock weight as a single string: "38.2 kg" or "36 bottles" */
+export function formatWeightStr(value: number, unit: string): string {
+	const w = formatWeight(value, unit);
+	return `${w.display} ${w.unit}`;
+}
+
 /** Format an ISO timestamp as "6:00 AM" */
 export function formatTime(isoTimestamp: string): string {
 	return new Date(isoTimestamp).toLocaleTimeString('en-PH', {

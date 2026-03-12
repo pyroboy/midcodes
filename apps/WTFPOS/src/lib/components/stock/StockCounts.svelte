@@ -9,6 +9,7 @@
 	import { Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import QuickNumberInput from './QuickNumberInput.svelte';
 	import VarianceBar from './VarianceBar.svelte';
+	import VarianceChart, { type VariancePoint } from './VarianceChart.svelte';
 
 	let activePeriod = $state<CountPeriod>('pm10');
 
@@ -85,6 +86,20 @@
 	);
 	const totalAbsVariance = $derived(driftEntries.reduce((s, d) => s + Math.abs(d), 0));
 	const itemsWithDrift   = $derived(driftEntries.filter(d => d !== 0).length);
+
+	// Chart data for completed periods
+	const varianceChartData = $derived<VariancePoint[]>(
+		branchItems.map(item => {
+			const drift = getDrift(item.id, activePeriod);
+			return {
+				label: item.name,
+				drift: drift ?? 0,
+				expected: getCurrentStock(item.id),
+				unit: item.unit ?? 'pcs',
+				category: item.category ?? 'Other',
+			};
+		})
+	);
 
 	// Percentage-based variance threshold (>10% of expected is flagged)
 	function varianceClass(item: typeof branchItems[0], v: number | null) {
@@ -173,6 +188,19 @@
 			</p>
 		</div>
 	</div>
+
+	<!-- Variance diverging chart -->
+	{#if driftEntries.length > 0}
+		<div class="mb-4 rounded-xl border border-border bg-white p-4">
+			<div class="mb-3 flex items-center justify-between">
+				<h3 class="text-sm font-bold text-gray-700">Variance Overview</h3>
+				<span class="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+					{itemsWithDrift} item{itemsWithDrift === 1 ? '' : 's'} with drift
+				</span>
+			</div>
+			<VarianceChart data={varianceChartData} />
+		</div>
+	{/if}
 {/if}
 
 <div class="overflow-hidden rounded-xl border border-border bg-white">
