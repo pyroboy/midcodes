@@ -73,7 +73,7 @@
 			{item.category}
 		</td>
 	{/if}
-	<td class="px-4 py-3 w-36">
+	<td class="px-4 py-3 w-24 lg:w-36">
 		<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} />
 	</td>
 	<td class="px-4 py-3 text-right">

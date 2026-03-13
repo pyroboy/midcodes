@@ -64,7 +64,7 @@
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-3 gap-4 flex-1">
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
 			{#if tab === 'meat'}
 				<KpiCard label="Total Weighed Out" value="{(totalMeatWeight / 1000).toFixed(1)} kg" />
 				<KpiCard label="Meat Revenue" value={formatPeso(totalMeatRevenue)} />
@@ -91,13 +91,13 @@
 
 	{#snippet content()}
 		{#if tab === 'meat' && meatItems.length > 0}
-			<div class="overflow-hidden rounded-xl border border-border bg-white">
+			<div class="overflow-x-auto rounded-xl border border-border bg-white">
 				<table class="w-full text-sm">
 					<thead>
 						<tr class="border-b border-border bg-gray-50">
 							<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">#</th>
 							<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Meat Cut</th>
-							<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Weight (g)</th>
+							<th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Weight (g)</th>
 							<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Weight (kg)</th>
 							<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Revenue</th>
 						</tr>
@@ -107,7 +107,7 @@
 							<tr class="hover:bg-gray-50">
 								<td class="px-4 py-3 text-gray-400">{item.rank}</td>
 								<td class="px-4 py-3 font-medium text-gray-900">{item.name}</td>
-								<td class="px-4 py-3 text-right font-mono text-gray-700">{item.weightGrams.toLocaleString()}g</td>
+								<td class="hidden sm:table-cell px-4 py-3 text-right font-mono text-gray-700">{item.weightGrams.toLocaleString()}g</td>
 								<td class="px-4 py-3 text-right font-mono text-gray-500">{(item.weightGrams / 1000).toFixed(2)} kg</td>
 								<td class="px-4 py-3 text-right font-mono font-semibold text-gray-900">{formatPeso(item.revenue)}</td>
 							</tr>
@@ -116,7 +116,7 @@
 				</table>
 			</div>
 		{:else if tab === 'addons' && addonItems.length > 0}
-			<div class="overflow-hidden rounded-xl border border-border bg-white">
+			<div class="overflow-x-auto rounded-xl border border-border bg-white">
 				<table class="w-full text-sm">
 					<thead>
 						<tr class="border-b border-border bg-gray-50">

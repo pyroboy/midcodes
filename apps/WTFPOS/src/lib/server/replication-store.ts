@@ -196,11 +196,15 @@ class CollectionStore {
 			.map(entry => this.docs.get(entry.pk))
 			.filter((doc): doc is NonNullable<typeof doc> => {
 				if (!doc) return false;
-				// Skip probe/diagnostic/test documents that don't conform to user schemas
+				// Skip probe/diagnostic documents that don't conform to user schemas.
+				// NOTE: __repltest_ is NOT filtered here — the round-trip diagnostic test
+				// needs to push+pull its test doc via HTTP. The SSE stream has its own
+				// independent filter (TEST_DOC_PREFIXES) that prevents probe docs from
+				// reaching RxDB clients.
 				const docId = pk(this.name, doc);
 				if (typeof docId !== 'string') return true;
 				return !docId.startsWith('__ping_') && !docId.startsWith('__diag_')
-					&& !docId.startsWith('__repltest_') && !docId.startsWith('__synctest_')
+					&& !docId.startsWith('__synctest_')
 					&& !docId.startsWith('__syncprobe_');
 			});
 
@@ -298,7 +302,7 @@ const VALID_COLLECTIONS = new Set([
 	'tables', 'orders', 'menu_items', 'stock_items', 'deliveries',
 	'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'devices',
 	'kds_tickets', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
-	'floor_elements'
+	'floor_elements', 'shifts'
 ]);
 
 const stores = new Map<string, CollectionStore>();

@@ -275,7 +275,7 @@
 				<KpiCard label="Transfers" value={String(transferLog.length)} />
 			</div>
 		{:else}
-			<div class="grid grid-cols-3 gap-3 flex-1">
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
 				<KpiCard label="Total Revenue" value={formatPeso(totalMeatRevenue)} variant="accent" />
 				<KpiCard label="Top Cut" value={report.rows.sort((a, b) => b.soldRevenue - a.soldRevenue)[0]?.cut ?? '—'} variant="success" />
 				<KpiCard label="Cuts Tracked" value={String(report.rows.length)} />
@@ -366,9 +366,9 @@
 					</div>
 				{/if}
 
-				<div class="overflow-hidden rounded-xl border border-border bg-white">
+				<div class="overflow-x-auto overflow-hidden rounded-xl border border-border bg-white">
 					<div class="max-h-[calc(100vh-380px)] overflow-y-auto">
-						<table class="w-full text-sm">
+						<table class="min-w-[700px] w-full text-sm">
 							<thead class="sticky top-0 z-10">
 								<tr class="border-b border-border bg-gray-50">
 									<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Cut</th>
@@ -481,13 +481,13 @@
 				<MeatFlowBar rows={report.rows} {period} />
 
 				<!-- Transfer Log Table -->
-				<div class="overflow-hidden rounded-xl border border-border bg-white">
+				<div class="overflow-x-auto overflow-hidden rounded-xl border border-border bg-white">
 					<div class="border-b border-border bg-gray-50 px-4 py-2.5">
 						<h3 class="text-xs font-bold uppercase tracking-wide text-gray-500">Transfer Log</h3>
 					</div>
 					<div class="max-h-[calc(100vh-420px)] overflow-y-auto">
 						{#if transferLog.length > 0}
-							<table class="w-full text-sm">
+							<table class="min-w-[550px] w-full text-sm">
 								<thead class="sticky top-0 z-10">
 									<tr class="border-b border-border bg-gray-50">
 										<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Time</th>

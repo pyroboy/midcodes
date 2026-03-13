@@ -111,9 +111,9 @@
 {#if isOpen && order}
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onclick={onclose}>
+<div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4" onclick={onclose}>
 	<div
-		class="w-full max-w-sm rounded-2xl bg-surface shadow-2xl pos-card flex flex-col overflow-hidden"
+		class="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl bg-surface shadow-2xl pos-card flex flex-col overflow-hidden max-h-[90vh] sm:max-h-[80vh]"
 		onclick={(e) => e.stopPropagation()}
 	>
 		<!-- Header -->
@@ -139,7 +139,7 @@
 				<div>
 					<!-- P2-1: section label 10px → 12px -->
 					<p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Meats</p>
-					<div class="grid grid-cols-3 gap-2">
+					<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
 						{#each refillMeats as meat (meat.id)}
 							{@const isPending = pendingRefillMeatIds.has(meat.id)}
 							<!-- P0-1: tap feedback overlay + relative/overflow-hidden -->

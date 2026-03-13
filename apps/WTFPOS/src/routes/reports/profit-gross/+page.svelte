@@ -48,7 +48,7 @@
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-4 gap-4 flex-1">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 flex-1">
 			<KpiCard
 				label="Net Revenue"
 				value={formatPeso(revenue)}
@@ -71,9 +71,9 @@
 	{/snippet}
 
 	{#snippet content()}
-		<div class="grid grid-cols-[1fr_380px] gap-6">
+		<div class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
 			<!-- COGS breakdown table -->
-			<div class="overflow-hidden rounded-xl border border-border bg-white">
+			<div class="overflow-x-auto rounded-xl border border-border bg-white">
 				<table class="w-full text-sm">
 					<thead>
 						<tr class="border-b border-border bg-gray-50">

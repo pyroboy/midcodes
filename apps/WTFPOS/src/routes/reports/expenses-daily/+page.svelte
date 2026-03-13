@@ -184,7 +184,7 @@
 <!-- ── Expense entry modal ─────────────────────────────────────────────────── -->
 {#if formOpen}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="pos-card w-[560px] max-h-[90vh] overflow-y-auto flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[560px] mx-3 max-h-[90vh] overflow-y-auto flex flex-col gap-5">
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">Log New Expense</h3>
 				<button onclick={() => { formOpen = false; resetForm(); }} class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
@@ -195,7 +195,7 @@
 			<!-- Category pills -->
 			<div>
 				<span class="text-xs font-bold uppercase tracking-widest text-gray-400 block mb-2">Category</span>
-				<div class="grid grid-cols-4 gap-2">
+				<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
 					{#each expenseCategories as cat}
 						<button
 							onclick={() => (entryCategory = cat)}
@@ -301,9 +301,9 @@
 			showLive={false}
 		>
 			{#snippet actions()}
-				<button onclick={() => { formOpen = true; }} class="btn-primary flex items-center gap-2 shadow-sm">
-					<span class="flex h-5 w-5 items-center justify-center rounded text-sm font-bold">+</span>
-					Log New Expense
+				<button onclick={() => { formOpen = true; }} class="btn-primary flex items-center sm:gap-2 shadow-sm sm:px-6 px-3">
+					<span class="flex items-center justify-center rounded text-lg sm:text-sm font-bold">+</span>
+					<span class="hidden sm:inline">Log New Expense</span>
 				</button>
 			{/snippet}
 		</ReportFilterBar>
@@ -377,27 +377,27 @@
 		</div>
 
 		<!-- Category table -->
-		<div class="mb-5 overflow-hidden rounded-xl border border-border bg-white">
-			<table class="w-full text-sm">
+		<div class="mb-5 overflow-x-auto rounded-xl border border-border bg-white">
+			<table class="w-full text-sm min-w-[400px]">
 				<thead>
 					<tr class="border-b border-border bg-gray-50">
-						<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Category</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</th>
-						<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">% of Sales</th>
-						<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Proportion</th>
+						<th class="px-3 sm:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Category</th>
+						<th class="px-3 sm:px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</th>
+						<th class="px-3 sm:px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 hidden sm:table-cell">% of Sales</th>
+						<th class="px-3 sm:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 hidden sm:table-cell">Proportion</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-border">
 					{#each filteredItems as item}
 						<tr class="hover:bg-gray-50">
-							<td class="px-4 py-3 font-medium text-gray-900">
+							<td class="px-3 sm:px-4 py-3 font-medium text-gray-900">
 								<span class="mr-2" aria-hidden="true">{item.icon}</span>{item.category}
 							</td>
-							<td class="px-4 py-3 text-right font-mono text-gray-700">{formatPeso(item.amount)}</td>
-							<td class="px-4 py-3 text-right font-mono text-gray-500">
+							<td class="px-3 sm:px-4 py-3 text-right font-mono text-gray-700">{formatPeso(item.amount)}</td>
+							<td class="px-3 sm:px-4 py-3 text-right font-mono text-gray-500 hidden sm:table-cell">
 								{currentSales > 0 ? item.pctOfSales + '%' : '—'}
 							</td>
-							<td class="px-4 py-3">
+							<td class="px-3 sm:px-4 py-3 hidden sm:table-cell">
 								<!-- [04] Scale relative to max category amount -->
 								<div class="h-2 w-full overflow-hidden rounded-full bg-gray-100" aria-label="{item.category}: {formatPeso(item.amount)}">
 									<div class="h-full rounded-full bg-status-red/60" style="width: {(item.amount / maxCategoryAmount) * 100}%"></div>
@@ -407,12 +407,12 @@
 					{/each}
 					{#if filteredItems.length > 0}
 						<tr class="border-t-2 border-border bg-gray-50 font-bold">
-							<td class="px-4 py-3 text-gray-900">TOTAL</td>
-							<td class="px-4 py-3 text-right font-mono text-gray-900">{formatPeso(totalExpenses)}</td>
-							<td class="px-4 py-3 text-right font-mono text-gray-900">
+							<td class="px-3 sm:px-4 py-3 text-gray-900">TOTAL</td>
+							<td class="px-3 sm:px-4 py-3 text-right font-mono text-gray-900">{formatPeso(totalExpenses)}</td>
+							<td class="px-3 sm:px-4 py-3 text-right font-mono text-gray-900 hidden sm:table-cell">
 								{currentSales > 0 ? (totalExpenses / currentSales * 100).toFixed(1) + '%' : '—'}
 							</td>
-							<td></td>
+							<td class="hidden sm:table-cell"></td>
 						</tr>
 					{/if}
 				</tbody>
@@ -457,34 +457,36 @@
 				</button>
 
 				{#if showRecentEntries}
-					<table class="w-full text-sm">
+					<div class="overflow-x-auto">
+					<table class="w-full text-sm min-w-[500px]">
 						<thead>
 							<tr class="border-b border-border bg-gray-50">
-								<th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Time</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Category</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Description</th>
-								<th class="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Paid By</th>
-								<th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Logged By</th>
+								<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Time</th>
+								<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Category</th>
+								<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 hidden sm:table-cell">Description</th>
+								<th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Amount</th>
+								<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 hidden md:table-cell">Paid By</th>
+								<th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-400 hidden md:table-cell">Logged By</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-border">
 							{#each recentEntries as entry (entry.id)}
 								<tr class="hover:bg-gray-50">
-									<td class="px-4 py-2 text-xs text-gray-500 font-mono whitespace-nowrap">
+									<td class="px-3 py-2 text-xs text-gray-500 font-mono whitespace-nowrap">
 										{new Date(entry.createdAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
 									</td>
-									<td class="px-4 py-2 text-gray-700 whitespace-nowrap">
+									<td class="px-3 py-2 text-gray-700 whitespace-nowrap">
 										<span aria-hidden="true">{getCategoryIcon(entry.category)}</span> {entry.category}
 									</td>
-									<td class="px-4 py-2 text-gray-600 max-w-[200px] truncate">{entry.description}</td>
-									<td class="px-4 py-2 text-right font-mono font-semibold text-gray-900">{formatPeso(entry.amount)}</td>
-									<td class="px-4 py-2 text-xs text-gray-500">{entry.paidBy}</td>
-									<td class="px-4 py-2 text-xs text-gray-500">{entry.createdBy}</td>
+									<td class="px-3 py-2 text-gray-600 max-w-[200px] truncate hidden sm:table-cell">{entry.description}</td>
+									<td class="px-3 py-2 text-right font-mono font-semibold text-gray-900">{formatPeso(entry.amount)}</td>
+									<td class="px-3 py-2 text-xs text-gray-500 hidden md:table-cell">{entry.paidBy}</td>
+									<td class="px-3 py-2 text-xs text-gray-500 hidden md:table-cell">{entry.createdBy}</td>
 								</tr>
 							{/each}
 						</tbody>
 					</table>
+					</div>
 				{/if}
 			</div>
 		{/if}
@@ -531,31 +533,32 @@
 					</div>
 
 					<!-- MoM table -->
-					<table class="w-full text-sm">
+					<div class="overflow-x-auto">
+					<table class="w-full text-sm min-w-[450px]">
 						<thead>
 							<tr class="border-b border-border bg-gray-50">
-								<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Category</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">This Month</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Last Month</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Change %</th>
-								<th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Status</th>
+								<th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Category</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">This Mo.</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 hidden sm:table-cell">Last Mo.</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Change</th>
+								<th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-400 hidden sm:table-cell">Status</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-border">
 							{#each momRows as row}
 								<tr class={cn('hover:bg-gray-50', row.flagged && 'bg-status-red-light/30')}>
-									<td class="px-4 py-3 font-medium text-gray-900">
+									<td class="px-3 py-3 font-medium text-gray-900">
 										<span class="mr-2" aria-hidden="true">{row.icon}</span>{row.category}
 									</td>
-									<td class="px-4 py-3 text-right font-mono text-gray-900">{formatPeso(row.current)}</td>
-									<td class="px-4 py-3 text-right font-mono text-gray-500">{formatPeso(row.previous)}</td>
+									<td class="px-3 py-3 text-right font-mono text-gray-900">{formatPeso(row.current)}</td>
+									<td class="px-3 py-3 text-right font-mono text-gray-500 hidden sm:table-cell">{formatPeso(row.previous)}</td>
 									<td class={cn(
-										'px-4 py-3 text-right font-mono font-bold',
+										'px-3 py-3 text-right font-mono font-bold',
 										row.variance > 15 ? 'text-status-red' : row.variance > 0 ? 'text-status-yellow' : 'text-status-green'
 									)}>
 										{row.variance > 0 ? `+${row.variance.toFixed(1)}` : row.variance.toFixed(1)}%
 									</td>
-									<td class="px-4 py-3 text-center">
+									<td class="px-3 py-3 text-center hidden sm:table-cell">
 										{#if row.flagged}
 											<span class="rounded-full border border-status-red/20 bg-status-red-light px-2.5 py-0.5 text-xs font-semibold text-status-red">⚠ Spike</span>
 										{:else if row.variance === 0}
@@ -567,19 +570,20 @@
 								</tr>
 							{/each}
 							<tr class="border-t-2 border-border bg-gray-50 font-bold">
-								<td class="px-4 py-3 text-gray-900">TOTAL</td>
-								<td class="px-4 py-3 text-right font-mono text-gray-900">{formatPeso(momTotalCurrent)}</td>
-								<td class="px-4 py-3 text-right font-mono text-gray-500">{formatPeso(momTotalPrevious)}</td>
+								<td class="px-3 py-3 text-gray-900">TOTAL</td>
+								<td class="px-3 py-3 text-right font-mono text-gray-900">{formatPeso(momTotalCurrent)}</td>
+								<td class="px-3 py-3 text-right font-mono text-gray-500 hidden sm:table-cell">{formatPeso(momTotalPrevious)}</td>
 								<td class={cn(
-									'px-4 py-3 text-right font-mono font-bold',
+									'px-3 py-3 text-right font-mono font-bold',
 									momTotalVariance > 10 ? 'text-status-red' : momTotalVariance > 0 ? 'text-status-yellow' : 'text-status-green'
 								)}>
 									{momTotalVariance > 0 ? '+' : ''}{momTotalVariance.toFixed(1)}%
 								</td>
-								<td></td>
+								<td class="hidden sm:table-cell"></td>
 							</tr>
 						</tbody>
 					</table>
+					</div>
 				{/if}
 			</div>
 		{/if}

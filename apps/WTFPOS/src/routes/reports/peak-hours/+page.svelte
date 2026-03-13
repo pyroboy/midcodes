@@ -75,7 +75,7 @@
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-3 gap-4 flex-1">
+		<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
 			<KpiCard label="Total Guest Covers" value={totalPax.toLocaleString()} />
 			<KpiCard
 				label="Peak Hour"
@@ -107,7 +107,8 @@
 		<!-- Heat map -->
 		<div class="mb-5 rounded-xl border border-border bg-white p-5">
 			<h2 class="mb-4 text-xs font-bold uppercase tracking-wide text-gray-400">Guest Cover Heat Map</h2>
-			<div class="grid gap-2" style="grid-template-columns: repeat({HOURS.length}, 1fr);">
+			<div class="overflow-x-auto">
+			<div class="grid gap-2 min-w-[650px]" style="grid-template-columns: repeat({HOURS.length}, 1fr);">
 				{#each HOURS as hour, i}
 					<div class="text-center">
 						<p class="mb-1 text-xs font-medium text-gray-400">{hour}</p>
@@ -117,6 +118,7 @@
 						<p class="mt-1 text-[10px] text-gray-400">{hourly.orders[i]} orders</p>
 					</div>
 				{/each}
+			</div>
 			</div>
 			<div class="mt-4 flex items-center gap-4 text-xs text-gray-400">
 				<span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded bg-gray-100"></span> Low</span>
@@ -128,7 +130,7 @@
 		</div>
 
 		<!-- Hourly breakdown table -->
-		<div class="overflow-hidden rounded-xl border border-border bg-white">
+		<div class="overflow-x-auto rounded-xl border border-border bg-white">
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b border-border bg-gray-50">

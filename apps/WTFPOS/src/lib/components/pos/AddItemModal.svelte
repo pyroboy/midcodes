@@ -47,6 +47,7 @@
     let weightScreenItem = $state<MenuItem | null>(null);
     let weightInput = $state('');
     let showIncluded = $state(false);
+    let showMobilePending = $state(false);
 
     // P1-5: Split pending items into package line vs. included (collapsed by default)
     const hasPkg = $derived(pendingItems.some(p => p.item.category === 'packages'));
@@ -163,10 +164,10 @@
 
 <svelte:window onkeydown={(e) => { if (e.key === 'Escape') tryClose(); }} />
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
-    <div class="flex h-[700px] w-full max-w-[1100px] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
-        <div class="flex flex-1 flex-col overflow-hidden">
-            <div class="flex items-start justify-between border-b border-border px-6 py-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm sm:p-4 lg:p-6">
+    <div class="flex h-full w-full sm:max-h-[95vh] lg:max-w-[1100px] overflow-hidden sm:rounded-xl border border-border bg-surface shadow-2xl flex-col lg:flex-row">
+        <div class="flex flex-1 flex-col overflow-hidden min-h-0">
+            <div class="flex items-start justify-between border-b border-border px-4 sm:px-6 py-3 sm:py-4">
                 <div class="flex flex-col gap-1.5">
                     {#if order.orderType === 'takeout'}
                         <div class="flex items-center gap-2">
@@ -182,7 +183,7 @@
                 <button onclick={tryClose} class="flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-gray-600" aria-label="Close modal">✕</button>
             </div>
 
-            <div class="flex gap-2 border-b border-border bg-surface-secondary px-6 py-3">
+            <div class="flex gap-2 border-b border-border bg-surface-secondary px-3 sm:px-6 py-2 sm:py-3">
                 {#each visibleCategories as cat}
                     <button
                         onclick={() => (activeCategory = cat.id)}
@@ -204,13 +205,13 @@
                 <p class="px-6 pb-2 text-[11px] text-gray-400">Packages and meats are dine-in only</p>
             {/if}
 
-            <div class="flex-1 overflow-y-auto p-6">
+            <div class="flex-1 overflow-y-auto p-3 sm:p-6">
                 {#if weightScreenItem}
                     <div class="flex h-full flex-col items-center justify-center gap-6">
                         <h3 class="text-3xl font-bold text-gray-900">{weightScreenItem.name}</h3>
                         <p class="text-sm text-gray-500">Enter weight from scale (grams)</p>
                         <p class="text-xs text-status-yellow font-medium">⚠ Use actual scale weight — estimates cause stock drift. Refills can be corrected at the weigh station.</p>
-                        <div class="flex flex-wrap items-center justify-center gap-3 w-[400px]">
+                        <div class="flex flex-wrap items-center justify-center gap-3 w-full max-w-[400px]">
                             {#each [100, 150, 200, 250, 300, 400] as preset}
                                 <button onclick={() => commitMeat(preset)} class="btn-secondary font-mono w-[30%]">
                                     {preset}g
@@ -249,7 +250,7 @@
                             />
                         </div>
                     {/if}
-                    <div class="grid grid-cols-3 gap-4">
+                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                         {#each filteredItems as item (item.id)}
                             <button
                                 onclick={() => item.available && tapItem(item)}
@@ -323,9 +324,32 @@
                     </div>
                 {/if}
             </div>
+
+            <!-- Mobile pending bottom bar (< lg) -->
+            {#if pendingItems.length > 0}
+                <div class="lg:hidden border-t-2 border-accent/30 px-3 py-2.5 bg-surface shrink-0 flex items-center gap-2">
+                    <button
+                        onclick={() => showMobilePending = true}
+                        class="flex-1 flex items-center gap-2 text-sm font-bold text-gray-900 min-h-[44px]"
+                    >
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-white shrink-0">{pendingItems.length}</span>
+                        <span class="font-mono">{formatPeso(pendingTotal)}</span>
+                        <span class="text-xs text-gray-400">▸ Review</span>
+                    </button>
+                    <button onclick={undoPending} class="btn-ghost text-xs px-3 shrink-0" style="min-height: 44px">Undo</button>
+                    <button
+                        onclick={chargeToOrder}
+                        class="rounded-lg bg-accent px-4 text-sm font-bold text-white hover:bg-accent-dark active:scale-95 transition-all shrink-0"
+                        style="min-height: 44px"
+                    >
+                        ⚡ CHARGE
+                    </button>
+                </div>
+            {/if}
         </div>
 
-        <div class="flex w-[320px] shrink-0 flex-col border-l border-border bg-surface-secondary">
+        <!-- Desktop pending sidebar (hidden on mobile) -->
+        <div class="hidden lg:flex w-[320px] shrink-0 flex-col border-l border-border bg-surface-secondary">
             <div class="flex flex-col gap-1.5 border-b border-border px-5 py-4">
                 <h3 class="text-base font-bold text-gray-900">Pending Items</h3>
                 <p class="text-xs text-gray-500">Review items before pushing to the bill.</p>
@@ -471,10 +495,69 @@
     </div>
 </div>
 
+<!-- Mobile pending items sheet (< lg) -->
+{#if showMobilePending}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="fixed inset-0 z-[55] flex flex-col lg:hidden" role="dialog">
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="flex-1 bg-black/30" onclick={() => showMobilePending = false} role="presentation"></div>
+        <div class="max-h-[75vh] bg-surface rounded-t-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+                <h3 class="text-base font-bold text-gray-900">Pending Items ({pendingItems.length})</h3>
+                <button onclick={() => showMobilePending = false} class="flex h-11 w-11 items-center justify-center text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div class="flex-1 overflow-y-auto divide-y divide-border px-4">
+                {#each pendingItems as p, idx (p.item.id + idx)}
+                    <div class="flex items-center justify-between py-3">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <span class="text-sm font-medium text-gray-900 truncate">{p.item.name}</span>
+                            {#if p.forceFree}
+                                <span class="rounded bg-status-green-light px-1.5 py-0.5 text-[10px] font-bold text-status-green shrink-0">FREE</span>
+                            {/if}
+                            {#if p.item.category === 'packages'}
+                                <span class="rounded bg-accent-light px-1.5 py-0.5 text-[10px] font-bold text-accent shrink-0">PKG</span>
+                            {/if}
+                            {#if p.weight}
+                                <span class="text-xs text-gray-400 shrink-0">{p.weight}g</span>
+                            {/if}
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            {#if !p.forceFree && p.item.category !== 'packages'}
+                                <button onclick={() => changeQty(idx, -1)} class="flex h-9 w-9 items-center justify-center rounded-md bg-gray-100 text-sm font-bold">−</button>
+                                <span class="w-6 text-center text-sm font-semibold">{p.item.isWeightBased && p.weight ? p.weight / 100 : p.qty}</span>
+                                <button onclick={() => changeQty(idx, +1)} class="flex h-9 w-9 items-center justify-center rounded-md bg-gray-100 text-sm font-bold">+</button>
+                            {:else}
+                                <span class="text-xs text-gray-400">×{p.qty}</span>
+                            {/if}
+                        </div>
+                    </div>
+                {/each}
+            </div>
+            <div class="border-t border-border px-4 py-3 flex flex-col gap-3 shrink-0">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-semibold text-gray-500">PENDING TOTAL</span>
+                    <span class="font-mono text-lg font-extrabold text-gray-900">{formatPeso(pendingTotal)}</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick={() => { undoPending(); showMobilePending = false; }} class="btn-secondary flex-1 text-sm" style="min-height: 44px">Clear All</button>
+                    <button
+                        onclick={() => { showMobilePending = false; chargeToOrder(); }}
+                        disabled={pendingItems.length === 0}
+                        class="flex flex-1 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-dark active:scale-95 disabled:opacity-40"
+                        style="min-height: 44px"
+                    >
+                        ⚡ CHARGE ({pendingItems.length})
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+{/if}
+
 {#if confirmingClose}
     <!-- P0-2: Confirm discard of uncommitted pending items -->
-    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-        <div class="pos-card flex flex-col gap-4 p-6 w-[340px]">
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+        <div class="pos-card flex flex-col gap-4 p-6 w-full max-w-[340px]">
             <div class="flex flex-col gap-1">
                 <p class="text-base font-bold text-gray-900">Discard {pendingItems.length} pending item{pendingItems.length !== 1 ? 's' : ''}?</p>
                 <p class="text-sm text-gray-500">These items have not been charged yet and will not be sent to the kitchen.</p>

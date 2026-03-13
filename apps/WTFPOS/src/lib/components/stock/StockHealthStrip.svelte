@@ -41,7 +41,81 @@
 	const spoilageCount = $derived(getSpoilageAlerts().length);
 </script>
 
-<div class="flex items-stretch gap-3 w-full shrink-0">
+<!-- Mobile: compact 2×2 grid -->
+<div class="grid grid-cols-2 gap-2 sm:hidden w-full shrink-0">
+	<button
+		onclick={() => onFilterClick?.('all')}
+		class={cn(
+			'pos-card px-3 py-2.5 flex items-center gap-2.5 text-left transition-all',
+			activeFilter === 'all' ? 'border-gray-400 bg-gray-50 shadow-sm' : 'hover:border-gray-300'
+		)}
+	>
+		<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
+			<Package class="w-4 h-4" />
+		</div>
+		<div>
+			<p class="text-[9px] font-bold uppercase tracking-wider text-gray-400">Total</p>
+			<p class="text-lg font-black text-gray-900 leading-none">{total}</p>
+		</div>
+	</button>
+
+	<button
+		onclick={() => onFilterClick?.('ok')}
+		class={cn(
+			'pos-card relative overflow-hidden px-3 py-2.5 flex items-center gap-2.5 text-left transition-all',
+			activeFilter === 'ok' ? 'border-status-green bg-status-green-light/30 shadow-sm' : 'hover:border-status-green/30',
+			okCount === 0 && 'opacity-40'
+		)}
+	>
+		<div class="absolute inset-y-0 left-0 w-1 bg-status-green"></div>
+		<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-status-green-light text-status-green shrink-0 ml-1">
+			<CheckCircle class="w-4 h-4" />
+		</div>
+		<div>
+			<p class="text-[9px] font-bold uppercase tracking-wider text-status-green/70">OK</p>
+			<p class="text-lg font-black text-status-green leading-none">{okCount}</p>
+		</div>
+	</button>
+
+	<button
+		onclick={() => onFilterClick?.('low')}
+		class={cn(
+			'pos-card relative overflow-hidden px-3 py-2.5 flex items-center gap-2.5 text-left transition-all',
+			activeFilter === 'low' ? 'border-status-yellow bg-status-yellow-light/30 shadow-sm' : 'hover:border-status-yellow/30',
+			lowCount === 0 && 'opacity-40'
+		)}
+	>
+		<div class="absolute inset-y-0 left-0 w-1 bg-status-yellow"></div>
+		<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-status-yellow-light text-status-yellow shrink-0 ml-1">
+			<AlertTriangle class="w-4 h-4" />
+		</div>
+		<div>
+			<p class="text-[9px] font-bold uppercase tracking-wider text-status-yellow/70">Low</p>
+			<p class="text-lg font-black text-status-yellow leading-none">{lowCount}</p>
+		</div>
+	</button>
+
+	<button
+		onclick={() => onFilterClick?.('critical')}
+		class={cn(
+			'pos-card relative overflow-hidden px-3 py-2.5 flex items-center gap-2.5 text-left transition-all',
+			activeFilter === 'critical' ? 'border-status-red bg-status-red-light/30 shadow-sm' : 'hover:border-status-red/30',
+			criticalCount === 0 && 'opacity-40'
+		)}
+	>
+		<div class="absolute inset-y-0 left-0 w-1 bg-status-red"></div>
+		<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-status-red-light text-status-red shrink-0 ml-1">
+			<AlertOctagon class="w-4 h-4" />
+		</div>
+		<div>
+			<p class="text-[9px] font-bold uppercase tracking-wider text-status-red/70">Critical</p>
+			<p class="text-lg font-black text-status-red leading-none">{criticalCount}</p>
+		</div>
+	</button>
+</div>
+
+<!-- Desktop: horizontal row (sm+) -->
+<div class="hidden sm:flex items-stretch gap-3 w-full shrink-0">
 	<button
 		onclick={() => onFilterClick?.('all')}
 		class={cn(

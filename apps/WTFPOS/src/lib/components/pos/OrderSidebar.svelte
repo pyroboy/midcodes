@@ -312,7 +312,7 @@
 	</div>
 {/snippet}
 
-<div class="flex w-[380px] shrink-0 flex-col border-l border-border bg-surface overflow-hidden">
+<div class="pos-order-sidebar flex w-full lg:w-[380px] shrink-0 flex-col lg:border-l border-border bg-surface overflow-hidden">
 	{#if !order}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center select-none">
 			<div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-secondary text-3xl">
@@ -648,8 +648,8 @@
 
 <!-- Void Item Reason Selector (shown after PIN confirmed) -->
 {#if showVoidReasonSelector}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[340px] flex flex-col gap-4">
+	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+		<div class="pos-card w-full max-w-[340px] flex flex-col gap-4">
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-gray-900">Void Reason</h3>
 				<p class="text-sm text-gray-500">Select the reason for voiding this item.</p>

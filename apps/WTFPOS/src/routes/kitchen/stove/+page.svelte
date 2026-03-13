@@ -171,23 +171,8 @@
 	});
 </script>
 
-<!-- Live indicator -->
-<div class={cn(
-	'fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm bg-white',
-	isStale ? 'border-status-yellow/40' : 'border-status-green/30'
-)}>
-	<span class={cn(
-		'h-2 w-2 rounded-full',
-		isStale ? 'bg-status-yellow' : 'bg-status-green animate-pulse'
-	)}></span>
-	<span class={cn(
-		'text-xs font-semibold',
-		isStale ? 'text-status-yellow' : 'text-status-green'
-	)}>{isStale ? '~ Stale' : 'Live'}</span>
-</div>
-
 <!-- Header -->
-<div class="mb-4 flex items-center justify-between">
+<div class="mb-3 sm:mb-4 flex items-center justify-between">
 	<div>
 		<h1 class="text-xl font-bold text-gray-900">Stove Queue</h1>
 		<p class="text-sm text-gray-500 mt-0.5">
@@ -213,7 +198,7 @@
 {:else}
 	<!-- Dine-in -->
 	{#if dineInTickets.length > 0}
-		<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+		<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));">
 			{#each dineInTickets as ticket (ticket.orderId)}
 				{@const urgency = urgencyLevel(ticket.createdAt)}
 				{@const progress = ticketProgress(ticket.items)}
@@ -297,7 +282,7 @@
 				</span>
 			</h2>
 		</div>
-		<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+		<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));">
 			{#each takeoutTickets as ticket (ticket.orderId)}
 				{@const urgency = urgencyLevel(ticket.createdAt)}
 				{@const progress = ticketProgress(ticket.items)}

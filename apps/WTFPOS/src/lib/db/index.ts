@@ -39,7 +39,10 @@ if (dev) {
 	addRxPlugin(RxDBDevModePlugin);
 }
 
-import { wrappedValidateIsMyJsonValidStorage } from 'rxdb/plugins/validate-is-my-json-valid';
+// AJV validator instead of is-my-json-valid: the latter uses naive modulo for
+// multipleOf checks, which fails for large timestamps due to IEEE 754 precision
+// (e.g. 1773409342808 % 0.01 !== 0 in JavaScript). AJV handles this correctly.
+import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
 
 const globalForRxDB = globalThis as unknown as {
 	__wtfposDbPromise: Promise<any> | null;
@@ -132,7 +135,7 @@ export async function getDb() {
 				: getRxStorageDexie();
 
 			if (dev) {
-				storage = wrappedValidateIsMyJsonValidStorage({ storage });
+				storage = wrappedValidateAjvStorage({ storage });
 			}
 
 			// crypto.subtle is unavailable on non-HTTPS non-localhost (e.g. phone on LAN via IP).
@@ -579,10 +582,8 @@ export async function resetDatabase() {
 		} else {
 			// Use the correct storage engine for removeRxDatabase
 			let storage: any = isRemoteClient ? getRxStorageMemory() : getRxStorageDexie();
-			if (dev && !isRemoteClient) {
-				try {
-					storage = wrappedValidateIsMyJsonValidStorage({ storage });
-				} catch (_) { /* mobile fallback */ }
+			if (dev) {
+				try { storage = wrappedValidateAjvStorage({ storage }); } catch { /* fallback */ }
 			}
 			await removeRxDatabase('wtfpos_db', storage);
 		}

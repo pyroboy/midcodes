@@ -149,8 +149,8 @@
 				<p class="text-[10px] font-bold uppercase tracking-widest text-gray-600 text-center">
 					All Locations <span class="font-normal text-gray-400">({tickerLocations.length})</span>
 				</p>
-				<!-- Ticker box -->
-				<div class="mt-1 mx-auto w-full overflow-hidden rounded border border-gray-100" style="height: 48px;">
+				<!-- Ticker box — hidden on phone portrait to save space -->
+				<div class="mt-1 mx-auto w-full overflow-hidden rounded border border-gray-100 hidden md:block" style="height: 48px;">
 					<div class="ticker-scroll">
 						{#each [...tickerLocations, ...tickerLocations] as loc}
 							<p class="text-center text-[10px] text-gray-400 leading-4 py-0.5">{loc.name}</p>
@@ -167,53 +167,58 @@
 
 	<SidebarSeparator />
 
-	<!-- Quick Actions (manager / owner / admin only) -->
-	{#if ELEVATED_ROLES.includes(session.role)}
-		{@const quickActions = [
-			{ href: '/stock/deliveries', label: 'Receive Delivery', Icon: Truck },
-			{ href: '/reports/expenses-daily', label: 'Log Expense', Icon: Receipt },
-			{ href: '/reports/utilities?action=open', label: 'Log Utility', Icon: Gauge },
-			{ href: '/stock/waste', label: 'Log Waste', Icon: Trash2 },
-			{ href: '/stock/counts', label: 'Stock Count', Icon: ClipboardCheck },
-			{ href: '/reports/x-read', label: 'X-Reading', Icon: FileText },
-			{ href: '/stock/transfers', label: 'Transfer Stock', Icon: ArrowLeftRight },
-			{ href: '/reports/eod', label: 'End of Day', Icon: Moon },
-		]}
-		{@const isAllLocation = session.locationId === 'all'}
-		<!-- P0-7: overflow-hidden prevents quick action elements from extending outside sidebar bounds -->
-		<div class="px-2 py-1.5 group-data-[collapsible=icon]:px-1 overflow-hidden">
-			<div class="mb-1.5 flex items-center justify-between group-data-[collapsible=icon]:hidden">
-				<p class="px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">
-					Quick Actions
-				</p>
-				{#if isAllLocation}
-					<span class="rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-gray-100">Select branch</span>
-				{/if}
-			</div>
-			<div class={cn('flex flex-col gap-1', isAllLocation && 'opacity-50 pointer-events-none')} title={isAllLocation ? 'Select a specific branch to use quick actions' : undefined}>
-				{#each quickActions as qa}
-					<a
-						href="{qa.href}?action=open"
-						title={isAllLocation ? 'Select a branch first' : qa.label}
-						class={cn(
-							'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors',
-							isActive(qa.href)
-								? 'bg-accent text-white'
-								: 'border border-dashed border-gray-200 bg-white text-gray-600 hover:border-accent/40 hover:bg-accent-light hover:text-accent',
-							'group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-md'
-						)}
-					>
-						<qa.Icon class="h-4 w-4 shrink-0" />
-						<!-- P1-18: Visible label in expanded mode; sr-only in collapsed mode -->
-						<span class="group-data-[collapsible=icon]:sr-only">{qa.label}</span>
-					</a>
-				{/each}
-			</div>
-		</div>
-	{/if}
-
-	<!-- Primary navigation -->
+	<!-- Primary navigation + Quick Actions (scrollable together) -->
 	<SidebarContent>
+		<!-- Quick Actions (manager / owner / admin only) -->
+		{#if ELEVATED_ROLES.includes(session.role)}
+			{@const quickActions = [
+				{ href: '/stock/deliveries', label: 'Receive Delivery', shortLabel: 'Delivery', Icon: Truck },
+				{ href: '/reports/expenses-daily', label: 'Log Expense', shortLabel: 'Expense', Icon: Receipt },
+				{ href: '/reports/utilities?action=open', label: 'Log Utility', shortLabel: 'Utility', Icon: Gauge },
+				{ href: '/stock/waste', label: 'Log Waste', shortLabel: 'Waste', Icon: Trash2 },
+				{ href: '/stock/counts', label: 'Stock Count', shortLabel: 'Count', Icon: ClipboardCheck },
+				{ href: '/reports/x-read', label: 'X-Reading', shortLabel: 'X-Read', Icon: FileText },
+				{ href: '/stock/transfers', label: 'Transfer Stock', shortLabel: 'Transfer', Icon: ArrowLeftRight },
+				{ href: '/reports/eod', label: 'End of Day', shortLabel: 'EOD', Icon: Moon },
+			]}
+			{@const isAllLocation = session.locationId === 'all'}
+			<!-- P0-7: overflow-hidden prevents quick action elements from extending outside sidebar bounds -->
+			<div class="px-2 py-1 md:py-1.5 group-data-[collapsible=icon]:px-1 overflow-hidden">
+				<div class="mb-1 md:mb-1.5 flex items-center justify-between group-data-[collapsible=icon]:hidden">
+					<p class="px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">
+						Quick Actions
+					</p>
+					{#if isAllLocation}
+						<span class="rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-gray-100">Select branch</span>
+					{/if}
+				</div>
+				<!-- Phone: 4-col icon grid | Tablet+: 2-col with labels -->
+				<div class={cn('grid grid-cols-4 md:grid-cols-2 gap-1', isAllLocation && 'opacity-50 pointer-events-none')} title={isAllLocation ? 'Select a specific branch to use quick actions' : undefined}>
+					{#each quickActions as qa}
+						<a
+							href="{qa.href}?action=open"
+							title={qa.label}
+							class={cn(
+								'flex rounded-md font-medium transition-colors',
+								'flex-col items-center gap-0.5 px-1 py-1.5 md:flex-row md:gap-2 md:px-2 md:py-1.5 text-xs md:text-sm',
+								isActive(qa.href)
+									? 'bg-accent text-white'
+									: 'border border-dashed border-gray-200 bg-white text-gray-600 hover:border-accent/40 hover:bg-accent-light hover:text-accent',
+								'group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-md group-data-[collapsible=icon]:flex-row'
+							)}
+						>
+							<qa.Icon class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
+							<!-- Phone: short label below icon | Tablet+: full label | Collapsed: sr-only -->
+							<span class="text-[9px] leading-tight text-center md:hidden group-data-[collapsible=icon]:sr-only">{qa.shortLabel}</span>
+							<span class="hidden md:inline group-data-[collapsible=icon]:sr-only">{qa.label}</span>
+						</a>
+					{/each}
+				</div>
+			</div>
+
+			<SidebarSeparator />
+		{/if}
+
 		<SidebarGroup>
 			<SidebarGroupContent>
 				<SidebarMenu>
@@ -261,7 +266,7 @@
 			<div class="px-1 group-data-[collapsible=icon]:hidden">
 				{#if showLocationConfirm}
 					<!-- Inline confirmation panel -->
-					<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 flex flex-col gap-2">
+					<div class="rounded-lg border border-amber-200 bg-amber-50 p-2 md:p-3 flex flex-col gap-1.5 md:gap-2">
 						<p class="text-xs font-semibold text-amber-800 leading-snug">
 							Switch location? This will change all data views to the new branch.
 						</p>
@@ -270,16 +275,16 @@
 								You have <strong>{openOrderCount}</strong> open {openOrderCount === 1 ? 'table' : 'tables'} at this branch.
 							</p>
 						{/if}
-						<div class="flex gap-2 mt-1">
+						<div class="flex gap-2 mt-0.5 md:mt-1">
 							<button
 								onclick={confirmLocationSwitch}
-								class="flex-1 rounded-md bg-amber-600 px-2 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors"
+								class="flex-1 rounded-md bg-amber-600 px-2 py-1 md:py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors"
 							>
 								Switch Anyway
 							</button>
 							<button
 								onclick={cancelLocationChange}
-								class="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+								class="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 md:py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
 							>
 								Cancel
 							</button>
@@ -288,7 +293,7 @@
 				{:else}
 					<button
 						onclick={requestLocationChange}
-						class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors border border-dashed border-gray-200"
+						class="flex w-full items-center gap-2 rounded-md px-2 py-1 md:py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors border border-dashed border-gray-200"
 					>
 						<ArrowLeftRight class="h-3.5 w-3.5 shrink-0" />
 						<span>Change Location</span>
@@ -302,7 +307,7 @@
 			<a
 				href="/"
 				onclick={() => clearSession()}
-				class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0"
+				class="flex w-full items-center gap-2 rounded-md px-2 py-1 md:py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0"
 				title="Logout"
 			>
 				<LogOut class="h-4 w-4 shrink-0" />

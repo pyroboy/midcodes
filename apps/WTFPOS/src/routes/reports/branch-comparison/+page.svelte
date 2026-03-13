@@ -164,12 +164,13 @@
 			showLive={false}
 		>
 			{#snippet actions()}
+				<div class="flex flex-wrap items-center gap-2">
 				<span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Custom range:</span>
 				<input
 					type="date"
 					bind:value={customFrom}
 					class={cn('pos-input text-sm py-1.5', period === 'custom' ? 'border-accent ring-1 ring-accent/20' : '')}
-					style="min-height: unset; width: 140px"
+					style="min-height: unset; width: 120px"
 				/>
 				<span class="text-xs text-gray-400">to</span>
 				<input
@@ -177,17 +178,18 @@
 					bind:value={customTo}
 					min={customFrom}
 					class={cn('pos-input text-sm py-1.5', period === 'custom' ? 'border-accent ring-1 ring-accent/20' : '')}
-					style="min-height: unset; width: 140px"
+					style="min-height: unset; width: 120px"
 				/>
 				{#if period === 'custom'}
 					<span class="rounded-full bg-accent-light px-2.5 py-0.5 text-xs font-semibold text-accent">Custom range active</span>
 				{/if}
+				</div>
 			{/snippet}
 		</ReportFilterBar>
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-4 gap-4 flex-1">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 flex-1">
 			<KpiCard label="Combined Revenue" value={formatPeso(combined.revenue)} />
 			<KpiCard label="Combined Expenses" value={formatPeso(combined.expenses)} variant="danger" />
 			<KpiCard
@@ -233,7 +235,7 @@
 					i === 0 ? 'border-blue-200 bg-blue-50' : 'border-purple-200 bg-purple-50'
 				)}>
 					<p class={cn('text-sm font-bold', i === 0 ? 'text-blue-700' : 'text-purple-700')}>{branch.name}</p>
-					<p class={cn('mt-1 text-3xl font-bold', i === 0 ? 'text-blue-900' : 'text-purple-900')}>{formatPeso(branch.netProfit)}</p>
+					<p class={cn('mt-1 text-xl sm:text-3xl font-bold', i === 0 ? 'text-blue-900' : 'text-purple-900')}>{formatPeso(branch.netProfit)}</p>
 					<p class={cn('text-xs', i === 0 ? 'text-blue-500' : 'text-purple-500')}>Net Profit</p>
 				</div>
 			{/each}
@@ -256,7 +258,7 @@
 		{/if}
 
 		<!-- Side-by-side comparison table -->
-		<div class="overflow-hidden rounded-xl border border-border bg-white">
+		<div class="overflow-x-auto rounded-xl border border-border bg-white">
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b border-border bg-gray-50">

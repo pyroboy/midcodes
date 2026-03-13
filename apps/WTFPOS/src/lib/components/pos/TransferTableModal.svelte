@@ -47,8 +47,8 @@
 	}
 </script>
 
-<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-	<div class="pos-card w-[420px] flex flex-col gap-4">
+<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+	<div class="pos-card w-full max-w-[420px] flex flex-col gap-4">
 		{#if step === 'select'}
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">🔀 Transfer {fromTable.label}</h3>

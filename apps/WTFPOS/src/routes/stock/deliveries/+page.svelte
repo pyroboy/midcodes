@@ -145,19 +145,19 @@
 		</div>
 	{/if}
 
-	<div class="flex items-center justify-between">
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 		<div>
-			<h2 class="text-lg font-bold text-gray-900">Delivery History & Batches</h2>
-			<p class="text-sm text-gray-500 mt-1">Track incoming stock batches, FIFO usage, and expiry.</p>
+			<h2 class="text-base sm:text-lg font-bold text-gray-900">Delivery History & Batches</h2>
+			<p class="text-xs sm:text-sm text-gray-500 mt-1">Track incoming stock batches, FIFO usage, and expiry.</p>
 		</div>
-		<button onclick={openModal} class="btn-primary flex items-center gap-2 shadow-sm">
+		<button onclick={openModal} class="btn-primary flex items-center justify-center gap-2 shadow-sm shrink-0">
 			<Plus class="w-4 h-4" /> Receive Delivery
 		</button>
 	</div>
 
 	<!-- ─── Filters & Search ─── -->
-	<div class="flex flex-wrap items-center gap-3">
-		<div class="relative flex-1 min-w-[240px]">
+	<div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+		<div class="relative flex-1 min-w-0 sm:min-w-[200px]">
 			<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
 			<input
 				type="text"
@@ -167,24 +167,26 @@
 			/>
 		</div>
 
-		<div class="flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-lg">
-			<Calendar class="w-4 h-4 text-gray-400" />
-			<select bind:value={filterDateRange} class="bg-transparent text-sm font-medium outline-none text-gray-700 min-w-[120px]">
-				<option value="all">All Dates</option>
-				<option value="today">Today</option>
-				<option value="yesterday">Yesterday</option>
-				<option value="earlier">Earlier</option>
-			</select>
-		</div>
+		<div class="flex items-center gap-2">
+			<div class="flex-1 sm:flex-none flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-lg">
+				<Calendar class="w-4 h-4 text-gray-400 shrink-0" />
+				<select bind:value={filterDateRange} class="bg-transparent text-sm font-medium outline-none text-gray-700 w-full sm:min-w-[100px]">
+					<option value="all">All Dates</option>
+					<option value="today">Today</option>
+					<option value="yesterday">Yesterday</option>
+					<option value="earlier">Earlier</option>
+				</select>
+			</div>
 
-		<div class="flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-lg">
-			<Package class="w-4 h-4 text-gray-400" />
-			<select bind:value={filterItem} class="bg-transparent text-sm font-medium outline-none text-gray-700 min-w-[160px]">
-				<option value="all">All Items</option>
-				{#each activeItems as item}
-					<option value={item.id}>{item.name}</option>
-				{/each}
-			</select>
+			<div class="flex-1 sm:flex-none flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-lg">
+				<Package class="w-4 h-4 text-gray-400 shrink-0" />
+				<select bind:value={filterItem} class="bg-transparent text-sm font-medium outline-none text-gray-700 w-full sm:min-w-[120px]">
+					<option value="all">All Items</option>
+					{#each activeItems as item}
+						<option value={item.id}>{item.name}</option>
+					{/each}
+				</select>
+			</div>
 		</div>
 
 		<label class="flex items-center gap-2 px-3 py-2.5 bg-white border border-border rounded-lg cursor-pointer">
@@ -193,8 +195,53 @@
 		</label>
 	</div>
 
-	<!-- Deliveries Table -->
-	<div class="pos-card p-0 overflow-hidden">
+	<!-- Deliveries — Mobile card view -->
+	<div class="flex flex-col gap-2 md:hidden">
+		{#each filteredDeliveries as d (d.id)}
+			<div class={cn('rounded-xl border border-border bg-white p-3', d.depleted && 'opacity-50')}>
+				<div class="flex items-start justify-between gap-2">
+					<div class="flex-1 min-w-0">
+						<p class="font-semibold text-sm text-gray-900">{d.itemName}</p>
+						<p class="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
+							{d.supplier}
+							{#if d.supplier?.includes('Transfer from')}
+								<span class="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded font-semibold leading-none">Transfer</span>
+							{/if}
+						</p>
+					</div>
+					<span class="font-mono font-bold text-sm shrink-0">
+						<span class="text-status-green">+{d.qty}</span>
+						<span class="text-xs font-normal text-gray-400">{d.unit}</span>
+					</span>
+				</div>
+				<div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+					<div class="flex items-center gap-3">
+						<span>{formatDate(d.receivedAt)}</span>
+						{#if d.batchNo}
+							<span class="font-mono">{d.batchNo}</span>
+						{/if}
+					</div>
+					{#if d.depleted}
+						<span class="rounded bg-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-500 uppercase">DEPLETED</span>
+					{:else}
+						<div class="flex items-center gap-2">
+							<ProgressRing used={d.usedQty ?? 0} total={d.qty} size={24} strokeWidth={3} />
+							<span class="text-[10px] font-medium text-gray-700">{d.qty - (d.usedQty ?? 0)} left</span>
+						</div>
+					{/if}
+				</div>
+			</div>
+		{/each}
+
+		{#if filteredDeliveries.length === 0}
+			<div class="px-4 py-12 text-center text-sm text-gray-400">
+				No deliveries found matching the filters.
+			</div>
+		{/if}
+	</div>
+
+	<!-- Deliveries — Desktop table view -->
+	<div class="pos-card p-0 overflow-hidden hidden md:block">
 		<table class="w-full text-sm">
 			<thead>
 				<tr class="border-b border-border bg-surface-secondary text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -213,7 +260,6 @@
 						<td class="px-5 py-3">
 							<div class="flex flex-col gap-0.5">
 								<span class="font-semibold text-gray-900">{d.itemName}</span>
-								<!-- Issue 10: Transfer badge for transfer-origin deliveries -->
 								<span class="text-xs text-gray-400 flex items-center gap-1.5">
 									{d.supplier}
 									{#if d.supplier?.includes('Transfer from')}
@@ -281,7 +327,7 @@
 		amount: String(lastSavedDelivery.totalCost),
 		description: `${lastSavedDelivery.itemName} ${lastSavedDelivery.qty}${lastSavedDelivery.unit}`
 	})}
-	<div class="fixed bottom-6 left-6 z-[60] flex items-center gap-3 rounded-xl border border-accent/30 bg-white px-4 py-3 shadow-xl" transition:fade={{ duration: 200 }}>
+	<div class="fixed bottom-3 left-3 right-3 sm:left-6 sm:right-auto sm:bottom-6 z-[60] flex items-center gap-3 rounded-xl border border-accent/30 bg-white px-4 py-3 shadow-xl" transition:fade={{ duration: 200 }}>
 		<div class="flex flex-col gap-0.5">
 			<span class="text-xs font-semibold text-gray-600">Procurement cost: <span class="font-mono text-accent">{formatPeso(lastSavedDelivery.totalCost)}</span></span>
 			<span class="text-xs text-gray-400">Add as expense?</span>
@@ -299,8 +345,8 @@
 
 <!-- Receive Delivery Modal -->
 {#if showModal}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="w-[500px] rounded-xl shadow-xl relative">
+	<div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
+		<div class="w-full sm:w-[500px] sm:max-w-[500px] rounded-t-2xl sm:rounded-xl shadow-xl relative">
 			<button
 				onclick={() => (showModal = false)}
 				class="absolute top-4 right-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"

@@ -258,11 +258,14 @@
 	const numpadKeys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C', '0', 'DEL'];
 </script>
 
-<div class="-m-6 flex h-[calc(100%+48px)] bg-surface-secondary">
+<div class="-m-3 sm:-m-4 md:-m-6 flex flex-col md:flex-row h-[calc(100%+24px)] sm:h-[calc(100%+32px)] md:h-[calc(100%+48px)] bg-surface-secondary">
 	<!-- LEFT: Pending meat orders grouped by table -->
-	<div class="w-96 shrink-0 border-r border-border flex flex-col bg-surface">
-		<div class="px-5 py-4 border-b border-border">
-			<h2 class="text-lg font-extrabold tracking-tight text-gray-900">Pending Meat</h2>
+	<div class={cn(
+		'shrink-0 border-b md:border-b-0 md:border-r border-border flex flex-col bg-surface',
+		selectedItem ? 'hidden md:flex md:w-80 lg:w-96' : 'w-full md:w-80 lg:w-96'
+	)}>
+		<div class="px-4 sm:px-5 py-3 sm:py-4 border-b border-border">
+			<h2 class="text-base sm:text-lg font-extrabold tracking-tight text-gray-900">Pending Meat</h2>
 			<p class="text-xs text-gray-500 mt-0.5">{totalPendingItems} items waiting</p>
 		</div>
 
@@ -332,7 +335,10 @@
 	</div>
 
 	<!-- CENTER: Numpad + Weight Display -->
-	<div class="flex-1 flex flex-col min-h-0">
+	<div class={cn(
+		'flex-1 flex flex-col min-h-0',
+		!selectedItem && 'hidden md:flex'
+	)}>
 		<!-- [08] Compact BT disconnect chip at top — dismissable after first manual dispatch -->
 		{#if !btConnected && !manualModeDismissed}
 			<div class="flex items-center gap-2 bg-amber-50 border-b border-amber-200 text-amber-700 text-xs px-4 py-2 justify-between">
@@ -353,204 +359,224 @@
 		{/if}
 		<!-- Scrollable content area -->
 		<div
-			class="flex-1 overflow-y-auto flex flex-col items-center justify-center gap-6 p-8 transition-colors duration-300"
+			class="flex-1 overflow-y-auto flex flex-col items-center p-3 sm:p-6 md:p-8 transition-colors duration-300"
 			style={selectedPkgColors ? `background-color: ${selectedPkgColors.fill}` : ''}
 		>
 		{#if selectedItem}
 			{@const group = tableGroups.find((g) => g.orderId === selectedItem?.orderId)}
-			<!-- Fix [03]: Dominant protein banner -->
-			{#if selectedPkgColors}
-				<div class="text-center mb-2">
-					<div class="text-8xl font-black leading-none" style="color: {selectedPkgColors.label}">
+
+			<!-- ── TOP: Context info (compact) ── -->
+			<div class="w-full max-w-sm flex flex-col items-center gap-1 pt-1 sm:pt-2">
+				<!-- Mobile back button -->
+				<button
+					onclick={() => { selectedItem = null; weightInput = ''; }}
+					class="md:hidden self-start rounded-lg bg-white/80 border border-border px-3 py-1.5 text-sm font-semibold text-gray-700 active:scale-95 transition-all mb-1"
+					style="min-height: 40px"
+				>
+					← Back
+				</button>
+
+				<!-- Protein banner -->
+				{#if selectedPkgColors}
+					<div class="text-3xl sm:text-5xl md:text-7xl font-black leading-none" style="color: {selectedPkgColors.label}">
 						{selectedPkgColors.emoji} {selectedPkgColors.name}
 					</div>
-				</div>
-			{/if}
-			<!-- Selected item info -->
-			<div class="text-center">
-				<div class="text-sm font-semibold text-gray-500 uppercase tracking-widest">
-					Weighing for
-				</div>
-				<div class="text-3xl font-extrabold text-gray-900 mt-1">
-					{#if selectedItem.tableNumber !== null}
-						T{selectedItem.tableNumber}
-					{:else}
-						{selectedItem.customerName ?? 'Takeout'}
-					{/if}
-					— {selectedItem.name}
-				</div>
-				{#if group}
-					<div class="flex items-center justify-center gap-3 mt-2 text-sm text-gray-500">
-						<span>{group.pax} pax</span>
-						<span class="text-gray-300">|</span>
-						<span class="font-mono text-amber-600 font-semibold">
-							Suggested: ~{group.suggestedPerMeat}g
-						</span>
-						{#if selectedItem.refillNumber > 0}
-							<span class="text-gray-300">|</span>
-							<span class="font-mono font-bold text-status-purple">
-								Refill #{selectedItem.refillNumber}
-							</span>
+				{/if}
+
+				<!-- Item info -->
+				<div class="text-center">
+					<div class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-widest">
+						Weighing for
+					</div>
+					<div class="text-lg sm:text-xl md:text-2xl font-extrabold text-gray-900 leading-tight">
+						{#if selectedItem.tableNumber !== null}
+							T{selectedItem.tableNumber}
+						{:else}
+							{selectedItem.customerName ?? 'Takeout'}
 						{/if}
+						— {selectedItem.name}
+					</div>
+					{#if group}
+						<div class="flex items-center justify-center gap-2 sm:gap-3 mt-1 text-xs sm:text-sm text-gray-500 flex-wrap">
+							<span>{group.pax} pax</span>
+							<span class="text-gray-300">|</span>
+							<span class="font-mono text-amber-600 font-semibold">
+								~{group.suggestedPerMeat}g
+							</span>
+							{#if selectedItem.refillNumber > 0}
+								<span class="text-gray-300">|</span>
+								<span class="font-mono font-bold text-status-purple">
+									Refill #{selectedItem.refillNumber}
+								</span>
+							{/if}
+						</div>
+					{/if}
+					{#if selectedCurrentStock !== null && selectedStockItem}
+						<div class="mt-1 text-xs sm:text-sm text-gray-500">
+							Stock:
+							<span class={cn(
+								'font-mono font-semibold',
+								selectedCurrentStock <= 0
+									? 'text-status-red'
+									: selectedCurrentStock < (selectedStockItem.minLevel ?? 500)
+										? 'text-status-yellow'
+										: 'text-status-green'
+							)}>
+								{selectedCurrentStock}{selectedStockItem.unit}
+							</span>
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<!-- ── Spacer: push input controls toward bottom ── -->
+			<div class="flex-1 min-h-2 sm:min-h-4"></div>
+
+			<!-- ── BOTTOM: Input controls (tight group) ── -->
+			<div class="w-full max-w-sm flex flex-col items-center gap-2 sm:gap-3 pb-2">
+				<!-- Mode toggle (only when BT connected) -->
+				{#if btConnected}
+					<div class="flex rounded-xl bg-gray-100 p-1 w-full border border-border">
+						<button
+							onclick={() => (inputMode = 'manual')}
+							class={cn(
+								'flex-1 rounded-lg py-2 text-sm font-bold transition-colors',
+								inputMode === 'manual'
+									? 'bg-white text-gray-900 shadow-sm'
+									: 'text-gray-500 hover:text-gray-700'
+							)}
+							style="min-height: 48px"
+						>
+							Manual
+						</button>
+						<button
+							onclick={() => (inputMode = 'scale')}
+							class={cn(
+								'flex-1 rounded-lg py-2 text-sm font-bold transition-colors flex items-center justify-center gap-1.5',
+								inputMode === 'scale'
+									? 'bg-white text-blue-600 shadow-sm'
+									: 'text-gray-500 hover:text-gray-700'
+							)}
+							style="min-height: 48px"
+						>
+							<Bluetooth class="w-4 h-4" />
+							Scale
+						</button>
 					</div>
 				{/if}
-				{#if selectedCurrentStock !== null && selectedStockItem}
-					<div class="mt-2 text-sm text-gray-500">
-						Current stock:
-						<span class={cn(
-							'font-mono font-semibold',
-							selectedCurrentStock <= 0
-								? 'text-status-red'
-								: selectedCurrentStock < (selectedStockItem.minLevel ?? 500)
-									? 'text-status-yellow'
-									: 'text-status-green'
-						)}>
-							{selectedCurrentStock}{selectedStockItem.unit}
-						</span>
+
+				{#if btConnected && inputMode === 'scale'}
+					<!-- BT Scale mode -->
+					<BluetoothWeightInput
+						id="weigh-station"
+						value={weightInput}
+						onValueChange={(v) => {
+							weightInput = v;
+						}}
+						theme="light"
+						class="w-full"
+					/>
+					<div
+						class="w-full rounded-2xl border-2 border-blue-200 bg-blue-50 px-6 py-4 sm:px-8 sm:py-5 text-center"
+					>
+						<div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">
+							Live Scale Reading
+						</div>
+						<div
+							class={cn(
+								'text-5xl sm:text-6xl font-extrabold font-mono tracking-tight min-h-[60px] flex items-center justify-center',
+								btScale.stability === 'stable'
+									? 'text-status-green'
+									: btScale.stability === 'unstable'
+										? 'text-status-yellow'
+										: 'text-gray-400'
+							)}
+						>
+							{btScale.stability === 'unstable' ? '~' : ''}{btScale.currentWeight}<span
+								class="text-xl text-gray-400 ml-1">g</span
+							>
+						</div>
+						{#if btScale.stability !== 'idle'}
+							<span
+								class={cn(
+									'text-xs font-bold uppercase mt-1 inline-block',
+									btScale.stability === 'stable'
+										? 'text-status-green'
+										: 'text-status-yellow'
+								)}
+							>
+								{btScale.stability}
+							</span>
+						{:else}
+							<span class="text-xs text-gray-400 mt-1 inline-block"
+								>Place item on scale</span
+							>
+						{/if}
+					</div>
+				{:else}
+					<!-- Manual mode: weight display + numpad as tight unit -->
+					<div
+						class="w-full rounded-2xl border-2 border-border bg-white px-6 py-3 sm:px-8 sm:py-4 text-center shadow-sm"
+					>
+						<div class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+							Weight (grams)
+						</div>
+						<div
+							class="text-4xl sm:text-5xl md:text-6xl font-extrabold font-mono tracking-tight min-h-[48px] sm:min-h-[60px] flex items-center justify-center text-gray-900"
+						>
+							{#if weightInput}
+								{weightInput}<span class="text-xl sm:text-2xl text-gray-400 ml-1">g</span>
+							{:else}
+								<span class="text-gray-300">0</span><span
+									class="text-xl sm:text-2xl text-gray-300 ml-1">g</span
+								>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Numpad — tight gap, directly under display -->
+					<div class="grid grid-cols-3 gap-1.5 sm:gap-2 w-full">
+						{#each numpadKeys as key}
+							<button
+								onclick={() => handleNumpad(key)}
+								class={cn(
+									'flex items-center justify-center rounded-xl text-xl sm:text-2xl font-bold transition-all active:scale-95 border',
+									key === 'C'
+										? 'bg-red-50 text-status-red border-red-200 hover:bg-red-100'
+										: key === 'DEL'
+											? 'bg-gray-100 text-gray-600 border-border hover:bg-gray-200'
+											: 'bg-white text-gray-900 border-border hover:bg-gray-50 shadow-sm'
+								)}
+								style="min-height: 52px"
+							>
+								{key === 'DEL' ? '⌫' : key}
+							</button>
+						{/each}
 					</div>
 				{/if}
 			</div>
 
-			<!-- Mode toggle (only when BT connected) -->
-			{#if btConnected}
-				<div class="flex rounded-xl bg-gray-100 p-1 w-full max-w-sm border border-border">
-					<button
-						onclick={() => (inputMode = 'manual')}
-						class={cn(
-							'flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors',
-							inputMode === 'manual'
-								? 'bg-white text-gray-900 shadow-sm'
-								: 'text-gray-500 hover:text-gray-700'
-						)}
-						style="min-height: 56px"
-					>
-						Manual
-					</button>
-					<button
-						onclick={() => (inputMode = 'scale')}
-						class={cn(
-							'flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors flex items-center justify-center gap-1.5',
-							inputMode === 'scale'
-								? 'bg-white text-blue-600 shadow-sm'
-								: 'text-gray-500 hover:text-gray-700'
-						)}
-						style="min-height: 56px"
-					>
-						<Bluetooth class="w-4 h-4" />
-						Scale
-					</button>
-				</div>
-			{/if}
-
-			{#if btConnected && inputMode === 'scale'}
-				<!-- BT Scale mode -->
-				<BluetoothWeightInput
-					id="weigh-station"
-					value={weightInput}
-					onValueChange={(v) => {
-						weightInput = v;
-					}}
-					theme="light"
-					class="w-full max-w-sm"
-				/>
-				<div
-					class="w-full max-w-sm rounded-2xl border-2 border-blue-200 bg-blue-50 px-8 py-6 text-center"
-				>
-					<div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">
-						Live Scale Reading
-					</div>
-					<div
-						class={cn(
-							'text-6xl font-extrabold font-mono tracking-tight min-h-[72px] flex items-center justify-center',
-							btScale.stability === 'stable'
-								? 'text-status-green'
-								: btScale.stability === 'unstable'
-									? 'text-status-yellow'
-									: 'text-gray-400'
-						)}
-					>
-						{btScale.stability === 'unstable' ? '~' : ''}{btScale.currentWeight}<span
-							class="text-2xl text-gray-400 ml-1">g</span
-						>
-					</div>
-					{#if btScale.stability !== 'idle'}
-						<span
-							class={cn(
-								'text-xs font-bold uppercase mt-2 inline-block',
-								btScale.stability === 'stable'
-									? 'text-status-green'
-									: 'text-status-yellow'
-							)}
-						>
-							{btScale.stability}
-						</span>
-					{:else}
-						<span class="text-xs text-gray-400 mt-2 inline-block"
-							>Place item on scale</span
-						>
-					{/if}
-				</div>
-			{:else}
-				<!-- Manual mode -->
-				<div
-					class="w-full max-w-sm rounded-2xl border-2 border-border bg-white px-8 py-6 text-center shadow-sm"
-				>
-					<div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-						Weight (grams)
-					</div>
-					<div
-						class="text-6xl font-extrabold font-mono tracking-tight min-h-[72px] flex items-center justify-center text-gray-900"
-					>
-						{#if weightInput}
-							{weightInput}<span class="text-2xl text-gray-400 ml-1">g</span>
-						{:else}
-							<span class="text-gray-300">0</span><span
-								class="text-2xl text-gray-300 ml-1">g</span
-							>
-						{/if}
-					</div>
-				</div>
-
-				<!-- Numpad -->
-				<div class="grid grid-cols-3 gap-3 w-full max-w-sm">
-					{#each numpadKeys as key}
-						<button
-							onclick={() => handleNumpad(key)}
-							class={cn(
-								'flex items-center justify-center rounded-xl text-2xl font-bold transition-all active:scale-95 border',
-								key === 'C'
-									? 'bg-red-50 text-status-red border-red-200 hover:bg-red-100'
-									: key === 'DEL'
-										? 'bg-gray-100 text-gray-600 border-border hover:bg-gray-200'
-										: 'bg-white text-gray-900 border-border hover:bg-gray-50 shadow-sm'
-							)}
-							style="min-height: 72px"
-						>
-							{key === 'DEL' ? '⌫' : key}
-						</button>
-					{/each}
-				</div>
-			{/if}
-
 		{:else}
 			<!-- No selection state -->
-			<div class="text-center text-gray-400">
-				<div class="text-6xl mb-4">⚖️</div>
-				<p class="text-xl font-semibold text-gray-600">Select a meat order</p>
-				<p class="text-sm mt-1">Choose from the pending list on the left</p>
+			<div class="flex-1 flex items-center justify-center">
+				<div class="text-center text-gray-400">
+					<div class="text-5xl sm:text-6xl mb-3 sm:mb-4">⚖️</div>
+					<p class="text-lg sm:text-xl font-semibold text-gray-600">Select a meat order</p>
+					<p class="text-sm mt-1">Choose from the pending list on the left</p>
+				</div>
 			</div>
 		{/if}
 		</div>
 
 		<!-- DISPATCH button — sticky at bottom, always visible when item is selected -->
 		{#if selectedItem}
-			<div class="sticky bottom-0 bg-surface border-t border-border px-8 py-4 flex justify-center">
+			<div class="sticky bottom-0 bg-surface border-t border-border px-4 sm:px-8 py-3 sm:py-4 flex justify-center">
 				<button
 					onclick={dispatch}
 					disabled={!weightInput || parseInt(weightInput) <= 0}
-					class="w-full max-w-sm rounded-xl bg-status-green py-5 text-xl font-extrabold text-white
+					class="w-full max-w-sm rounded-xl bg-status-green py-4 sm:py-5 text-lg sm:text-xl font-extrabold text-white
 					       hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none shadow-md"
-					style="min-height: 64px"
+					style="min-height: 56px"
 				>
 					DISPATCH
 				</button>
@@ -558,9 +584,9 @@
 		{/if}
 	</div>
 
-	<!-- RIGHT: Dispatched log — collapsible -->
+	<!-- RIGHT: Dispatched log — collapsible, hidden on mobile -->
 	{#if dispatchedCollapsed}
-		<div class="w-12 shrink-0 border-l border-border flex flex-col items-center py-3 gap-2 bg-surface">
+		<div class="hidden md:flex w-12 shrink-0 border-l border-border flex-col items-center py-3 gap-2 bg-surface">
 			<button
 				onclick={() => (dispatchedCollapsed = false)}
 				class="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
@@ -576,7 +602,7 @@
 			{/if}
 		</div>
 	{:else}
-		<div class="w-72 shrink-0 border-l border-border flex flex-col bg-surface">
+		<div class="hidden md:flex w-72 shrink-0 border-l border-border flex-col bg-surface">
 			<div class="px-4 py-3 border-b border-border flex justify-between items-center">
 				<div>
 					<h2 class="text-base font-extrabold tracking-tight text-gray-900">Dispatched</h2>

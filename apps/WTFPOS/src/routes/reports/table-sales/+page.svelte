@@ -94,7 +94,7 @@
 
 	{#snippet kpis()}
 		<!-- [01] KPIs with comparison context; [06] Replaced Gross Sales with Avg ₱/Guest -->
-		<div class="grid grid-cols-4 gap-4 flex-1">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 flex-1">
 			<KpiCard
 				label="Total Sessions"
 				value={String(comparison.sessions.current)}
@@ -140,7 +140,7 @@
 	{/snippet}
 
 	{#snippet content()}
-		<div class="overflow-hidden rounded-xl border border-border bg-white">
+		<div class="overflow-x-auto rounded-xl border border-border bg-white">
 			{#if rows.length === 0}
 				<div class="flex items-center justify-center p-10 text-center text-gray-400">
 					<div><div class="mb-2 text-3xl">📊</div><p class="text-sm">No table sales recorded for this period</p></div>
@@ -164,10 +164,10 @@
 								onclick={() => toggleSort('avgPerPax')}
 							>₱/Guest{sortIndicator('avgPerPax')}</th>
 							<th
-								class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none hover:text-gray-600"
+								class="hidden sm:table-cell px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none hover:text-gray-600"
 								onclick={() => toggleSort('grossSales')}
 							>Gross{sortIndicator('grossSales')}</th>
-							<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Disc.</th>
+							<th class="hidden sm:table-cell px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Disc.</th>
 							<th
 								class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 cursor-pointer select-none hover:text-gray-600"
 								onclick={() => toggleSort('netSales')}
@@ -193,8 +193,8 @@
 								<td class="px-4 py-3 text-right font-mono text-gray-600">
 									{row.pax > 0 ? formatPeso(Math.round(row.netSales / row.pax)) : '—'}
 								</td>
-								<td class="px-4 py-3 text-right font-mono text-gray-700">{formatPeso(row.grossSales)}</td>
-								<td class="px-4 py-3 text-right font-mono text-status-red">
+								<td class="hidden sm:table-cell px-4 py-3 text-right font-mono text-gray-700">{formatPeso(row.grossSales)}</td>
+								<td class="hidden sm:table-cell px-4 py-3 text-right font-mono text-status-red">
 									{row.discounts > 0 ? `−${formatPeso(row.discounts)}` : '—'}
 								</td>
 								<td class="px-4 py-3 text-right font-mono font-bold text-gray-900">{formatPeso(row.netSales)}</td>
@@ -207,8 +207,8 @@
 							<td class="px-4 py-3 text-right font-mono text-gray-600">
 								{totals.pax > 0 ? formatPeso(Math.round(totals.netSales / totals.pax)) : '—'}
 							</td>
-							<td class="px-4 py-3 text-right font-mono text-gray-900">{formatPeso(totals.grossSales)}</td>
-							<td class="px-4 py-3 text-right font-mono text-status-red">
+							<td class="hidden sm:table-cell px-4 py-3 text-right font-mono text-gray-900">{formatPeso(totals.grossSales)}</td>
+							<td class="hidden sm:table-cell px-4 py-3 text-right font-mono text-status-red">
 								{totals.discounts > 0 ? `−${formatPeso(totals.discounts)}` : '—'}
 							</td>
 							<td class="px-4 py-3 text-right font-mono text-gray-900">{formatPeso(totals.netSales)}</td>

@@ -163,7 +163,7 @@
 </script>
 
 <!-- ─── Summary cards ───────────────────────────────────────────────────────── -->
-<div class="mb-5 grid grid-cols-3 gap-4">
+<div class="mb-5 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
 	<div class="rounded-xl border border-border bg-white px-4 py-3">
 		<div class="flex items-center gap-2 mb-1">
 			<Trash2 class="w-4 h-4 text-gray-400" />
@@ -214,12 +214,12 @@
 {/if}
 
 <!-- Log Waste button + waste log table -->
-<div class="flex items-center justify-between mb-4">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
 	<div>
-		<h2 class="text-lg font-bold text-gray-900">Today's Waste Log</h2>
-		<p class="text-sm text-gray-500 mt-0.5">Preparation waste only — not unconsumed customer leftovers</p>
+		<h2 class="text-base sm:text-lg font-bold text-gray-900">Today's Waste Log</h2>
+		<p class="text-xs sm:text-sm text-gray-500 mt-0.5">Preparation waste only — not unconsumed customer leftovers</p>
 	</div>
-	<button onclick={openWasteModal} class="btn-primary flex items-center gap-2 shadow-sm">
+	<button onclick={openWasteModal} class="btn-primary flex items-center justify-center gap-2 shadow-sm shrink-0">
 		<Plus class="w-4 h-4" /> Log Waste
 	</button>
 </div>
@@ -233,7 +233,29 @@
 			</div>
 		</div>
 	{:else}
-		<div class="overflow-hidden rounded-xl border border-border bg-white">
+		<!-- Mobile card view -->
+		<div class="flex flex-col gap-2 md:hidden">
+			{#each todayEntries as e (e.id)}
+				<div class="rounded-xl border border-border bg-white p-3">
+					<div class="flex items-start justify-between gap-2">
+						<div class="flex-1 min-w-0">
+							<p class="font-medium text-gray-900 text-sm">{e.itemName}</p>
+							<p class="font-mono text-sm text-gray-700 mt-0.5">{e.qty} {e.unit}</p>
+						</div>
+						<span class={cn('rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0', reasonBadgeColor[e.reason] ?? 'bg-gray-100 text-gray-500')}>
+							{e.reason}
+						</span>
+					</div>
+					<div class="flex items-center justify-between mt-2 text-xs text-gray-400">
+						<span>by {e.loggedBy}</span>
+						<span>{new Date(e.loggedAt).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Desktop table view -->
+		<div class="overflow-hidden rounded-xl border border-border bg-white hidden md:block">
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b border-border bg-gray-50">
@@ -275,8 +297,8 @@
 
 <!-- Log Waste Modal -->
 {#if showModal}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="pos-card w-[440px] max-h-[90vh] overflow-y-auto flex flex-col gap-5">
+	<div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
+		<div class="pos-card w-full sm:w-[440px] sm:max-w-[440px] max-h-[90vh] overflow-y-auto flex flex-col gap-5 rounded-t-2xl sm:rounded-xl">
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">Log Waste</h3>
 				<button onclick={() => (showModal = false)} class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">

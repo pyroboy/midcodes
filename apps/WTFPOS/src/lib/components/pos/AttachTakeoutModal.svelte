@@ -64,8 +64,8 @@
 	}
 </script>
 
-<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-	<div class="pos-card w-[380px] max-h-[85vh] flex flex-col">
+<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+	<div class="pos-card w-full max-w-[380px] max-h-[85vh] flex flex-col">
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b border-border px-5 py-4">
 			<div>

@@ -19,7 +19,7 @@
 	let { label, value, change = null, changeLabel = 'vs prev period', prevValue = null, variant = 'default', sub }: Props = $props();
 
 	const containerClass = $derived(cn(
-		'rounded-xl border p-4',
+		'rounded-lg sm:rounded-xl border p-2.5 sm:p-4',
 		variant === 'success' ? 'border-status-green/20 bg-status-green-light' :
 		variant === 'danger'  ? 'border-status-red/20 bg-status-red-light' :
 		variant === 'accent'  ? 'border-accent/20 bg-accent-light' :
@@ -27,7 +27,7 @@
 	));
 
 	const labelClass = $derived(cn(
-		'text-xs font-medium uppercase tracking-wide',
+		'text-[10px] sm:text-xs font-medium uppercase tracking-wide leading-tight',
 		variant === 'success' ? 'text-status-green' :
 		variant === 'danger'  ? 'text-status-red' :
 		variant === 'accent'  ? 'text-accent' :
@@ -35,7 +35,7 @@
 	));
 
 	const valueClass = $derived(cn(
-		'mt-1 text-2xl font-bold',
+		'mt-0.5 sm:mt-1 text-base sm:text-2xl font-bold leading-snug',
 		variant === 'success' ? 'text-status-green' :
 		variant === 'danger'  ? 'text-status-red' :
 		variant === 'accent'  ? 'text-accent' :
@@ -51,10 +51,10 @@
 	<p class={labelClass}>{label}</p>
 	<p class={valueClass}>{value}</p>
 	{#if sub}
-		<p class="mt-0.5 text-xs text-gray-400">{sub}</p>
+		<p class="mt-0.5 text-[10px] sm:text-xs text-gray-400 leading-tight">{sub}</p>
 	{/if}
 	{#if change !== null}
-		<div class="mt-2 flex flex-col gap-0.5">
+		<div class="mt-1 sm:mt-2 flex flex-col gap-0.5">
 			<div class="flex items-center gap-1">
 				<span class={cn(
 					'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',

@@ -52,7 +52,8 @@ const PRIORITY_COLLECTIONS = [
 // Priority tier 2: everything else (history, stock, reports)
 const SECONDARY_COLLECTIONS = [
 	'stock_items', 'deliveries', 'waste', 'deductions', 'adjustments',
-	'expenses', 'stock_counts', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts'
+	'expenses', 'stock_counts', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
+	'shifts'
 ];
 
 const REPLICATED_COLLECTIONS = [...PRIORITY_COLLECTIONS, ...SECONDARY_COLLECTIONS];
@@ -440,6 +441,57 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 		_global.__wtfposRepl.serverPollInterval = pollInterval;
 	}
 
+	// LAN clients: safety-net poll (every 30s) to catch changes missed when
+	// mobile browsers throttle/kill the SSE connection in background tabs.
+	// Priority collections only — these are what the POS floor + kitchen need.
+	if (!isServerDevice) {
+		// Clear any previous client poll interval (HMR safety)
+		if (_global.__wtfposRepl.clientPollInterval) {
+			clearInterval(_global.__wtfposRepl.clientPollInterval);
+			_global.__wtfposRepl.clientPollInterval = null;
+		}
+		const clientPoll = setInterval(() => {
+			for (const name of PRIORITY_COLLECTIONS) {
+				const stream = pullStreams.get(name);
+				if (stream) stream.next('RESYNC');
+			}
+		}, 30_000);
+		_global.__wtfposRepl.clientPollInterval = clientPoll;
+
+		// Wake-up recovery: when a mobile browser tab becomes visible again after
+		// being backgrounded, the SSE stream is often dead. Immediately resync
+		// all priority collections so stale data (old KDS tickets, missing orders)
+		// gets replaced within seconds of the user looking at the screen.
+		if (typeof document !== 'undefined') {
+			// Remove previous listener if any (HMR safety)
+			if (_global.__wtfposRepl.visibilityHandler) {
+				document.removeEventListener('visibilitychange', _global.__wtfposRepl.visibilityHandler);
+			}
+			const visibilityHandler = () => {
+				if (document.visibilityState !== 'visible') return;
+				remoteLog('info', 'Tab became visible — triggering priority resync');
+				// Stagger resyncs to avoid a burst of concurrent fetches
+				let delay = 0;
+				for (const name of PRIORITY_COLLECTIONS) {
+					const stream = pullStreams.get(name);
+					if (stream) {
+						setTimeout(() => stream.next('RESYNC'), delay);
+						delay += 150;
+					}
+				}
+				// Also resync secondary collections after priority ones settle
+				setTimeout(() => {
+					for (const name of SECONDARY_COLLECTIONS) {
+						const stream = pullStreams.get(name);
+						if (stream) stream.next('RESYNC');
+					}
+				}, delay + 500);
+			};
+			document.addEventListener('visibilitychange', visibilityHandler);
+			_global.__wtfposRepl.visibilityHandler = visibilityHandler;
+		}
+	}
+
 	// Set up replication per collection
 	let started = 0;
 	const initialSyncPromises: Promise<void>[] = [];
@@ -766,6 +818,16 @@ export async function stopReplication() {
 	if (_global.__wtfposRepl.serverPollInterval) {
 		clearInterval(_global.__wtfposRepl.serverPollInterval);
 		_global.__wtfposRepl.serverPollInterval = null;
+	}
+	// Clear client polling interval if active
+	if (_global.__wtfposRepl.clientPollInterval) {
+		clearInterval(_global.__wtfposRepl.clientPollInterval);
+		_global.__wtfposRepl.clientPollInterval = null;
+	}
+	// Remove visibility change listener
+	if (_global.__wtfposRepl.visibilityHandler && typeof document !== 'undefined') {
+		document.removeEventListener('visibilitychange', _global.__wtfposRepl.visibilityHandler);
+		_global.__wtfposRepl.visibilityHandler = null;
 	}
 	for (const rep of activeReplications.values()) {
 		try { await rep.cancel(); } catch { /* noop */ }

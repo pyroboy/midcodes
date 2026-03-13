@@ -59,8 +59,8 @@
 </script>
 
 {#if isOpen}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[340px] flex flex-col gap-4">
+	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+		<div class="pos-card w-full max-w-[340px] flex flex-col gap-4">
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-gray-900">{title}</h3>
 				<p class="text-sm text-gray-500">{description}</p>

@@ -19,10 +19,13 @@ export const GET: RequestHandler = async () => {
 		userName: c.userName,
 		role: c.role,
 		locationId: c.locationId,
+		currentRoute: c.currentRoute,
 		lastSeenAt: c.lastSeenAt.toISOString(),
 		// Consider active if seen in the last 90 seconds (accounts for page idle)
 		isActive: (now - c.lastSeenAt.getTime()) < 90_000,
 		hitCount: c.hitCount,
+		connectionTypes: Array.from(c.connectionTypes),
+		lastSyncAt: c.lastSyncAt?.toISOString() ?? null,
 	}));
 
 	return json({ clients: result });

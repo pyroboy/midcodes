@@ -63,7 +63,7 @@
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-4 gap-4 flex-1">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 flex-1">
 			<KpiCard
 				label="Gross Profit"
 				value={formatPeso(grossProfit)}
@@ -86,8 +86,8 @@
 	{/snippet}
 
 	{#snippet content()}
-		<div class="grid grid-cols-[1fr_380px] gap-6">
-			<div class="overflow-hidden rounded-xl border border-border bg-white">
+		<div class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+			<div class="overflow-x-auto rounded-xl border border-border bg-white">
 				<table class="w-full text-sm">
 					<thead>
 						<tr class="border-b border-border bg-gray-50">
@@ -136,7 +136,7 @@
 					<p class={cn('text-xs font-bold uppercase tracking-wide', netProfit >= 0 ? 'text-status-green' : 'text-status-red')}>
 						Take-Home Profit
 					</p>
-					<p class={cn('mt-2 text-4xl font-bold', netProfit >= 0 ? 'text-status-green' : 'text-status-red')}>
+					<p class={cn('mt-2 text-2xl sm:text-4xl font-bold', netProfit >= 0 ? 'text-status-green' : 'text-status-red')}>
 						{formatPeso(netProfit)}
 					</p>
 					<p class={cn('mt-1 text-sm', netProfit >= 0 ? 'text-status-green/60' : 'text-status-red/60')}>

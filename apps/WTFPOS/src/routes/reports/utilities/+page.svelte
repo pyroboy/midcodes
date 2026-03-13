@@ -315,10 +315,11 @@
 			{#snippet actions()}
 				<button
 					onclick={() => { resetForm(); formOpen = true; }}
-					class="btn-primary flex items-center gap-2"
+					class="btn-primary flex items-center sm:gap-2 sm:px-6 px-3"
 				>
-					<Plus size={16} />
-					Log Utility Reading
+					<Plus size={20} class="sm:hidden" />
+					<Plus size={16} class="hidden sm:block" />
+					<span class="hidden sm:inline">Log Utility Reading</span>
 				</button>
 			{/snippet}
 		</ReportFilterBar>
@@ -386,41 +387,41 @@
 					<table class="w-full text-sm">
 						<thead>
 							<tr class="border-b border-border bg-surface-secondary text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-								<th class="px-4 py-2">Date</th>
-								<th class="px-4 py-2">Category</th>
-								<th class="px-4 py-2 text-right">Prev</th>
-								<th class="px-4 py-2 text-right">Current</th>
-								<th class="px-4 py-2 text-right">Consumption</th>
-								<th class="px-4 py-2 text-right">Rate</th>
-								<th class="px-4 py-2 text-right">Cost</th>
+								<th class="px-3 sm:px-4 py-2">Date</th>
+								<th class="px-3 sm:px-4 py-2">Category</th>
+								<th class="px-3 sm:px-4 py-2 text-right hidden sm:table-cell">Prev</th>
+								<th class="px-3 sm:px-4 py-2 text-right hidden sm:table-cell">Current</th>
+								<th class="px-3 sm:px-4 py-2 text-right">Consumption</th>
+								<th class="px-3 sm:px-4 py-2 text-right hidden md:table-cell">Rate</th>
+								<th class="px-3 sm:px-4 py-2 text-right">Cost</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each filteredReadings as reading}
 								<tr class="border-b border-border last:border-b-0 hover:bg-gray-50">
-									<td class="px-4 py-2.5 text-gray-600">
+									<td class="px-3 sm:px-4 py-2.5 text-gray-600">
 										{formatPeriodLabel(reading.billingPeriod)}
 									</td>
-									<td class="px-4 py-2.5">
+									<td class="px-3 sm:px-4 py-2.5">
 										<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
 											style="background: {UTILITY_COLORS[reading.category]}15; color: {UTILITY_COLORS[reading.category]}"
 										>
 											{UTILITY_EMOJI[reading.category]} {UTILITY_LABELS[reading.category]}
 										</span>
 									</td>
-									<td class="px-4 py-2.5 text-right font-mono text-gray-500">
+									<td class="px-3 sm:px-4 py-2.5 text-right font-mono text-gray-500 hidden sm:table-cell">
 										{reading.previousReading.toLocaleString()}
 									</td>
-									<td class="px-4 py-2.5 text-right font-mono text-gray-700">
+									<td class="px-3 sm:px-4 py-2.5 text-right font-mono text-gray-700 hidden sm:table-cell">
 										{reading.currentReading.toLocaleString()}
 									</td>
-									<td class="px-4 py-2.5 text-right font-mono font-semibold text-gray-900">
+									<td class="px-3 sm:px-4 py-2.5 text-right font-mono font-semibold text-gray-900">
 										{reading.consumption.toLocaleString()} {UTILITY_UNITS[reading.category]}
 									</td>
-									<td class="px-4 py-2.5 text-right font-mono text-gray-500">
+									<td class="px-3 sm:px-4 py-2.5 text-right font-mono text-gray-500 hidden md:table-cell">
 										₱{reading.rate}
 									</td>
-									<td class="px-4 py-2.5 text-right font-mono font-bold text-accent">
+									<td class="px-3 sm:px-4 py-2.5 text-right font-mono font-bold text-accent">
 										{formatPeso(reading.totalCost)}
 									</td>
 								</tr>

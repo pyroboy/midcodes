@@ -74,7 +74,7 @@
 	)}
 >
 	{#if item.image}
-		<div class="w-full h-40 bg-gray-100 relative overflow-hidden">
+		<div class="w-full h-28 sm:h-40 bg-gray-100 relative overflow-hidden">
 			<img src={item.image} alt={item.name} class="w-full h-full object-cover" />
 			<div class={cn("absolute bottom-0 left-0 right-0 h-1", getProteinStripeClass(item.proteinType))}></div>
 		</div>
@@ -86,18 +86,18 @@
 		</div>
 	{/if}
 
-	<div class="flex flex-col gap-2 p-4 pt-3" in:fade={{ duration: 200, delay: 100 }}>
+	<div class="flex flex-col gap-1.5 sm:gap-2 p-3 sm:p-4 pt-2 sm:pt-3" in:fade={{ duration: 200, delay: 100 }}>
 		{#if !item.image}
 			<div class="flex flex-wrap items-center gap-2">
-				<CategoryIcon category={item.category} class="h-8 w-8" iconClass="w-4 h-4" />
+				<CategoryIcon category={item.category} class="h-7 w-7 sm:h-8 sm:w-8" iconClass="w-3.5 h-3.5 sm:w-4 sm:h-4" />
 			</div>
 		{/if}
 
-		<p class="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 mt-2">{item.name}</p>
+		<p class="line-clamp-2 text-xs sm:text-sm font-semibold leading-snug text-gray-900 mt-1 sm:mt-2">{item.name}</p>
 
-		<p class="font-mono text-xl font-bold text-gray-900 mt-1">
+		<p class="font-mono text-lg sm:text-xl font-bold text-gray-900 mt-0.5 sm:mt-1">
 			{weight.display}
-			<span class="text-xs font-normal text-gray-400">{weight.unit}</span>
+			<span class="text-[10px] sm:text-xs font-normal text-gray-400">{weight.unit}</span>
 		</p>
 
 		<StockLevelBar current={item.currentStock} min={item.minLevel} status={item.status} class="mt-1" />

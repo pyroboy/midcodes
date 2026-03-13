@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-hide {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+	display: none;
+}
+
 @layer base {
 	:root {
 		--sidebar: #ffffff;
@@ -74,5 +83,70 @@
 	/* Explicit placeholder contrast rule — gray-500 (#6B7280) for WCAG AA compliance */
 	.pos-input::placeholder {
 		color: #6B7280;
+	}
+}
+
+/* ── Mobile Landscape POS Optimization ─────────────────────────────────────── */
+/* Targets phones in landscape (height ≤ 500px) — tablets stay unchanged       */
+@media (orientation: landscape) and (max-height: 500px) {
+	/* Hide MobileTopBar — SidebarTrigger in POS header replaces it */
+	.mobile-topbar {
+		display: none !important;
+	}
+
+	/* Show desktop-style sidebar panel in landscape */
+	.pos-sidebar-desktop {
+		display: flex !important;
+		width: 280px;
+		min-width: 280px;
+	}
+
+	/* Hide the bottom-sheet overlay — side panel takes over */
+	.pos-sheet-mobile {
+		display: none !important;
+	}
+
+	/* Compact floor plan column padding + gap */
+	.pos-floor-col {
+		padding: 0.375rem !important;
+		gap: 0.375rem !important;
+	}
+
+	/* Show SidebarTrigger (hidden by default on mobile) */
+	.pos-sidebar-trigger {
+		display: flex !important;
+	}
+
+	/* Compact POS header */
+	.pos-header-row {
+		gap: 0.25rem !important;
+	}
+	.pos-header-row h1 {
+		font-size: 0.875rem !important;
+	}
+
+	/* Compact takeout queue */
+	.pos-takeout-queue {
+		padding-top: 0.25rem !important;
+		gap: 0.375rem !important;
+	}
+	.pos-takeout-queue h2 {
+		font-size: 0.625rem !important;
+	}
+
+	/* Compact LocationBanner */
+	.location-banner-compact {
+		padding-top: 0.125rem !important;
+		padding-bottom: 0.125rem !important;
+		min-height: unset !important;
+	}
+
+	/* Compact OrderSidebar internals */
+	.pos-sidebar-desktop .pos-order-sidebar {
+		font-size: 0.8125rem;
+	}
+	.pos-sidebar-desktop .pos-order-sidebar .px-4 {
+		padding-left: 0.5rem !important;
+		padding-right: 0.5rem !important;
 	}
 }

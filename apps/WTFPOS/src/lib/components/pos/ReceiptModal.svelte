@@ -87,8 +87,8 @@
 </script>
 
 {#if isOpen && order}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[380px] flex flex-col gap-0 overflow-hidden p-0">
+	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+		<div class="pos-card w-full max-w-[380px] flex flex-col gap-0 overflow-hidden p-0">
 			<!-- Receipt Header -->
 			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-5 bg-surface">
 				<!-- [04] Branch name -->

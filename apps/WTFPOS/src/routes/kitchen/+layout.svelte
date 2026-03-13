@@ -50,21 +50,21 @@
 </script>
 
 <div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
-	<div class="flex items-center border-b border-border bg-surface">
-		<div class="flex-1">
+	<div class="flex items-center border-b border-border bg-surface gap-1">
+		<div class="flex-1 min-w-0 overflow-x-auto">
 			<SubNav {links} />
 		</div>
 		{#if session.kitchenFocus}
 			{@const badge = FOCUS_BADGE[session.kitchenFocus]}
-			<div class={cn('flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold mr-2', badge.cls)}>
+			<div class={cn('hidden md:flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold shrink-0 mr-1', badge.cls)}>
 				{badge.icon} {badge.label}
 			</div>
 		{/if}
-		<div class="pr-3">
+		<div class="pr-2 shrink-0 hidden sm:block">
 			<BluetoothScaleStatus />
 		</div>
 	</div>
-	<main class="flex-1 overflow-y-auto p-6">
+	<main class="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
 		{@render children()}
 	</main>
 </div>

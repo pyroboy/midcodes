@@ -243,7 +243,7 @@
 <!-- ─── EOD Modal ───────────────────────────────────────────────────────────── -->
 {#if showModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="pos-card w-[460px] max-h-[90vh] overflow-y-auto flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[460px] mx-3 max-h-[90vh] overflow-y-auto flex flex-col gap-5">
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">End of Day</h3>
 				<button onclick={() => (showModal = false)} class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
@@ -286,7 +286,7 @@
 							{closingActual === 0 ? 'Enter amount' : cashVariance === 0 ? 'Balanced' : cashVariance > 0 ? 'Cash Over' : 'Cash Short'}
 						</p>
 						{#if closingActual !== 0}
-							<p class={cn('mt-0.5 font-mono text-2xl font-bold',
+							<p class={cn('mt-0.5 font-mono text-lg sm:text-2xl font-bold',
 								cashVariance === 0 ? 'text-status-green' : cashVariance > 0 ? 'text-status-yellow' : 'text-status-red'
 							)}>
 								{cashVariance > 0 ? `+${formatPeso(cashVariance)}` : cashVariance < 0 ? `−${formatPeso(-cashVariance)}` : '₱0.00'}
@@ -352,7 +352,7 @@
 					<p class="text-xs text-gray-500 mt-0.5">Record today's meter readings to estimate daily utility usage.</p>
 				</div>
 
-				<div class="grid grid-cols-3 gap-3">
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 					<div class="flex flex-col gap-1.5">
 						<span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Electricity (kWh)</span>
 						<input type="number" bind:value={currentElec} class="pos-input font-mono" min="0" disabled={eodSubmitted} placeholder={previousReading ? String(previousReading.electricity) : '0'} />
@@ -543,7 +543,7 @@
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-4 gap-4 flex-1">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 flex-1">
 			<KpiCard label="Gross Sales" value={isBlindCloseSubmitted ? formatPeso(summary.grossSales) : '—'} variant="accent" />
 			<KpiCard label="Net Sales" value={isBlindCloseSubmitted ? formatPeso(summary.netSales) : '—'} variant="success" />
 			<KpiCard label="Cash Variance" value={isBlindCloseSubmitted && closingActual > 0 ? formatPeso(cashVariance) : '—'} variant={cashVariance === 0 ? 'success' : cashVariance > 0 ? 'default' : 'danger'} />
@@ -630,7 +630,7 @@
 								{closingActual === 0 ? 'No cash declared' : cashVariance === 0 ? 'Balanced' : cashVariance > 0 ? 'Cash Over' : 'Cash Short'}
 							</p>
 							{#if closingActual !== 0}
-								<p class={cn('mt-0.5 font-mono text-2xl font-bold',
+								<p class={cn('mt-0.5 font-mono text-lg sm:text-2xl font-bold',
 									cashVariance === 0 ? 'text-status-green' : cashVariance > 0 ? 'text-status-yellow' : 'text-status-red'
 								)}>
 									{cashVariance > 0 ? `+${formatPeso(cashVariance)}` : cashVariance < 0 ? `−${formatPeso(-cashVariance)}` : '₱0.00'}
@@ -661,32 +661,32 @@
 					<History class="w-4 h-4 text-gray-400" />
 					<h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">Z-Read History</h2>
 				</div>
-				<div class="overflow-hidden rounded-xl border border-border bg-white">
-					<table class="w-full text-sm">
+				<div class="overflow-x-auto rounded-xl border border-border bg-white">
+					<table class="w-full text-sm min-w-[500px]">
 						<thead>
 							<tr class="border-b border-border bg-gray-50">
-								<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Date</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Gross Sales</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Discounts</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Net Sales</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">VAT</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Variance</th>
-								<th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">By</th>
+								<th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Date</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Gross</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 hidden sm:table-cell">Disc.</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Net</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 hidden md:table-cell">VAT</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Var.</th>
+								<th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-400 hidden sm:table-cell">By</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-border">
 							{#each zReadHistory.value.slice(0, 30) as z (z.id)}
 								{@const variance = z.cashVariance ?? 0}
 								<tr class="hover:bg-gray-50">
-									<td class="px-4 py-3 font-mono text-xs text-gray-700">{z.date}</td>
-									<td class="px-4 py-3 text-right font-mono text-xs text-gray-700">{formatPeso(z.grossSales)}</td>
-									<td class="px-4 py-3 text-right font-mono text-xs text-status-red">−{formatPeso(z.discounts)}</td>
-									<td class="px-4 py-3 text-right font-mono text-xs font-semibold text-gray-900">{formatPeso(z.netSales)}</td>
-									<td class="px-4 py-3 text-right font-mono text-xs text-gray-500">{formatPeso(z.vatAmount)}</td>
-									<td class="px-4 py-3 text-right font-mono text-xs {variance === 0 ? 'text-status-green' : variance > 0 ? 'text-status-yellow' : 'text-status-red'}">
+									<td class="px-3 py-3 font-mono text-xs text-gray-700">{z.date}</td>
+									<td class="px-3 py-3 text-right font-mono text-xs text-gray-700">{formatPeso(z.grossSales)}</td>
+									<td class="px-3 py-3 text-right font-mono text-xs text-status-red hidden sm:table-cell">−{formatPeso(z.discounts)}</td>
+									<td class="px-3 py-3 text-right font-mono text-xs font-semibold text-gray-900">{formatPeso(z.netSales)}</td>
+									<td class="px-3 py-3 text-right font-mono text-xs text-gray-500 hidden md:table-cell">{formatPeso(z.vatAmount)}</td>
+									<td class="px-3 py-3 text-right font-mono text-xs {variance === 0 ? 'text-status-green' : variance > 0 ? 'text-status-yellow' : 'text-status-red'}">
 										{variance > 0 ? `+${formatPeso(variance)}` : variance < 0 ? `−${formatPeso(-variance)}` : '₱0.00'}
 									</td>
-									<td class="px-4 py-3 text-right text-xs text-gray-400">{z.submittedBy}</td>
+									<td class="px-3 py-3 text-right text-xs text-gray-400 hidden sm:table-cell">{z.submittedBy}</td>
 								</tr>
 							{/each}
 						</tbody>

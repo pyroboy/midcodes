@@ -49,7 +49,7 @@
 </script>
 
 {#if isAuthenticated}
-<div class={cn('sticky top-0 z-30 w-full border-b px-4 py-2 sm:px-6 shadow-sm flex items-center justify-between gap-3 transition-colors', colors.bg, colors.border)}>
+<div class={cn('location-banner-compact sticky top-0 z-30 w-full border-b px-4 py-2 sm:px-6 shadow-sm flex items-center justify-between gap-3 transition-colors', colors.bg, colors.border)}>
 	<div class="flex items-center gap-2.5">
 		<MapPin class={cn('h-4 w-4 shrink-0', colors.text)} />
 		<h2 class={cn('text-base font-black tracking-tight', colors.text)}>

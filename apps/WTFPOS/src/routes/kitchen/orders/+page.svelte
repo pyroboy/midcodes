@@ -434,39 +434,25 @@
 	</div>
 {/snippet}
 
-<!-- ── Live Indicator (fixed top-right) — P2-08: dims when stale >60s ── -->
-<div class={cn(
-	'fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm bg-white',
-	isStale ? 'border-status-yellow/40' : 'border-status-green/30'
-)}>
-	<span class={cn(
-		'h-2 w-2 rounded-full',
-		isStale ? 'bg-status-yellow' : 'bg-status-green animate-pulse'
-	)}></span>
-	<span class={cn(
-		'text-xs font-semibold',
-		isStale ? 'text-status-yellow' : 'text-status-green'
-	)}>{isStale ? '~ Stale' : 'Live'}</span>
+<!-- ── Header ── -->
+<div class="mb-3 sm:mb-4 space-y-3 sm:space-y-4">
 	<!-- [07]: New tables badge -->
 	{#if newTableCount > 0}
-		<span class="bg-accent text-white text-sm font-bold px-3 py-1.5 rounded-lg">
-			🆕 {newTableCount} new table{newTableCount > 1 ? 's' : ''}
-		</span>
-	{/if}
-</div>
-
-<!-- ── Header ── -->
-<div class="mb-4 space-y-4">
-	<div class="flex items-center justify-between">
-		<div class="flex items-center gap-3">
-			<div>
-				<h1 class="text-xl font-bold text-gray-900 no-select">Kitchen Queue</h1>
-				<p class="text-sm text-gray-500 mt-0.5"><span class="font-bold">{queueOrders}</span> active · <span class="font-bold">{totalItems}</span> items</p>
-			</div>
+		<div class="flex items-center gap-2 rounded-lg bg-accent-light px-3 py-2 border border-accent/20">
+			<span class="bg-accent text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+				🆕 {newTableCount} new table{newTableCount > 1 ? 's' : ''}
+			</span>
 		</div>
-		<div class="flex items-center gap-3">
+	{/if}
+
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+		<div>
+			<h1 class="text-lg sm:text-xl font-bold text-gray-900 no-select">Kitchen Queue</h1>
+			<p class="text-sm text-gray-500 mt-0.5"><span class="font-bold">{queueOrders}</span> active · <span class="font-bold">{totalItems}</span> items</p>
+		</div>
+		<div class="flex items-center gap-2 sm:gap-3 flex-wrap">
 			<!-- P2-06: Volume slider — 44px touch wrapper ── -->
-			<div class="flex items-center gap-2 min-h-[44px] px-3 py-1 rounded-lg border border-border bg-white">
+			<div class="hidden sm:flex items-center gap-2 min-h-[44px] px-3 py-1 rounded-lg border border-border bg-white">
 				<span class="text-xs font-semibold text-gray-500 shrink-0">&#128266;</span>
 				<div class="min-h-[44px] flex items-center w-20">
 					<input
@@ -483,15 +469,15 @@
 			<button
 				onclick={() => recallLastTicket()}
 				disabled={kdsTicketHistory.value.length === 0}
-				class="btn-primary px-5 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
-				style="min-height: 48px"
+				class="btn-primary px-3 sm:px-5 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+				style="min-height: 44px"
 			>
-				&#8617; UNDO LAST
+				&#8617; UNDO
 			</button>
 			<button
 				onclick={() => showKdsHistory = true}
-				class="btn-secondary px-5 text-sm"
-				style="min-height: 48px"
+				class="btn-secondary px-3 sm:px-5 text-sm"
+				style="min-height: 44px"
 			>
 				History
 				{#if kdsTicketHistory.value.length > 0}
@@ -534,7 +520,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+	<div class="grid gap-3 sm:gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));">
 		{#each activeTickets as ticket (ticket.orderId)}
 			{@const grouped = groupItems(ticket.items)}
 			{@const progress = ticketProgress(ticket)}
@@ -548,17 +534,17 @@
 				isNew && 'animate-pulse'
 			)}>
 				<!-- Card Header -->
-				<div class="flex items-center justify-between px-4 py-3 bg-white/60">
-					<div class="flex items-center gap-2">
+				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-white/60">
+					<div class="flex items-center gap-2 min-w-0">
 						{#if ticket.tableNumber !== null}
-							<span class="text-2xl font-black text-gray-900">T{ticket.tableNumber}</span>
+							<span class="text-xl sm:text-2xl font-black text-gray-900">T{ticket.tableNumber}</span>
 						{:else}
 							<span class="flex items-center gap-2">
-								<span class="rounded-lg bg-status-purple px-2 py-1 text-xs font-bold text-white">📦 TAKEOUT</span>
-								<span class="text-lg font-black text-gray-900">{ticket.customerName ?? 'Walk-in'}</span>
+								<span class="rounded-lg bg-status-purple px-2 py-1 text-xs font-bold text-white">📦 TO</span>
+								<span class="text-base sm:text-lg font-black text-gray-900 truncate">{ticket.customerName ?? 'Walk-in'}</span>
 							</span>
 						{/if}
-						<span class="font-mono text-xs font-bold text-gray-400">{formatDisplayId(ticket.orderId, ticket.tableNumber)}</span>
+						<span class="font-mono text-xs font-bold text-gray-400 hidden sm:inline">{formatDisplayId(ticket.orderId, ticket.tableNumber)}</span>
 
 						{#if printFailed}
 							<button
@@ -574,13 +560,13 @@
 					<div class="flex items-center gap-2">
 						<button
 							onclick={() => completeAll(ticket)}
-							class="rounded-lg border border-gray-300 bg-white px-6 text-sm font-semibold text-gray-600 active:scale-95 transition-all hover:bg-gray-50 min-h-[56px]"
+							class="rounded-lg border border-gray-300 bg-white px-4 sm:px-6 text-sm font-semibold text-gray-600 active:scale-95 transition-all hover:bg-gray-50 min-h-[48px] sm:min-h-[56px]"
 							title="Quick bump — mark all items served"
 						>
-							Quick Bump
+							Bump All
 						</button>
 						<span class="text-sm font-bold text-gray-400 font-mono">{progress.served}/{progress.total}</span>
-						<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
+						<span class={cn('rounded-full px-2.5 sm:px-3 py-1 font-mono text-xs sm:text-sm font-bold', timerBadgeClass(urgency))}>
 							{timerText(ticket.createdAt)}
 						</span>
 					</div>

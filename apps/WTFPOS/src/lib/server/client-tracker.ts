@@ -45,6 +45,23 @@ function classifyContext(context: string): ConnectionType {
 /** All known clients by display IP */
 const knownClients = new Map<string, ClientInfo>();
 
+// ─── Change notification ─────────────────────────────────────────────────────
+// Subscribers are notified when client state changes (new client, route change, etc.)
+type ClientChangeListener = () => void;
+const clientChangeListeners = new Set<ClientChangeListener>();
+
+/** Subscribe to client-tracker changes. Returns unsubscribe function. */
+export function subscribeClientChanges(fn: ClientChangeListener): () => void {
+	clientChangeListeners.add(fn);
+	return () => clientChangeListeners.delete(fn);
+}
+
+function emitClientChange() {
+	for (const fn of clientChangeListeners) {
+		try { fn(); } catch { /* noop */ }
+	}
+}
+
 export function displayIP(ip: string): string {
 	if (ip.startsWith('::ffff:')) return ip.slice(7);
 	return ip;
@@ -121,10 +138,13 @@ export function trackClient(rawIp: string, userAgent: string, context: string, r
 
 	const existing = knownClients.get(dip);
 	if (existing) {
+		const routeChanged = route && existing.currentRoute !== route;
 		existing.lastSeenAt = now;
 		existing.hitCount++;
 		existing.connectionTypes.add(connType);
 		if (route) existing.currentRoute = route;
+		// Notify listeners when route or connection type changes (not every heartbeat)
+		if (routeChanged) emitClientChange();
 
 		// Refresh device info periodically (every 20 requests) for non-server clients
 		if (!existing.isServer && existing.hitCount % 20 === 0) {
@@ -169,6 +189,7 @@ export function trackClient(rawIp: string, userAgent: string, context: string, r
 		connectionTypes: new Set([connType]),
 	};
 	knownClients.set(dip, info);
+	emitClientChange(); // New client connected — notify devices page
 
 	if (isServer) {
 		const name = devInfo?.name || devInfo?.userName || 'this machine';

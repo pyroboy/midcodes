@@ -417,20 +417,20 @@
     {:else}
         <!-- Floor plan wrapper -->
         <div class="flex flex-1 overflow-hidden">
-            <div class="flex flex-1 flex-col overflow-hidden min-h-0 p-6 gap-5">
+            <div class="pos-floor-col flex flex-1 flex-col overflow-hidden min-h-0 p-3 sm:p-4 lg:p-6 gap-3 lg:gap-5">
                 <!-- Header -->
-                <div class="flex items-center justify-between shrink-0">
-                    <div class="flex items-center gap-3">
-                        <SidebarTrigger class="hidden md:flex h-9 w-9 text-gray-500" />
-                        <h1 class="text-lg font-bold text-gray-900">POS</h1>
-                        <span class="badge-orange">{occupied} occ</span>
-                        <span class="badge-green">{free} free</span>
+                <div class="pos-header-row flex items-center justify-between shrink-0 gap-1 sm:gap-2">
+                    <div class="flex items-center gap-1 sm:gap-2 lg:gap-3">
+                        <SidebarTrigger class="pos-sidebar-trigger hidden md:flex h-9 w-9 text-gray-500" />
+                        <h1 class="text-sm sm:text-base lg:text-lg font-bold text-gray-900">POS</h1>
+                        <span class="badge-orange text-[10px] sm:text-xs px-1.5 sm:px-3 h-5 sm:h-7">{occupied} occ</span>
+                        <span class="badge-green text-[10px] sm:text-xs px-1.5 sm:px-3 h-5 sm:h-7">{free} free</span>
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-1 sm:gap-2 lg:gap-4">
                         <div class="relative">
                             <button
                                 onclick={() => showLegend = !showLegend}
-                                class="flex items-center justify-center rounded-lg border border-border bg-surface p-2 text-gray-500 hover:bg-gray-50 transition-colors min-h-[44px] min-w-[44px]"
+                                class="hidden sm:flex items-center justify-center rounded-lg border border-border bg-surface p-2 text-gray-500 hover:bg-gray-50 transition-colors min-h-[44px] min-w-[44px]"
                                 aria-label="Toggle color legend"
                             >
                                 <Info class="h-4 w-4" />
@@ -501,17 +501,17 @@
                         </div>
                         <button
                             onclick={openTakeoutModal}
-                            class="flex items-center gap-2 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-accent hover:bg-orange-100 transition-colors"
-                            style="min-height: 40px"
+                            class="flex items-center gap-1 sm:gap-1.5 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 px-1.5 sm:px-4 py-1 sm:py-2 text-[10px] sm:text-sm font-semibold text-accent hover:bg-orange-100 transition-colors"
+                            style="min-height: 32px"
                         >
-                            📦 New Takeout
+                            📦 <span class="hidden sm:inline">New </span>Takeout
                         </button>
                         <button
                             onclick={() => showHistory = true}
-                            class="flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-                            style="min-height: 40px"
+                            class="flex items-center gap-1 sm:gap-1.5 rounded-lg border border-border bg-surface px-1.5 sm:px-4 py-1 sm:py-2 text-[10px] sm:text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                            style="min-height: 32px"
                         >
-                            🧾 History {#if closedOrdersTodayCount > 0}<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">{closedOrdersTodayCount}</span>{/if}
+                            🧾 <span class="hidden sm:inline">History</span> {#if closedOrdersTodayCount > 0}<span class="rounded-full bg-gray-200 px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-gray-600">{closedOrdersTodayCount}</span>{/if}
                         </button>
                     </div>
                 </div>
@@ -525,42 +525,87 @@
                     {activeKdsOrderIds}
                 />
 
-                <TakeoutQueue 
-                    {takeoutOrders} 
+                <TakeoutQueue
+                    {takeoutOrders}
                     {selectedTakeoutId}
                     onclick={handleTakeoutClick}
                     onadvancestatus={advanceTakeoutStatus}
                 />
             </div>
 
-            <OrderSidebar
-                order={currentActiveOrder}
-                table={selectedTable}
-                onclose={closeBill}
-                onadditem={() => showAddItem = true}
-                onrefill={() => showRefill = true}
-                oncheckout={() => {
-                    if (currentActiveOrder?.packageId) {
-                        showLeftoverPenalty = true;
-                    } else {
-                        checkoutOrder = currentActiveOrder ?? null;
-                        showCheckout = true;
-                    }
-                }}
-                onvoid={() => showVoidConfirm = true}
-                ontransfer={() => showTransferModal = true}
-                onchangepackage={() => showPackageChange = true}
-                onsplit={() => { splitBillOrderId = currentActiveOrder?.id ?? null; showSplitBill = true; }}
-                onattachtakeout={() => showAttachTakeout = true}
-                hasTakeoutOrders={takeoutOrders.length > 0}
-                onchangepax={() => showPaxChange = true}
-                onmerge={() => showMergeModal = true}
-                oncanceltable={handleCancelTable}
-                {pendingRejections}
-                onacknowledgeRejection={(alertId) => acknowledgeAlert(alertId)}
-                takeoutSeq={currentTakeoutSeq}
-            />
+            <!-- Desktop sidebar (lg+ or landscape mobile) -->
+            <div class="pos-sidebar-desktop hidden lg:flex">
+                <OrderSidebar
+                    order={currentActiveOrder}
+                    table={selectedTable}
+                    onclose={closeBill}
+                    onadditem={() => showAddItem = true}
+                    onrefill={() => showRefill = true}
+                    oncheckout={() => {
+                        if (currentActiveOrder?.packageId) {
+                            showLeftoverPenalty = true;
+                        } else {
+                            checkoutOrder = currentActiveOrder ?? null;
+                            showCheckout = true;
+                        }
+                    }}
+                    onvoid={() => showVoidConfirm = true}
+                    ontransfer={() => showTransferModal = true}
+                    onchangepackage={() => showPackageChange = true}
+                    onsplit={() => { splitBillOrderId = currentActiveOrder?.id ?? null; showSplitBill = true; }}
+                    onattachtakeout={() => showAttachTakeout = true}
+                    hasTakeoutOrders={takeoutOrders.length > 0}
+                    onchangepax={() => showPaxChange = true}
+                    onmerge={() => showMergeModal = true}
+                    oncanceltable={handleCancelTable}
+                    {pendingRejections}
+                    onacknowledgeRejection={(alertId) => acknowledgeAlert(alertId)}
+                    takeoutSeq={currentTakeoutSeq}
+                />
+            </div>
         </div>
+
+        <!-- Mobile order sidebar (bottom sheet, < lg — hidden in landscape mobile) -->
+        {#if currentActiveOrder}
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <div class="pos-sheet-mobile fixed inset-0 z-50 flex flex-col lg:hidden" role="dialog" aria-label="Running bill">
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div class="flex-1 bg-black/30" onclick={closeBill} role="presentation"></div>
+                <div class="flex flex-col bg-surface rounded-t-2xl shadow-2xl overflow-hidden max-h-[85vh]">
+                    <!-- Drag handle -->
+                    <div class="flex justify-center py-2 shrink-0">
+                        <div class="h-1 w-10 rounded-full bg-gray-300"></div>
+                    </div>
+                    <OrderSidebar
+                        order={currentActiveOrder}
+                        table={selectedTable}
+                        onclose={closeBill}
+                        onadditem={() => showAddItem = true}
+                        onrefill={() => showRefill = true}
+                        oncheckout={() => {
+                            if (currentActiveOrder?.packageId) {
+                                showLeftoverPenalty = true;
+                            } else {
+                                checkoutOrder = currentActiveOrder ?? null;
+                                showCheckout = true;
+                            }
+                        }}
+                        onvoid={() => showVoidConfirm = true}
+                        ontransfer={() => showTransferModal = true}
+                        onchangepackage={() => showPackageChange = true}
+                        onsplit={() => { splitBillOrderId = currentActiveOrder?.id ?? null; showSplitBill = true; }}
+                        onattachtakeout={() => showAttachTakeout = true}
+                        hasTakeoutOrders={takeoutOrders.length > 0}
+                        onchangepax={() => showPaxChange = true}
+                        onmerge={() => showMergeModal = true}
+                        oncanceltable={handleCancelTable}
+                        {pendingRejections}
+                        onacknowledgeRejection={(alertId) => acknowledgeAlert(alertId)}
+                        takeoutSeq={currentTakeoutSeq}
+                    />
+                </div>
+            </div>
+        {/if}
     {/if}
 </div>
 
@@ -747,8 +792,8 @@
 
 <!-- P1-20: Ghost-occupied table recovery prompt -->
 {#if ghostTable}
-    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div class="pos-card w-[340px] flex flex-col gap-4 p-6">
+    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+        <div class="pos-card w-full max-w-[340px] flex flex-col gap-4 p-6">
             <div class="flex flex-col gap-1">
                 <h3 class="font-bold text-gray-900">Empty Order Detected</h3>
                 <p class="text-sm text-gray-500">

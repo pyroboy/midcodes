@@ -55,9 +55,9 @@
 </script>
 
 {#if table}
-    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4">
         <div
-            class="pos-card w-[340px] flex flex-col gap-0 overflow-hidden"
+            class="pos-card w-full sm:max-w-[340px] flex flex-col gap-0 overflow-hidden rounded-t-2xl sm:rounded-xl max-h-[90vh] overflow-y-auto"
             style="padding: 0;"
         >
             <!-- Header -->

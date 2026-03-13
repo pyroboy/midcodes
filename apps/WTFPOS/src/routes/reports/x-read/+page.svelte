@@ -115,7 +115,7 @@
 <!-- P1-9: Centered modal overlay for X-Read confirmation -->
 {#if showConfirm}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[400px] flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[400px] mx-3 flex flex-col gap-5">
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-gray-900">Generate X-Read?</h3>
 				<p class="text-sm text-gray-500">
@@ -196,7 +196,7 @@
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-4 gap-4 flex-1">
+		<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 flex-1">
 			<KpiCard
 				label="Gross Sales"
 				value={formatPeso(comparison.grossSales.current)}
@@ -247,20 +247,20 @@
 	{/snippet}
 
 	{#snippet content()}
-		<div class="grid grid-cols-[1fr_380px] gap-6">
+		<div class="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
 			<!-- Left: Payment breakdown + order stats -->
 			<div class="flex flex-col gap-4">
 				<div class="rounded-xl border border-border bg-white p-5">
 					<h3 class="mb-4 font-bold text-gray-900">Payment Breakdown — {RANGE_LABELS[quickRange]}</h3>
 					<!-- P1-17: All four payment methods including Maya -->
-					<div class="flex gap-4 mb-4">
+					<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
 						{#each [
 							{ label: 'Cash', amount: eod.cash },
 							{ label: 'GCash', amount: eod.gcash },
 							{ label: 'Maya', amount: eod.maya },
 							{ label: 'Credit/Debit', amount: eod.card },
 						] as p}
-							<div class="flex-1 rounded-lg border border-border bg-gray-50 p-4 text-center">
+							<div class="rounded-lg border border-border bg-gray-50 p-3 sm:p-4 text-center">
 								<p class="text-xs font-medium text-gray-400">{p.label}</p>
 								<p class="mt-0.5 font-mono text-lg font-bold text-gray-900">{formatPeso(p.amount)}</p>
 							</div>
@@ -285,20 +285,20 @@
 					</div>
 				</div>
 
-				<div class="rounded-xl border border-border bg-white p-5">
-					<h3 class="mb-4 font-bold text-gray-900">Order Status</h3>
-					<div class="grid grid-cols-3 gap-4">
-						<div class="rounded-lg bg-blue-50 border border-blue-100 p-3 text-center">
-							<p class="text-xs font-medium text-blue-500">Open</p>
-							<p class="font-mono text-2xl font-bold text-blue-700">{openOrders}</p>
+				<div class="rounded-xl border border-border bg-white p-3 sm:p-5">
+					<h3 class="mb-3 sm:mb-4 text-sm sm:text-base font-bold text-gray-900">Order Status</h3>
+					<div class="grid grid-cols-3 gap-2 sm:gap-4">
+						<div class="rounded-lg bg-blue-50 border border-blue-100 p-2 sm:p-3 text-center">
+							<p class="text-[10px] sm:text-xs font-medium text-blue-500">Open</p>
+							<p class="font-mono text-lg sm:text-2xl font-bold text-blue-700">{openOrders}</p>
 						</div>
-						<div class="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-center">
-							<p class="text-xs font-medium text-emerald-500">Paid</p>
-							<p class="font-mono text-2xl font-bold text-emerald-700">{paidOrders}</p>
+						<div class="rounded-lg bg-emerald-50 border border-emerald-100 p-2 sm:p-3 text-center">
+							<p class="text-[10px] sm:text-xs font-medium text-emerald-500">Paid</p>
+							<p class="font-mono text-lg sm:text-2xl font-bold text-emerald-700">{paidOrders}</p>
 						</div>
-						<div class="rounded-lg bg-red-50 border border-red-100 p-3 text-center">
-							<p class="text-xs font-medium text-red-500">Voided</p>
-							<p class="font-mono text-2xl font-bold text-red-700">{voidedOrders}</p>
+						<div class="rounded-lg bg-red-50 border border-red-100 p-2 sm:p-3 text-center">
+							<p class="text-[10px] sm:text-xs font-medium text-red-500">Voided</p>
+							<p class="font-mono text-lg sm:text-2xl font-bold text-red-700">{voidedOrders}</p>
 							<!-- P0-6: Show voided amount for BIR cancelled transaction requirement -->
 							{#if voidedAmount > 0}
 								<p class="font-mono text-xs text-red-400 mt-0.5">{formatPeso(voidedAmount)}</p>

@@ -47,7 +47,7 @@
 	}
 
 	// ─── View / Search / Filter ───────────────────────────────────────────────
-	let viewMode     = $state<'grid' | 'list'>('list');
+	let viewMode     = $state<'grid' | 'list'>(typeof window !== 'undefined' && window.innerWidth < 768 ? 'grid' : 'list');
 	let searchQuery  = $state('');
 	let filterStatus = $state<'all' | 'ok' | 'low' | 'critical'>('all');
 
@@ -222,13 +222,13 @@
 	<AllLocationsInventory />
 {:else}
 
-<div class="mb-5">
+<div class="mb-3 sm:mb-5">
 	<StockHealthStrip bind:activeFilter={filterStatus} onFilterClick={(s) => filterStatus = s} />
 </div>
 
 <!-- ─── [06][10] Needs Attention Section ──────────────────────────────────── -->
 {#if hasAttentionItems}
-	<div class="mb-5 rounded-xl border border-status-yellow/30 bg-status-yellow-light/20 overflow-hidden" transition:slide={{ duration: 250 }}>
+	<div class="mb-3 sm:mb-5 rounded-xl border border-status-yellow/30 bg-status-yellow-light/20 overflow-hidden" transition:slide={{ duration: 250 }}>
 		<button
 			class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-status-yellow-light/30 transition-colors"
 			onclick={() => attentionExpanded = !attentionExpanded}
@@ -305,7 +305,7 @@
 		{/if}
 	</div>
 {:else}
-	<div class="mb-5 rounded-xl border border-status-green/20 bg-status-green-light/10 px-4 py-3 flex items-center gap-2">
+	<div class="mb-3 sm:mb-5 rounded-xl border border-status-green/20 bg-status-green-light/10 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center gap-2">
 		<span class="h-2 w-2 rounded-full bg-status-green"></span>
 		<span class="text-sm text-gray-600">All items within healthy ranges.</span>
 	</div>
@@ -383,9 +383,31 @@
 		</div>
 	{/if}
 
-<!-- ─── List View ──────────────────────────────────────────────────────────── -->
+<!-- ─── List View (table hidden on mobile — show grid cards instead) ──────── -->
 {:else}
-	<div class="overflow-hidden rounded-xl border border-border bg-white">
+	<!-- Mobile fallback: grid cards when in list mode on small screens -->
+	<div class="sm:hidden">
+		{#if filteredAndSorted.length === 0}
+			<div class="flex flex-col items-center justify-center py-20 text-gray-400">
+				<Search class="w-10 h-10 mb-3 opacity-25" />
+				<p class="font-medium text-gray-500">No items match your search</p>
+			</div>
+		{:else}
+			<div class="grid grid-cols-1 gap-3">
+				{#each filteredAndSorted as item (item.id)}
+					<InventoryItemCard
+						{item}
+						onOpenModal={openItemModal}
+						onEditClick={openEditModalClick}
+						readonly={!canEditDetails}
+					/>
+				{/each}
+			</div>
+		{/if}
+	</div>
+
+	<!-- Desktop table -->
+	<div class="overflow-hidden rounded-xl border border-border bg-white hidden sm:block">
 		{#if filteredAndSorted.length === 0}
 			<div class="flex flex-col items-center justify-center py-20 text-gray-400">
 				<Search class="w-10 h-10 mb-3 opacity-25" />

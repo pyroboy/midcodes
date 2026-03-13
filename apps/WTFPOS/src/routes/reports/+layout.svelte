@@ -61,9 +61,9 @@
 </script>
 
 <div class="flex h-full flex-col overflow-hidden bg-surface-secondary">
-	<div class="shrink-0 bg-white border-b border-border px-6 pt-3 pb-0 flex flex-col gap-2">
-		<div class="flex items-center gap-3">
-			<h1 class="text-xl font-bold text-gray-900 tracking-tight shrink-0">
+	<div class="shrink-0 bg-white border-b border-border px-3 sm:px-6 pt-3 pb-0 flex flex-col gap-2">
+		<div class="flex items-center gap-2 sm:gap-3">
+			<h1 class="text-base sm:text-xl font-bold text-gray-900 tracking-tight shrink-0">
 				{session.locationId === 'all' ? 'Consolidated Reports' : 'Branch Reports'}
 			</h1>
 			{#if session.locationId === 'all'}
@@ -76,19 +76,19 @@
 				</span>
 			{/if}
 		</div>
-		<nav class="flex items-center gap-0 overflow-x-auto">
+		<nav class="flex items-center gap-0 overflow-x-auto scrollbar-hide -mx-3 sm:mx-0 px-3 sm:px-0">
 			{#each tabGroups as group, gi}
 				{#if gi > 0}
-					<div class="mx-3 h-5 w-px shrink-0 bg-border"></div>
+					<div class="mx-1.5 sm:mx-3 h-5 w-px shrink-0 bg-border"></div>
 				{/if}
 				<div class="flex flex-col">
-					<span class="mb-1 px-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">{group.label}</span>
+					<span class="mb-1 px-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 hidden sm:block">{group.label}</span>
 					<div class="flex items-center gap-0.5">
 						{#each group.tabs as tab}
 							<a
 								href={tab.href}
 								class={cn(
-									"px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
+									"px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
 									currentRoute === tab.href
 										? "border-accent text-accent font-semibold"
 										: "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
@@ -104,7 +104,7 @@
 	</div>
 
 	<div class="flex-1 overflow-auto">
-		<div class="p-6">
+		<div class="p-3 sm:p-6">
 			{@render children()}
 		</div>
 	</div>

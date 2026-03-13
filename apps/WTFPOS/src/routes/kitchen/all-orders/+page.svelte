@@ -308,8 +308,8 @@
 		</div>
 	{:else}
 		<div
-			class="grid gap-4 pb-4"
-			style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));"
+			class="grid gap-3 sm:gap-4 pb-4"
+			style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));"
 		>
 			{#each filteredOrders as order (order.id)}
 				{@const progress = servedProgress(order)}
@@ -411,14 +411,14 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 sm:p-6 lg:p-8"
 	>
-		<div class="pos-card flex h-full max-h-[800px] w-full max-w-4xl flex-col overflow-hidden shadow-2xl">
+		<div class="pos-card flex h-full max-h-[90vh] sm:max-h-[800px] w-full max-w-4xl flex-col overflow-hidden shadow-2xl">
 			<!-- Modal Header -->
-			<div class="flex shrink-0 items-center justify-between border-b border-border bg-gray-50 px-6 py-4">
-				<div class="flex items-center gap-3">
-					<span class="font-mono text-base font-bold text-gray-900">
+			<div class="flex shrink-0 items-center justify-between border-b border-border bg-gray-50 px-4 sm:px-6 py-3 sm:py-4">
+				<div class="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+					<span class="font-mono text-sm sm:text-base font-bold text-gray-900">
 						{formatDisplayId(selectedOrder.id, selectedOrder.tableNumber)}
 					</span>
-					<h2 class="text-xl font-bold text-gray-900">
+					<h2 class="text-lg sm:text-xl font-bold text-gray-900">
 						{#if selectedOrder.orderType === 'dine-in'}
 							Table {selectedOrder.tableNumber}
 						{:else}
@@ -447,9 +447,9 @@
 			</div>
 
 			<!-- Modal Body -->
-			<div class="flex flex-1 overflow-hidden">
+			<div class="flex flex-col md:flex-row flex-1 overflow-hidden">
 				<!-- Left: Order Info -->
-				<div class="w-1/3 shrink-0 border-r border-border bg-surface p-6 flex flex-col gap-5 overflow-y-auto">
+				<div class="md:w-1/3 shrink-0 border-b md:border-b-0 md:border-r border-border bg-surface p-4 sm:p-6 flex flex-col gap-4 sm:gap-5 overflow-y-auto max-h-[40vh] md:max-h-none">
 					<!-- Timing -->
 					<div class="flex flex-col gap-1">
 						<h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">Timing</h3>
@@ -528,7 +528,7 @@
 				</div>
 
 				<!-- Right: Items List -->
-				<div class="flex-1 overflow-y-auto p-6 bg-gray-50">
+				<div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
 					<div class="flex items-center justify-between mb-4">
 						<h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">
 							Order Items ({selectedOrder.items.length})
@@ -618,9 +618,9 @@
 				</div>
 			</div>
 
-			<div class="flex flex-1 overflow-hidden bg-white">
-				<div class="flex-1 overflow-y-auto p-6 bg-gray-50/30">
-					<div class="grid grid-cols-3 xl:grid-cols-4 gap-3">
+			<div class="flex flex-col md:flex-row flex-1 overflow-hidden bg-white">
+				<div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50/30">
+					<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
 						{#each filteredItems as item (item.id)}
 							<button
 								onclick={() => { selectedMenuItem = item; itemNote = ''; }}
@@ -639,7 +639,7 @@
 					</div>
 				</div>
 
-				<div class="w-80 shrink-0 border-l border-border bg-surface p-6 flex flex-col gap-6">
+				<div class="md:w-80 shrink-0 border-t md:border-t-0 md:border-l border-border bg-surface p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 max-h-[40vh] md:max-h-none overflow-y-auto">
 					{#if selectedMenuItem}
 						<div class="flex flex-col gap-1 items-center pb-4 border-b border-dashed border-border text-center">
 							<span class="text-xl font-extrabold text-gray-900">{selectedMenuItem.name}</span>

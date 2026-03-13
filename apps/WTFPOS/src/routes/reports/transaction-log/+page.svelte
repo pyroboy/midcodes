@@ -315,7 +315,7 @@
 				<input
 					type="text"
 					placeholder="Search table, cashier, order ID..."
-					class="w-64 rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-gray-600 placeholder:text-gray-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+					class="w-40 sm:w-64 rounded-lg border border-border bg-white px-3 py-1.5 text-xs text-gray-600 placeholder:text-gray-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
 					bind:value={searchQuery}
 				/>
 			</div>
@@ -326,8 +326,8 @@
 				No transactions for this period
 			</div>
 		{:else}
-			<div class="rounded-xl border border-border bg-white overflow-hidden">
-				<table class="w-full text-sm">
+			<div class="rounded-xl border border-border bg-white overflow-x-auto">
+				<table class="w-full min-w-[700px] text-sm">
 					<thead>
 						<tr class="border-b border-border bg-gray-50">
 							{#if isAllLocations}
@@ -336,12 +336,12 @@
 							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Time</th>
 							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Table</th>
 							<th scope="col" class="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Pax</th>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Items</th>
+							<th scope="col" class="hidden md:table-cell px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Items</th>
 							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Payment</th>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Cashier</th>
-							<th scope="col" class="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Subtotal</th>
-							<th scope="col" class="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Disc. Pax</th>
-							<th scope="col" class="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Discount</th>
+							<th scope="col" class="hidden md:table-cell px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Cashier</th>
+							<th scope="col" class="hidden md:table-cell px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Subtotal</th>
+							<th scope="col" class="hidden md:table-cell px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Disc. Pax</th>
+							<th scope="col" class="hidden sm:table-cell px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Discount</th>
 							<th scope="col" class="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Total</th>
 							<th scope="col" class="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Receipt</th>
 						</tr>
@@ -366,7 +366,7 @@
 								<td class="px-3 py-2.5 text-center text-xs text-gray-600">
 									{order.pax}
 								</td>
-								<td class="px-3 py-2.5 text-xs text-gray-500 max-w-[160px]">
+								<td class="hidden md:table-cell px-3 py-2.5 text-xs text-gray-500 max-w-[160px]">
 									<span class="line-clamp-1">
 										{order.items.filter(i => i.status !== 'cancelled').length} items
 									</span>
@@ -380,13 +380,13 @@
 										</span>
 									{/if}
 								</td>
-								<td class="px-3 py-2.5 text-xs text-gray-600">
+								<td class="hidden md:table-cell px-3 py-2.5 text-xs text-gray-600">
 									{order.closedBy ?? '—'}
 								</td>
-								<td class="px-3 py-2.5 text-right font-mono text-xs text-gray-700">
+								<td class="hidden md:table-cell px-3 py-2.5 text-right font-mono text-xs text-gray-700">
 									{formatPeso(order.subtotal)}
 								</td>
-								<td class="px-3 py-2.5 text-center text-xs">
+								<td class="hidden md:table-cell px-3 py-2.5 text-center text-xs">
 									{#if hasDiscount(order)}
 										<div class="flex flex-col items-center gap-0.5">
 											<span class="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{discountTypeShort(order)}</span>
@@ -398,7 +398,7 @@
 										<span class="text-gray-300">—</span>
 									{/if}
 								</td>
-								<td class="px-3 py-2.5 text-right font-mono text-xs">
+								<td class="hidden sm:table-cell px-3 py-2.5 text-right font-mono text-xs">
 									{#if order.discountAmount > 0}
 										<span class="text-accent">-{formatPeso(order.discountAmount)}</span>
 									{:else}
@@ -428,11 +428,11 @@
 			</div>
 
 			<!-- Summary footer -->
-			<div class="mt-3 flex items-center justify-between rounded-lg border border-border bg-white px-5 py-3">
+			<div class="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 rounded-lg border border-border bg-white px-5 py-3">
 				<span class="text-xs text-gray-400">
 					Showing {filteredOrders.length} of {data.orders.length} transactions
 				</span>
-				<div class="flex items-center gap-4 text-xs font-mono">
+				<div class="flex flex-wrap items-center gap-4 text-xs font-mono">
 					<span class="text-gray-500">Subtotal: {formatPeso(filteredOrders.filter(o => o.status === 'paid').reduce((s, o) => s + o.subtotal, 0))}</span>
 					<span class="text-accent">Discounts: -{formatPeso(filteredOrders.filter(o => o.status === 'paid').reduce((s, o) => s + o.discountAmount, 0))}</span>
 					<span class="font-bold text-gray-900">Net: {formatPeso(filteredOrders.filter(o => o.status === 'paid').reduce((s, o) => s + o.total, 0))}</span>

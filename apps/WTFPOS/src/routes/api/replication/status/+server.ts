@@ -9,7 +9,7 @@ const ALL_COLLECTIONS = [
 	'tables', 'orders', 'menu_items', 'stock_items', 'deliveries',
 	'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'devices',
 	'kds_tickets', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
-	'floor_elements'
+	'floor_elements', 'shifts'
 ];
 
 /**

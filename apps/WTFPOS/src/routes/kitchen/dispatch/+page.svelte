@@ -400,22 +400,7 @@
 	});
 </script>
 
-<!-- Live indicator -->
-<div class={cn(
-	'fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm bg-white',
-	isStale ? 'border-status-yellow/40' : 'border-status-green/30'
-)}>
-	<span class={cn(
-		'h-2 w-2 rounded-full',
-		isStale ? 'bg-status-yellow' : 'bg-status-green animate-pulse'
-	)}></span>
-	<span class={cn(
-		'text-xs font-semibold',
-		isStale ? 'text-status-yellow' : 'text-status-green'
-	)}>{isStale ? '~ Stale' : 'Live'}</span>
-</div>
-
-<div class="flex flex-col gap-4 pb-6">
+<div class="flex flex-col gap-3 sm:gap-4 pb-6">
 
 	<!-- ── Dispatch Cards ─────────────────────────────────────────── -->
 	<div class="flex flex-col gap-3">
@@ -426,7 +411,7 @@
 				<p class="text-sm mt-1">Orders will appear as tables open and items are sent</p>
 			</div>
 		{:else}
-			<div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+			<div class="grid gap-3 sm:gap-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));">
 				{#each dispatchCards as card (card.orderId)}
 					{@const urgency = urgencyLevel(card.createdAt)}
 					{@const elapsedMin = Math.floor((now - new Date(card.createdAt).getTime()) / 60_000)}
@@ -603,17 +588,17 @@
 </div>
 
 <!-- Connectivity Test Panel -->
-<div class="fixed bottom-20 right-4 z-50">
+<div class="fixed bottom-20 right-3 sm:right-4 z-50">
 	<button
 		onclick={runConnectivityTest}
 		disabled={pingRunning}
-		class="rounded-full bg-gray-800 text-white shadow-lg w-12 h-12 flex items-center justify-center text-lg active:scale-95 transition-all"
+		class="rounded-full bg-gray-800 text-white shadow-lg w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center text-lg active:scale-95 transition-all"
 		title="Test server connection"
 	>
 		{pingRunning ? '⏳' : '🏓'}
 	</button>
 	{#if pingResult}
-		<div class="absolute bottom-14 right-0 w-80 rounded-xl bg-gray-900 text-white p-4 shadow-xl text-xs font-mono">
+		<div class="absolute bottom-14 right-0 w-[calc(100vw-2rem)] max-w-80 rounded-xl bg-gray-900 text-white p-4 shadow-xl text-xs font-mono">
 			<div class="flex justify-between items-center mb-2">
 				<span class="font-bold text-sm">Connection Test</span>
 				<button onclick={() => { pingResult = ''; }} class="text-white/60 hover:text-white">&times;</button>
@@ -625,7 +610,7 @@
 
 <!-- Undo Toast -->
 {#if toast.visible}
-	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 text-white px-5 py-3 shadow-lg">
+	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 text-white px-4 sm:px-5 py-3 shadow-lg max-w-[calc(100vw-2rem)]">
 		<span class="text-sm font-semibold">{toast.message}</span>
 		{#if toast.undoFn}
 			<button

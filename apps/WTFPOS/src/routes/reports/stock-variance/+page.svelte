@@ -270,17 +270,17 @@
 
 		<!-- [02] Grouped table -->
 		<div class="overflow-x-auto rounded-xl border border-border bg-white">
-			<table class="w-full text-sm">
+			<table class="w-full min-w-[400px] text-sm">
 				<thead>
 					<tr class="border-b border-border bg-surface-secondary text-left">
 						<th class="px-4 py-3 font-semibold text-gray-600">Item</th>
-						<th class="px-4 py-3 text-right font-semibold text-gray-600">Delivered</th>
+						<th class="hidden sm:table-cell px-4 py-3 text-right font-semibold text-gray-600">Delivered</th>
 						<th class="px-4 py-3 text-right font-semibold text-gray-600">Sold</th>
-						<th class="px-4 py-3 text-right font-semibold text-gray-600">Waste</th>
+						<th class="hidden sm:table-cell px-4 py-3 text-right font-semibold text-gray-600">Waste</th>
 						<th class="px-4 py-3 text-right font-semibold text-gray-600">Expected</th>
 						<th class="px-4 py-3 text-right font-semibold text-gray-600">Counted</th>
 						<th class="px-4 py-3 text-right font-semibold text-gray-600">Drift</th>
-						<th class="px-4 py-3 text-right font-semibold text-gray-600">Drift %</th>
+						<th class="hidden sm:table-cell px-4 py-3 text-right font-semibold text-gray-600">Drift %</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -319,9 +319,9 @@
 											<span class="text-xs capitalize text-gray-400">{row.item.category}{row.item.proteinType ? ` · ${row.item.proteinType}` : ''}</span>
 										</div>
 									</td>
-									<td class="px-4 py-3 text-right font-mono text-gray-700">{fmtQty(row.delivered, row.item.unit)}</td>
+									<td class="hidden sm:table-cell px-4 py-3 text-right font-mono text-gray-700">{fmtQty(row.delivered, row.item.unit)}</td>
 									<td class="px-4 py-3 text-right font-mono text-gray-700">{fmtQty(row.sold, row.item.unit)}</td>
-									<td class="px-4 py-3 text-right font-mono text-gray-700">{fmtQty(row.waste, row.item.unit)}</td>
+									<td class="hidden sm:table-cell px-4 py-3 text-right font-mono text-gray-700">{fmtQty(row.waste, row.item.unit)}</td>
 									<td class="px-4 py-3 text-right font-mono text-gray-700">{fmtQty(row.expected, row.item.unit)}</td>
 									<td class="px-4 py-3 text-right font-mono">
 										{#if row.counted === null}
@@ -350,7 +350,7 @@
 											</span>
 										{/if}
 									</td>
-									<td class="px-4 py-3 text-right font-mono {driftClass(row.drift)}">
+									<td class="hidden sm:table-cell px-4 py-3 text-right font-mono {driftClass(row.drift)}">
 										{#if row.driftPct === null}
 											<span class="text-gray-400 italic">—</span>
 										{:else}
@@ -365,15 +365,15 @@
 							{#if sub}
 								<tr class="border-b border-border bg-gray-50/80 font-semibold text-gray-700">
 									<td class="px-4 py-2 text-xs uppercase tracking-wide">Total {group.category}</td>
-									<td class="px-4 py-2 text-right font-mono text-xs">{fmtQty(sub.delivered, sub.unit)}</td>
+									<td class="hidden sm:table-cell px-4 py-2 text-right font-mono text-xs">{fmtQty(sub.delivered, sub.unit)}</td>
 									<td class="px-4 py-2 text-right font-mono text-xs">{fmtQty(sub.sold, sub.unit)}</td>
-									<td class="px-4 py-2 text-right font-mono text-xs">{fmtQty(sub.waste, sub.unit)}</td>
+									<td class="hidden sm:table-cell px-4 py-2 text-right font-mono text-xs">{fmtQty(sub.waste, sub.unit)}</td>
 									<td class="px-4 py-2 text-right font-mono text-xs">{fmtQty(sub.expected, sub.unit)}</td>
 									<td class="px-4 py-2 text-right font-mono text-xs">{fmtQty(sub.counted, sub.unit)}</td>
 									<td class="px-4 py-2 text-right font-mono text-xs {driftClass(sub.drift)}">
 										{#if sub.drift > 0}+{/if}{fmtQty(sub.drift, sub.unit)}
 									</td>
-									<td class="px-4 py-2"></td>
+									<td class="hidden sm:table-cell px-4 py-2"></td>
 								</tr>
 							{/if}
 						{/if}

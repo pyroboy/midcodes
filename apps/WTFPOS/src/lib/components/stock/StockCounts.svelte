@@ -119,9 +119,9 @@
 
 <!-- P0-10: Sticky top save bar — visible above fold so staff don't have to scroll to submit -->
 {#if isPending}
-	<div class="sticky top-0 z-20 mb-4 flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent-light px-4 py-2.5 shadow-sm">
+	<div class="sticky top-0 z-20 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 rounded-lg border border-accent/30 bg-accent-light px-3 sm:px-4 py-2.5 shadow-sm">
 		<div class="flex flex-col gap-0.5">
-			<p class="text-sm font-semibold text-accent">
+			<p class="text-xs sm:text-sm font-semibold text-accent">
 				{deadlineInfo.label} — submit by {deadlineInfo.deadline}
 				{#if deadlineInfo.urgency === 'overdue'}
 					<span class="ml-1 text-status-red">⚠ Overdue</span>
@@ -131,19 +131,19 @@
 			</p>
 			<p class="text-xs text-accent/70">{enteredCount} / {branchItems.length} items entered</p>
 		</div>
-		<button onclick={handleSubmitCount} class="btn-primary text-sm px-5">
+		<button onclick={handleSubmitCount} class="btn-primary text-sm px-5 w-full sm:w-auto">
 			Submit Count
 		</button>
 	</div>
 {/if}
 
-<!-- Period selector -->
-<div class="mb-5 flex items-center gap-3">
+<!-- Period selector — scrollable on mobile -->
+<div class="mb-5 flex items-center gap-2 sm:gap-3 overflow-x-auto scrollbar-none pb-1">
 	{#each countPeriods as p}
 		<button
 			onclick={() => (activePeriod = p.id)}
 			class={cn(
-				'flex items-center gap-3 min-h-[44px] rounded-xl border px-5 py-3 transition-all',
+				'flex items-center gap-2 sm:gap-3 min-h-[44px] rounded-xl border px-3 sm:px-5 py-2.5 sm:py-3 transition-all whitespace-nowrap shrink-0',
 				activePeriod === p.id
 					? 'border-accent bg-accent-light text-accent shadow-sm'
 					: 'border-border bg-white text-gray-600 hover:bg-gray-50'
@@ -151,8 +151,8 @@
 		>
 			<Clock class="w-4 h-4 flex-shrink-0 opacity-60" />
 			<div class="text-left">
-				<p class="text-sm font-bold">{p.label}</p>
-				<p class="text-xs text-gray-400">{p.time}</p>
+				<p class="text-xs sm:text-sm font-bold">{p.label}</p>
+				<p class="text-[10px] sm:text-xs text-gray-400">{p.time}</p>
 			</div>
 			{#if p.status === 'done'}
 				<CheckCircle class="w-4 h-4 text-status-green flex-shrink-0" />
@@ -170,7 +170,7 @@
 	</div>
 {:else}
 	<!-- Variance summary for completed periods -->
-	<div class="mb-4 grid grid-cols-3 gap-3">
+	<div class="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
 		<div class="rounded-lg border border-border bg-white px-4 py-3">
 			<p class="text-xs font-medium text-gray-400 uppercase tracking-wide">Items Counted</p>
 			<p class="mt-0.5 text-xl font-bold text-gray-900">{branchItems.length}</p>
@@ -203,7 +203,72 @@
 	{/if}
 {/if}
 
-<div class="overflow-hidden rounded-xl border border-border bg-white">
+<!-- Mobile card view for stock counts -->
+<div class="flex flex-col gap-2 md:hidden">
+	{#each grouped as [cat, items] (cat)}
+		<!-- Category header -->
+		<button
+			onclick={() => toggleCategory(cat)}
+			class="flex w-full items-center gap-2 text-left min-h-[36px] px-3 py-2 bg-gray-50 rounded-lg border border-border"
+		>
+			<span class="text-xs font-bold uppercase tracking-wider text-gray-500">{cat}</span>
+			<span class="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">{items.length}</span>
+			<span class="ml-auto text-gray-400">
+				{#if collapsed.get(cat)}
+					<ChevronDown class="w-4 h-4" />
+				{:else}
+					<ChevronUp class="w-4 h-4" />
+				{/if}
+			</span>
+		</button>
+		{#if !collapsed.get(cat)}
+			{#each items as item (item.id)}
+				{@const count = stockCounts.value.find(c => c.stockItemId === item.id)}
+				{@const counted = count?.counted[activePeriod] ?? null}
+				{@const expected = getCurrentStock(item.id)}
+				{@const drift = getDrift(item.id, activePeriod)}
+				<div class={cn('rounded-xl border bg-white p-3', drift !== null && Math.abs(drift) / Math.max(1, expected) > 0.1 ? 'border-status-red/30 bg-status-red-light/10' : 'border-border')}>
+					<p class="font-medium text-sm text-gray-900">{item.name}</p>
+					<div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+						<div>
+							<span class="text-gray-400">Expected</span>
+							<p class="font-mono text-gray-700">{expected.toLocaleString()} {item.unit}</p>
+						</div>
+						<div>
+							<span class="text-gray-400">Counted</span>
+							{#if isPending}
+								<QuickNumberInput
+									value={counted}
+									onChange={(val) => submitCount(item.id, activePeriod, val)}
+								/>
+							{:else if counted !== null}
+								<p class="font-mono font-semibold text-gray-900">{counted.toLocaleString()} {item.unit}</p>
+							{:else}
+								<p class="text-gray-300">—</p>
+							{/if}
+						</div>
+					</div>
+					{#if drift !== null}
+						<div class={cn('mt-2 flex items-center gap-2', varianceClass(item, drift))}>
+							<VarianceBar expected={expected} drift={drift} />
+							<span class="text-[10px] font-mono whitespace-nowrap">
+								{#if drift > 0}−{drift.toLocaleString()} {item.unit}
+								{:else if drift < 0}+{Math.abs(drift).toLocaleString()} {item.unit}
+								{:else}<span class="text-status-green">✓ 0</span>{/if}
+							</span>
+						</div>
+					{/if}
+				</div>
+			{/each}
+		{/if}
+	{/each}
+	{#if branchItems.length === 0}
+		<div class="px-4 py-12 text-center text-sm text-gray-400">No items tracked for this location.</div>
+	{/if}
+</div>
+
+<!-- Desktop table view -->
+<div class="overflow-hidden rounded-xl border border-border bg-white hidden md:block">
 	<table class="w-full text-sm">
 		<thead>
 			<tr class="border-b border-border bg-gray-50">

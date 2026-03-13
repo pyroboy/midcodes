@@ -19,7 +19,47 @@
 </script>
 
 {#if takeoutOrders.length > 0}
-    <div class="border-t border-dashed border-orange-200 pt-4 flex flex-col gap-3">
+    <!-- ── Mobile: compact horizontal scroll strip (< lg) ── -->
+    <div class="pos-takeout-queue lg:hidden border-t border-dashed border-orange-200 pt-2 flex flex-col gap-1.5 shrink-0">
+        <h2 class="text-[10px] font-semibold uppercase tracking-wider text-accent flex items-center gap-1.5 px-1">
+            📦 Takeout
+            <span class="rounded-full bg-accent px-1.5 py-0.5 text-[9px] text-white font-bold">{takeoutOrders.length}</span>
+        </h2>
+        <div class="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+            {#each takeoutOrders as order (order.id)}
+                {@const tStatus = order.takeoutStatus ?? 'new'}
+                {@const isSelected = selectedTakeoutId === order.id}
+                <button
+                    onclick={() => onclick(order)}
+                    class={cn(
+                        'relative flex items-center gap-2 rounded-lg border-2 border-dashed px-2.5 py-1.5 text-left transition-all shrink-0',
+                        isSelected ? 'border-accent bg-accent-light' :
+                        tStatus === 'new' ? 'border-blue-300 bg-blue-50' :
+                        tStatus === 'preparing' ? 'border-yellow-300 bg-yellow-50' :
+                        tStatus === 'ready' ? 'border-green-300 bg-green-50' :
+                        'border-gray-300 bg-gray-50'
+                    )}
+                    style="min-height: 36px"
+                >
+                    <span class="font-mono text-[10px] font-bold text-accent">{takeoutLabel(order)}</span>
+                    <span class="text-xs font-semibold text-gray-900 truncate max-w-[80px]">{order.customerName ?? 'Walk-in'}</span>
+                    <span class="font-mono text-[10px] font-bold text-gray-600">{formatPeso(order.total)}</span>
+                    <span class={cn(
+                        'rounded px-1 py-0.5 text-[8px] font-bold text-white shrink-0',
+                        tStatus === 'new' ? 'bg-blue-500' :
+                        tStatus === 'preparing' ? 'bg-yellow-500' :
+                        tStatus === 'ready' ? 'bg-status-green animate-pulse' :
+                        'bg-gray-400'
+                    )}>
+                        {tStatus === 'new' ? 'NEW' : tStatus === 'preparing' ? 'PREP' : tStatus === 'ready' ? 'READY' : 'DONE'}
+                    </span>
+                </button>
+            {/each}
+        </div>
+    </div>
+
+    <!-- ── Desktop: full card layout (lg+) ── -->
+    <div class="hidden lg:flex flex-col gap-3 border-t border-dashed border-orange-200 pt-4">
         <h2 class="text-xs font-semibold uppercase tracking-wider text-accent flex items-center gap-2">
             📦 Takeout Orders
             <span class="rounded-full bg-accent px-2 py-0.5 text-[10px] text-white font-bold">{takeoutOrders.length}</span>

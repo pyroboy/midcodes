@@ -6,7 +6,7 @@
 	import { getSseConnectionState } from '$lib/stores/server-store.svelte';
 	import { APP_VERSION, BUILD_DATE } from '$lib/version';
 	import { cn } from '$lib/utils';
-	import { Wifi, WifiOff, Radio, Server, Smartphone, RefreshCw, ChevronDown, ChevronUp, X, Rss } from 'lucide-svelte';
+	import { Wifi, WifiOff, Radio, Server, Smartphone, RefreshCw, ChevronDown, ChevronUp, X, Rss, Users, Monitor, Tablet } from 'lucide-svelte';
 	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
 
@@ -90,7 +90,7 @@
 		'tables', 'orders', 'menu_items', 'stock_items', 'deliveries',
 		'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'devices',
 		'kds_tickets', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
-		'floor_elements'
+		'floor_elements', 'shifts'
 	];
 
 	// Thin clients only sync priority collections — compare against those only
@@ -206,16 +206,55 @@
 		}
 	}
 
+	// ─── Connected Clients (server only) ────────────────────────────────────
+	interface ConnectedClient {
+		ip: string;
+		isServer: boolean;
+		deviceHint: string;
+		deviceName: string;
+		userName: string;
+		role: string;
+		locationId: string;
+		currentRoute: string;
+		lastSeenAt: string;
+		isActive: boolean;
+		connectionTypes: string[];
+		lastSyncAt: string | null;
+	}
+	let connectedClients = $state<ConnectedClient[]>([]);
+	let clientsLoading = $state(false);
+	let showClients = $state(false);
+	let clientsInterval: ReturnType<typeof setInterval> | null = null;
+
+	async function fetchClients() {
+		if (!browser || !identity.isServer) return;
+		clientsLoading = true;
+		try {
+			const res = await fetch('/api/device/clients', { signal: AbortSignal.timeout(5000) });
+			if (res.ok) {
+				const data = await res.json();
+				connectedClients = (data.clients ?? []).filter((c: ConnectedClient) => !c.isServer);
+			}
+		} catch { /* noop */ }
+		clientsLoading = false;
+	}
+
+	const activeClients = $derived(connectedClients.filter(c => c.isActive));
+
 	onMount(() => {
 		// Fetch identity immediately (with retry) — don't wait for device heartbeat
 		fetchIdentity();
 		// Delay first sync check to let replication start
 		setTimeout(() => checkSync(), 3000);
 		checkInterval = setInterval(() => checkSync(), 60_000);
+		// Fetch connected clients for server (after identity resolves)
+		setTimeout(() => { fetchClients(); }, 2000);
+		clientsInterval = setInterval(() => { if (identity.isServer && showClients) fetchClients(); }, 15_000);
 	});
 
 	onDestroy(() => {
 		if (checkInterval) clearInterval(checkInterval);
+		if (clientsInterval) clearInterval(clientsInterval);
 	});
 
 	// ─── Helpers ─────────────────────────────────────────────────────────────
@@ -291,25 +330,24 @@
 {/if}
 
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
-<!-- Live Status Pill — visible to ALL logged-in users                     -->
+<!-- Live Status Indicator — top-right, visible to ALL logged-in users     -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 {#if isLoggedIn}
 	<button
 		onclick={() => { showPanel = !showPanel; if (showPanel) checkSync(); }}
 		class={cn(
-			'fixed bottom-4 left-4 z-50 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg transition-all active:scale-95',
+			'fixed top-2.5 right-3 z-50 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold text-white shadow-md transition-all active:scale-95',
 			pillColor
 		)}
 		title="Live Status — {tierLabel}"
+		style="min-height: unset"
 	>
-		{#if connectionState.connectivityTier === 'offline'}
-			<WifiOff class="h-3.5 w-3.5" />
-		{:else if connectionState.connectivityTier === 'lan'}
-			<Radio class="h-3.5 w-3.5" />
-		{:else}
-			<Wifi class="h-3.5 w-3.5" />
-		{/if}
-		<span class="hidden sm:inline">{tierLabel}</span>
+		<span class={cn(
+			'inline-block h-2 w-2 rounded-full bg-white/80',
+			connectionState.connectivityTier === 'full' && 'animate-none',
+			connectionState.connectivityTier !== 'full' && 'animate-pulse'
+		)}></span>
+		<span>Live</span>
 	</button>
 
 	<!-- ─── Live Status Panel ──────────────────────────────────────────── -->
@@ -321,7 +359,7 @@
 			aria-label="Close status panel"
 		></button>
 
-		<div class="fixed bottom-14 left-4 z-50 w-80 rounded-2xl border border-border bg-white shadow-2xl overflow-hidden">
+		<div class="fixed top-12 right-3 z-50 w-80 rounded-2xl border border-border bg-white shadow-2xl overflow-hidden">
 			<!-- Header -->
 			<div class={cn(
 				'flex items-center justify-between px-4 py-3',
@@ -583,6 +621,89 @@
 						</div>
 					{/if}
 				</div>
+
+				<!-- ─── Connected Clients (server only) ────────────── -->
+				{#if identity.isServer}
+					<div class="border-t border-gray-100"></div>
+					<div>
+						<div class="flex items-center justify-between mb-2">
+							<div class="flex items-center gap-1.5">
+								<h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Connected Devices</h4>
+								{#if activeClients.length > 0}
+									<span class="rounded-full bg-accent-light text-accent px-1.5 py-0.5 text-[9px] font-bold">{activeClients.length}</span>
+								{/if}
+							</div>
+							<button
+								onclick={() => { showClients = !showClients; if (showClients) fetchClients(); }}
+								class="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-accent transition-colors"
+								style="min-height: unset"
+							>
+								{#if clientsLoading}
+									<RefreshCw class="h-3 w-3 animate-spin" />
+								{:else}
+									<Users class="h-3 w-3" />
+								{/if}
+								{showClients ? 'Hide' : 'Show'}
+							</button>
+						</div>
+
+						{#if showClients}
+							{#if connectedClients.length === 0}
+								<p class="text-[10px] text-gray-400 italic">No client devices connected</p>
+							{:else}
+								<div class="flex flex-col gap-1.5">
+									{#each connectedClients as client}
+										<div class={cn(
+											'flex items-center justify-between rounded-lg px-2.5 py-2 border',
+											client.isActive
+												? 'bg-white border-gray-150'
+												: 'bg-gray-50 border-gray-100 opacity-60'
+										)}>
+											<div class="flex items-center gap-2 min-w-0">
+												<!-- Device icon + activity dot -->
+												<div class="relative shrink-0">
+													{#if client.deviceHint?.includes('iPad') || client.deviceHint?.includes('Tablet')}
+														<Tablet class="h-3.5 w-3.5 text-gray-400" />
+													{:else if client.deviceHint?.includes('Desktop') || client.deviceHint?.includes('Mac')}
+														<Monitor class="h-3.5 w-3.5 text-gray-400" />
+													{:else}
+														<Smartphone class="h-3.5 w-3.5 text-gray-400" />
+													{/if}
+													<span class={cn(
+														'absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full border border-white',
+														client.isActive ? 'bg-status-green' : 'bg-gray-300'
+													)}></span>
+												</div>
+												<!-- Info -->
+												<div class="min-w-0">
+													<p class="text-[11px] font-bold text-gray-800 truncate">
+														{client.deviceName || client.userName || client.deviceHint || client.ip}
+													</p>
+													<p class="text-[9px] text-gray-400 truncate">
+														{client.role || '—'}
+														{#if client.locationId}
+															· {client.locationId}
+														{/if}
+														{#if client.currentRoute}
+															· <span class="font-mono">{client.currentRoute}</span>
+														{/if}
+													</p>
+												</div>
+											</div>
+											<!-- Right side: IP + sync -->
+											<div class="flex flex-col items-end shrink-0 ml-2">
+												<span class="text-[9px] font-mono text-gray-400">{client.ip}</span>
+												{#if client.lastSyncAt}
+													<span class="text-[8px] text-gray-300">sync {formatTimeSince(new Date(client.lastSyncAt))}</span>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						{/if}
+					</div>
+				{/if}
 
 				<!-- Divider -->
 				<div class="border-t border-gray-100"></div>

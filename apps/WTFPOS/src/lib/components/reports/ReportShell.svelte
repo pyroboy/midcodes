@@ -12,8 +12,8 @@
 	let { filter, kpis, chart, content, alerts }: Props = $props();
 </script>
 
-<!-- TOPMOST zone: filter + KPIs — strict height, KPIs stretch to fill unused space -->
-<div class="relative h-[200px] shrink-0 flex flex-col print:h-auto print:overflow-visible">
+<!-- TOPMOST zone: filter + KPIs — auto height on mobile, fixed on desktop -->
+<div class="relative h-auto sm:h-[200px] shrink-0 flex flex-col print:h-auto print:overflow-visible">
 	{#if alerts}
 		<div class="absolute inset-x-0 top-0 z-10">{@render alerts()}</div>
 	{/if}
@@ -24,7 +24,7 @@
 </div>
 
 <!-- CHART zone: min height ensures consistency, but expands naturally for taller charts -->
-<div class="mt-4 mb-5 min-h-[280px] flex flex-col print:min-h-0">
+<div class="mt-3 sm:mt-4 mb-4 sm:mb-5 min-h-[200px] sm:min-h-[280px] flex flex-col print:min-h-0">
 	<div class="flex-1 flex flex-col">{@render chart()}</div>
 </div>
 

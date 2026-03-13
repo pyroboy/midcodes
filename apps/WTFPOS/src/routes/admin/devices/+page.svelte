@@ -30,9 +30,12 @@
 		userName: string;
 		role: string;
 		locationId: string;
+		currentRoute: string;
 		lastSeenAt: string;
 		isActive: boolean;
 		hitCount: number;
+		connectionTypes: string[];
+		lastSyncAt: string | null;
 	}
 	let serverClients = $state<ServerClient[]>([]);
 
@@ -55,8 +58,25 @@
 
 	onMount(() => {
 		fetchServerClients();
-		const poll = setInterval(fetchServerClients, 10_000);
-		return () => clearInterval(poll);
+		// Fallback poll every 30s — SSE is the primary update mechanism now
+		const poll = setInterval(fetchServerClients, 30_000);
+
+		// SSE: listen for real-time client-tracker changes
+		const es = new EventSource('/api/replication/stream');
+		es.addEventListener('clients', (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				if (data.clients) {
+					serverClients = data.clients;
+					now = new Date(); // refresh timestamps
+				}
+			} catch { /* ignore parse errors */ }
+		});
+
+		return () => {
+			clearInterval(poll);
+			es.close();
+		};
 	});
 
 	const deviceList = $derived(devices.value || []);

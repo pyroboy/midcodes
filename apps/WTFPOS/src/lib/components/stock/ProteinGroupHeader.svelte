@@ -64,36 +64,46 @@
 
 <button
   onclick={onToggle}
-  class="w-full grid grid-cols-3 items-center px-4 py-3 outline-none transition-all hover:brightness-95 focus:ring-2 focus:ring-{config.borderColor.replace('border-', '')}/50 {!noBorder ? `rounded-xl border-l-4 sh-border-class ${config.borderColor}` : ''} {!noBg ? config.bgLight : 'bg-transparent'}"
+  class="w-full flex flex-col sm:grid sm:grid-cols-3 items-start sm:items-center gap-2 sm:gap-0 px-3 sm:px-4 py-2.5 sm:py-3 outline-none transition-all hover:brightness-95 focus:ring-2 focus:ring-{config.borderColor.replace('border-', '')}/50 {!noBorder ? `rounded-xl border-l-4 sh-border-class ${config.borderColor}` : ''} {!noBg ? config.bgLight : 'bg-transparent'}"
 >
   <style>
     .sh-border-class {
        border-left-style: solid;
     }
   </style>
-  <!-- Left Side: Title and Alerts -->
-  <div class="flex flex-col items-start gap-1 justify-self-start">
-    <div class="flex items-center gap-2">
-      <span class="font-bold text-gray-900 text-lg">{config.label}</span>
-      <span class="text-sm font-medium text-gray-500">({itemCount} items)</span>
+  <!-- Top row on mobile / Left side on desktop: Title, alerts, and chevron -->
+  <div class="flex items-center justify-between w-full sm:justify-start sm:w-auto">
+    <div class="flex flex-col items-start gap-1 justify-self-start">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-gray-900 text-base sm:text-lg">{config.label}</span>
+        <span class="text-xs sm:text-sm font-medium text-gray-500">({itemCount})</span>
+      </div>
+      <div class="flex gap-1.5 sm:gap-2 flex-wrap">
+        {#if criticalCount > 0}
+          <span class="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] sm:text-xs font-semibold">
+            <AlertCircle class="w-3 h-3" />
+            {criticalCount} critical
+          </span>
+        {/if}
+        {#if lowCount > 0}
+          <span class="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[10px] sm:text-xs font-semibold">
+            {lowCount} low
+          </span>
+        {/if}
+      </div>
     </div>
-    <div class="flex gap-2">
-      {#if criticalCount > 0}
-        <span class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
-          <AlertCircle class="w-3 h-3" />
-          {criticalCount} critical
-        </span>
-      {/if}
-      {#if lowCount > 0}
-        <span class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold">
-          {lowCount} low
-        </span>
+    <!-- Chevron visible on mobile only (inline with title) -->
+    <div class="sm:hidden">
+      {#if expanded}
+        <ChevronDown class="w-5 h-5 text-gray-400" />
+      {:else}
+        <ChevronRight class="w-5 h-5 text-gray-400" />
       {/if}
     </div>
   </div>
 
-  <!-- Middle: Horizontal Stacked Bar -->
-  <div class="flex flex-col items-center gap-1.5 justify-self-center w-full max-w-[220px] pointer-events-auto">
+  <!-- Middle: Horizontal Stacked Bar (hidden on very small screens, shown sm+) -->
+  <div class="hidden sm:flex flex-col items-center gap-1.5 justify-self-center w-full max-w-[220px] pointer-events-auto">
     {#if chartData.length > 0}
       <!-- Total label -->
       <span class="text-[11px] font-bold text-gray-900">{formattedTotal()} <span class="text-[9px] font-medium text-gray-400 uppercase">total</span></span>
@@ -141,8 +151,25 @@
     {/if}
   </div>
 
-  <!-- Right Side: Expand Indicator -->
-  <div class="flex items-center gap-2 justify-self-end">
+  <!-- Mobile mini bar (visible only on small screens) -->
+  {#if chartData.length > 0}
+    <div class="sm:hidden w-full">
+      <div class="w-full h-2 rounded-full bg-gray-100 flex overflow-hidden">
+        {#each sortedData as item, index}
+          {@const pct = totalStock > 0 ? (item.value / totalStock) * 100 : 0}
+          <div
+            role="presentation"
+            class={cn(barColor, 'h-full')}
+            style="width: {pct}%; opacity: {opacities[index % opacities.length]};"
+          ></div>
+        {/each}
+      </div>
+      <span class="text-[10px] font-bold text-gray-500 mt-0.5">{formattedTotal()} total</span>
+    </div>
+  {/if}
+
+  <!-- Right Side: Expand Indicator (desktop only — mobile has chevron inline with title) -->
+  <div class="hidden sm:flex items-center gap-2 justify-self-end">
     <div class="hidden md:flex flex-col items-end mr-2">
       <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Variants</span>
       <span class="text-sm font-black text-gray-900 leading-none">{itemCount}</span>

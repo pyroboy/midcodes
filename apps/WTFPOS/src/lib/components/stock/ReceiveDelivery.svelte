@@ -151,13 +151,13 @@
 
 <div class="rounded-xl border border-border bg-white flex flex-col self-start" style="max-height: 85vh;">
 	<!-- Header (always visible) -->
-	<div class="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+	<div class="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-border flex-shrink-0">
 		<h2 class="text-base font-bold text-gray-900">Log Delivery</h2>
 		<p class="mt-0.5 text-xs text-gray-400">Record incoming stock from suppliers</p>
 	</div>
 
 	<!-- Scrollable form body -->
-	<div class="overflow-y-auto flex-1 px-6 py-5">
+	<div class="overflow-y-auto flex-1 px-4 sm:px-6 py-4 sm:py-5">
 		<div class="flex flex-col gap-4">
 			<!-- Searchable item picker -->
 			<div class="flex flex-col gap-1.5">
@@ -280,7 +280,7 @@
 	</div>
 
 	<!-- Sticky footer: error + action buttons always visible -->
-	<div class="sticky bottom-0 bg-white border-t border-gray-100 px-6 pt-3 pb-5 flex-shrink-0 flex flex-col gap-3">
+	<div class="sticky bottom-0 bg-white border-t border-gray-100 px-4 sm:px-6 pt-3 pb-4 sm:pb-5 flex-shrink-0 flex flex-col gap-3">
 		{#if formError}
 			<p class="rounded-lg bg-status-red-light border border-status-red/20 px-3 py-2 text-sm font-medium text-status-red">{formError}</p>
 		{/if}

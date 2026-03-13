@@ -186,14 +186,14 @@
 	] as const;
 </script>
 
-<div class="flex flex-col gap-6 max-w-4xl mx-auto">
+<div class="flex flex-col gap-4 sm:gap-6 max-w-4xl mx-auto">
 	<div class="flex flex-col gap-1">
-		<h2 class="text-lg font-bold text-gray-900">Inter-Branch Stock Transfers</h2>
-		<p class="text-sm text-gray-500">Move inventory from <strong>{locationLabels[sourceLocationId] ?? sourceLocationId}</strong> to another branch or warehouse.</p>
+		<h2 class="text-base sm:text-lg font-bold text-gray-900">Inter-Branch Stock Transfers</h2>
+		<p class="text-xs sm:text-sm text-gray-500">Move inventory from <strong>{locationLabels[sourceLocationId] ?? sourceLocationId}</strong> to another branch or warehouse.</p>
 	</div>
 
 	<!-- Wizard card -->
-	<div class="pos-card p-6 flex flex-col gap-6">
+	<div class="pos-card p-4 sm:p-6 flex flex-col gap-4 sm:gap-6">
 		<!-- Step indicator -->
 		<div class="flex items-center gap-2">
 			{#each steps as step, i}
@@ -535,7 +535,31 @@
 	{#if recentTransfers.length > 0}
 		<div>
 			<h3 class="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Recent Transfers</h3>
-			<div class="overflow-hidden rounded-xl border border-border bg-white">
+
+			<!-- Mobile card view -->
+			<div class="flex flex-col gap-2 md:hidden">
+				{#each groupedTransfers() as group}
+					<div class="text-xs font-bold uppercase tracking-wider text-gray-400 px-1 pt-2">{group.label}</div>
+					{#each group.items as a (a.id)}
+						<div class="rounded-xl border border-border bg-white p-3">
+							<div class="flex items-start justify-between gap-2">
+								<div class="flex-1 min-w-0">
+									<p class="font-medium text-sm text-gray-900">{a.itemName}</p>
+									<p class="text-xs text-gray-500 mt-0.5">{a.reason}</p>
+								</div>
+								<span class="font-mono text-sm font-bold text-gray-700 shrink-0">{a.qty} {a.unit}</span>
+							</div>
+							<div class="flex items-center justify-between mt-2 text-xs text-gray-400">
+								<span>{formatTransferDate(a.loggedAt)}</span>
+								<span>by {a.loggedBy}</span>
+							</div>
+						</div>
+					{/each}
+				{/each}
+			</div>
+
+			<!-- Desktop table view -->
+			<div class="overflow-hidden rounded-xl border border-border bg-white hidden md:block">
 				<table class="w-full text-sm">
 					<thead>
 						<tr class="border-b border-border bg-gray-50">

@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { getCollectionStore, subscribeBroadcast, getServerStoreSummary } from '$lib/server/replication-store';
-import { trackClient, isLoopbackIP, displayIP } from '$lib/server/client-tracker';
+import { trackClient, isLoopbackIP, displayIP, subscribeClientChanges, getTrackedClients } from '$lib/server/client-tracker';
 import { log } from '$lib/server/logger';
 
 /**
@@ -13,7 +13,7 @@ const ALL_COLLECTIONS = [
 	'tables', 'orders', 'menu_items', 'stock_items', 'deliveries',
 	'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'devices',
 	'kds_tickets', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
-	'floor_elements'
+	'floor_elements', 'shifts'
 ];
 
 /** Prefixes used by test/probe/diagnostic documents — must not leak to client replication */
@@ -89,6 +89,30 @@ export const GET: RequestHandler = async (event) => {
 				} catch { /* disconnected */ }
 			});
 			unsubscribes.push(unsubBroadcast);
+
+			// Push client-tracker changes to the devices page in real-time
+			const unsubClients = subscribeClientChanges(() => {
+				try {
+					const now = Date.now();
+					const clients = getTrackedClients().map(c => ({
+						ip: c.displayIp,
+						isServer: c.isServer,
+						deviceHint: c.deviceHint,
+						deviceName: c.deviceName,
+						userName: c.userName,
+						role: c.role,
+						locationId: c.locationId,
+						currentRoute: c.currentRoute,
+						lastSeenAt: c.lastSeenAt.toISOString(),
+						isActive: (now - c.lastSeenAt.getTime()) < 90_000,
+						hitCount: c.hitCount,
+						connectionTypes: Array.from(c.connectionTypes),
+						lastSyncAt: c.lastSyncAt?.toISOString() ?? null,
+					}));
+					controller.enqueue(encoder.encode(`event: clients\ndata: ${JSON.stringify({ clients })}\n\n`));
+				} catch { /* disconnected */ }
+			});
+			unsubscribes.push(unsubClients);
 
 			// Heartbeat every 30s
 			const heartbeat = setInterval(() => {
