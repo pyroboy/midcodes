@@ -285,11 +285,21 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 		isServer: isServerBrowser(),
 	});
 
-	// Skip if replication already running and this isn't a forced re-sync (generation bump)
-	if (!options?.generation && _global.__wtfposRepl.replicationStarted && getSharedEventSource()?.readyState !== EventSource.CLOSED) {
-		console.log('[Replication] Already running with active SSE — skipping duplicate start');
-		remoteLog('info', 'startReplication() skipped — already running');
-		return;
+	// Skip if replication is already running with active SSE and live replication instances.
+	// This prevents duplicate SSE connections on SvelteKit page navigation.
+	// BUT: allow re-start if forced (generation bump), or if replications are dead (HMR killed them).
+	if (!options?.generation && _global.__wtfposRepl.replicationStarted) {
+		const es = getSharedEventSource();
+		const esAlive = es && es.readyState !== EventSource.CLOSED;
+		const hasActiveReps = activeReplications.size > 0;
+		if (esAlive && hasActiveReps) {
+			console.log('[Replication] Already running with active SSE — skipping duplicate start');
+			remoteLog('info', 'startReplication() skipped — already running');
+			return;
+		}
+		// SSE or replications are dead (e.g. after HMR) — allow restart
+		console.log(`[Replication] Stale state detected (sse=${esAlive}, reps=${activeReplications.size}) — restarting`);
+		_global.__wtfposRepl.replicationStarted = false;
 	}
 
 	// Prevent concurrent starts (HMR reloads can trigger multiple calls)
