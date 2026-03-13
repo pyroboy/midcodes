@@ -5,8 +5,8 @@
 import { nanoid } from 'nanoid';
 import { session } from '$lib/stores/session.svelte';
 import { rejectOrderItem, orders } from '$lib/stores/pos.svelte';
-import { createRxStore } from '$lib/stores/sync.svelte';
-import { getDb } from '$lib/db';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { browser } from '$app/environment';
 
 export interface KitchenAlert {
@@ -22,7 +22,7 @@ export interface KitchenAlert {
 	restoredStock?: boolean;
 }
 
-const _alerts = createRxStore<KitchenAlert>('kitchen_alerts', db =>
+const _alerts = createStore<KitchenAlert>('kitchen_alerts', db =>
 	db.kitchen_alerts.find({ sort: [{ createdAt: 'desc' }] })
 );
 
@@ -59,10 +59,10 @@ export async function refuseItem(orderId: string, tableNumber: number | null, it
 	const orderItem = order.items.find(i => i.menuItemName === itemName && i.status !== 'cancelled');
 	if (!orderItem) return;
 
-	// Insert alert into RxDB
-	const db = await getDb();
+	// Insert alert
+	const col = getWritableCollection('kitchen_alerts');
 	const alertId = nanoid();
-	await db.kitchen_alerts.insert({
+	await col.insert({
 		id: alertId,
 		orderId,
 		tableNumber,
@@ -80,15 +80,12 @@ export async function refuseItem(orderId: string, tableNumber: number | null, it
 
 export async function acknowledgeAlert(alertId: string) {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.kitchen_alerts.findOne(alertId).exec();
-	if (doc) {
-		await doc.incrementalPatch({
-			acknowledgedBy: session.userName || 'Staff',
-			acknowledgedAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-		});
-	}
+	const col = getWritableCollection('kitchen_alerts');
+	await col.incrementalPatch(alertId, {
+		acknowledgedBy: session.userName || 'Staff',
+		acknowledgedAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+	});
 }
 
 /**
@@ -99,19 +96,16 @@ export async function acknowledgeAllForTable(tableId: string | null) {
 	const order = orders.value.find(o => o.tableId === tableId && o.status === 'open');
 	if (!order) return;
 
-	const db = await getDb();
+	const col = getWritableCollection('kitchen_alerts');
 	const pendingAlerts = alerts.value.filter(a => a.orderId === order.id && !a.acknowledgedBy);
 	const now = new Date().toISOString();
 	const user = session.userName || 'Staff';
 
 	for (const alert of pendingAlerts) {
-		const doc = await db.kitchen_alerts.findOne(alert.id).exec();
-		if (doc) {
-			await doc.incrementalPatch({
-				acknowledgedBy: user,
-				acknowledgedAt: now,
-				updatedAt: now,
-			});
-		}
+		await col.incrementalPatch(alert.id, {
+			acknowledgedBy: user,
+			acknowledgedAt: now,
+			updatedAt: now,
+		});
 	}
 }

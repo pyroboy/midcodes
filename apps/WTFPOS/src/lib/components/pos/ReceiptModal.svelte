@@ -65,35 +65,22 @@
 		return order.discountType !== 'none' || Object.keys(order.discountEntries ?? {}).length > 0;
 	});
 
-	// [01] Discount lines — one per type, supports SC + PWD simultaneously
-	type DiscountLine = { label: string; ids: string[]; type: string };
+	// Discount summary — clean one-liner per type
+	type DiscountLine = { label: string; pax: number; type: string };
 	const discountLines = $derived.by((): DiscountLine[] => {
 		if (!order) return [];
 		const lines: DiscountLine[] = [];
-		const totalPax = order.pax;
 
 		const typeLabel = (t: string) =>
-			t === 'senior' ? 'Senior Citizen' :
-			t === 'pwd' ? 'PWD' :
-			t === 'promo' ? 'Promo' :
-			t === 'comp' ? 'Comp' : 'Service Recovery';
+			t === 'senior' ? 'SC' : t === 'pwd' ? 'PWD' : t;
 
 		if (order.discountEntries && Object.keys(order.discountEntries).length > 0) {
 			for (const [type, entry] of Object.entries(order.discountEntries) as [string, DiscountEntry | undefined][]) {
 				if (!entry) continue;
-				const pax = entry.pax ?? 1;
-				const label = (type === 'senior' || type === 'pwd')
-					? `${typeLabel(type)} (20%) — ${pax} of ${totalPax} pax`
-					: typeLabel(type);
-				lines.push({ label, ids: entry.ids?.filter(Boolean) ?? [], type });
+				lines.push({ label: typeLabel(type), pax: entry.pax ?? 1, type });
 			}
-		} else if (order.discountType !== 'none') {
-			// Legacy fallback
-			const qualifyingPax = order.discountPax ?? 1;
-			const label = (order.discountType === 'senior' || order.discountType === 'pwd')
-				? `${typeLabel(order.discountType)} (20%) — ${qualifyingPax} of ${totalPax} pax`
-				: typeLabel(order.discountType);
-			lines.push({ label, ids: order.discountIds?.filter(Boolean) ?? [], type: order.discountType });
+		} else if (order.discountType !== 'none' && (order.discountType === 'senior' || order.discountType === 'pwd')) {
+			lines.push({ label: typeLabel(order.discountType), pax: order.discountPax ?? 1, type: order.discountType });
 		}
 		return lines;
 	});
@@ -157,21 +144,13 @@
 					<span>Subtotal</span>
 					<span>{formatPeso(order.subtotal)}</span>
 				</div>
-				<!-- [01] SC/PWD discount lines — multi-entry aware, one row per type -->
 				{#if hasDiscount}
-					{#each discountLines as line, li}
-						<div class="flex justify-between text-status-green">
-							<span class="flex-1 pr-2 break-words">{line.label}</span>
-							{#if li === 0}<span class="whitespace-nowrap">-{formatPeso(order.discountAmount)}</span>{/if}
-						</div>
-						{#if line.ids.length > 0}
-							{#each line.ids as idNum, i}
-								<div class="text-[10px] text-gray-400 font-mono">
-									{line.type === 'senior' ? 'SC' : 'PWD'} ID {i + 1}: {idNum}
-								</div>
-							{/each}
-						{/if}
-					{/each}
+					<div class="flex justify-between text-status-green">
+						<span class="flex-1 pr-2">
+							Discount ({discountLines.map(l => `${l.pax} ${l.label}`).join(' + ')})
+						</span>
+						<span class="whitespace-nowrap">-{formatPeso(order.discountAmount)}</span>
+					</div>
 				{/if}
 				<div class="flex justify-between text-gray-500 text-xs">
 					<span>{hasDiscount ? 'VAT (exempt)' : 'Incl. VAT (12%)'}</span>

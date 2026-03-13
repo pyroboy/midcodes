@@ -23,6 +23,7 @@
     import AttachTakeoutModal from '$lib/components/pos/AttachTakeoutModal.svelte';
     import RefillPanel from '$lib/components/pos/RefillPanel.svelte';
     import { getActiveShift, openShift } from '$lib/stores/pos/shifts.svelte';
+    import { kdsTickets } from '$lib/stores/pos/kds.svelte';
     import { session, isWarehouseSession } from '$lib/stores/session.svelte';
     import { formatPeso } from '$lib/utils';
     import { Info } from 'lucide-svelte';
@@ -166,6 +167,9 @@
         }
         return map;
     });
+
+    // Set of order IDs that still have active (un-bumped) KDS tickets in dispatch
+    const activeKdsOrderIds = $derived(new Set(kdsTickets.value.map(t => t.orderId)));
 
     // ─── Receipt State ────────────────────────────────────────────────────────
     let showReceipt = $state(false);
@@ -445,14 +449,14 @@
                                             <!-- Timer (top-right) -->
                                             <text x="119" y="18" text-anchor="end" dominant-baseline="middle" font-family="monospace" font-size="8" font-weight="700" fill="#10b981">25m</text>
                                             <!-- Table name (center) -->
-                                            <text x="65" y="46" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="15" font-weight="800" fill="#111827">T1</text>
+                                            <text x="65" y="42" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="15" font-weight="800" fill="#111827">T1</text>
                                             <!-- Pax (below name) -->
-                                            <text x="65" y="60" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="9" font-weight="600" fill="#6b7280">4 pax</text>
-                                            <!-- Bill total (bottom-center) -->
-                                            <text x="65" y="92" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="9" font-weight="700" fill="#111827">P1,996.00</text>
-                                            <!-- Unserved badge (bottom-left) — pill with count+items -->
-                                            <rect x="4" y="88" width="36" height="12" rx="6" fill="#f97316" opacity="0.9" />
-                                            <text x="22" y="95" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="7" font-weight="800" fill="#ffffff">5 items</text>
+                                            <text x="65" y="56" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="9" font-weight="600" fill="#6b7280">4 pax</text>
+                                            <!-- Status badge (bottom-left, above bill) -->
+                                            <rect x="9" y="74" width="36" height="12" rx="6" fill="#f97316" opacity="0.9" />
+                                            <text x="27" y="81" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="7" font-weight="800" fill="#ffffff">5 items</text>
+                                            <!-- Bill total (bottom-left, below badge) -->
+                                            <text x="12" y="96" text-anchor="start" dominant-baseline="middle" font-family="monospace" font-size="9" font-weight="700" fill="#111827">P1,996.00</text>
                                             <!-- Refill badge (bottom-right) -->
                                             <rect x="99" y="88" width="20" height="12" rx="6" fill="#8b5cf6" opacity="0.9" />
                                             <text x="109" y="95" text-anchor="middle" dominant-baseline="middle" font-family="Inter, sans-serif" font-size="7" font-weight="800" fill="#ffffff">R3</text>
@@ -462,8 +466,8 @@
                                             <span><b class="text-emerald-600">25m</b> — time since seated</span>
                                             <span><b class="text-gray-900">T1</b> — table name</span>
                                             <span><b class="text-gray-500">4 pax</b> — guests seated</span>
-                                            <span><b class="text-gray-900">P1,996</b> — running bill</span>
                                             <span><span class="inline-flex h-3 px-1 rounded-full bg-orange-500 align-middle text-[7px] text-white font-bold items-center">5 items</span> — unserved items</span>
+                                            <span><b class="text-gray-900">P1,996</b> — running bill</span>
                                             <span><span class="inline-block h-3 w-5 rounded-full bg-purple-500 align-middle text-[8px] text-white font-bold text-center leading-3">R3</span> — refills (AYCE)</span>
                                         </div>
                                     </div>
@@ -488,7 +492,8 @@
                                     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-3 mb-2">Badges</p>
                                     <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-gray-600">
                                         <span class="flex items-center gap-1.5"><span class="inline-flex h-4 px-1.5 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white">5 items</span>Unserved items</span>
-                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">✓</span>All served</span>
+                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 px-1.5 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-white">✓ READY</span>Kitchen done</span>
+                                        <span class="flex items-center gap-1.5"><span class="inline-flex h-4 px-1.5 items-center justify-center rounded-full bg-emerald-500 text-[8px] font-bold text-white">✓ SERVED</span>Dispatch cleared</span>
                                         <span class="flex items-center gap-1.5"><span class="inline-flex h-4 w-6 items-center justify-center rounded-full bg-purple-500 text-[8px] font-bold text-white">R3</span>Refill count</span>
                                     </div>
                                 </div>
@@ -517,6 +522,7 @@
                     {selectedTableId}
                     ontableclick={handleTableClick}
                     {tableRejectionMap}
+                    {activeKdsOrderIds}
                 />
 
                 <TakeoutQueue 

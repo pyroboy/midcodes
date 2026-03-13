@@ -4,6 +4,10 @@
 	import { setSession, MANAGER_PIN } from '$lib/stores/session.svelte';
 	import type { Role, KitchenFocus } from '$lib/stores/session.svelte';
 	import { writeLog } from '$lib/stores/audit.svelte';
+	import { resolveDataMode } from '$lib/stores/data-mode.svelte';
+	import { devices } from '$lib/stores/device.svelte';
+	import { differenceInSeconds, parseISO } from 'date-fns';
+	import { AlertTriangle, Trash2 } from 'lucide-svelte';
 
 	// ─── Accounts ─────────────────────────────────────────────────────────────
 	import type { LocationId } from '$lib/stores/session.svelte';
@@ -68,18 +72,28 @@
 	let pinError    = $state(false);
 	let pendingDest = $state('');
 
-	// ─── Login logic ──────────────────────────────────────────────────────────
-	function login() {
-		error = '';
-		const u = username.trim().toLowerCase();
-		const account = ACCOUNTS[u];
+	// ─── P1: Duplicate session warning ────────────────────────────────────────
+	let showDuplicateWarning = $state(false);
+	let duplicateDeviceName  = $state('');
+	let pendingAccount       = $state<Account | null>(null);
+	let pendingUsername       = $state('');
 
-		if (!account) { error = 'Username not found.'; return; }
-		if (account.password !== password) { error = 'Incorrect password.'; return; }
+	function checkDuplicateSession(displayName: string): { isDuplicate: boolean; deviceName: string } {
+		const deviceList = devices.value || [];
+		const now = new Date();
+		for (const dev of deviceList) {
+			if (!dev.lastSeenAt || !dev.userName) continue;
+			const diff = differenceInSeconds(now, parseISO(dev.lastSeenAt));
+			if (diff < 120 && dev.userName === displayName) {
+				return { isDuplicate: true, deviceName: dev.name || dev.deviceType || 'another device' };
+			}
+		}
+		return { isDuplicate: false, deviceName: '' };
+	}
 
+	async function proceedWithLogin(account: Account) {
 		setSession(account.displayName, account.role, account.locationId, account.kitchenFocus ?? null);
-
-		// Collapse sidebar on login
+		await resolveDataMode();
 		document.cookie = 'sidebar:state=false; path=/; max-age=604800';
 
 		if (account.requiresPin) {
@@ -91,6 +105,28 @@
 			writeLog('auth', `Login: ${account.displayName} (${account.role})`);
 			goto(account.dest);
 		}
+	}
+
+	// ─── Login logic ──────────────────────────────────────────────────────────
+	function login() {
+		error = '';
+		const u = username.trim().toLowerCase();
+		const account = ACCOUNTS[u];
+
+		if (!account) { error = 'Username not found.'; return; }
+		if (account.password !== password) { error = 'Incorrect password.'; return; }
+
+		// P1: Check if this user is already logged in on another device
+		const { isDuplicate, deviceName } = checkDuplicateSession(account.displayName);
+		if (isDuplicate) {
+			pendingAccount = account;
+			pendingUsername = u;
+			duplicateDeviceName = deviceName;
+			showDuplicateWarning = true;
+			return;
+		}
+
+		proceedWithLogin(account);
 	}
 
 	function handlePinKey(key: string) {
@@ -122,10 +158,35 @@
 		username = u;
 		password = ACCOUNTS[u].password;
 		error = '';
+		// Goes through the same duplicate-check flow via login()
 		login();
 	}
 
 	const canLogin = $derived(username.trim().length > 0 && password.length > 0);
+
+	let resetting = $state(false);
+	async function resetDb() {
+		if (!confirm('Clear local database and reload? Data will re-sync from server.')) return;
+		resetting = true;
+		try { sessionStorage.clear(); } catch { /* noop */ }
+		try { localStorage.removeItem('wtfpos-sync-gen'); } catch { /* noop */ }
+		try { localStorage.removeItem('wtfpos-sync-epoch'); } catch { /* noop */ }
+		// Log to server console
+		fetch('/api/replication/client-log', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ level: 'error', message: '🧹 RESET-DB button pressed on login page' }),
+			keepalive: true,
+		}).catch(() => {});
+		await new Promise<void>((resolve) => {
+			const req = window.indexedDB.deleteDatabase('wtfpos_db');
+			req.onsuccess = () => resolve();
+			req.onerror = () => resolve();
+			req.onblocked = () => resolve();
+			setTimeout(resolve, 3000);
+		});
+		window.location.reload();
+	}
 </script>
 
 <!-- Full page: login card + test credentials side panel -->
@@ -200,14 +261,27 @@
 			<p class="text-xs text-gray-400">
 				WTF! Samgyupsal POS · v0.1-alpha
 			</p>
-			<button
-				onclick={() => quickLogin('sysadmin')}
-				class="text-[10px] font-semibold tracking-wide text-gray-300 hover:text-gray-500 uppercase transition-colors"
-				style="min-height: unset"
-				tabindex={-1}
-			>
-				System Admin
-			</button>
+			<div class="flex items-center gap-3">
+				<button
+					onclick={() => quickLogin('sysadmin')}
+					class="text-[10px] font-semibold tracking-wide text-gray-300 hover:text-gray-500 uppercase transition-colors"
+					style="min-height: unset"
+					tabindex={-1}
+				>
+					System Admin
+				</button>
+				<span class="text-gray-200">·</span>
+				<button
+					onclick={resetDb}
+					disabled={resetting}
+					class="flex items-center gap-1 text-[10px] font-semibold tracking-wide text-gray-300 hover:text-status-red uppercase transition-colors disabled:opacity-50"
+					style="min-height: unset"
+					tabindex={-1}
+				>
+					<Trash2 size={10} />
+					{resetting ? 'Resetting…' : 'Reset DB'}
+				</button>
+			</div>
 		</div>
 	</div>
 
@@ -343,6 +417,51 @@
 					← Back
 				</button>
 				<span class="text-xs text-gray-400">or Cancel</span>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ─── P1: Duplicate Session Warning Modal ────────────────────────────────── -->
+{#if showDuplicateWarning && pendingAccount}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+		<div class="pos-card w-[420px] flex flex-col items-center gap-5 py-8 px-8">
+			<div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100">
+				<AlertTriangle class="h-7 w-7 text-amber-600" />
+			</div>
+
+			<div class="flex flex-col items-center gap-1 text-center">
+				<h2 class="text-lg font-bold text-gray-900">Already logged in</h2>
+				<p class="text-sm text-gray-600 leading-relaxed max-w-xs">
+					<span class="font-semibold text-gray-900">{pendingAccount.displayName}</span> is already active on
+					<span class="font-semibold text-gray-900">{duplicateDeviceName}</span>.
+				</p>
+				<p class="text-xs text-gray-400 mt-1">
+					Logging in here may cause data conflicts if both devices edit the same order.
+				</p>
+			</div>
+
+			<div class="flex w-full flex-col gap-2">
+				<button
+					onclick={() => {
+						showDuplicateWarning = false;
+						if (pendingAccount) proceedWithLogin(pendingAccount);
+						pendingAccount = null;
+					}}
+					class="btn-primary w-full"
+				>
+					Continue anyway
+				</button>
+				<button
+					onclick={() => {
+						showDuplicateWarning = false;
+						pendingAccount = null;
+						error = '';
+					}}
+					class="btn-secondary w-full"
+				>
+					Cancel
+				</button>
 			</div>
 		</div>
 	</div>

@@ -345,7 +345,7 @@ export const stockCountSchema: RxJsonSchema<any> = {
 // ─── Device ─────────────────────────────────────────────────────────────────
 export const deviceSchema: RxJsonSchema<any> = {
 	title: 'device schema',
-	version: 1,
+	version: 5,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -362,10 +362,15 @@ export const deviceSchema: RxJsonSchema<any> = {
 		deviceType: { type: 'string' },
 		screenWidth: { type: 'number' },
 		userAgent: { type: 'string' },
+		dbLastUpdated: { type: 'string' },
+		dbDocCount: { type: 'number' },
+		isServer: { type: 'boolean' },
+		ipAddress: { type: 'string', maxLength: 45 },
+		dataMode: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'name', 'lastSeenAt', 'isOnline', 'syncStatus', 'appVersion', 'buildDate', 'updatedAt'],
-	indexes: ['updatedAt']
+	required: ['id', 'name', 'lastSeenAt', 'isOnline', 'syncStatus', 'appVersion', 'buildDate', 'ipAddress', 'updatedAt'],
+	indexes: ['updatedAt', 'ipAddress']
 };
 
 // ─── Expense ─────────────────────────────────────────────────────────────────

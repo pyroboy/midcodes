@@ -19,7 +19,7 @@
 	let confirmingUnEighty6 = $state<string | null>(null);
 
 	// ── P2-06: KDS notification volume ──
-	let notificationVolume = $state(0.7);
+	let notificationVolume = $state(1.0);
 
 	// Refuse modal
 	let refuseTarget = $state<{ orderId: string; tableNumber: number | null; itemName: string } | null>(null);
@@ -108,7 +108,7 @@
 			if (!notificationAudio) {
 				notificationAudio = new Audio('/sounds/new-order.wav');
 			}
-			notificationAudio.volume = notificationVolume;
+			notificationAudio.volume = Math.min(notificationVolume, 1.0);
 			notificationAudio.currentTime = 0;
 			notificationAudio.play().catch(() => {});
 		} catch { /* skip if audio unavailable */ }
@@ -123,7 +123,7 @@
 			osc.connect(gain);
 			gain.connect(ctx.destination);
 			osc.frequency.value = 880; // 880Hz — distinct from 440Hz new-order chime
-			gain.gain.value = notificationVolume * 0.5;
+			gain.gain.value = notificationVolume * 1.5;
 			osc.start();
 			osc.stop(ctx.currentTime + 0.2);
 			osc.onended = () => ctx.close();

@@ -3,9 +3,9 @@
  * Used by POS FloorPlan and AllBranchesDashboard to render the real floor layout.
  */
 import type { FloorElement, FloorCanvasConfig } from '$lib/types';
-import { createRxStore } from '$lib/stores/sync.svelte';
+import { createStore } from '$lib/stores/create-store.svelte';
 
-const _floorElements = createRxStore<FloorElement & { gridSize?: number }>('floor_elements', db =>
+const _floorElements = createStore<FloorElement & { gridSize?: number }>('floor_elements', db =>
 	db.floor_elements.find()
 );
 

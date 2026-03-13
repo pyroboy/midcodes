@@ -13,14 +13,44 @@ import { nanoid } from 'nanoid';
 /**
  * Automatically seeds the database with mock data if it determines
  * the current collections are empty (first time load).
+ *
+ * CRITICAL: If the server already has data, skip seeding entirely.
+ * Replication will pull the real data. Without this check, a fresh client
+ * would seed mock data with newer updatedAt timestamps, then push it to
+ * the server, overwriting the main tablet's real orders/tables.
  */
 export async function seedDatabaseIfNeeded(db: RxDatabase) {
+    // Thin clients use memory storage — all data comes from replication, seeding is pointless
+    if (typeof window !== 'undefined'
+        && window.location.hostname !== 'localhost'
+        && window.location.hostname !== '127.0.0.1') {
+        console.log('[RxDB] Thin client detected — skipping seed (replication will provide data)');
+        return;
+    }
+
+    // Check if the server already has data — if so, replication will provide it
+    if (typeof window !== 'undefined') {
+        try {
+            const res = await fetch('/api/replication/status', { signal: AbortSignal.timeout(3000) });
+            if (res.ok) {
+                const data = await res.json();
+                if ((data.total ?? 0) >= 5) {
+                    console.log(`[RxDB] Server has ${data.total} docs — skipping seed, replication will sync`);
+                    return;
+                }
+            }
+        } catch {
+            // Server unreachable — fall through to local seed check
+            console.log('[RxDB] Server unreachable during seed check — checking local data');
+        }
+    }
+
     // Check if the menu items or tables collection is empty
     const existingMenu = await db.menu_items.find().exec();
     const existingTables = await db.tables.find().exec();
-    
+
     if (existingMenu.length === 0 || existingTables.length === 0) {
-        console.log('[RxDB] Database is empty or missing tables. Seeding initial mock data...');
+        console.log('[RxDB] Database is empty AND server has no data. Seeding initial mock data...');
         
         // 1. Seed Menu Items if empty
         if (existingMenu.length === 0) {

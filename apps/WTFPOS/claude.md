@@ -455,6 +455,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | Generate role scenarios, implementation assessment, user journeys | `skills/user-scenarios/SKILL.md` |
 | Maturity check, PRD alignment, feature completeness, progress report | `skills/check-maturity/SKILL.md` |
 | Report audit, data audit, analytics review, chart check, KPI review | `skills/report-audit/SKILL.md` |
+| Network topology, sync protocols, offline tiers, LAN replication, latency, backup, disaster recovery | `skills/network-expert/SKILL.md` |
 
 ### By technology keyword
 
@@ -471,6 +472,7 @@ Every skill has its own **Human in the Loop** gates and **Self-Improvement Proto
 | "user scenarios", "create scenarios", "generate scenarios", "role journeys", "as manager", "as staff" | user-scenarios |
 | "maturity", "PRD alignment", "how complete", "how mature", "what's missing", "progress report", "readiness" | check-maturity |
 | "report audit", "data audit", "chart check", "KPI review", "analytics review", "is this chart correct", "wrong chart type", "misleading axis" | report-audit |
+| "network", "topology", "WiFi", "LAN", "latency", "bandwidth", "connection", "cross-branch", "device sync", "server restart", "SSE stream", "multiplexed", "backup", "restore", "disaster recovery", "data retention", "BIR retention" | network-expert |
 
 ### Skill file locations
 
@@ -485,7 +487,8 @@ skills/
 ├── ux-audit/       SKILL.md (v5.1.0 — uses playwright-cli) + references/ (DESIGN_BIBLE, ENVIRONMENT, KNOWN_PATTERNS, PRD_QUICK_REF, BIR_REQUIREMENTS, ROLE_WORKFLOWS) + audits/ (v4+ output) + audits-legacy/ (pre-v4 output)
 ├── user-scenarios/ SKILL.md + references/ (SCENARIO_CONTEXT) + scenarios/ (generated output)
 ├── check-maturity/ SKILL.md + references/ (MATURITY_FRAMEWORK) + reports/ (generated output)
-└── report-audit/   SKILL.md (v1.0.0 — uses playwright-cli + DATA_ANALYTICS_BIBLE) + audits/ (generated output)
+├── report-audit/   SKILL.md (v1.0.0 — uses playwright-cli + DATA_ANALYTICS_BIBLE) + audits/ (generated output)
+└── network-expert/ SKILL.md (v2.0.0) + references/ (NETWORK_TOPOLOGY, NETWORKING_BIBLE, BACKUP_REGIMEN)
 ```
 
 > **Self-Improvement rule:** When the user corrects something a skill states, update the skill

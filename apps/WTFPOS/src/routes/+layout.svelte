@@ -2,24 +2,34 @@
 	import '../app.css';
 	import ConnectionStatus from '$lib/components/ConnectionStatus.svelte';
 	import DbHealthBanner from '$lib/components/DbHealthBanner.svelte';
+	import SyncStatusBanner from '$lib/components/SyncStatusBanner.svelte';
 	import AppSidebar from '$lib/components/AppSidebar.svelte';
 	import MobileTopBar from '$lib/components/MobileTopBar.svelte';
 	import LocationBanner from '$lib/components/stock/LocationBanner.svelte';
 	import { SidebarProvider, SidebarInset } from '$lib/components/ui/sidebar/index.js';
 	import { initConnectionMonitor } from '$lib/stores/connection.svelte';
-	import { initDeviceHeartbeat } from '$lib/stores/device.svelte';
+	import { initDeviceHeartbeat, stopDeviceHeartbeat, isThisDeviceServer } from '$lib/stores/device.svelte';
 	import { initDbHealthCheck } from '$lib/stores/db-health.svelte';
 	import { pruneOldData } from '$lib/db/cleanup';
+	import { needsRxDb, isFullRxDbMode, resolveDataMode } from '$lib/stores/data-mode.svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { isWarehouseSession } from '$lib/stores/session.svelte';
+	import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
 
 	// Don't show sidebar on the login page
-	const showSidebar = $derived(page.url.pathname !== '/');
+	const isLoginPage = $derived(page.url.pathname === '/');
+	const showSidebar = $derived(!isLoginPage);
+
+	// P0: Redirect unauthenticated users to login
+	$effect(() => {
+		if (browser && !isLoginPage && !session.userName) {
+			goto('/');
+		}
+	});
 
 	const RETAIL_ONLY_PREFIXES = ['/pos', '/kitchen'];
 	$effect(() => {
@@ -28,8 +38,53 @@
 		}
 	});
 
+	// Report route changes to the server so the device route map stays current
+	afterNavigate(({ to }) => {
+		if (!browser || !to?.url) return;
+		const route = to.url.pathname;
+		// Skip API/internal paths — only report real page navigations
+		if (route.startsWith('/api/') || route.startsWith('/_app/')) return;
+		const body = new Blob([JSON.stringify({ route })], { type: 'application/json' });
+		if (navigator.sendBeacon) {
+			navigator.sendBeacon('/api/device/route', body);
+		} else {
+			fetch('/api/device/route', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ route }),
+				keepalive: true,
+			}).catch(() => {});
+		}
+	});
+
 	// Default sidebar collapsed; read cookie for persisted state
 	let sidebarOpen = $state(browser ? document.cookie.match(/sidebar:state=(\w+)/)?.[1] === 'true' : false);
+
+	// ─── Sync Gate (client devices only) ─────────────────────────────────────
+	// Blocks the UI with a loading overlay until priority collections sync,
+	// preventing stale local data from being shown to the user.
+	// Server device skips this — its local data IS the source of truth.
+	const SYNC_GATE_TIMEOUT_MS = 8_000; // max wait before showing local data anyway
+	let syncGateOpen = $state(false); // true = gate lifted, show app
+	let syncGateStatus = $state('Connecting to server...');
+	let unsubSyncGate: (() => void) | null = null;
+	let syncGateTimer: ReturnType<typeof setTimeout> | null = null;
+
+	// Login page and server device bypass the gate immediately
+	const needsSyncGate = $derived(!isLoginPage && !isThisDeviceServer() && !!session.userName);
+
+	function liftSyncGate() {
+		syncGateOpen = true;
+		if (unsubSyncGate) { unsubSyncGate(); unsubSyncGate = null; }
+		if (syncGateTimer) { clearTimeout(syncGateTimer); syncGateTimer = null; }
+	}
+
+	// If device identity resolves as server AFTER mount, lift the gate
+	$effect(() => {
+		if (isThisDeviceServer() && !syncGateOpen) {
+			liftSyncGate();
+		}
+	});
 
 	// ─── Dev Error Overlay ────────────────────────────────────────────────────
 	interface CapturedError { message: string; source?: string; stack?: string; type: 'error' | 'rejection' }
@@ -41,6 +96,45 @@
 		initDeviceHeartbeat();
 		initDbHealthCheck();
 		pruneOldData(); // background cleanup — non-blocking
+
+		// Ensure data mode is resolved on every page load (not just login).
+		// The sessionStorage cache provides the initial value instantly,
+		// but this call re-validates against the device identity endpoint.
+		if (session.userName) {
+			resolveDataMode();
+		}
+
+		// ─── Sync gate: wait for priority sync on client devices ─────────
+		if (needsSyncGate && needsRxDb()) {
+			// Safety timeout — never block forever
+			syncGateTimer = setTimeout(() => {
+				console.warn(`[SyncGate] Timeout (${SYNC_GATE_TIMEOUT_MS}ms) — showing local data`);
+				liftSyncGate();
+			}, SYNC_GATE_TIMEOUT_MS);
+
+			// Subscribe to replication activity
+			import('$lib/db/replication').then(({ subscribeSyncActivity }) => {
+				unsubSyncGate = subscribeSyncActivity((activity) => {
+					if (activity.prioritySyncDone) {
+						console.log('[SyncGate] Priority sync done — lifting gate');
+						liftSyncGate();
+					} else if (activity.active) {
+						syncGateStatus = 'Syncing data with server...';
+					}
+				});
+			}).catch(() => {
+				// Replication not available — lift gate immediately
+				liftSyncGate();
+			});
+		} else {
+			// Server device, login page, or non-RxDB data mode — no gate needed
+			syncGateOpen = true;
+		}
+
+		// P4: Request persistent storage to prevent IndexedDB eviction
+		navigator.storage?.persist?.().then((granted) => {
+			if (granted) console.log('[Storage] Persistent storage granted');
+		});
 
 		if (!import.meta.env.DEV) return;
 
@@ -60,12 +154,36 @@
 		return () => {
 			window.removeEventListener('error', handleError);
 			window.removeEventListener('unhandledrejection', handleRejection);
+			stopDeviceHeartbeat();
+			if (unsubSyncGate) unsubSyncGate();
+			if (syncGateTimer) clearTimeout(syncGateTimer);
 		};
 	});
 </script>
 
+<!-- ═══ Sync Gate: blocks client devices until server data arrives ═══ -->
+{#if needsSyncGate && !syncGateOpen}
+	<div class="fixed inset-0 z-[9998] flex flex-col items-center justify-center bg-white">
+		<div class="flex flex-col items-center gap-4">
+			<!-- Animated logo/spinner -->
+			<div class="relative flex h-16 w-16 items-center justify-center">
+				<div class="absolute inset-0 rounded-full border-4 border-gray-100"></div>
+				<div class="absolute inset-0 rounded-full border-4 border-t-accent animate-spin"></div>
+				<span class="text-xl font-black text-accent">W</span>
+			</div>
+			<div class="flex flex-col items-center gap-1">
+				<p class="text-sm font-bold text-gray-900">{syncGateStatus}</p>
+				<p class="text-xs text-gray-400">Fetching latest data from server</p>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <ConnectionStatus />
 <DbHealthBanner />
+{#if !isThisDeviceServer()}
+	<SyncStatusBanner />
+{/if}
 
 {#if showSidebar}
 	<SidebarProvider bind:open={sidebarOpen}>

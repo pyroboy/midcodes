@@ -3,8 +3,8 @@
  * Central log for every meaningful action across the app.
  */
 import { nanoid } from 'nanoid';
-import { createRxStore } from '$lib/stores/sync.svelte';
-import { getDb } from '$lib/db';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { browser } from '$app/environment';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,8 +25,9 @@ export interface LogEntry {
 
 // ─── Reactive State (RxDB Store) ──────────────────────────────────────────────
 
-const _auditLog = createRxStore<LogEntry>('audit_logs', db =>
-	db.audit_logs.find({ sort: [{ isoTimestamp: 'desc' }] })
+const _auditLog = createStore<LogEntry>('audit_logs', db =>
+	db.audit_logs.find({ sort: [{ isoTimestamp: 'desc' }] }),
+	{ sort: (a, b) => b.isoTimestamp.localeCompare(a.isoTimestamp) }
 );
 
 export const auditLog = {
@@ -59,13 +60,10 @@ export function writeLog(
 		...(opts.meta && { meta: JSON.stringify(opts.meta) }),
 	};
 
-	// Fire-and-forget insert to RxDB
-	getDb().then(db => {
-		db.audit_logs.insert({ ...entry, updatedAt: now.toISOString() }).catch((err: any) => {
-			console.error('[AUDIT] Failed to write log entry:', err);
-		});
-	}).catch(err => {
-		console.error('[AUDIT] DB not available for logging:', err);
+	// Fire-and-forget insert via write proxy
+	const col = getWritableCollection('audit_logs');
+	col.insert({ ...entry, updatedAt: now.toISOString() }).catch((err: any) => {
+		console.error('[AUDIT] Failed to write log entry:', err);
 	});
 }
 

@@ -12,9 +12,10 @@
         selectedTableId: string | null;
         ontableclick: (table: Table) => void;
         tableRejectionMap?: Map<string, number>;
+        activeKdsOrderIds?: Set<string>;
     }
 
-    let { mainTables, orders, selectedTableId, ontableclick, tableRejectionMap = new Map() }: Props = $props();
+    let { mainTables, orders, selectedTableId, ontableclick, tableRejectionMap = new Map(), activeKdsOrderIds = new Set() }: Props = $props();
 
     // Floor layout data
     const canvas = $derived(floorLayout.canvasFor(session.locationId));
@@ -208,9 +209,11 @@
             {@const rot = table.rotation ?? 0}
             {@const isSelected = selectedTableId === table.id}
             {@const isOccupied = table.status !== 'available' && table.status !== 'maintenance'}
-            {@const activeItems = order?.items.filter(i => i.status !== 'cancelled') ?? []}
+            {@const activeItems = order?.items.filter(i => i.status !== 'cancelled' && i.tag !== 'PKG') ?? []}
             {@const unservedCount = activeItems.filter(i => i.status !== 'served').length}
             {@const isFullyServed = isOccupied && !!order && activeItems.length > 0 && unservedCount === 0}
+            {@const hasActiveKds = !!order && activeKdsOrderIds.has(order.id)}
+            {@const serveState = isFullyServed ? (hasActiveKds ? 'ready' : 'served') : null}
             {@const isAyce = !!order?.packageId}
             {@const refills = isAyce ? getRefillCount(order) : 0}
             {@const pkg = isOccupied ? pkgLabel(order?.packageId) : ''}
@@ -339,38 +342,52 @@
                         >cap {table.capacity}</text>
                     {/if}
 
-                    <!-- Bill total (bottom) -->
-                    {#if table.billTotal}
-                        <text
-                            x={cx} y={table.y + H - 8}
-                            text-anchor="middle" dominant-baseline="middle"
-                            font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700"
-                            fill="#111827" pointer-events="none"
-                        >{formatPeso(table.billTotal)}</text>
-                    {/if}
-
-                    <!-- Unserved count badge (bottom-left) — pill with count + "items" label -->
+                    <!-- Status badge (left-aligned, above bill total) -->
                     {#if isOccupied && !!order && unservedCount > 0}
                         {@const badgeLabel = `${unservedCount} item${unservedCount !== 1 ? 's' : ''}`}
                         {@const badgeW = badgeLabel.length * 6.5 + 10}
                         <title>{unservedCount} unserved item{unservedCount !== 1 ? 's' : ''}</title>
-                        <rect x={table.x + 4} y={table.y + H - 18} width={badgeW} height="14" rx="7" fill="#f97316" opacity="0.9">
+                        <rect x={table.x + 4} y={table.y + H - 32} width={badgeW} height="14" rx="7" fill="#f97316" opacity="0.9">
                             <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1.2s" repeatCount="indefinite" />
                         </rect>
                         <text
-                            x={table.x + 4 + badgeW / 2} y={table.y + H - 10}
+                            x={table.x + 4 + badgeW / 2} y={table.y + H - 24}
                             text-anchor="middle" dominant-baseline="middle"
                             font-family="Inter, sans-serif" font-size="9" font-weight="800"
                             fill="#ffffff" pointer-events="none"
                         >{badgeLabel}</text>
-                    {:else if isFullyServed}
-                        <circle cx={table.x + 10} cy={table.y + H - 10} r="9" fill="#10b981" opacity="0.9" />
+                    {:else if serveState === 'ready'}
+                        {@const readyLabel = '✓ READY'}
+                        {@const readyW = readyLabel.length * 7 + 10}
+                        <rect x={table.x + 4} y={table.y + H - 32} width={readyW} height="14" rx="7" fill="#f59e0b" opacity="0.9">
+                            <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1.2s" repeatCount="indefinite" />
+                        </rect>
                         <text
-                            x={table.x + 10} y={table.y + H - 9}
+                            x={table.x + 4 + readyW / 2} y={table.y + H - 24}
                             text-anchor="middle" dominant-baseline="middle"
-                            font-size="12" font-weight="bold"
+                            font-family="Inter, sans-serif" font-size="9" font-weight="800"
                             fill="#ffffff" pointer-events="none"
-                        >✓</text>
+                        >{readyLabel}</text>
+                    {:else if serveState === 'served'}
+                        {@const servedLabel = '✓ SERVED'}
+                        {@const servedW = servedLabel.length * 7 + 10}
+                        <rect x={table.x + 4} y={table.y + H - 32} width={servedW} height="14" rx="7" fill="#10b981" opacity="0.9" />
+                        <text
+                            x={table.x + 4 + servedW / 2} y={table.y + H - 24}
+                            text-anchor="middle" dominant-baseline="middle"
+                            font-family="Inter, sans-serif" font-size="9" font-weight="800"
+                            fill="#ffffff" pointer-events="none"
+                        >{servedLabel}</text>
+                    {/if}
+
+                    <!-- Bill total (bottom-left, below badge) -->
+                    {#if table.billTotal}
+                        <text
+                            x={table.x + 8} y={table.y + H - 8}
+                            text-anchor="start" dominant-baseline="middle"
+                            font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700"
+                            fill="#111827" pointer-events="none"
+                        >{formatPeso(table.billTotal)}</text>
                     {/if}
 
                     <!-- Refill count badge (bottom-right) — AYCE only -->

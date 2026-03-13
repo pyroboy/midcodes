@@ -14,6 +14,7 @@
 
 import { browser } from '$app/environment';
 import { getDb } from '$lib/db';
+import { needsRxDb } from '$lib/stores/data-mode.svelte';
 
 /** Retention windows */
 const ORDERS_RETENTION_DAYS      = 30;
@@ -30,6 +31,12 @@ function daysAgoIso(days: number): string {
 
 export async function pruneOldData(): Promise<void> {
 	if (!browser) return;
+	if (!needsRxDb()) return; // No DB to clean on thin clients
+
+	// Thin clients use memory storage — cleanup is pointless (data is ephemeral)
+	const isRemoteClient = window.location.hostname !== 'localhost'
+		&& window.location.hostname !== '127.0.0.1';
+	if (isRemoteClient) return;
 
 	try {
 		const db = await getDb();

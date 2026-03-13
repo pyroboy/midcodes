@@ -3,7 +3,7 @@
 	import { orders, markItemServed } from '$lib/stores/pos.svelte';
 	import { log } from '$lib/stores/audit.svelte';
 	import type { KdsTicketItem } from '$lib/types';
-	import { formatCountdown, formatTimeAgo, cn } from '$lib/utils';
+	import { formatCountdown, cn } from '$lib/utils';
 	import { getPkgColors } from '$lib/stores/pos/utils';
 	import { untrack } from 'svelte';
 
@@ -14,30 +14,7 @@
 		return () => clearInterval(id);
 	});
 
-	// ── Section A: New tables (opened in last 15min, no items yet) ──
-	const newTables = $derived.by(() => {
-		const fifteenMinAgo = now - 15 * 60_000;
-		return orders.value
-			.filter(
-				(o) =>
-					o.status === 'open' &&
-					o.tableNumber !== null &&
-					new Date(o.createdAt).getTime() > fifteenMinAgo &&
-					(!o.items || o.items.length === 0)
-			)
-			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-	});
-
-	let acknowledgedTableIds = $state<Set<string>>(new Set());
-	const unacknowledgedNewTables = $derived(
-		newTables.filter((o) => !acknowledgedTableIds.has(o.id))
-	);
-
-	function acknowledgeTable(orderId: string) {
-		acknowledgedTableIds = new Set([...acknowledgedTableIds, orderId]);
-	}
-
-	// ── Section B: Per-table dispatch cards ──
+	// ── Per-table dispatch cards ──
 	interface DispatchTableCard {
 		orderId: string;
 		tableNumber: number | null;
@@ -134,48 +111,91 @@
 			});
 	});
 
-	// ── Section C: Service alerts ──
-	type ServiceAlert = {
-		orderId: string;
-		itemId: string;
-		tableLabel: string;
-		text: string;
-		waitingSince: string;
-	};
-
-	const serviceAlerts = $derived.by((): ServiceAlert[] => {
-		const alerts: ServiceAlert[] = [];
-		for (const ticket of kdsTickets.value) {
-			for (const item of ticket.items) {
-				if (item.category === 'service' && item.status !== 'served' && item.status !== 'cancelled') {
-					alerts.push({
-						orderId: ticket.orderId,
-						itemId: item.id,
-						tableLabel: ticket.tableNumber
-							? `T${ticket.tableNumber}`
-							: (ticket.customerName ?? 'Takeout'),
-						text: item.menuItemName,
-						waitingSince: ticket.createdAt
-					});
-				}
-			}
-		}
-		return alerts.sort(
-			(a, b) => new Date(a.waitingSince).getTime() - new Date(b.waitingSince).getTime()
-		);
-	});
-
 	// ── Actions ──
 	async function markSideDone(orderId: string, itemId: string) {
-		await markItemServed(orderId, itemId);
+		try {
+			await markItemServed(orderId, itemId);
+		} catch (err) {
+			console.error('[Dispatch] markSideDone failed:', err);
+			showToast(`Failed to update — ${err instanceof Error ? err.message : 'try again'}`);
+		}
 	}
 
 	async function completeAllSides(orderId: string, items: KdsTicketItem[]) {
-		for (const item of items) {
-			if (item.status !== 'served') {
-				await markItemServed(orderId, item.id);
+		try {
+			for (const item of items) {
+				if (item.status !== 'served') {
+					await markItemServed(orderId, item.id);
+				}
 			}
+		} catch (err) {
+			console.error('[Dispatch] completeAllSides failed:', err);
+			showToast(`Failed to update — ${err instanceof Error ? err.message : 'try again'}`);
 		}
+	}
+
+	// ── Connectivity Test ──
+	let pingResult = $state<string>('');
+	let pingRunning = $state(false);
+
+	async function runConnectivityTest() {
+		pingRunning = true;
+		pingResult = '⏳ Testing...';
+		const steps: string[] = [];
+
+		try {
+			// Step 1: HTTP round-trip
+			const token = `ping-${Date.now()}`;
+			const res = await fetch('/api/replication/ping', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ token, collection: 'orders', testWrite: true,
+					testFields: { locationId: 'test', tableNumber: 0, items: [], total: 0 }
+				})
+			});
+			if (!res.ok) {
+				steps.push(`❌ HTTP: ${res.status}`);
+			} else {
+				const data = await res.json();
+				steps.push(`✅ HTTP round-trip OK`);
+				steps.push(`✅ Server sees us as: ${data.deviceLabel}`);
+				steps.push(`${data.storeCount > 0 ? '✅' : '⚠️'} Orders in store: ${data.storeCount}`);
+				if (data.writeOk === true) steps.push('✅ Server write OK');
+				else if (data.writeOk === false) steps.push(`❌ Server write FAILED: ${data.writeError}`);
+			}
+
+			// Step 2: Test the actual write proxy path (what DONE button uses)
+			const testOrder = orders.value[0];
+			if (testOrder) {
+				try {
+					// Read the order via the same path the write proxy uses
+					const readRes = await fetch(`/api/collections/orders/read`);
+					if (readRes.ok) {
+						const readData = await readRes.json();
+						const docs = Array.isArray(readData) ? readData : (readData.documents ?? []);
+						steps.push(`✅ Collection read: ${docs.length} orders`);
+						const found = docs.find((d: any) => d.id === testOrder.id);
+						steps.push(found ? `✅ Can find order ${testOrder.id.slice(0,8)}…` : `❌ Order ${testOrder.id.slice(0,8)}… NOT in server store`);
+					} else {
+						steps.push(`❌ Collection read failed: ${readRes.status}`);
+					}
+				} catch (e: any) {
+					steps.push(`❌ Collection read error: ${e.message}`);
+				}
+			} else {
+				steps.push('⚠️ No orders in local store to test with');
+			}
+
+			// Step 3: Check KDS tickets
+			steps.push(`📋 Local KDS tickets: ${kdsTickets.value.length}`);
+			steps.push(`📋 Local orders: ${orders.value.length}`);
+
+		} catch (err: any) {
+			steps.push(`❌ Network error: ${err.message}`);
+		}
+
+		pingResult = steps.join('\n');
+		pingRunning = false;
 	}
 
 	// ── Toast ──
@@ -204,21 +224,26 @@
 
 	// ── ALL DONE: Complete entire order from dispatch ──
 	async function completeAllForOrder(card: DispatchTableCard) {
-		// Get ALL KDS tickets for this order (may be multiple due to refills)
-		const tickets = kdsTickets.value.filter(t => t.orderId === card.orderId);
-		for (const ticket of tickets) {
-			for (const item of ticket.items) {
-				if (item.status !== 'served' && item.status !== 'cancelled') {
-					await markItemServed(card.orderId, item.id);
+		try {
+			// Get ALL KDS tickets for this order (may be multiple due to refills)
+			const tickets = kdsTickets.value.filter(t => t.orderId === card.orderId);
+			for (const ticket of tickets) {
+				for (const item of ticket.items) {
+					if (item.status !== 'served' && item.status !== 'cancelled') {
+						await markItemServed(card.orderId, item.id);
+					}
 				}
 			}
-		}
-		log.dispatchOrderCleared(card.tableNumber);
+			log.dispatchOrderCleared(card.tableNumber);
 
-		const label = card.tableNumber !== null ? `T${card.tableNumber}` : (card.customerName ?? 'Takeout');
-		showToast(`✓ ${label} — Order cleared`, () => {
-			recallTicket(card.orderId);
-		});
+			const label = card.tableNumber !== null ? `T${card.tableNumber}` : (card.customerName ?? 'Takeout');
+			showToast(`✓ ${label} — Order cleared`, () => {
+				recallTicket(card.orderId);
+			});
+		} catch (err) {
+			console.error('[Dispatch] completeAllForOrder failed:', err);
+			showToast(`Failed to clear order — ${err instanceof Error ? err.message : 'try again'}`);
+		}
 	}
 
 	// ── Urgency ──
@@ -240,20 +265,6 @@
 		if (level === 'critical') return 'bg-status-red text-white';
 		if (level === 'warning') return 'bg-status-yellow text-gray-900';
 		return 'bg-gray-100 text-gray-600';
-	}
-
-	function timeAgo(isoStr: string): string {
-		const mins = Math.floor((now - new Date(isoStr).getTime()) / 60_000);
-		if (mins < 1) return 'just now';
-		if (mins === 1) return '1m ago';
-		return `${mins}m ago`;
-	}
-
-	function alertUrgency(waitingSince: string): 'normal' | 'warning' | 'critical' {
-		const mins = Math.floor((now - new Date(waitingSince).getTime()) / 60_000);
-		if (mins >= 5) return 'critical';
-		if (mins >= 3) return 'warning';
-		return 'normal';
 	}
 
 	// ── Station status helpers ──
@@ -283,47 +294,109 @@
 		return () => clearInterval(id);
 	});
 
-	// ── Audio: chime when a table transitions to readyToRun ──
-	let lastReadyCount = $state(0);
-	let isFirstRun = true;
+	// ── Audio: distinct sounds per station update ──
+	// All sounds play on every interaction — including local dispatch actions
 
-	function playReadyChime() {
+	// Snapshot of previous card state for diffing
+	type CardSnapshot = { meatDone: number; dishDone: number; sideDone: number; serviceCount: number; readyToRun: boolean };
+	let prevSnapshots = $state<Map<string, CardSnapshot>>(new Map());
+	let audioInitialized = false;
+
+	const MASTER_VOLUME = 1.5;
+
+	/** Play a tone sequence. Each note: [frequency, duration, delay-before] */
+	function playTones(notes: Array<[number, number, number]>, volume = MASTER_VOLUME) {
 		try {
 			const ctx = new AudioContext();
-			const osc = ctx.createOscillator();
-			const gain = ctx.createGain();
-			osc.connect(gain);
-			gain.connect(ctx.destination);
-			// Two-tone ascending chime (C5 → E5)
-			osc.frequency.value = 523;
-			gain.gain.value = 0.3;
-			osc.start();
-			osc.stop(ctx.currentTime + 0.3);
-			osc.onended = () => {
-				const ctx2 = new AudioContext();
-				const osc2 = ctx2.createOscillator();
-				const gain2 = ctx2.createGain();
-				osc2.connect(gain2);
-				gain2.connect(ctx2.destination);
-				osc2.frequency.value = 659;
-				gain2.gain.value = 0.3;
-				osc2.start();
-				osc2.stop(ctx2.currentTime + 0.3);
-				osc2.onended = () => ctx2.close();
-				ctx.close();
-			};
+			let t = ctx.currentTime;
+			for (const [freq, dur, delay] of notes) {
+				t += delay;
+				const osc = ctx.createOscillator();
+				const gain = ctx.createGain();
+				osc.connect(gain);
+				gain.connect(ctx.destination);
+				osc.frequency.value = freq;
+				gain.gain.setValueAtTime(volume, t);
+				gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+				osc.start(t);
+				osc.stop(t + dur);
+				t += dur;
+			}
+			// Clean up after all notes finish
+			setTimeout(() => ctx.close(), (t - ctx.currentTime) * 1000 + 200);
 		} catch { /* skip if audio unavailable */ }
 	}
 
+	// NEW ORDER received — bold descending double-ding (G5 → C5), attention-grabbing
+	function playNewOrderSound() {
+		playTones([[784, 0.3, 0], [523, 0.4, 0.1]]);
+	}
+
+	// Meat updated — punchy mid-range triple-tone (G4 → B4 → D5), loud and clear on tablet speakers
+	function playMeatSound() {
+		playTones([[392, 0.35, 0], [494, 0.35, 0.05], [587, 0.4, 0.05]], MASTER_VOLUME * 1.3);
+	}
+
+	// Dishes updated — loud mid three-tone (E4 → G4 → B4), warm and full
+	function playDishesSound() {
+		playTones([[330, 0.25, 0], [392, 0.25, 0.05], [494, 0.3, 0.05]]);
+	}
+
+	// Sides done — punchy double beep (A5 → A5), clear confirmation
+	function playSidesSound() {
+		playTones([[880, 0.15, 0], [880, 0.18, 0.08]]);
+	}
+
+	// Request incoming — attention triple-tap (F5 → F5 → A5), urgent
+	function playRequestSound() {
+		playTones([[698, 0.15, 0], [698, 0.15, 0.08], [880, 0.2, 0.08]]);
+	}
+
+	// Ready to run — ascending chime (C5 → E5 → G5 → C6), triumphant
+	function playReadyChime() {
+		playTones([[523, 0.2, 0], [659, 0.2, 0.05], [784, 0.25, 0.05], [1047, 0.35, 0.05]]);
+	}
+
 	$effect(() => {
-		const readyCount = dispatchCards.filter((c) => c.readyToRun).length;
-		if (isFirstRun) {
-			isFirstRun = false;
-			lastReadyCount = readyCount;
+		// Build current snapshots — read dispatchCards to subscribe
+		const currentSnapshots = new Map<string, CardSnapshot>();
+		for (const card of dispatchCards) {
+			currentSnapshots.set(card.orderId, {
+				meatDone: card.meats.done,
+				dishDone: card.dishes.done,
+				sideDone: card.sides.done,
+				serviceCount: card.service.items.length,
+				readyToRun: card.readyToRun
+			});
+		}
+
+		// Skip first run — just capture initial state
+		if (!audioInitialized) {
+			audioInitialized = true;
+			prevSnapshots = currentSnapshots;
 			return;
 		}
-		if (readyCount > lastReadyCount) playReadyChime();
-		lastReadyCount = readyCount;
+
+		// Diff against previous state and play appropriate sounds
+		let playedNewOrder = false, playedMeat = false, playedDish = false, playedSides = false, playedRequest = false, playedReady = false;
+
+		for (const [orderId, curr] of currentSnapshots) {
+			const prev = untrack(() => prevSnapshots).get(orderId);
+			if (!prev) {
+				// New card appeared — play new order sound
+				if (!playedNewOrder) { playNewOrderSound(); playedNewOrder = true; }
+				if (curr.serviceCount > 0 && !playedRequest) { playRequestSound(); playedRequest = true; }
+				continue;
+			}
+
+			if (curr.meatDone > prev.meatDone && !playedMeat) { playMeatSound(); playedMeat = true; }
+			if (curr.dishDone > prev.dishDone && !playedDish) { playDishesSound(); playedDish = true; }
+			if (curr.sideDone > prev.sideDone && !playedSides) { playSidesSound(); playedSides = true; }
+			if (curr.serviceCount > prev.serviceCount && !playedRequest) { playRequestSound(); playedRequest = true; }
+			if (curr.readyToRun && !prev.readyToRun && !playedReady) { playReadyChime(); playedReady = true; }
+		}
+
+		prevSnapshots = currentSnapshots;
 	});
 </script>
 
@@ -344,38 +417,8 @@
 
 <div class="flex flex-col gap-4 pb-6">
 
-	<!-- ── Section A: New Tables — compact chip row ([CR-03]) ───────────────── -->
-	{#if unacknowledgedNewTables.length > 0}
-		<div>
-			<p class="text-xs text-gray-400 mb-1">Setup</p>
-			<div class="flex gap-2 flex-wrap">
-				{#each unacknowledgedNewTables as order (order.id)}
-					<div class="bg-accent-light border border-accent/20 text-accent text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
-						<span class="font-bold">T{order.tableNumber}</span>
-						<span class="opacity-70">— Stage Utensils</span>
-						<span class="opacity-60">&middot; {timeAgo(order.createdAt)}</span>
-						<button
-							onclick={() => acknowledgeTable(order.id)}
-							class="ml-1 rounded-full bg-accent text-white font-bold px-2 py-0.5 text-[10px] hover:bg-accent-dark active:scale-95 transition-all"
-							style="min-height: 22px"
-						>&#10003; Staged</button>
-					</div>
-				{/each}
-			</div>
-		</div>
-	{/if}
-
-	<!-- ── Section B: Dispatch Cards ─────────────────────────────────────────── -->
+	<!-- ── Dispatch Cards ─────────────────────────────────────────── -->
 	<div class="flex flex-col gap-3">
-		<h2 class="flex items-center gap-2 text-base font-bold text-gray-700 uppercase tracking-wide">
-			<span>&#128203; Dispatch Board</span>
-			{#if dispatchCards.length > 0}
-				<span class="rounded-full bg-accent px-2.5 py-0.5 text-sm font-black text-white">
-					{dispatchCards.length}
-				</span>
-			{/if}
-		</h2>
-
 		{#if dispatchCards.length === 0}
 			<div class="rounded-xl border border-border bg-surface px-6 py-10 text-center text-gray-400">
 				<p class="text-3xl mb-2">&#9989;</p>
@@ -513,6 +556,29 @@
 									</div>
 								{/if}
 							</div>
+
+							<!-- Requests row (service items — extra tongs, scissors, etc.) -->
+							{#if card.service.items.length > 0}
+								<div class="py-2.5">
+									<div class="flex items-center gap-3 text-status-purple">
+										<span class="text-lg w-7 text-center" aria-hidden="true">&#128296;</span>
+										<span class="flex-1 text-sm font-semibold">Requests</span>
+										<span class="font-mono text-sm font-bold">{card.service.items.length}</span>
+									</div>
+									<div class="mt-2 ml-10 flex flex-wrap gap-2">
+										{#each card.service.items as item (item.id)}
+											<button
+												onclick={() => markSideDone(card.orderId, item.id)}
+												class="flex items-center gap-2 rounded-lg border border-status-purple/30 bg-status-purple/5 px-3 text-sm font-semibold text-status-purple hover:bg-status-purple/10 active:scale-95 transition-all no-select"
+												style="min-height: 44px"
+											>
+												{item.menuItemName}
+												<span class="rounded bg-status-purple text-white text-[10px] font-bold px-1.5 py-0.5">DONE</span>
+											</button>
+										{/each}
+									</div>
+								</div>
+							{/if}
 						</div>
 
 						<!-- ALL DONE — Clear Order -->
@@ -533,45 +599,28 @@
 		{/if}
 	</div>
 
-	<!-- ── Section C: Service Alerts ─────────────────────────────────────────── -->
-	{#if serviceAlerts.length > 0}
-		<div class="flex flex-col gap-2">
-			<h2 class="flex items-center gap-2 text-base font-bold text-gray-700 uppercase tracking-wide">
-				<span>&#9888;&#65039; Service Alerts</span>
-				<span class="rounded-full bg-status-yellow px-2.5 py-0.5 text-sm font-black text-gray-900">
-					{serviceAlerts.length}
-				</span>
-			</h2>
-			<div class="flex flex-col gap-2">
-				{#each serviceAlerts as alert (alert.itemId)}
-					{@const urgency = alertUrgency(alert.waitingSince)}
-					<div class={cn(
-						'flex items-center gap-3 px-4 rounded-xl border overflow-hidden',
-						urgency === 'critical' ? 'bg-red-50 border-red-200' :
-						urgency === 'warning'  ? 'bg-amber-100 border-amber-300' :
-						                        'border-status-yellow bg-status-yellow/10'
-					)}>
-						<span class="w-14 flex-shrink-0 text-sm font-black text-gray-900">{alert.tableLabel}</span>
-						<span class="flex-1 font-medium text-gray-800">{alert.text}</span>
-						<span class={cn(
-							'text-xs flex-shrink-0',
-							urgency === 'critical' ? 'text-status-red font-bold' : 'text-gray-500'
-						)}>{timeAgo(alert.waitingSince)}</span>
-						<button
-							onclick={() => markSideDone(alert.orderId, alert.itemId)}
-							class={cn(
-								'flex-shrink-0 rounded-xl bg-status-yellow px-4 font-bold text-gray-900 hover:opacity-80 active:scale-95 transition-all',
-								'min-h-[56px]'
-							)}
-						>
-							Done &#10003;
-						</button>
-					</div>
-				{/each}
+
+</div>
+
+<!-- Connectivity Test Panel -->
+<div class="fixed bottom-20 right-4 z-50">
+	<button
+		onclick={runConnectivityTest}
+		disabled={pingRunning}
+		class="rounded-full bg-gray-800 text-white shadow-lg w-12 h-12 flex items-center justify-center text-lg active:scale-95 transition-all"
+		title="Test server connection"
+	>
+		{pingRunning ? '⏳' : '🏓'}
+	</button>
+	{#if pingResult}
+		<div class="absolute bottom-14 right-0 w-80 rounded-xl bg-gray-900 text-white p-4 shadow-xl text-xs font-mono">
+			<div class="flex justify-between items-center mb-2">
+				<span class="font-bold text-sm">Connection Test</span>
+				<button onclick={() => { pingResult = ''; }} class="text-white/60 hover:text-white">&times;</button>
 			</div>
+			<pre class="whitespace-pre-wrap">{pingResult}</pre>
 		</div>
 	{/if}
-
 </div>
 
 <!-- Undo Toast -->

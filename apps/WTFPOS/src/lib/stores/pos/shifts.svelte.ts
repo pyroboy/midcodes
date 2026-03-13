@@ -5,8 +5,8 @@
  */
 import { nanoid } from 'nanoid';
 import { browser } from '$app/environment';
-import { createRxStore } from '$lib/stores/sync.svelte';
-import { getDb } from '$lib/db';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { session } from '$lib/stores/session.svelte';
 
 export interface ShiftDoc {
@@ -21,7 +21,7 @@ export interface ShiftDoc {
 	updatedAt: string;
 }
 
-const _shifts = createRxStore<ShiftDoc>('shifts', db => db.shifts.find());
+const _shifts = createStore<ShiftDoc>('shifts', db => db.shifts.find());
 
 export const shifts = {
 	get value() { return _shifts.value; },
@@ -39,12 +39,12 @@ export function getActiveShift(): ShiftDoc | null {
 /** Opens a new shift with the given opening cash float. */
 export async function openShift(openingFloat: number): Promise<void> {
 	if (!browser) return;
-	const db = await getDb();
+	const col = getWritableCollection('shifts');
 	const locationId = (session.locationId === 'all' || session.locationId === 'wh-tag')
 		? 'tag'
 		: session.locationId;
 
-	await db.shifts.insert({
+	await col.insert({
 		id: nanoid(),
 		locationId,
 		cashierName: session.userName || 'Staff',
@@ -63,14 +63,11 @@ export async function closeShift(closingCash: number): Promise<void> {
 	const activeShift = getActiveShift();
 	if (!activeShift) return;
 
-	const db = await getDb();
-	const shiftDoc = await db.shifts.findOne(activeShift.id).exec();
-	if (shiftDoc) {
-		await shiftDoc.incrementalPatch({
-			status: 'closed',
-			endedAt: new Date().toISOString(),
-			closingCash,
-			updatedAt: new Date().toISOString()
-		});
-	}
+	const col = getWritableCollection('shifts');
+	await col.incrementalPatch(activeShift.id, {
+		status: 'closed',
+		endedAt: new Date().toISOString(),
+		closingCash,
+		updatedAt: new Date().toISOString()
+	});
 }

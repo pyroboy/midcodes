@@ -13,13 +13,15 @@
 
 	let currentRoute = $derived(page.url.pathname);
 
-	const tabs = [
+	const allTabs = [
 		{ href: '/admin/users', label: '👤 Users' },
 		{ href: '/admin/menu',  label: '📋 Menu Editor' },
 		{ href: '/admin/logs',  label: '📋 Activity Logs' },
 		{ href: '/admin/floor-editor', label: '🪑 Floor Editor' },
 		{ href: '/admin/devices', label: '💻 Devices' }
 	];
+
+	const tabs = allTabs;
 </script>
 
 <div class="flex h-full flex-col overflow-hidden bg-surface-secondary">

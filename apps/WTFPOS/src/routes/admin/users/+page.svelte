@@ -38,7 +38,7 @@
 		admin:   { label: '🛡 Admin',   class: 'border-gray-300 bg-gray-100 text-gray-700' },
 		manager: { label: '👑 Manager', class: 'border-accent/30 bg-accent-light text-accent' },
 		kitchen: { label: '🍳 Kitchen', class: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-		staff:   { label: '👤 Staff',   class: 'border-blue-200 bg-blue-50 text-blue-700' }
+		staff:   { label: '👤 Staff',   class: 'border-blue-200 bg-blue-50 text-blue-700' },
 	};
 
 	let showAdd = $state(false);

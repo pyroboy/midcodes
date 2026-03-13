@@ -5,7 +5,7 @@ import type { PaymentMethod, SubBill } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { log, writeLog } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
-import { getDb } from '$lib/db';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { closeTable, tables } from '$lib/stores/pos/tables.svelte';
 import { orders } from '$lib/stores/pos/orders.svelte';
 import { getOrderLabel } from '$lib/stores/pos/label.utils';
@@ -22,15 +22,13 @@ export async function checkoutOrder(
 	payments: { method: string; amount: number }[],
 	tableId: string | null,
 ) {
-	const db = await getDb();
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (!orderDoc) return;
+	const col = getWritableCollection('orders');
 
 	const capturedElapsed = tableId
 		? (tables.value.find(t => t.id === tableId)?.elapsedSeconds ?? null)
 		: null;
 
-	await orderDoc.incrementalModify((doc: any) => {
+	await col.incrementalModify(orderId, (doc: any) => {
 		doc.payments = payments;
 		doc.status = 'paid';
 		doc.closedAt = new Date().toISOString();
@@ -56,15 +54,11 @@ export async function holdPayment(orderId: string, method: 'gcash' | 'maya') {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.status !== 'open') return;
 
-	const db = await getDb();
-	const doc = await db.orders.findOne(orderId).exec();
-	if (doc) {
-		await doc.incrementalPatch({
-			status: 'pending_payment',
-			pendingPaymentMethod: method,
-			updatedAt: new Date().toISOString()
-		});
-	}
+	const col = getWritableCollection('orders');
+	await col.incrementalPatch(orderId, {
+		status: 'pending_payment',
+		pendingPaymentMethod: method,
+	});
 
 	const label = getOrderLabel(order);
 	log.paymentHeld(label);
@@ -74,7 +68,7 @@ export async function confirmHeldPayment(orderId: string) {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.status !== 'pending_payment') return;
 
-	const db = await getDb();
+	const col = getWritableCollection('orders');
 	const method = order.pendingPaymentMethod ?? 'gcash';
 	const label = getOrderLabel(order);
 
@@ -82,17 +76,14 @@ export async function confirmHeldPayment(orderId: string) {
 		? (tables.value.find(t => t.id === order.tableId)?.elapsedSeconds ?? null)
 		: null;
 
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (orderDoc) {
-		await orderDoc.incrementalModify((doc: any) => {
-			doc.payments = [...doc.payments, { method, amount: doc.total }];
-			doc.status = 'paid';
-			doc.closedAt = new Date().toISOString();
-			doc.closedBy = session.userName || 'Staff';
-			doc.updatedAt = new Date().toISOString();
-			return doc;
-		});
-	}
+	await col.incrementalModify(orderId, (doc: any) => {
+		doc.payments = [...doc.payments, { method, amount: doc.total }];
+		doc.status = 'paid';
+		doc.closedAt = new Date().toISOString();
+		doc.closedBy = session.userName || 'Staff';
+		doc.updatedAt = new Date().toISOString();
+		return doc;
+	});
 
 	if (order.tableId) await closeTable(order.tableId);
 
@@ -104,15 +95,11 @@ export async function cancelHeldPayment(orderId: string) {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.status !== 'pending_payment') return;
 
-	const db = await getDb();
-	const doc = await db.orders.findOne(orderId).exec();
-	if (doc) {
-		await doc.incrementalPatch({
-			status: 'open',
-			pendingPaymentMethod: '',
-			updatedAt: new Date().toISOString()
-		});
-	}
+	const col = getWritableCollection('orders');
+	await col.incrementalPatch(orderId, {
+		status: 'open',
+		pendingPaymentMethod: '',
+	});
 
 	const label = getOrderLabel(order);
 	log.paymentCancelled(label);
@@ -124,18 +111,13 @@ export async function initEqualSplit(orderId: string, splitCount: number) {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || splitCount <= 0) return;
 
-	const db = await getDb();
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (!orderDoc) {
-		console.warn(`[initEqualSplit] Order ${orderId} not found`);
-		return;
-	}
+	const col = getWritableCollection('orders');
 
-	await orderDoc.incrementalModify((doc: any) => {
+	await col.incrementalModify(orderId, (doc: any) => {
 		if (doc.total <= 0) return doc;
 
 		const amounts = calculateEqualSplit(doc.total, splitCount);
-		const subBills = amounts.map((amount, i) => ({
+		const subBills = amounts.map((amount: number, i: number) => ({
 			id: nanoid(),
 			label: `Guest ${i + 1}`,
 			itemIds: [],
@@ -161,7 +143,7 @@ export async function initItemSplit(orderId: string, splitCount: number) {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order) return;
 
-	const db = await getDb();
+	const col = getWritableCollection('orders');
 	const subBills = Array.from({ length: splitCount }, (_, i) => ({
 		id: nanoid(),
 		label: `Guest ${i + 1}`,
@@ -170,19 +152,16 @@ export async function initItemSplit(orderId: string, splitCount: number) {
 		payment: null, paidAt: null
 	}));
 
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (orderDoc) await orderDoc.incrementalPatch({ splitType: 'by-item', subBills, updatedAt: new Date().toISOString() });
+	await col.incrementalPatch(orderId, { splitType: 'by-item', subBills });
 
 	const label = getOrderLabel(order);
 	log.splitInitiated(label, 'by-item', splitCount);
 }
 
 export async function assignItemToSubBill(orderId: string, itemId: string, subBillId: string) {
-	const db = await getDb();
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (!orderDoc) return;
+	const col = getWritableCollection('orders');
 
-	await orderDoc.incrementalModify((doc: any) => {
+	await col.incrementalModify(orderId, (doc: any) => {
 		if (!doc.subBills) return doc;
 
 		const updatedSubBills = doc.subBills.map((sb: any) => {
@@ -215,16 +194,14 @@ export async function assignItemToSubBill(orderId: string, itemId: string, subBi
 
 export async function paySubBill(orderId: string, subBillId: string, method: PaymentMethod, amount: number) {
 	const order = orders.value.find(o => o.id === orderId);
-	const db = await getDb();
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (!orderDoc) return;
+	const col = getWritableCollection('orders');
 
 	let tableId: string | null = null;
 	let allPaid = false;
 	let guestLabel = '';
 	let totalPaid = 0;
 
-	await orderDoc.incrementalModify((doc: any) => {
+	await col.incrementalModify(orderId, (doc: any) => {
 		if (!doc.subBills) return doc;
 
 		tableId = doc.tableId ?? null;
@@ -262,17 +239,10 @@ export async function cancelSplit(orderId: string) {
 	const order = orders.value.find(o => o.id === orderId);
 	if (!order || order.subBills?.some(sb => sb.payment !== null)) return;
 
-	const db = await getDb();
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (!orderDoc) {
-		console.warn(`[cancelSplit] Order ${orderId} not found`);
-		return;
-	}
-
-	await orderDoc.incrementalPatch({
+	const col = getWritableCollection('orders');
+	await col.incrementalPatch(orderId, {
 		splitType: '',
 		subBills: [],
-		updatedAt: new Date().toISOString()
 	});
 
 	const label = getOrderLabel(order);
@@ -290,16 +260,13 @@ export async function correctPaymentMethod(orderId: string, newMethod: PaymentMe
 	const order = orders.value.find(o => o.id === orderId && o.status === 'paid');
 	if (!order) return;
 
-	const db = await getDb();
-	const orderDoc = await db.orders.findOne(orderId).exec();
-	if (!orderDoc) return;
+	const col = getWritableCollection('orders');
 
 	const prevMethods = order.payments.map(p => p.method).join(', ') || 'unknown';
 	const correctedPayment = { id: nanoid(), method: newMethod, amount: order.total };
 
-	await orderDoc.incrementalPatch({
+	await col.incrementalPatch(orderId, {
 		payments: [correctedPayment],
-		updatedAt: new Date().toISOString(),
 	});
 
 	const label = getOrderLabel(order);

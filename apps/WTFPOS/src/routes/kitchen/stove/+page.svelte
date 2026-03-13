@@ -150,9 +150,9 @@
 			osc.connect(gain);
 			gain.connect(ctx.destination);
 			osc.frequency.value = 440; // A4 — distinct from sides (660Hz)
-			gain.gain.value = 0.35;
+			gain.gain.value = 1.5;
 			osc.start();
-			osc.stop(ctx.currentTime + 0.2);
+			osc.stop(ctx.currentTime + 0.3);
 			osc.onended = () => ctx.close();
 		} catch { /* skip if audio unavailable */ }
 	}

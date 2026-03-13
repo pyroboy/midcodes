@@ -4,8 +4,8 @@
 import type { MenuItem } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { log } from '$lib/stores/audit.svelte';
-import { createRxStore } from '$lib/stores/sync.svelte';
-import { getDb } from '$lib/db';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { browser } from '$app/environment';
 
 export const INITIAL_MENU_ITEMS: MenuItem[] = [
@@ -53,7 +53,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
 	{ id: 'ret-123456',  name: 'Bottled Water',         category: 'drinks', price: 40,  isWeightBased: false, available: true, isRetail: true, image: '/images/menu/bottled-water.jpg', updatedAt: new Date().toISOString() },
 ];
 
-const _menuItems = createRxStore<MenuItem>('menu_items', db => db.menu_items.find());
+const _menuItems = createStore<MenuItem>('menu_items', db => db.menu_items.find());
 
 export const menuItems = {
 	get value(): MenuItem[] {
@@ -66,38 +66,38 @@ export const menuItems = {
 export async function addMenuItem(item: Omit<MenuItem, 'id'>): Promise<string> {
 	if (!browser) return '';
 	const id = `menu-${nanoid(8)}`;
-	const db = await getDb();
-	await db.menu_items.insert({ ...item, id, updatedAt: new Date().toISOString() });
+	const col = getWritableCollection('menu_items');
+	await col.insert({ ...item, id, updatedAt: new Date().toISOString() });
 	log.menuItemCreated(item.name, item.category);
 	return id;
 }
 
 export async function updateMenuItem(id: string, updates: Partial<Omit<MenuItem, 'id'>>): Promise<void> {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.menu_items.findOne(id).exec();
+	const col = getWritableCollection('menu_items');
+	const doc = await col.findOne(id).exec();
 	if (!doc) return;
 	const oldName = doc.name;
-	await doc.incrementalPatch({ ...updates, updatedAt: new Date().toISOString() });
+	await col.incrementalPatch(id, { ...updates, updatedAt: new Date().toISOString() });
 	log.menuItemUpdated(oldName, Object.keys(updates).join(', '));
 }
 
 export async function deleteMenuItem(id: string): Promise<void> {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.menu_items.findOne(id).exec();
+	const col = getWritableCollection('menu_items');
+	const doc = await col.findOne(id).exec();
 	if (!doc) return;
 	const name = doc.name;
-	await doc.remove();
+	await col.incrementalPatch(id, { _deleted: true, updatedAt: new Date().toISOString() });
 	log.menuItemDeleted(name);
 }
 
 export async function toggleMenuItemAvailability(id: string): Promise<void> {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.menu_items.findOne(id).exec();
+	const col = getWritableCollection('menu_items');
+	const doc = await col.findOne(id).exec();
 	if (!doc) return;
 	const newAvailable = !doc.available;
-	await doc.incrementalPatch({ available: newAvailable, updatedAt: new Date().toISOString() });
+	await col.incrementalPatch(id, { available: newAvailable, updatedAt: new Date().toISOString() });
 	log.menuItemToggled(doc.name, newAvailable);
 }

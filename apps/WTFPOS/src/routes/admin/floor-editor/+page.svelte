@@ -4,6 +4,8 @@
 	import { session, LOCATIONS } from '$lib/stores/session.svelte';
 	import { floorEditor } from '$lib/stores/floor-editor.svelte';
 	import { getDb } from '$lib/db';
+	import { getWritableCollection } from '$lib/db/write-proxy';
+	import { needsRxDb } from '$lib/stores/data-mode.svelte';
 	import { browser } from '$app/environment';
 	import { nanoid } from 'nanoid';
 	import { writeLog } from '$lib/stores/audit.svelte';
@@ -43,13 +45,22 @@
 	const CANVAS_H = $derived(floorEditor.canvasConfig.height);
 	const GRID_SIZE = $derived(floorEditor.canvasConfig.gridSize);
 
-	// ─── Load from RxDB ───────────────────────────────────────────────────────
+	// ─── Load persisted floor elements ────────────────────────────────────────
+	async function loadFloorElements(): Promise<any[]> {
+		if (needsRxDb()) {
+			const db = await getDb();
+			const allEls = await db.floor_elements.find().exec();
+			return allEls.map((e: any) => e.toJSON());
+		}
+		const res = await fetch('/api/collections/floor_elements/read');
+		if (!res.ok) return [];
+		return res.json();
+	}
+
 	$effect(() => {
 		if (!browser) return;
 		(async () => {
-			const db = await getDb();
-			const allEls = await db.floor_elements.find().exec();
-			const allJson = allEls.map((e: any) => e.toJSON());
+			const allJson = await loadFloorElements();
 			persistedElements = allJson.filter((e: any) => e.type !== 'canvas_config');
 			const cfg = allJson.find((e: any) => e.type === 'canvas_config' && e.locationId === selectedLocationId);
 			if (cfg) {
@@ -337,31 +348,30 @@
 	// ─── Save ─────────────────────────────────────────────────────────────────
 	async function save() {
 		if (!browser) return;
-		const db = await getDb();
+		const tablesProxy = getWritableCollection('tables');
+		const elementsProxy = getWritableCollection('floor_elements');
 
 		for (const [id, patch] of floorEditor.pendingTableUpdates) {
-			const doc = await db.tables.findOne(id).exec();
-			if (doc) await doc.incrementalPatch({ ...JSON.parse(JSON.stringify(patch)), updatedAt: new Date().toISOString() });
+			const doc = await tablesProxy.findOne(id).exec();
+			if (doc) await tablesProxy.incrementalPatch(id, JSON.parse(JSON.stringify(patch)));
 		}
 
 		for (const id of floorEditor.deletedTableIds) {
-			const doc = await db.tables.findOne(id).exec();
-			if (doc && doc.status === 'available') await doc.remove();
+			await tablesProxy.remove(id);
 		}
 
 		for (const el of floorEditor.pendingElements.values()) {
 			const plain = JSON.parse(JSON.stringify(el));
-			const existing = await db.floor_elements.findOne(el.id).exec();
+			const existing = await elementsProxy.findOne(el.id).exec();
 			if (existing) {
-				await existing.incrementalPatch({ ...plain, updatedAt: new Date().toISOString() });
+				await elementsProxy.incrementalPatch(el.id, plain);
 			} else {
-				await db.floor_elements.insert({ ...plain, updatedAt: new Date().toISOString() });
+				await elementsProxy.insert({ ...plain, updatedAt: new Date().toISOString() });
 			}
 		}
 
 		for (const id of floorEditor.deletedElementIds) {
-			const doc = await db.floor_elements.findOne(id).exec();
-			if (doc) await doc.remove();
+			await elementsProxy.remove(id);
 		}
 
 		const canvasId = `canvas_${selectedLocationId}`;
@@ -377,15 +387,15 @@
 			gridSize: floorEditor.canvasConfig.gridSize,
 			updatedAt: new Date().toISOString()
 		};
-		const existingCfg = await db.floor_elements.findOne(canvasId).exec();
+		const existingCfg = await elementsProxy.findOne(canvasId).exec();
 		if (existingCfg) {
-			await existingCfg.incrementalPatch(canvasCfg);
+			await elementsProxy.incrementalPatch(canvasId, canvasCfg);
 		} else {
-			await db.floor_elements.insert(canvasCfg);
+			await elementsProxy.insert(canvasCfg);
 		}
 
-		const allEls2 = await db.floor_elements.find().exec();
-		persistedElements = allEls2.map((e: any) => e.toJSON()).filter((e: any) => e.type !== 'canvas_config');
+		const allEls2 = await loadFloorElements();
+		persistedElements = allEls2.filter((e: any) => e.type !== 'canvas_config');
 		floorEditor.discard();
 		writeLog('admin', `Saved floor layout for ${selectedLocationId}`);
 	}

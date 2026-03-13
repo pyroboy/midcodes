@@ -3,8 +3,8 @@
  */
 import { nanoid } from 'nanoid';
 import { session } from '$lib/stores/session.svelte';
-import { getDb } from '$lib/db';
-import { createRxStore } from '$lib/stores/sync.svelte';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { browser } from '$app/environment';
 import { log } from '$lib/stores/audit.svelte';
 export {
@@ -44,7 +44,7 @@ export interface ExpenseTemplate {
 }
 
 // Replaces the static array with a reactive RxDB query wrapped in a $derived
-const dbQuery = createRxStore<Expense>('expenses', db => db.expenses.find({ sort: [{ createdAt: 'desc' }] }));
+const dbQuery = createStore<Expense>('expenses', db => db.expenses.find({ sort: [{ createdAt: 'desc' }] }), { filter: { locationId: undefined }, sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
 
 // We export the getter so UI components still read it identically to before without modifying components
 export const allExpenses = {
@@ -147,8 +147,8 @@ export async function addExpense(category: string, amount: number, description: 
     };
 
     try {
-        const db = await getDb();
-        await db.expenses.insert(expense);
+        const col = getWritableCollection('expenses');
+        await col.insert(expense);
 
         // Log to audit
         log.expenseLogged(category, amount, description);
@@ -165,12 +165,12 @@ export async function deleteExpense(id: string, _snapshot?: unknown): Promise<{ 
     if (!id || typeof id !== 'string') return { success: false, error: 'Invalid expense ID' };
 
     try {
-        const db = await getDb();
-        const doc = await db.expenses.findOne(id).exec();
+        const col = getWritableCollection('expenses');
+        const doc = await col.findOne(id).exec();
         if (!doc) {
             return { success: false, error: 'Expense not found' };
         }
-        await doc.remove();
+        await col.remove(id);
         return { success: true };
     } catch (err) {
         console.error('[EXPENSE] Failed to delete expense:', err);

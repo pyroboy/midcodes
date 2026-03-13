@@ -120,7 +120,6 @@
                     if (side) pendingItems.push({ item: side, qty: Math.ceil(activePax / 6), forceFree: true });
                 }
             }
-            activeCategory = 'dishes';
             return;
         }
         if (item.isWeightBased) { weightScreenItem = item; weightInput = ''; return; }

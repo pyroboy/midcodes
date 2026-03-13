@@ -83,8 +83,6 @@
 		return Math.max(0, Math.ceil((30_000 - (Date.now() - new Date(addedAt).getTime())) / 1000));
 	}
 
-	// Full-order void PIN gate
-	let showVoidPin = $state(false);
 
 	function handleRemoveItem(item: Order['items'][number]) {
 		if (!order) return;
@@ -142,7 +140,7 @@
 	);
 
 	const activeItemCount = $derived(
-		order?.items.filter(i => i.status !== 'cancelled').length ?? 0
+		order?.items.filter(i => i.status !== 'cancelled' && i.tag !== 'PKG').length ?? 0
 	);
 
 	// P1-2: Refill count badge for at-a-glance confirmation
@@ -591,7 +589,7 @@
 				<!-- Secondary actions row: Print + Void (smaller, less prominent) -->
 				<div class="flex gap-2">
 					<button onclick={() => printBill(order.id)} disabled={activeItemCount === 0} class={cn('btn-secondary flex-1 px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Print</button>
-					<button onclick={() => showVoidPin = true} disabled={activeItemCount === 0} class={cn('btn-ghost flex-1 px-3 text-sm border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Void</button>
+					<button onclick={onvoid} disabled={activeItemCount === 0} class={cn('btn-ghost flex-1 px-3 text-sm border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Void</button>
 				</div>
 				<!-- Primary CTA: Checkout — full width, visually dominant -->
 				<button onclick={oncheckout} disabled={activeItemCount === 0} class={cn('w-full rounded-xl text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 56px">✓ Checkout</button>
@@ -691,12 +689,3 @@
 	</div>
 {/if}
 
-<ManagerPinModal
-	isOpen={showVoidPin}
-	title="Void Entire Order"
-	description="Voiding the entire order will cancel all items and release the table. Enter Manager PIN to proceed."
-	confirmLabel="Void Order"
-	confirmClass="btn-danger"
-	onClose={() => showVoidPin = false}
-	onConfirm={() => { showVoidPin = false; onvoid(); }}
-/>

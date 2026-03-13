@@ -25,8 +25,7 @@
 				{ href: '/reports/meat-report',      label: 'Meat Report' },
 				{ href: '/reports/stock-variance',   label: 'Stock Variance' },
 				{ href: '/reports/table-sales',   label: 'Table Sales' },
-				{ href: '/reports/voids-discounts',label: 'Voids & Discounts' },
-				{ href: '/reports/x-read',        label: 'X-Read' },
+		{ href: '/reports/x-read',        label: 'X-Read' },
 				{ href: '/reports/eod',           label: 'End of Day' }
 			]
 		},
@@ -41,7 +40,6 @@
 			label: 'Revenue & Sales',
 			tabs: [
 				{ href: '/reports/transaction-log', label: 'Transaction Log' },
-				{ href: '/reports/sales-summary', label: 'Sales Summary' },
 				{ href: '/reports/best-sellers',  label: 'Best Sellers' },
 				{ href: '/reports/peak-hours',    label: 'Peak Hours' }
 			]

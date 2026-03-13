@@ -5,7 +5,7 @@
     import { calculateOrderTotals } from '$lib/stores/pos/utils';
     import { printReceipt } from '$lib/stores/hardware.svelte';
     import { log } from '$lib/stores/audit.svelte';
-    import { session } from '$lib/stores/session.svelte';
+    import { session, MANAGER_PIN } from '$lib/stores/session.svelte';
     import { formatPeso, cn } from '$lib/utils';
     import ManagerPinModal from './ManagerPinModal.svelte';
     import PhotoCapture from '$lib/components/PhotoCapture.svelte';
@@ -23,6 +23,10 @@
     let checkoutLoading = $state(false);
     let checkoutError = $state('');
     let showPinForDiscount = $state(false);
+    let showDiscountConfirm = $state(false);
+    let discountConfirmPin = $state('');
+    let discountConfirmPinError = $state(false);
+    $effect(() => { if (showDiscountConfirm) { discountConfirmPin = ''; discountConfirmPinError = false; } });
     let pendingDiscountType = $state<DiscountType>('none');
 
     // ─── Multi-method payment state ─────────────────────────────────────────
@@ -30,12 +34,16 @@
     interface PaymentEntry { method: PaymentMethod; amount: number }
     let paymentEntries = $state<PaymentEntry[]>([{ method: 'cash', amount: 0 }]);
 
-    // Reset payment amounts to 0 whenever the modal opens for a new order.
-    // Depend only on order.id so field mutations (discounts, pax) don't re-zero amounts.
+    // Reset payment amounts to 0 whenever the modal opens for a *different* order.
+    // Track the previous ID so RxDB mutations on the same order don't re-zero amounts.
+    let prevOrderId = $state(order?.id);
     $effect(() => {
         const _id = order?.id;
-        if (_id) {
-            untrack(() => { paymentEntries = paymentEntries.map(e => ({ ...e, amount: 0 })); });
+        if (_id && _id !== prevOrderId) {
+            untrack(() => {
+                paymentEntries = paymentEntries.map(e => ({ ...e, amount: 0 }));
+                prevOrderId = _id;
+            });
         }
     });
 
@@ -111,11 +119,37 @@
                     }
                 };
             }
-            return {};
+            // Auto-activate SC/PWD from table-open declaration (mutually exclusive per person)
+            const auto: Partial<Record<DiscountType, import('$lib/types').DiscountEntry>> = {};
+            let remaining = order.pax;
+            if ((order.scCount ?? 0) > 0) {
+                const pax = Math.min(order.scCount!, remaining);
+                auto['senior'] = { pax, ids: Array.from({ length: pax }, () => ''), idPhotos: Array.from({ length: pax }, () => []) };
+                remaining -= pax;
+            }
+            if ((order.pwdCount ?? 0) > 0 && remaining > 0) {
+                const pax = Math.min(order.pwdCount!, remaining);
+                auto['pwd'] = { pax, ids: Array.from({ length: pax }, () => ''), idPhotos: Array.from({ length: pax }, () => []) };
+            }
+            return auto;
         })
     );
 
-    const activeScPwdTypes = $derived(['senior', 'pwd'].filter(t => !!localDiscountEntries[t as DiscountType]) as DiscountType[]);
+    // Auto-recalc totals on mount if SC/PWD were pre-activated
+    $effect(() => {
+        untrack(() => {
+            if (Object.keys(localDiscountEntries).length > 0 && !order.discountEntries) {
+                recalcWithEntries();
+            }
+        });
+    });
+
+    const activeScPwdTypes = $derived(['senior', 'pwd'].filter(t => {
+        const e = localDiscountEntries[t as DiscountType];
+        return e && e.pax > 0;
+    }) as DiscountType[]);
+    const hasDeclaredScPwd = $derived((order.scCount ?? 0) > 0 || (order.pwdCount ?? 0) > 0);
+    const hasActiveDiscount = $derived(activeScPwdTypes.length > 0);
 
     const hasItems = $derived(order.items.filter(i => i.status !== 'cancelled').length > 0);
     
@@ -146,11 +180,20 @@
     });
 
     function recalcWithEntries() {
-        recalcOrder(order, { discountEntries: JSON.parse(JSON.stringify(localDiscountEntries)) });
+        // Only persist entries with pax > 0 to the order — keeps receipt and totals clean
+        const cleaned: typeof localDiscountEntries = {};
+        for (const [k, v] of Object.entries(localDiscountEntries)) {
+            if (v && v.pax > 0) cleaned[k as DiscountType] = v;
+        }
+        recalcOrder(order, { discountEntries: Object.keys(cleaned).length > 0 ? JSON.parse(JSON.stringify(cleaned)) : null });
     }
 
     function applyScPwdPax(type: DiscountType, newPax: number) {
-        const validatedPax = Math.max(1, Math.min(newPax, order.pax));
+        // SC + PWD combined must not exceed total pax
+        const otherType = type === 'senior' ? 'pwd' : 'senior';
+        const otherPax = localDiscountEntries[otherType as DiscountType]?.pax ?? 0;
+        const maxForType = order.pax - otherPax;
+        const validatedPax = Math.max(0, Math.min(newPax, maxForType));
         if (localDiscountEntries[type]) {
             localDiscountEntries[type]!.pax = validatedPax;
             localDiscountEntries[type]!.ids = Array.from({ length: validatedPax }, (_, i) => localDiscountEntries[type]!.ids[i] ?? '');
@@ -190,12 +233,6 @@
                 const amount = previewDiscountAmount(type, prefillPax);
                 const label = type === 'senior' ? 'SC' : 'PWD';
                 pendingDiscountDescription = `20% off for ${prefillPax} ${label} guest${prefillPax !== 1 ? 's' : ''} — estimated ${formatPeso(amount)}`;
-            } else if (type === 'promo') {
-                pendingDiscountDescription = `Promo discount — ${formatPeso(order.subtotal)} (full comp)`;
-            } else if (type === 'comp') {
-                pendingDiscountDescription = `Complimentary — ${formatPeso(order.subtotal)} (full comp)`;
-            } else if (type === 'service_recovery') {
-                pendingDiscountDescription = `Service recovery — ${formatPeso(order.subtotal)} (full comp)`;
             } else {
                 pendingDiscountDescription = 'Manager PIN required. Total will adjust based on active discounts.';
             }
@@ -216,17 +253,13 @@
             delete localDiscountEntries[type];
             log.discountRemoved(`${type} discount removed from ${tableLabel}`);
         } else {
-            if (type === 'senior' || type === 'pwd') {
-                const declared = type === 'senior' ? (order.scCount ?? 0) : (order.pwdCount ?? 0);
-                const prefillPax = Math.max(1, Math.min(declared || 1, order.pax));
-                localDiscountEntries[type] = {
-                    pax: prefillPax,
-                    ids: Array.from({ length: prefillPax }, () => ''),
-                    idPhotos: Array.from({ length: prefillPax }, () => [])
-                };
-            } else {
-                localDiscountEntries[type] = { pax: order.pax, ids: [], idPhotos: [] };
-            }
+            const declared = type === 'senior' ? (order.scCount ?? 0) : (order.pwdCount ?? 0);
+            const prefillPax = Math.max(1, Math.min(declared || 1, order.pax));
+            localDiscountEntries[type] = {
+                pax: prefillPax,
+                ids: Array.from({ length: prefillPax }, () => ''),
+                idPhotos: Array.from({ length: prefillPax }, () => [])
+            };
             log.discountApplied(tableLabel, type, 0); // amount is logged as 0 here since recalculation happens async
         }
         recalcWithEntries();
@@ -355,10 +388,7 @@
                 {#each Object.entries(order.discountEntries) as [type, entry]}
                     {@const discountLabel =
                         type === 'senior' ? `Senior Citizen 20% (${entry.pax} of ${order.pax} pax)` :
-                        type === 'pwd'    ? `PWD 20% (${entry.pax} of ${order.pax} pax)` :
-                        type === 'promo'  ? 'Promo Discount' :
-                        type === 'comp'   ? 'Complimentary' :
-                        'Service Recovery'}
+                        `PWD 20% (${entry.pax} of ${order.pax} pax)`}
                     <div class="flex justify-between text-sm text-status-green">
                         <span>{discountLabel}</span>
                     </div>
@@ -388,39 +418,23 @@
             <!-- SC and PWD: primary row — most common discounts, always visible -->
             <div class="grid grid-cols-2 gap-2">
                 {#each [
-                    { id: 'senior' as const, label: '👴 Senior Citizen (20%)' },
-                    { id: 'pwd' as const, label: '♿ PWD (20%)' }
+                    { id: 'senior' as const, label: '👴 Senior Citizen (20%)', shortLabel: 'SC' },
+                    { id: 'pwd' as const, label: '♿ PWD (20%)', shortLabel: 'PWD' }
                 ] as discount}
+                    {@const entry = localDiscountEntries[discount.id]}
                     <button
                         onclick={() => applyDiscount(discount.id)}
                         class={cn(
                             'rounded-xl px-3 font-semibold transition-all text-sm min-h-[44px]',
-                            !!localDiscountEntries[discount.id]
+                            entry
                                 ? 'bg-status-green text-white shadow-md'
                                 : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
                         )}
                     >
                         {discount.label}
-                    </button>
-                {/each}
-            </div>
-            <!-- Secondary discounts: smaller row -->
-            <div class="grid grid-cols-3 gap-2">
-                {#each [
-                    { id: 'promo' as const, label: '🎟️ Promo' },
-                    { id: 'comp' as const, label: '💯 Comp' },
-                    { id: 'service_recovery' as const, label: '❤️ Service Rec' }
-                ] as discount}
-                    <button
-                        onclick={() => applyDiscount(discount.id)}
-                        class={cn(
-                            'rounded-lg px-2 text-xs font-semibold transition-all min-h-[44px]',
-                            !!localDiscountEntries[discount.id]
-                                ? 'bg-status-green text-white shadow-md'
-                                : 'border border-border bg-surface text-gray-600 hover:bg-gray-50'
-                        )}
-                    >
-                        {discount.label}
+                        {#if entry}
+                            <span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">{entry.pax}</span>
+                        {/if}
                     </button>
                 {/each}
             </div>
@@ -431,63 +445,90 @@
             {/if}
         </div>
 
-        {#each activeScPwdTypes as type}
-            {@const entry = localDiscountEntries[type]!}
-            {@const label = type === 'senior' ? 'Senior Citizen' : 'PWD'}
+        {#each [
+            { type: 'senior' as DiscountType, label: 'Senior Citizen', shortLabel: 'SC', declared: order.scCount ?? 0 },
+            { type: 'pwd' as DiscountType, label: 'PWD', shortLabel: 'PWD', declared: order.pwdCount ?? 0 }
+        ].filter(d => d.declared > 0 || !!localDiscountEntries[d.type]) as disc}
+            {@const entry = localDiscountEntries[disc.type]}
+            {@const currentPax = entry?.pax ?? 0}
+            {@const otherPax = localDiscountEntries[disc.type === 'senior' ? 'pwd' : 'senior']?.pax ?? 0}
             <div class="flex flex-col gap-3 border-b border-border px-6 py-4 bg-surface-secondary">
-                <!-- Qualifying pax stepper -->
+                <!-- Qualifying pax stepper — always visible when declared -->
                 <div class="flex items-center justify-between">
                     <div class="flex flex-col gap-0.5">
                         <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                            Qualifying Persons ({label})
+                            {disc.shortLabel} Qualifying Persons
                         </span>
                         <span class="text-[10px] text-gray-400">
-                            {entry.pax} of {order.pax} pax qualify for 20% discount
+                            {#if currentPax > 0}
+                                {currentPax} of {order.pax} pax qualify for 20% discount
+                            {:else}
+                                Declared {disc.declared} {disc.shortLabel} — tap + to apply discount
+                            {/if}
                         </span>
                     </div>
                     <div class="flex items-center gap-2">
                         <button
-                            onclick={() => applyScPwdPax(type, entry.pax - 1)}
-                            disabled={entry.pax <= 1}
+                            onclick={() => {
+                                if (currentPax === 1 && entry) {
+                                    applyScPwdPax(disc.type, 0);
+                                } else if (currentPax > 1 && entry) {
+                                    applyScPwdPax(disc.type, currentPax - 1);
+                                }
+                            }}
+                            disabled={currentPax <= 0}
                             class="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
                         >−</button>
-                        <span class="w-8 text-center font-mono text-xl font-extrabold text-gray-900">{entry.pax}</span>
+                        <span class={cn('w-8 text-center font-mono text-xl font-extrabold', currentPax > 0 ? 'text-gray-900' : 'text-gray-300')}>{currentPax}</span>
                         <button
-                            onclick={() => applyScPwdPax(type, entry.pax + 1)}
-                            disabled={entry.pax >= order.pax}
+                            onclick={() => {
+                                if (!entry) {
+                                    // Re-add the discount entry at 1 pax
+                                    localDiscountEntries[disc.type] = {
+                                        pax: 1,
+                                        ids: [''],
+                                        idPhotos: [[]]
+                                    };
+                                    recalcWithEntries();
+                                } else {
+                                    applyScPwdPax(disc.type, currentPax + 1);
+                                }
+                            }}
+                            disabled={currentPax >= order.pax - otherPax}
                             class="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
                         >+</button>
                     </div>
                 </div>
-                <!-- SC/PWD ID inputs -->
-                <div class="flex flex-col gap-2">
-                    <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ID Numbers (required to confirm checkout)</span>
-                    {#each entry.ids as _, i}
-                        <div class="flex flex-col gap-1.5">
-                            <div class="flex items-center gap-2">
-                                <span class="w-20 shrink-0 text-xs font-semibold text-gray-500">
-                                    {type === 'senior' ? 'SC' : 'PWD'} ID #{i + 1}
-                                </span>
-                                <input
-                                    type="text"
-                                    bind:value={entry.ids[i]}
-                                    oninput={() => syncDiscountIds(type)}
-                                    placeholder="e.g. 12345678"
-                                    class="pos-input flex-1 text-sm"
+                {#if entry}
+                    <div class="flex flex-col gap-2">
+                        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ID Numbers (required to confirm checkout)</span>
+                        {#each entry.ids as _, i}
+                            <div class="flex flex-col gap-1.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-20 shrink-0 text-xs font-semibold text-gray-500">
+                                        {disc.shortLabel} ID #{i + 1}
+                                    </span>
+                                    <input
+                                        type="text"
+                                        bind:value={entry.ids[i]}
+                                        oninput={() => syncDiscountIds(disc.type)}
+                                        placeholder="e.g. 12345678"
+                                        class="pos-input flex-1 text-sm"
+                                    />
+                                </div>
+                                <PhotoCapture
+                                    photos={entry.idPhotos[i] ?? []}
+                                    onchange={(photos) => {
+                                        entry.idPhotos[i] = photos;
+                                        recalcWithEntries();
+                                    }}
+                                    max={1}
+                                    label="📷 Attach ID photo"
                                 />
                             </div>
-                            <PhotoCapture
-                                photos={entry.idPhotos[i] ?? []}
-                                onchange={(photos) => {
-                                    entry.idPhotos[i] = photos;
-                                    recalcWithEntries();
-                                }}
-                                max={1}
-                                label="📷 Attach ID photo"
-                            />
-                        </div>
-                    {/each}
-                </div>
+                        {/each}
+                    </div>
+                {/if}
             </div>
         {/each}
 
@@ -642,14 +683,27 @@
                         </button>
                     {/if}
                     <button
-                        onclick={confirmCheckout}
+                        onclick={() => {
+                            if (order.discountAmount > 0 && !hasPinGrace) {
+                                showDiscountConfirm = true;
+                            } else {
+                                confirmCheckout();
+                            }
+                        }}
                         disabled={!canConfirmCheckout || checkoutLoading}
-                        class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-base font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        class={cn(
+                            'flex flex-1 items-center justify-center gap-2 rounded-xl text-white text-base font-bold active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed',
+                            order.discountAmount > 0
+                                ? 'bg-status-green hover:bg-emerald-600'
+                                : 'bg-status-green hover:bg-emerald-600'
+                        )}
                         style="min-height: 48px"
                     >
                         {#if checkoutLoading}
                             <span class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                             Printing...
+                        {:else if order.discountAmount > 0}
+                            ✓ Confirm Discount
                         {:else}
                             ✓ Confirm Payment
                         {/if}
@@ -662,9 +716,117 @@
 
 <ManagerPinModal
     isOpen={showPinForDiscount}
-    title={`Authorize ${pendingDiscountType === 'senior' ? 'Senior Citizen' : pendingDiscountType === 'pwd' ? 'PWD' : pendingDiscountType === 'promo' ? 'Promo' : pendingDiscountType === 'comp' ? 'Complimentary' : pendingDiscountType === 'service_recovery' ? 'Service Recovery' : 'Discount'}`}
+    title={`Authorize ${pendingDiscountType === 'senior' ? 'Senior Citizen' : pendingDiscountType === 'pwd' ? 'PWD' : 'Discount'}`}
     description={pendingDiscountDescription}
     confirmLabel="Authorize"
     onClose={() => { showPinForDiscount = false; pendingDiscountType = 'none'; }}
     onConfirm={handlePinConfirmed}
 />
+
+{#if showDiscountConfirm}
+    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="pos-card w-[400px] flex flex-col gap-0 p-0 overflow-hidden max-h-[95vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-border bg-surface">
+                <h3 class="text-lg font-bold text-gray-900">Confirm Discount</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Manager PIN required to authorize</p>
+            </div>
+            <div class="flex flex-col gap-3 px-6 py-4">
+                <div class="flex flex-col gap-2 rounded-xl bg-surface-secondary border border-border px-4 py-3">
+                    {#if (order.scCount ?? 0) > 0}
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-semibold text-gray-700">👴 Senior Citizen</span>
+                            <span class="font-mono font-bold text-gray-900">{order.scCount} pax</span>
+                        </div>
+                    {/if}
+                    {#if (order.pwdCount ?? 0) > 0}
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-semibold text-gray-700">♿ PWD</span>
+                            <span class="font-mono font-bold text-gray-900">{order.pwdCount} pax</span>
+                        </div>
+                    {/if}
+                </div>
+                {#if hasActiveDiscount}
+                    <div class="flex flex-col gap-1 rounded-xl bg-status-green/10 border border-status-green/20 px-4 py-3">
+                        {#each activeScPwdTypes as type}
+                            {@const entry = localDiscountEntries[type]!}
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-700">{type === 'senior' ? 'SC' : 'PWD'} 20%</span>
+                                <span class="font-mono font-semibold text-status-green">{entry.pax} pax · −{formatPeso(order.discountAmount)}</span>
+                            </div>
+                        {/each}
+                    </div>
+                {:else}
+                    <div class="rounded-xl bg-status-yellow/10 border border-status-yellow/20 px-4 py-3">
+                        <span class="text-sm font-semibold text-yellow-700">No discount applied — full price will be charged.</span>
+                    </div>
+                {/if}
+
+                <!-- PIN dots -->
+                <div class="flex flex-col gap-2 mt-1">
+                    <span class="text-xs font-semibold text-gray-500 text-center">Enter Manager PIN</span>
+                    <div class="flex justify-center gap-3">
+                        {#each [0, 1, 2, 3] as idx}
+                            <div class={cn(
+                                'h-4 w-4 rounded-full border-2 transition-all',
+                                idx < discountConfirmPin.length
+                                    ? (discountConfirmPinError ? 'bg-status-red border-status-red' : 'bg-accent border-accent')
+                                    : 'border-gray-300'
+                            )}></div>
+                        {/each}
+                    </div>
+                    {#if discountConfirmPinError}
+                        <p class="text-center text-xs font-semibold text-status-red">Incorrect PIN. Try again.</p>
+                    {/if}
+                </div>
+
+                <!-- Numpad -->
+                <div class="grid grid-cols-3 gap-2">
+                    {#each [1,2,3,4,5,6,7,8,9] as num}
+                        <button
+                            onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) discountConfirmPin += String(num); }}
+                            class="btn-secondary h-12 text-lg font-bold"
+                            style="min-height: 48px"
+                        >{num}</button>
+                    {/each}
+                    <button
+                        onclick={() => { discountConfirmPin = ''; discountConfirmPinError = false; }}
+                        class="btn-ghost h-12 text-sm"
+                        style="min-height: 48px"
+                    >Clear</button>
+                    <button
+                        onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) discountConfirmPin += '0'; }}
+                        class="btn-secondary h-12 text-lg font-bold"
+                        style="min-height: 48px"
+                    >0</button>
+                    <button
+                        onclick={() => { discountConfirmPin = discountConfirmPin.slice(0, -1); discountConfirmPinError = false; }}
+                        class="btn-ghost h-12 text-sm"
+                        style="min-height: 48px"
+                    >⌫</button>
+                </div>
+            </div>
+            <div class="flex gap-3 px-6 py-4 border-t border-border bg-surface">
+                <button
+                    onclick={() => { showDiscountConfirm = false; }}
+                    class="btn-secondary flex-1"
+                    style="min-height: 48px"
+                >
+                    ← Go Back
+                </button>
+                <button
+                    onclick={() => {
+                        if (discountConfirmPin !== MANAGER_PIN) { discountConfirmPinError = true; return; }
+                        pinGraceUntil = Date.now() + 60000;
+                        showDiscountConfirm = false;
+                        confirmCheckout();
+                    }}
+                    disabled={discountConfirmPin.length !== 4}
+                    class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-base font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style="min-height: 48px"
+                >
+                    ✓ Proceed
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}

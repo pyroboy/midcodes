@@ -1,0 +1,145 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: 🔥
+      - heading "WTF! SAMGYUP" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Restaurant POS
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - generic [ref=e12]: Username
+        - textbox "Username" [ref=e13]:
+          - /placeholder: e.g. staff
+      - generic [ref=e14]:
+        - generic [ref=e15]: Password
+        - generic [ref=e16]:
+          - textbox "Password" [ref=e17]:
+            - /placeholder: Enter password
+          - button "👁" [ref=e18] [cursor=pointer]
+    - button "LOGIN →" [disabled] [ref=e19] [cursor=pointer]
+    - generic [ref=e20]:
+      - paragraph [ref=e21]: WTF! Samgyupsal POS · v0.1-alpha
+      - button "System Admin" [ref=e22] [cursor=pointer]
+  - generic [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]: 🧪 Dev — Test Accounts
+      - generic [ref=e26]: click to login
+    - generic [ref=e27]:
+      - paragraph [ref=e29]: 🏠 Alta Citta · POS / Management
+      - generic [ref=e30]:
+        - button "M Maria Santos Staff Alta Citta ›" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: M
+          - generic [ref=e33]:
+            - paragraph [ref=e34]: Maria Santos
+            - generic [ref=e35]:
+              - generic [ref=e36]: Staff
+              - generic [ref=e37]: Alta Citta
+          - generic [ref=e38]: ›
+        - button "J Juan Reyes Manager Alta Citta PIN ›" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: J
+          - generic [ref=e41]:
+            - paragraph [ref=e42]: Juan Reyes
+            - generic [ref=e43]:
+              - generic [ref=e44]: Manager
+              - generic [ref=e45]: Alta Citta
+              - generic [ref=e46]: PIN
+          - generic [ref=e47]: ›
+    - generic [ref=e48]:
+      - paragraph [ref=e50]: 🔥 Alta Citta · Kitchen
+      - generic [ref=e51]:
+        - button "L Lito Paglinawan Kitchen Alta Citta 🍳 Stove ›" [ref=e52] [cursor=pointer]:
+          - generic [ref=e53]: L
+          - generic [ref=e54]:
+            - paragraph [ref=e55]: Lito Paglinawan
+            - generic [ref=e56]:
+              - generic [ref=e57]: Kitchen
+              - generic [ref=e58]: Alta Citta
+              - generic [ref=e59]: 🍳 Stove
+          - generic [ref=e60]: ›
+        - button "B Benny Flores Kitchen Alta Citta ⚖️ Butcher ›" [ref=e61] [cursor=pointer]:
+          - generic [ref=e62]: B
+          - generic [ref=e63]:
+            - paragraph [ref=e64]: Benny Flores
+            - generic [ref=e65]:
+              - generic [ref=e66]: Kitchen
+              - generic [ref=e67]: Alta Citta
+              - generic [ref=e68]: ⚖️ Butcher
+          - generic [ref=e69]: ›
+        - button "C Corazon Dela Cruz Kitchen Alta Citta 📋 Dispatch ›" [ref=e70] [cursor=pointer]:
+          - generic [ref=e71]: C
+          - generic [ref=e72]:
+            - paragraph [ref=e73]: Corazon Dela Cruz
+            - generic [ref=e74]:
+              - generic [ref=e75]: Kitchen
+              - generic [ref=e76]: Alta Citta
+              - generic [ref=e77]: 📋 Dispatch
+          - generic [ref=e78]: ›
+    - generic [ref=e79]:
+      - paragraph [ref=e81]: 🏠 Alona Beach · POS / Management
+      - generic [ref=e82]:
+        - button "A Ana Lim Staff Alona Beach ›" [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]: A
+          - generic [ref=e85]:
+            - paragraph [ref=e86]: Ana Lim
+            - generic [ref=e87]:
+              - generic [ref=e88]: Staff
+              - generic [ref=e89]: Alona Beach
+          - generic [ref=e90]: ›
+        - button "C Carlo Ramos Manager Alona Beach PIN ›" [ref=e91] [cursor=pointer]:
+          - generic [ref=e92]: C
+          - generic [ref=e93]:
+            - paragraph [ref=e94]: Carlo Ramos
+            - generic [ref=e95]:
+              - generic [ref=e96]: Manager
+              - generic [ref=e97]: Alona Beach
+              - generic [ref=e98]: PIN
+          - generic [ref=e99]: ›
+    - generic [ref=e100]:
+      - paragraph [ref=e102]: 🔥 Alona Beach · Kitchen
+      - generic [ref=e103]:
+        - button "R Romy Dalisay Kitchen Alona Beach 🍳 Stove ›" [ref=e104] [cursor=pointer]:
+          - generic [ref=e105]: R
+          - generic [ref=e106]:
+            - paragraph [ref=e107]: Romy Dalisay
+            - generic [ref=e108]:
+              - generic [ref=e109]: Kitchen
+              - generic [ref=e110]: Alona Beach
+              - generic [ref=e111]: 🍳 Stove
+          - generic [ref=e112]: ›
+        - button "D Dante Villanueva Kitchen Alona Beach ⚖️ Butcher ›" [ref=e113] [cursor=pointer]:
+          - generic [ref=e114]: D
+          - generic [ref=e115]:
+            - paragraph [ref=e116]: Dante Villanueva
+            - generic [ref=e117]:
+              - generic [ref=e118]: Kitchen
+              - generic [ref=e119]: Alona Beach
+              - generic [ref=e120]: ⚖️ Butcher
+          - generic [ref=e121]: ›
+        - button "N Nena Ocampo Kitchen Alona Beach 📋 Dispatch ›" [ref=e122] [cursor=pointer]:
+          - generic [ref=e123]: "N"
+          - generic [ref=e124]:
+            - paragraph [ref=e125]: Nena Ocampo
+            - generic [ref=e126]:
+              - generic [ref=e127]: Kitchen
+              - generic [ref=e128]: Alona Beach
+              - generic [ref=e129]: 📋 Dispatch
+          - generic [ref=e130]: ›
+    - generic [ref=e131]:
+      - paragraph [ref=e133]: 🏭 Tagbilaran Warehouse
+      - button "N Noel Garcia Staff Warehouse ›" [ref=e135] [cursor=pointer]:
+        - generic [ref=e136]: "N"
+        - generic [ref=e137]:
+          - paragraph [ref=e138]: Noel Garcia
+          - generic [ref=e139]:
+            - generic [ref=e140]: Staff
+            - generic [ref=e141]: Warehouse
+        - generic [ref=e142]: ›
+    - generic [ref=e143]:
+      - paragraph [ref=e145]: 💼 Management
+      - button "C Christopher S Owner All ›" [ref=e147] [cursor=pointer]:
+        - generic [ref=e148]: C
+        - generic [ref=e149]:
+          - paragraph [ref=e150]: Christopher S
+          - generic [ref=e151]:
+            - generic [ref=e152]: Owner
+            - generic [ref=e153]: All
+        - generic [ref=e154]: ›

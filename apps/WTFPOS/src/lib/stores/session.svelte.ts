@@ -150,5 +150,7 @@ export function clearSession() {
 	session.locationId   = 'tag';
 	session.isLocked     = false;
 	session.kitchenFocus = null;
-	if (browser) sessionStorage.removeItem(SESSION_KEY);
+	if (browser) {
+		sessionStorage.removeItem(SESSION_KEY);
+	}
 }

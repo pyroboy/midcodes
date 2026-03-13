@@ -177,9 +177,9 @@
 			osc.connect(gain);
 			gain.connect(ctx.destination);
 			osc.frequency.value = 660;
-			gain.gain.value = 0.35;
+			gain.gain.value = 1.5;
 			osc.start();
-			osc.stop(ctx.currentTime + 0.15);
+			osc.stop(ctx.currentTime + 0.25);
 			osc.onended = () => ctx.close();
 		} catch { /* skip if audio unavailable */ }
 	}

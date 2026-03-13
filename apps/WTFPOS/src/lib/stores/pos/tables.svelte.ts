@@ -6,8 +6,8 @@ import type { Table, TableZone, TableStatus, ChairConfig } from '$lib/types';
 import { nanoid } from 'nanoid';
 import { log } from '$lib/stores/audit.svelte';
 import { session, isWarehouseSession } from '$lib/stores/session.svelte';
-import { createRxStore } from '$lib/stores/sync.svelte';
-import { getDb } from '$lib/db';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { browser } from '$app/environment';
 
 const FLOOR_POSITIONS = [
@@ -32,7 +32,7 @@ function makeTables(): Table[] {
 
 export const INITIAL_TABLES = makeTables();
 
-const _tables = createRxStore<Table>('tables', db => db.tables.find());
+const _tables = createStore<Table>('tables', db => db.tables.find());
 
 export const tables = {
 	get value() { return _tables.value; },
@@ -46,22 +46,19 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 	const table = tables.value.find((t) => t.id === tableId);
 	if (!table || table.status !== 'available') return table?.currentOrderId ?? '';
 
-	const db = await getDb();
+	const tablesCol = getWritableCollection('tables');
+	const ordersCol = getWritableCollection('orders');
 	const orderId = nanoid();
 
-	const tableDoc = await db.tables.findOne(tableId).exec();
-	if (tableDoc) {
-		await tableDoc.incrementalPatch({
-			status: 'occupied',
-			sessionStartedAt: new Date().toISOString(),
-			elapsedSeconds: 0,
-			currentOrderId: orderId,
-			billTotal: 0,
-			updatedAt: new Date().toISOString()
-		});
-	}
+	await tablesCol.incrementalPatch(tableId, {
+		status: 'occupied',
+		sessionStartedAt: new Date().toISOString(),
+		elapsedSeconds: 0,
+		currentOrderId: orderId,
+		billTotal: 0,
+	});
 
-	await db.orders.insert({
+	await ordersCol.insert({
 		id: orderId,
 		locationId: table.locationId,
 		orderType: 'dine-in',
@@ -97,33 +94,32 @@ export async function closeTable(tableId: string) {
 	const table = tables.value.find(t => t.id === tableId);
 	if (!table) return;
 
-	const db = await getDb();
-	const doc = await db.tables.findOne(tableId).exec();
-	if (!doc) {
+	const col = getWritableCollection('tables');
+	try {
+		await col.incrementalPatch(tableId, {
+			status: 'available',
+			sessionStartedAt: null,
+			elapsedSeconds: null,
+			currentOrderId: null,
+			billTotal: null,
+		});
+	} catch (e) {
 		console.warn(`[closeTable] Table ${tableId} not found`);
-		return;
 	}
-	await doc.incrementalPatch({
-		status: 'available',
-		sessionStartedAt: null,
-		elapsedSeconds: null,
-		currentOrderId: null,
-		billTotal: null,
-		updatedAt: new Date().toISOString()
-	});
 }
 
 export async function printBill(orderId: string) {
-	const db = await getDb();
-	const orderDoc = await db.orders.findOne(orderId).exec();
+	const ordersCol = getWritableCollection('orders');
+	const tablesCol = getWritableCollection('tables');
+
+	const orderDoc = await ordersCol.findOne(orderId).exec();
 	if (!orderDoc) return;
 
-	const order = orderDoc.toJSON();
-	await orderDoc.incrementalPatch({ billPrinted: true, updatedAt: new Date().toISOString() });
+	const order = typeof orderDoc.toJSON === 'function' ? orderDoc.toJSON() : orderDoc;
+	await ordersCol.incrementalPatch(orderId, { billPrinted: true });
 
 	if (order.tableId) {
-		const tableDoc = await db.tables.findOne(order.tableId).exec();
-		if (tableDoc) await tableDoc.incrementalPatch({ status: 'billing', updatedAt: new Date().toISOString() });
+		await tablesCol.incrementalPatch(order.tableId, { status: 'billing' });
 	}
 }
 
@@ -132,20 +128,16 @@ export async function setTableMaintenance(tableId: string, isMaintenance: boolea
 	if (!table) return;
 	if (isMaintenance && table.status !== 'available') return;
 
-	const db = await getDb();
-	const doc = await db.tables.findOne(tableId).exec();
-	if (doc) {
-		await doc.incrementalPatch({
-			status: isMaintenance ? 'maintenance' : 'available',
-			updatedAt: new Date().toISOString()
-		});
-	}
+	const col = getWritableCollection('tables');
+	await col.incrementalPatch(tableId, {
+		status: isMaintenance ? 'maintenance' : 'available',
+	});
 	log.tableMaintenanceToggled(table.label, isMaintenance);
 }
 
 export async function updateTableTimers() {
 	if (!browser || session.locationId === 'wh-tag') return;
-	const db = await getDb();
+	const col = getWritableCollection('tables');
 	const SESSION_SECONDS = 2 * 60 * 60; // 2 hours
 
 	for (const table of tables.value) {
@@ -174,29 +166,25 @@ export async function updateTableTimers() {
 		}
 
 		if (Object.keys(updates).length > 0) {
-			const doc = await db.tables.findOne(table.id).exec();
-			if (doc) await doc.incrementalPatch({ ...updates, updatedAt: new Date().toISOString() });
+			await col.incrementalPatch(table.id, { ...updates });
 		}
 	}
 }
 
 export async function updateTableLayout(tableUpdates: Pick<Table, 'id' | 'x' | 'y' | 'width' | 'height'>[]) {
 	if (!browser) return;
-	const db = await getDb();
+	const col = getWritableCollection('tables');
 	for (const update of tableUpdates) {
-		const doc = await db.tables.findOne(update.id).exec();
-		if (doc) {
-			await doc.incrementalPatch({ x: update.x, y: update.y, width: update.width, height: update.height, updatedAt: new Date().toISOString() });
-		}
+		await col.incrementalPatch(update.id, { x: update.x, y: update.y, width: update.width, height: update.height });
 	}
 }
 
 export async function addTable(locationId: string, label: string, capacity: number, x: number, y: number) {
 	if (!browser) return;
-	const db = await getDb();
+	const col = getWritableCollection('tables');
 	const number = tables.value.filter(t => t.locationId === locationId).length + 1;
 	const id = `${locationId === 'tag' ? 'TAG' : 'PGL'}-T${number}-${nanoid(4)}`;
-	await db.tables.insert({
+	await col.insert({
 		id, locationId, number, label, zone: 'main', capacity,
 		x, y, width: 112, height: 112,
 		shape: 'rect',
@@ -207,21 +195,17 @@ export async function addTable(locationId: string, label: string, capacity: numb
 
 export async function deleteTable(tableId: string) {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.tables.findOne(tableId).exec();
-	if (doc && doc.status === 'available') {
-		await doc.remove();
+	const table = tables.value.find(t => t.id === tableId);
+	if (table && table.status === 'available') {
+		await getWritableCollection('tables').remove(tableId);
 	}
 }
 
 export async function updateTableChairs(tableId: string, chairConfig: ChairConfig | null) {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.tables.findOne(tableId).exec();
-	if (doc) {
-		const plain = chairConfig ? JSON.parse(JSON.stringify(chairConfig)) : null;
-		await doc.incrementalPatch({ chairConfig: plain, updatedAt: new Date().toISOString() });
-	}
+	const col = getWritableCollection('tables');
+	const plain = chairConfig ? JSON.parse(JSON.stringify(chairConfig)) : null;
+	await col.incrementalPatch(tableId, { chairConfig: plain });
 }
 
 export async function updateTableStyle(tableId: string, style: {
@@ -235,20 +219,14 @@ export async function updateTableStyle(tableId: string, style: {
 	height?: number;
 }) {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.tables.findOne(tableId).exec();
-	if (doc) {
-		await doc.incrementalPatch({ ...JSON.parse(JSON.stringify(style)), updatedAt: new Date().toISOString() });
-	}
+	const col = getWritableCollection('tables');
+	await col.incrementalPatch(tableId, JSON.parse(JSON.stringify(style)));
 }
 
 export async function updateTableOrder(tableId: string, orderId: string | null) {
 	const table = tables.value.find(t => t.id === tableId);
 	if (!table) return;
 
-	const db = await getDb();
-	const doc = await db.tables.findOne(tableId).exec();
-	if (doc) {
-		await doc.incrementalPatch({ currentOrderId: orderId, updatedAt: new Date().toISOString() });
-	}
+	const col = getWritableCollection('tables');
+	await col.incrementalPatch(tableId, { currentOrderId: orderId });
 }

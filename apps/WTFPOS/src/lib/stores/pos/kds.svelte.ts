@@ -2,16 +2,17 @@
  * POS KDS — Kitchen Display System state and ticket management.
  */
 import type { KdsTicket, KdsTicketItem } from '$lib/types';
-import { nanoid } from 'nanoid';
 import { log } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
-import { createRxStore } from '$lib/stores/sync.svelte';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
+import { needsRxDb } from '$lib/stores/data-mode.svelte';
 import { getDb } from '$lib/db';
 
-const _kdsActive = createRxStore<KdsTicket>('kds_tickets', db => db.kds_tickets.find({
+const _kdsActive = createStore<KdsTicket>('kds_tickets', db => db.kds_tickets.find({
 	selector: { bumpedAt: null }
 }));
-const _kdsHistory = createRxStore<KdsTicket>('kds_tickets_history', db => db.kds_tickets.find({
+const _kdsHistory = createStore<KdsTicket>('kds_tickets_history', db => db.kds_tickets.find({
 	selector: { bumpedAt: { $ne: null } },
 	sort: [{ bumpedAt: 'desc' }]
 }));
@@ -37,30 +38,43 @@ export const kdsTicketHistory = {
 // ─── KDS Actions ─────────────────────────────────────────────────────────────
 
 export async function recallTicket(orderId: string) {
-	const db = await getDb();
-	const historyDoc = await db.kds_tickets.findOne({ selector: { orderId, bumpedAt: { $ne: null } } }).exec();
-	if (!historyDoc) return;
+	let historyEntry: KdsTicket | undefined;
+	let alreadyActive = false;
 
-	const entry = historyDoc.toJSON();
+	if (needsRxDb()) {
+		const db = await getDb();
+		const historyDoc = await db.kds_tickets.findOne({ selector: { orderId, bumpedAt: { $ne: null } } }).exec();
+		if (!historyDoc) return;
+		historyEntry = historyDoc.toJSON() as KdsTicket;
+		const existingTicket = await db.kds_tickets.findOne({ selector: { orderId, bumpedAt: null } }).exec();
+		alreadyActive = !!existingTicket;
+	} else {
+		historyEntry = kdsTicketHistory.value.find(t => t.orderId === orderId && t.bumpedAt);
+		if (!historyEntry) return;
+		alreadyActive = kdsTickets.value.some(t => t.orderId === orderId);
+	}
+
+	const entry = historyEntry;
 	const restoredItems = entry.items.map((i: KdsTicketItem) => i.status === 'served' ? { ...i, status: 'pending' as const } : i);
 
-	const existingTicket = await db.kds_tickets.findOne({ selector: { orderId, bumpedAt: null } }).exec();
-	if (existingTicket) {
+	if (alreadyActive) {
 		console.warn(`[RECALL] Ticket for order ${orderId} already exists in active tickets`);
 		return;
 	}
 
 	// Convert history ticket back to active by clearing bumped fields
-	await historyDoc.incrementalPatch({
+	const kdsCol = getWritableCollection('kds_tickets');
+	await kdsCol.incrementalPatch(entry.id, {
 		items: restoredItems,
 		bumpedAt: null,
 		bumpedBy: null,
 		updatedAt: new Date().toISOString()
 	});
 
-	const orderDoc = await db.orders.findOne(orderId).exec();
+	const ordersCol = getWritableCollection('orders');
+	const orderDoc = await ordersCol.findOne(orderId).exec();
 	if (orderDoc) {
-		await orderDoc.incrementalModify((doc: any) => {
+		await ordersCol.incrementalModify(orderId, (doc: any) => {
 			doc.items = doc.items.map((i: KdsTicketItem) => i.status === 'served' ? { ...i, status: 'pending' as const } : i);
 			doc.updatedAt = new Date().toISOString();
 			return doc;

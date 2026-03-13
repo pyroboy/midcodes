@@ -110,6 +110,35 @@
 		return order.payments.map(p => paymentMethodLabel(p.method)).join(' + ');
 	}
 
+	// Discount pax: count from discountEntries (multi-type) or discountPax (legacy)
+	function discountPaxCount(order: Order): number {
+		const entries = order.discountEntries as Record<string, { pax?: number } | undefined> ?? {};
+		const entryKeys = Object.keys(entries);
+		if (entryKeys.length > 0) {
+			return entryKeys.reduce((s, k) => s + (entries[k]?.pax ?? 0), 0);
+		}
+		return order.discountPax ?? 0;
+	}
+
+	function discountTypeShort(order: Order): string {
+		const entries = order.discountEntries as Record<string, unknown> ?? {};
+		const entryKeys = Object.keys(entries);
+		if (entryKeys.length > 0) {
+			return entryKeys.map(k =>
+				k === 'senior' ? 'SC' : k === 'pwd' ? 'PWD' :
+				k === 'promo' ? 'Promo' : k === 'comp' ? 'Comp' : 'SR'
+			).join('+');
+		}
+		const t = order.discountType;
+		if (!t || t === 'none') return '';
+		return t === 'senior' ? 'SC' : t === 'pwd' ? 'PWD' :
+			t === 'promo' ? 'Promo' : t === 'comp' ? 'Comp' : 'SR';
+	}
+
+	function hasDiscount(order: Order): boolean {
+		return order.discountAmount > 0;
+	}
+
 	// Hourly chart for today, daily chart for week/month
 	const trendChart = $derived.by((): ChartDataPoint[] => {
 		if (period === 'today') {
@@ -204,7 +233,7 @@
 	{/snippet}
 
 	{#snippet kpis()}
-		<div class="grid grid-cols-4 gap-4 flex-1">
+		<div class="grid grid-cols-3 md:grid-cols-6 gap-4 flex-1">
 			<KpiCard
 				label="Transactions"
 				value={String(data.paidCount)}
@@ -217,7 +246,6 @@
 			<KpiCard
 				label="Net Sales"
 				value={formatPeso(data.netSales)}
-				sub={data.totalDiscount > 0 ? formatPeso(data.totalDiscount) + ' discounted' : undefined}
 			/>
 			<KpiCard
 				label="Avg Ticket"
@@ -229,6 +257,17 @@
 			<KpiCard
 				label="Total Pax"
 				value={String(data.totalPax)}
+			/>
+			<KpiCard
+				label="Void Value"
+				value={formatPeso(data.voidValue)}
+				variant="danger"
+				sub={data.voidCount > 0 ? `${data.voidCount} order${data.voidCount > 1 ? 's' : ''}` : undefined}
+			/>
+			<KpiCard
+				label="Discount Value"
+				value={formatPeso(data.totalDiscount)}
+				variant="accent"
 			/>
 		</div>
 	{/snippet}
@@ -301,6 +340,7 @@
 							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Payment</th>
 							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">Cashier</th>
 							<th scope="col" class="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Subtotal</th>
+							<th scope="col" class="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Disc. Pax</th>
 							<th scope="col" class="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Discount</th>
 							<th scope="col" class="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Total</th>
 							<th scope="col" class="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">Receipt</th>
@@ -345,6 +385,18 @@
 								</td>
 								<td class="px-3 py-2.5 text-right font-mono text-xs text-gray-700">
 									{formatPeso(order.subtotal)}
+								</td>
+								<td class="px-3 py-2.5 text-center text-xs">
+									{#if hasDiscount(order)}
+										<div class="flex flex-col items-center gap-0.5">
+											<span class="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{discountTypeShort(order)}</span>
+											{#if discountPaxCount(order) > 0}
+												<span class="text-[10px] text-gray-400">{discountPaxCount(order)} of {order.pax} pax</span>
+											{/if}
+										</div>
+									{:else}
+										<span class="text-gray-300">—</span>
+									{/if}
 								</td>
 								<td class="px-3 py-2.5 text-right font-mono text-xs">
 									{#if order.discountAmount > 0}

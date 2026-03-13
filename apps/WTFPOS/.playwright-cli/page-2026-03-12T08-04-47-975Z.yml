@@ -1,0 +1,512 @@
+- generic [ref=e2]:
+  - button "📡" [ref=e151] [cursor=pointer]
+  - generic [ref=e3]:
+    - generic [ref=e7]:
+      - button "Toggle sidebar" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: W!
+      - separator [ref=e12]
+      - generic [ref=e152]:
+        - generic "Select a specific branch to use quick actions":
+          - link "Receive Delivery":
+            - /url: /stock/deliveries?action=open
+            - img
+            - generic: Receive Delivery
+          - link "Log Expense":
+            - /url: /reports/expenses-daily?action=open
+            - img
+            - generic: Log Expense
+          - link "Log Utility":
+            - /url: /reports/utilities?action=open?action=open
+            - img
+            - generic: Log Utility
+          - link "Log Waste":
+            - /url: /stock/waste?action=open
+            - img
+            - generic: Log Waste
+          - link "Stock Count":
+            - /url: /stock/counts?action=open
+            - img
+            - generic: Stock Count
+          - link "X-Reading":
+            - /url: /reports/x-read?action=open
+            - img
+            - generic: X-Reading
+          - link "Transfer Stock":
+            - /url: /stock/transfers?action=open
+            - img
+            - generic: Transfer Stock
+          - link "End of Day":
+            - /url: /reports/eod?action=open
+            - img
+            - generic: End of Day
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - link "POS" [ref=e18] [cursor=pointer]:
+            - /url: /pos
+            - img [ref=e19]
+            - generic: POS
+        - listitem [ref=e153]:
+          - link "Kitchen" [ref=e154] [cursor=pointer]:
+            - /url: /kitchen
+            - img [ref=e155]
+            - generic: Kitchen
+        - listitem [ref=e156]:
+          - link "Stock" [ref=e157] [cursor=pointer]:
+            - /url: /stock
+            - img [ref=e158]
+            - generic: Stock
+        - listitem [ref=e159]:
+          - link "Reports" [ref=e160] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e161]
+            - generic: Reports
+        - listitem [ref=e162]:
+          - link "Admin" [ref=e163] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e164]
+            - generic: Admin
+      - generic [ref=e23]:
+        - separator [ref=e24]
+        - generic [ref=e26]: C
+        - link "Logout" [ref=e28] [cursor=pointer]:
+          - /url: /
+          - img [ref=e29]
+      - button "Toggle Sidebar" [ref=e32]
+    - main [ref=e33]:
+      - generic [ref=e165]:
+        - generic [ref=e166]:
+          - img [ref=e167]
+          - heading "ALL LOCATIONS" [level=2] [ref=e168]
+        - button "Change Location" [ref=e169] [cursor=pointer]:
+          - img [ref=e170]
+          - text: Change Location
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - heading "Consolidated Reports" [level=1] [ref=e171]
+            - generic [ref=e172]: 🌐 All Branches
+          - navigation [ref=e39]:
+            - generic [ref=e40]:
+              - generic [ref=e41]: Operations
+              - generic [ref=e42]:
+                - link "Meat Report" [ref=e43] [cursor=pointer]:
+                  - /url: /reports/meat-report
+                - link "Stock Variance" [ref=e44] [cursor=pointer]:
+                  - /url: /reports/stock-variance
+                - link "Table Sales" [ref=e45] [cursor=pointer]:
+                  - /url: /reports/table-sales
+                - link "Voids & Discounts" [ref=e46] [cursor=pointer]:
+                  - /url: /reports/voids-discounts
+                - link "X-Read" [ref=e47] [cursor=pointer]:
+                  - /url: /reports/x-read
+                - link "End of Day" [ref=e48] [cursor=pointer]:
+                  - /url: /reports/eod
+            - generic [ref=e50]:
+              - generic [ref=e51]: Expenses
+              - generic [ref=e52]:
+                - link "Expenses" [ref=e53] [cursor=pointer]:
+                  - /url: /reports/expenses-daily
+                - link "Utilities" [ref=e54] [cursor=pointer]:
+                  - /url: /reports/utilities
+            - generic [ref=e56]:
+              - generic [ref=e57]: Revenue & Sales
+              - generic [ref=e58]:
+                - link "Transaction Log" [ref=e59] [cursor=pointer]:
+                  - /url: /reports/transaction-log
+                - link "Sales Summary" [ref=e60] [cursor=pointer]:
+                  - /url: /reports/sales-summary
+                - link "Best Sellers" [ref=e61] [cursor=pointer]:
+                  - /url: /reports/best-sellers
+                - link "Peak Hours" [ref=e62] [cursor=pointer]:
+                  - /url: /reports/peak-hours
+            - generic [ref=e64]:
+              - generic [ref=e65]: Profitability
+              - generic [ref=e66]:
+                - link "Gross Profit" [ref=e67] [cursor=pointer]:
+                  - /url: /reports/profit-gross
+                - link "Net Profit" [ref=e68] [cursor=pointer]:
+                  - /url: /reports/profit-net
+            - generic [ref=e70]:
+              - generic [ref=e71]: Branch
+              - link "Compare" [ref=e73] [cursor=pointer]:
+                - /url: /reports/branch-comparison
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - generic [ref=e78]:
+              - button "Today" [ref=e79] [cursor=pointer]
+              - button "This Week" [ref=e80] [cursor=pointer]
+              - button "This Month" [ref=e81] [cursor=pointer]
+              - button "All Time" [ref=e82] [cursor=pointer]
+              - generic [ref=e83]:
+                - combobox [ref=e84]:
+                  - option "All Methods" [selected]
+                  - option "Card"
+                  - option "Cash"
+                  - option "GCash"
+                - combobox [ref=e85]:
+                  - option "All Status" [selected]
+                  - option "Paid"
+                  - option "Voided"
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - paragraph [ref=e89]: Transactions
+                - paragraph [ref=e90]: "13"
+                - paragraph [ref=e173]: + 1 voided
+                - generic [ref=e174]:
+                  - generic [ref=e175]:
+                    - generic "No change 0.0 percent" [ref=e176]: — 0.0%
+                    - generic [ref=e177]: vs yesterday
+                  - generic [ref=e178]: "prev: 13"
+              - generic [ref=e91]:
+                - paragraph [ref=e92]: Net Sales
+                - paragraph [ref=e93]: ₱18,364.00
+                - paragraph [ref=e179]: ₱646.00 discounted
+              - generic [ref=e94]:
+                - paragraph [ref=e95]: Avg Ticket
+                - paragraph [ref=e96]: ₱1,413.00
+                - generic [ref=e180]:
+                  - generic [ref=e181]:
+                    - generic "Down 11.9 percent" [ref=e182]: ▼ 11.9%
+                    - generic [ref=e183]: vs yesterday
+                  - generic [ref=e184]: "prev: ₱1,604.00"
+              - generic [ref=e97]:
+                - paragraph [ref=e98]: Total Pax
+                - paragraph [ref=e99]: "37"
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - paragraph [ref=e104]: Checkouts by Hour
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - generic [ref=e187]: Cash
+                  - generic [ref=e188]: ₱13,833.00
+                - generic [ref=e189]:
+                  - generic [ref=e190]: Card
+                  - generic [ref=e191]: ₱2,293.00
+                - generic [ref=e192]:
+                  - generic [ref=e193]: GCash
+                  - generic [ref=e194]: ₱2,238.00
+            - img [ref=e107]:
+              - generic [ref=e108]: "0"
+              - generic [ref=e109]: "1"
+              - generic [ref=e110]: "2"
+              - generic [ref=e111]: "3"
+              - generic [ref=e112]: "4"
+              - 'img "8AM: 0 checkouts" [ref=e113] [cursor=pointer]'
+              - generic [ref=e114]: 8AM
+              - 'img "9AM: 0 checkouts" [ref=e115] [cursor=pointer]'
+              - generic [ref=e116]: 9AM
+              - 'img "10AM: 0 checkouts" [ref=e117] [cursor=pointer]'
+              - generic [ref=e118]: 10AM
+              - 'img "11AM: 0 checkouts" [ref=e119] [cursor=pointer]'
+              - generic [ref=e120]: 11AM
+              - 'img "12PM: 0 checkouts" [ref=e121] [cursor=pointer]'
+              - generic [ref=e122]: 12PM
+              - 'img "1PM: 2 checkouts" [ref=e195] [cursor=pointer]'
+              - generic [ref=e124]: 1PM
+              - 'img "2PM: 4 checkouts" [ref=e196] [cursor=pointer]'
+              - generic [ref=e126]: 2PM
+              - 'img "3PM: 0 checkouts" [ref=e127] [cursor=pointer]'
+              - generic [ref=e128]: 3PM
+              - 'img "4PM: 2 checkouts" [ref=e197] [cursor=pointer]'
+              - generic [ref=e130]: 4PM
+              - 'img "5PM: 0 checkouts" [ref=e131] [cursor=pointer]'
+              - generic [ref=e132]: 5PM
+              - 'img "6PM: 2 checkouts" [ref=e198] [cursor=pointer]'
+              - generic [ref=e134]: 6PM
+              - 'img "7PM: 0 checkouts" [ref=e135] [cursor=pointer]'
+              - generic [ref=e136]: 7PM
+              - 'img "8PM: 1 checkouts" [ref=e199] [cursor=pointer]'
+              - generic [ref=e138]: 8PM
+              - 'img "9PM: 2 checkouts" [ref=e200] [cursor=pointer]'
+              - generic [ref=e140]: 9PM
+              - 'img "10PM: 0 checkouts" [ref=e141] [cursor=pointer]'
+              - generic [ref=e142]: 10PM
+          - generic [ref=e143]:
+            - generic [ref=e144]:
+              - heading "14 Transactions" [level=2] [ref=e201]
+              - generic [ref=e146]: Local data
+            - textbox "Search table, cashier, order ID..." [ref=e149]
+          - table [ref=e203]:
+            - rowgroup [ref=e204]:
+              - row "Branch Time Table Pax Items Payment Cashier Subtotal Discount Total Receipt" [ref=e205]:
+                - columnheader "Branch" [ref=e206]
+                - columnheader "Time" [ref=e207]
+                - columnheader "Table" [ref=e208]
+                - columnheader "Pax" [ref=e209]
+                - columnheader "Items" [ref=e210]
+                - columnheader "Payment" [ref=e211]
+                - columnheader "Cashier" [ref=e212]
+                - columnheader "Subtotal" [ref=e213]
+                - columnheader "Discount" [ref=e214]
+                - columnheader "Total" [ref=e215]
+                - columnheader "Receipt" [ref=e216]
+            - rowgroup [ref=e217]:
+              - row "Alona Beach 09:41 PM Mar 12 T8 5 7 items Cash Pedro Cruz ₱4,227.00 — ₱4,227.00 View" [ref=e218]:
+                - cell "Alona Beach" [ref=e219]
+                - cell "09:41 PM Mar 12" [ref=e220]:
+                  - generic [ref=e221]:
+                    - generic [ref=e222]: 09:41 PM
+                    - generic [ref=e223]: Mar 12
+                - cell "T8" [ref=e224]
+                - cell "5" [ref=e225]
+                - cell "7 items" [ref=e226]:
+                  - generic [ref=e227]: 7 items
+                - cell "Cash" [ref=e228]
+                - cell "Pedro Cruz" [ref=e229]
+                - cell "₱4,227.00" [ref=e230]
+                - cell "—" [ref=e231]
+                - cell "₱4,227.00" [ref=e232]
+                - cell "View" [ref=e233]:
+                  - button "View" [ref=e234] [cursor=pointer]:
+                    - img [ref=e235]
+                    - text: View
+              - row "Alta Citta 09:34 PM Mar 12 T4 5 6 items Cash Ana Reyes ₱3,452.00 -₱518.00 ₱2,934.00 View" [ref=e236]:
+                - cell "Alta Citta" [ref=e237]
+                - cell "09:34 PM Mar 12" [ref=e238]:
+                  - generic [ref=e239]:
+                    - generic [ref=e240]: 09:34 PM
+                    - generic [ref=e241]: Mar 12
+                - cell "T4" [ref=e242]
+                - cell "5" [ref=e243]
+                - cell "6 items" [ref=e244]:
+                  - generic [ref=e245]: 6 items
+                - cell "Cash" [ref=e246]
+                - cell "Ana Reyes" [ref=e247]
+                - cell "₱3,452.00" [ref=e248]
+                - cell "-₱518.00" [ref=e249]
+                - cell "₱2,934.00" [ref=e250]
+                - cell "View" [ref=e251]:
+                  - button "View" [ref=e252] [cursor=pointer]:
+                    - img [ref=e253]
+                    - text: View
+              - row "Alta Citta 08:25 PM Mar 12 T2 5 5 items Cash Pedro Cruz ₱300.00 — ₱300.00 View" [ref=e254]:
+                - cell "Alta Citta" [ref=e255]
+                - cell "08:25 PM Mar 12" [ref=e256]:
+                  - generic [ref=e257]:
+                    - generic [ref=e258]: 08:25 PM
+                    - generic [ref=e259]: Mar 12
+                - cell "T2" [ref=e260]
+                - cell "5" [ref=e261]
+                - cell "5 items" [ref=e262]:
+                  - generic [ref=e263]: 5 items
+                - cell "Cash" [ref=e264]
+                - cell "Pedro Cruz" [ref=e265]
+                - cell "₱300.00" [ref=e266]
+                - cell "—" [ref=e267]
+                - cell "₱300.00" [ref=e268]
+                - cell "View" [ref=e269]:
+                  - button "View" [ref=e270] [cursor=pointer]:
+                    - img [ref=e271]
+                    - text: View
+              - row "Alta Citta 06:15 PM Mar 12 T7 2 5 items GCash Pedro Cruz ₱998.00 — ₱998.00 View" [ref=e272]:
+                - cell "Alta Citta" [ref=e273]
+                - cell "06:15 PM Mar 12" [ref=e274]:
+                  - generic [ref=e275]:
+                    - generic [ref=e276]: 06:15 PM
+                    - generic [ref=e277]: Mar 12
+                - cell "T7" [ref=e278]
+                - cell "2" [ref=e279]
+                - cell "5 items" [ref=e280]:
+                  - generic [ref=e281]: 5 items
+                - cell "GCash" [ref=e282]
+                - cell "Pedro Cruz" [ref=e283]
+                - cell "₱998.00" [ref=e284]
+                - cell "—" [ref=e285]
+                - cell "₱998.00" [ref=e286]
+                - cell "View" [ref=e287]:
+                  - button "View" [ref=e288] [cursor=pointer]:
+                    - img [ref=e289]
+                    - text: View
+              - row "Alta Citta 06:15 PM Mar 12 T6 1 2 items Cash Juan Reyes ₱596.00 — ₱596.00 View" [ref=e290]:
+                - cell "Alta Citta" [ref=e291]
+                - cell "06:15 PM Mar 12" [ref=e292]:
+                  - generic [ref=e293]:
+                    - generic [ref=e294]: 06:15 PM
+                    - generic [ref=e295]: Mar 12
+                - cell "T6" [ref=e296]
+                - cell "1" [ref=e297]
+                - cell "2 items" [ref=e298]:
+                  - generic [ref=e299]: 2 items
+                - cell "Cash" [ref=e300]
+                - cell "Juan Reyes" [ref=e301]
+                - cell "₱596.00" [ref=e302]
+                - cell "—" [ref=e303]
+                - cell "₱596.00" [ref=e304]
+                - cell "View" [ref=e305]:
+                  - button "View" [ref=e306] [cursor=pointer]:
+                    - img [ref=e307]
+                    - text: View
+              - row "Alta Citta 04:47 PM Mar 12 T5 3 5 items Cash Pedro Cruz ₱2,053.00 — ₱2,053.00 View" [ref=e308]:
+                - cell "Alta Citta" [ref=e309]
+                - cell "04:47 PM Mar 12" [ref=e310]:
+                  - generic [ref=e311]:
+                    - generic [ref=e312]: 04:47 PM
+                    - generic [ref=e313]: Mar 12
+                - cell "T5" [ref=e314]
+                - cell "3" [ref=e315]
+                - cell "5 items" [ref=e316]:
+                  - generic [ref=e317]: 5 items
+                - cell "Cash" [ref=e318]
+                - cell "Pedro Cruz" [ref=e319]
+                - cell "₱2,053.00" [ref=e320]
+                - cell "—" [ref=e321]
+                - cell "₱2,053.00" [ref=e322]
+                - cell "View" [ref=e323]:
+                  - button "View" [ref=e324] [cursor=pointer]:
+                    - img [ref=e325]
+                    - text: View
+              - row "Alona Beach 04:11 PM Mar 12 Takeout 1 6 items GCash Maria Santos ₱566.00 — ₱566.00 View" [ref=e326]:
+                - cell "Alona Beach" [ref=e327]
+                - cell "04:11 PM Mar 12" [ref=e328]:
+                  - generic [ref=e329]:
+                    - generic [ref=e330]: 04:11 PM
+                    - generic [ref=e331]: Mar 12
+                - cell "Takeout" [ref=e332]
+                - cell "1" [ref=e333]
+                - cell "6 items" [ref=e334]:
+                  - generic [ref=e335]: 6 items
+                - cell "GCash" [ref=e336]
+                - cell "Maria Santos" [ref=e337]
+                - cell "₱566.00" [ref=e338]
+                - cell "—" [ref=e339]
+                - cell "₱566.00" [ref=e340]
+                - cell "View" [ref=e341]:
+                  - button "View" [ref=e342] [cursor=pointer]:
+                    - img [ref=e343]
+                    - text: View
+              - row "Alona Beach 02:49 PM Mar 12 T6 1 3 items Cash Juan Reyes ₱676.00 — ₱676.00 View" [ref=e344]:
+                - cell "Alona Beach" [ref=e345]
+                - cell "02:49 PM Mar 12" [ref=e346]:
+                  - generic [ref=e347]:
+                    - generic [ref=e348]: 02:49 PM
+                    - generic [ref=e349]: Mar 12
+                - cell "T6" [ref=e350]
+                - cell "1" [ref=e351]
+                - cell "3 items" [ref=e352]:
+                  - generic [ref=e353]: 3 items
+                - cell "Cash" [ref=e354]
+                - cell "Juan Reyes" [ref=e355]
+                - cell "₱676.00" [ref=e356]
+                - cell "—" [ref=e357]
+                - cell "₱676.00" [ref=e358]
+                - cell "View" [ref=e359]:
+                  - button "View" [ref=e360] [cursor=pointer]:
+                    - img [ref=e361]
+                    - text: View
+              - row "Alona Beach 02:46 PM Mar 12 T4 5 6 items Card Pedro Cruz ₱2,293.00 — ₱2,293.00 View" [ref=e362]:
+                - cell "Alona Beach" [ref=e363]
+                - cell "02:46 PM Mar 12" [ref=e364]:
+                  - generic [ref=e365]:
+                    - generic [ref=e366]: 02:46 PM
+                    - generic [ref=e367]: Mar 12
+                - cell "T4" [ref=e368]
+                - cell "5" [ref=e369]
+                - cell "6 items" [ref=e370]:
+                  - generic [ref=e371]: 6 items
+                - cell "Card" [ref=e372]
+                - cell "Pedro Cruz" [ref=e373]
+                - cell "₱2,293.00" [ref=e374]
+                - cell "—" [ref=e375]
+                - cell "₱2,293.00" [ref=e376]
+                - cell "View" [ref=e377]:
+                  - button "View" [ref=e378] [cursor=pointer]:
+                    - img [ref=e379]
+                    - text: View
+              - row "Alona Beach 02:12 PM Mar 12 T5 6 5 items Cash Pedro Cruz ₱935.00 — ₱935.00 View" [ref=e380]:
+                - cell "Alona Beach" [ref=e381]
+                - cell "02:12 PM Mar 12" [ref=e382]:
+                  - generic [ref=e383]:
+                    - generic [ref=e384]: 02:12 PM
+                    - generic [ref=e385]: Mar 12
+                - cell "T5" [ref=e386]
+                - cell "6" [ref=e387]
+                - cell "5 items" [ref=e388]:
+                  - generic [ref=e389]: 5 items
+                - cell "Cash" [ref=e390]
+                - cell "Pedro Cruz" [ref=e391]
+                - cell "₱935.00" [ref=e392]
+                - cell "—" [ref=e393]
+                - cell "₱935.00" [ref=e394]
+                - cell "View" [ref=e395]:
+                  - button "View" [ref=e396] [cursor=pointer]:
+                    - img [ref=e397]
+                    - text: View
+              - row "Alona Beach 02:04 PM Mar 12 T3 1 6 items Cash Pedro Cruz ₱717.00 -₱128.00 ₱589.00 View" [ref=e398]:
+                - cell "Alona Beach" [ref=e399]
+                - cell "02:04 PM Mar 12" [ref=e400]:
+                  - generic [ref=e401]:
+                    - generic [ref=e402]: 02:04 PM
+                    - generic [ref=e403]: Mar 12
+                - cell "T3" [ref=e404]
+                - cell "1" [ref=e405]
+                - cell "6 items" [ref=e406]:
+                  - generic [ref=e407]: 6 items
+                - cell "Cash" [ref=e408]
+                - cell "Pedro Cruz" [ref=e409]
+                - cell "₱717.00" [ref=e410]
+                - cell "-₱128.00" [ref=e411]
+                - cell "₱589.00" [ref=e412]
+                - cell "View" [ref=e413]:
+                  - button "View" [ref=e414] [cursor=pointer]:
+                    - img [ref=e415]
+                    - text: View
+              - row "Alta Citta 01:47 PM Mar 12 Takeout 1 5 items Cash Juan Reyes ₱1,523.00 — ₱1,523.00 View" [ref=e416]:
+                - cell "Alta Citta" [ref=e417]
+                - cell "01:47 PM Mar 12" [ref=e418]:
+                  - generic [ref=e419]:
+                    - generic [ref=e420]: 01:47 PM
+                    - generic [ref=e421]: Mar 12
+                - cell "Takeout" [ref=e422]
+                - cell "1" [ref=e423]
+                - cell "5 items" [ref=e424]:
+                  - generic [ref=e425]: 5 items
+                - cell "Cash" [ref=e426]
+                - cell "Juan Reyes" [ref=e427]
+                - cell "₱1,523.00" [ref=e428]
+                - cell "—" [ref=e429]
+                - cell "₱1,523.00" [ref=e430]
+                - cell "View" [ref=e431]:
+                  - button "View" [ref=e432] [cursor=pointer]:
+                    - img [ref=e433]
+                    - text: View
+              - row "Alona Beach 01:19 PM Mar 12 T7 1 4 items GCash Juan Reyes ₱674.00 — ₱674.00 View" [ref=e434]:
+                - cell "Alona Beach" [ref=e435]
+                - cell "01:19 PM Mar 12" [ref=e436]:
+                  - generic [ref=e437]:
+                    - generic [ref=e438]: 01:19 PM
+                    - generic [ref=e439]: Mar 12
+                - cell "T7" [ref=e440]
+                - cell "1" [ref=e441]
+                - cell "4 items" [ref=e442]:
+                  - generic [ref=e443]: 4 items
+                - cell "GCash" [ref=e444]
+                - cell "Juan Reyes" [ref=e445]
+                - cell "₱674.00" [ref=e446]
+                - cell "—" [ref=e447]
+                - cell "₱674.00" [ref=e448]
+                - cell "View" [ref=e449]:
+                  - button "View" [ref=e450] [cursor=pointer]:
+                    - img [ref=e451]
+                    - text: View
+              - row "Alona Beach 12:59 PM Mar 12 T2 1 0 items Voided — ₱0.00 — ₱0.00 —" [ref=e452]:
+                - cell "Alona Beach" [ref=e453]
+                - cell "12:59 PM Mar 12" [ref=e454]:
+                  - generic [ref=e455]:
+                    - generic [ref=e456]: 12:59 PM
+                    - generic [ref=e457]: Mar 12
+                - cell "T2" [ref=e458]
+                - cell "1" [ref=e459]
+                - cell "0 items" [ref=e460]:
+                  - generic [ref=e461]: 0 items
+                - cell "Voided" [ref=e462]
+                - cell "—" [ref=e463]
+                - cell "₱0.00" [ref=e464]
+                - cell "—" [ref=e465]
+                - cell "₱0.00" [ref=e466]
+                - cell "—" [ref=e467]
+          - generic [ref=e468]:
+            - generic [ref=e469]: Showing 14 of 14 transactions
+            - generic [ref=e470]:
+              - generic [ref=e471]: "Subtotal: ₱19,010.00"
+              - generic [ref=e472]: "Discounts: -₱646.00"
+              - generic [ref=e473]: "Net: ₱18,364.00"

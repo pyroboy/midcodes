@@ -9,8 +9,8 @@ import { allExpenses } from '$lib/stores/expenses.svelte';
 import { PROTEIN_ORDER, type MeatProtein } from '$lib/stores/stock.constants';
 import { session } from '$lib/stores/session.svelte';
 import { log, auditLog, writeLog } from '$lib/stores/audit.svelte';
-import { createRxStore } from '$lib/stores/sync.svelte';
-import { getDb } from '$lib/db';
+import { createStore } from '$lib/stores/create-store.svelte';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { nanoid } from 'nanoid';
 
 // Branch-filtered getters
@@ -391,7 +391,7 @@ export type XReadSnapshot = Reading & { type: 'x-read' };
 /** @deprecated Use Reading with type === 'z-read' */
 export type ZReadSnapshot = Reading & { type: 'z-read' };
 
-const _readings = createRxStore<Reading>('readings', db => db.readings.find().sort({ updatedAt: 'desc' }));
+const _readings = createStore<Reading>('readings', db => db.readings.find().sort({ updatedAt: 'desc' }), { sort: (a, b) => b.updatedAt.localeCompare(a.updatedAt) });
 
 export const xReadHistory = {
 	get value() {
@@ -436,8 +436,8 @@ export async function generateXRead(): Promise<Reading> {
 		generatedBy: session.userName || 'Staff',
 	};
 
-	const db = await getDb();
-	await db.readings.insert(snapshot);
+	const col = getWritableCollection('readings');
+	await col.insert(snapshot);
 	log.xReadGenerated();
 	return snapshot;
 }
@@ -604,6 +604,8 @@ export function transactionLog(period: 'today' | 'week' | 'month' | 'all' = 'tod
 	);
 
 	const paid = sorted.filter(o => o.status === 'paid');
+	const voided = sorted.filter(o => o.status === 'cancelled');
+	const voidValue = voided.reduce((s, o) => s + o.subtotal, 0);
 	const grossSales = paid.reduce((s, o) => s + o.subtotal, 0);
 	const netSales = paid.reduce((s, o) => s + o.total, 0);
 	const totalDiscount = paid.reduce((s, o) => s + o.discountAmount, 0);
@@ -642,7 +644,8 @@ export function transactionLog(period: 'today' | 'week' | 'month' | 'all' = 'tod
 	return {
 		orders: sorted,
 		paidCount: paid.length,
-		voidCount: sorted.length - paid.length,
+		voidCount: voided.length,
+		voidValue,
 		grossSales,
 		netSales,
 		totalDiscount,
@@ -803,8 +806,8 @@ export const zReadHistory = {
 export async function saveZRead(params: Omit<Reading, 'id' | 'type' | 'updatedAt'>): Promise<Reading> {
 	const now = new Date().toISOString();
 	const snapshot: Reading = { id: nanoid(), type: 'z-read' as const, updatedAt: now, ...params };
-	const db = await getDb();
-	await db.readings.insert(snapshot);
+	const col = getWritableCollection('readings');
+	await col.insert(snapshot);
 	writeLog('admin', 'EOD Z-Read submitted', { meta: { date: params.date ?? '', netSales: params.netSales } });
 	return snapshot;
 }

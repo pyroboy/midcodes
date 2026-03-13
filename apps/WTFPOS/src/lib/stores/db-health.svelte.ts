@@ -4,6 +4,7 @@
  */
 import { browser } from '$app/environment';
 import { getDb, resetDatabase } from '$lib/db';
+import { needsRxDb } from '$lib/stores/data-mode.svelte';
 
 export type DbHealthStatus = 'ok' | 'checking' | 'error';
 
@@ -56,6 +57,7 @@ async function checkDataIntegrity(db: any) {
 /** Call once from root layout onMount */
 export async function initDbHealthCheck() {
 	if (!browser) return;
+	if (!needsRxDb()) return; // No DB to check on thin clients
 
 	try {
 		const db = await getDb();

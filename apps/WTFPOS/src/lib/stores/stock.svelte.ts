@@ -5,9 +5,9 @@
 import { nanoid } from 'nanoid';
 import { log, writeLog } from '$lib/stores/audit.svelte';
 import { session } from '$lib/stores/session.svelte';
-import { createRxStore } from '$lib/stores/sync.svelte';
+import { createStore } from '$lib/stores/create-store.svelte';
 import { browser } from '$app/environment';
-import { getDb } from '$lib/db';
+import { getWritableCollection } from '$lib/db/write-proxy';
 import { STOCK_ITEMS_LIST, getProteinType, DEFAULT_MEAT_EDGES, type StockCategory, type MeatProtein } from '$lib/stores/stock.constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -280,9 +280,9 @@ export const INITIAL_ADJUSTMENT_EVENTS: StockEvent[] = [
 
 // ─── Reactive State (RxDB Stores) ─────────────────────────────────────────────
 
-export const stockItems = createRxStore<StockItem>('stock_items', db => db.stock_items.find());
-export const deliveries = createRxStore<Delivery>('deliveries', db => db.deliveries.find());
-const _stockEvents = createRxStore<StockEvent>('stock_events', db => db.stock_events.find());
+export const stockItems = createStore<StockItem>('stock_items', db => db.stock_items.find(), { filter: { locationId: undefined } });
+export const deliveries = createStore<Delivery>('deliveries', db => db.deliveries.find(), { filter: { locationId: undefined } });
+const _stockEvents = createStore<StockEvent>('stock_events', db => db.stock_events.find());
 
 /** All stock events (waste, manual add, manual deduct) */
 export const stockEvents = {
@@ -299,8 +299,8 @@ export const adjustments = {
 	get value() { return _stockEvents.value.filter(e => e.type === 'add' || e.type === 'deduct') as StockAdjustment[]; },
 	get initialized() { return _stockEvents.initialized; }
 };
-export const deductions = createRxStore<Deduction>('deductions', db => db.deductions.find());
-export const stockCounts = createRxStore<StockCount>('stock_counts', db => db.stock_counts.find());
+export const deductions = createStore<Deduction>('deductions', db => db.deductions.find());
+export const stockCounts = createStore<StockCount>('stock_counts', db => db.stock_counts.find(), { primaryKey: 'stockItemId' });
 
 export const countPeriods = $state<{ id: CountPeriod; label: string; time: string; status: 'done' | 'pending' }[]>([
 	{ id: 'am10', label: 'Morning',   time: '10:00 AM', status: 'done' },
@@ -549,9 +549,9 @@ export async function receiveDelivery(stockItemId: string, itemName: string, qty
 	if (!supplier || supplier.trim() === '') return { success: false, error: 'Supplier is required' };
 	
 	try {
-		const db = await getDb();
+		const col = getWritableCollection('deliveries');
 		const id = nanoid();
-		await db.deliveries.insert({
+		await col.insert({
 			id,
 			locationId: session.locationId,
 			stockItemId,
@@ -590,9 +590,9 @@ export async function logWaste(stockItemId: string, itemName: string, qty: numbe
 	const logger = loggedBy ?? session.userName ?? 'Staff';
 	
 	try {
-		const db = await getDb();
+		const col = getWritableCollection('stock_events');
 		const id = nanoid();
-		await db.stock_events.insert({
+		await col.insert({
 			id,
 			locationId: session.locationId,
 			stockItemId,
@@ -635,9 +635,9 @@ export async function adjustStock(
 	const logger = loggedBy ?? session.userName ?? 'Staff';
 	
 	try {
-		const db = await getDb();
+		const col = getWritableCollection('stock_events');
 		const id = nanoid();
-		await db.stock_events.insert({
+		await col.insert({
 			id,
 			locationId: session.locationId,
 			stockItemId,
@@ -684,20 +684,21 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
 	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === locId);
 	if (!item) return; // item not tracked in stock (e.g. packages themselves)
 	
-	const db = await getDb();
-	
+	const deductionsCol = getWritableCollection('deductions');
+	const deliveriesCol = getWritableCollection('deliveries');
+
 	try {
 		// Re-check stock inside transaction to prevent race conditions
 		const currentStock = getCurrentStock(item.id);
 		const deductQty = Math.min(qty, currentStock); // Never deduct more than available
-		
+
 		if (deductQty <= 0) {
 			console.warn(`[STOCK-DEDUCT] Insufficient stock for ${item.name}: have ${currentStock}, need ${qty}`);
 			return;
 		}
-		
+
 		// Insert deduction record
-		await db.deductions.insert({
+		await deductionsCol.insert({
 			id: nanoid(),
 			locationId: locId,
 			stockItemId: item.id,
@@ -722,14 +723,11 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
 			if (availableInBatch > 0) {
 				const deductNow = Math.min(availableInBatch, remainingToDeduct);
 				const newUsedQty = dUsed + deductNow;
-				const doc = await db.deliveries.findOne(d.id).exec();
-				if (doc) {
-					await doc.incrementalPatch({
-						usedQty: newUsedQty,
-						depleted: newUsedQty >= d.qty,
-						updatedAt: new Date().toISOString(),
-					});
-				}
+				await deliveriesCol.incrementalPatch(d.id, {
+					usedQty: newUsedQty,
+					depleted: newUsedQty >= d.qty,
+					updatedAt: new Date().toISOString(),
+				});
 				remainingToDeduct -= deductNow;
 				if (remainingToDeduct <= 0) break;
 			}
@@ -746,18 +744,19 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
  */
 export async function restoreStock(menuItemId: string, qty: number, orderId: string, locationId?: string) {
 	if (!browser) return;
-	const db = await getDb();
 	const locId = locationId ?? session.locationId ?? 'tag';
 	const item = stockItems.value.find(s => s.menuItemId === menuItemId && s.locationId === locId);
 	if (!item) return;
 
 	// 1. Find all deduction records for this order
-	const matchingDeductions = deductions.value.filter(d => 
+	const matchingDeductions = deductions.value.filter(d =>
 		d.stockItemId === item.id && d.orderId === orderId
 	);
 	if (matchingDeductions.length === 0) return;
 
 	const totalRestoreQty = matchingDeductions.reduce((sum, d) => sum + d.qty, 0);
+
+	const deliveriesCol = getWritableCollection('deliveries');
 
 	// 2. Roll back FIFO usedQty in deliveries (Newest First)
 	let remainingToRestore = totalRestoreQty;
@@ -769,17 +768,17 @@ export async function restoreStock(menuItemId: string, qty: number, orderId: str
 		const used = d.usedQty || 0;
 		const restoreNow = Math.min(used, remainingToRestore);
 		const newUsedQty = used - restoreNow;
-		
-		const dDoc = await db.deliveries.findOne(d.id).exec();
-		if (dDoc) await dDoc.incrementalPatch({ usedQty: newUsedQty, depleted: false, updatedAt: new Date().toISOString() });
+
+		await deliveriesCol.incrementalPatch(d.id, { usedQty: newUsedQty, depleted: false, updatedAt: new Date().toISOString() });
 
 		remainingToRestore -= restoreNow;
 		if (remainingToRestore <= 0) break;
 	}
 
 	// 3. Remove the deduction records
+	const deductionsCol = getWritableCollection('deductions');
 	for (const d of matchingDeductions) {
-		await db.deductions.findOne(d.id).remove();
+		await deductionsCol.remove(d.id);
 	}
 	log.stockRestored(item.name, totalRestoreQty, item.unit, orderId);
 }
@@ -818,10 +817,10 @@ export async function transferStock(stockItemMenuItemId: string, qty: number, fr
 
 export async function submitCount(stockItemId: string, period: CountPeriod, value: number) {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.stock_counts.findOne({ selector: { stockItemId } }).exec();
+	const col = getWritableCollection('stock_counts');
+	const doc = await col.findOne(stockItemId).exec();
 	if (doc) {
-		await doc.incrementalPatch({
+		await col.incrementalPatch(stockItemId, {
 			counted: { ...doc.counted, [period]: value },
 			updatedAt: new Date().toISOString(),
 		});
@@ -873,7 +872,6 @@ function hashCode(s: string): number {
 
 export async function updateStockItem(id: string, updates: Partial<StockItem>) {
 	if (!browser) return;
-	const db = await getDb();
-	const doc = await db.stock_items.findOne(id).exec();
-	if (doc) await doc.incrementalPatch({ ...updates, updatedAt: new Date().toISOString() });
+	const col = getWritableCollection('stock_items');
+	await col.incrementalPatch(id, { ...updates, updatedAt: new Date().toISOString() });
 }
