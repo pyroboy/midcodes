@@ -48,7 +48,7 @@ Read `BACKUP_REGIMEN.md` before implementing any backup, restore, or disaster re
 |----------|--------|
 | Can this feature work offline? | Depends on data mode: **full-rxdb** = full offline R/W. **selective-rxdb** = read-only offline (6 collections). **api-fetch** / **sse-only** = no offline. Cross-branch data always requires internet. |
 | Should I use SSE or Ably? | Phase 1 = SSE. Phase 2+ = Ably. Never mix both for the same use case. |
-| Should I poll or push? | **Always push.** Polling wastes LAN bandwidth and battery. Use SSE stream or Ably subscribe. |
+| Should I poll or push? | **Always push.** Polling wastes LAN bandwidth and battery. Use SSE stream or Ably subscribe. The server browser itself also uses SSE (not polling) for instant change delivery — see Resolved Issues §1. |
 | Can I open another SSE connection? | **No.** HTTP/1.1 limits to ~6 per host. Use the existing multiplexed stream at `/api/replication/stream`. |
 | Where does data live? | RxDB (operational truth, local) → Neon (analytical truth, cloud, Phase 2). Never reverse this. |
 | What if the main tablet crashes? | Other tablets operate locally. On restart, clients detect empty server and re-push all data. |
@@ -56,7 +56,7 @@ Read `BACKUP_REGIMEN.md` before implementing any backup, restore, or disaster re
 | What if ALL devices are lost? | Cloud backup (Phase 2) or air-gapped USB Drive B. Without either, seed data only. See disaster recovery scenarios in `BACKUP_REGIMEN.md`. |
 | Can this device write offline? | Only in `full-rxdb` mode (server tablet). `selective-rxdb` clients need the server for writes. `api-fetch` and `sse-only` have no offline capability. |
 | What data mode should this device use? | Server tablet → `full-rxdb`. Staff/kitchen thin client → `selective-rxdb`. Owner/admin on any browser → `api-fetch`. Passive kitchen display → `sse-only`. |
-| What happens when a thin client writes? | HTTP POST to `/api/collections/[col]/write` → server confirms synchronously → SSE broadcasts change to all devices. |
+| What happens when a thin client writes? | HTTP POST to `/api/collections/[col]/write` → server's `CollectionStore.push()` → `emit()` → SSE broadcasts instantly to **all** connected devices (including the server's own browser). |
 | How does a device know if it's the server? | `GET /api/device/identify` checks client IP against `os.networkInterfaces()`. Loopback or matching local IP = server. |
 | Can two branches sync directly? | **No.** Branches are blind to each other. Cross-branch = cloud only (Neon merge). |
 | Do branches need to know about each other? | **No.** Each branch uploads to Neon independently. Owner queries Neon for cross-branch views. |
@@ -95,7 +95,7 @@ Layer 5: REAL-TIME ALERTS 100-300ms Ably one-way publish (Phase 2b, optional lux
 
 | Aspect | Implementation |
 |--------|---------------|
-| **Intra-branch sync** | HTTP pull/push + multiplexed SSE (17 collections) |
+| **Intra-branch sync** | HTTP pull/push + multiplexed SSE (17 collections). Server browser uses SSE + 10s safety-net poll. |
 | **Kitchen real-time** | SSE with 3s debounce (same-branch only) |
 | **Cross-branch view** | SSE aggregate proxy (owner only, internet required) |
 | **Device monitoring** | RxDB `devices` collection + 30s heartbeat |
@@ -162,6 +162,42 @@ Layer 5: REAL-TIME ALERTS 100-300ms Ably one-way publish (Phase 2b, optional lux
 | **Tier 1** | No network | Full POS operation | Read cached data | Nothing | Nothing |
 | **Tier 2** | WiFi LAN only | + sync to all devices | + writes + sync | + reads/writes | + streaming |
 | **Tier 3** | LAN + Internet | + cross-branch view | + cross-branch | + cross-branch | + cross-branch |
+
+---
+
+## Resolved Issues & Lessons Learned
+
+### §1. Server Browser Not Receiving Instant Client Updates (2026-03-13)
+
+**Symptom:** When a thin client (e.g., kitchen staff on `/kitchen/dispatch`) bumped a KDS ticket, the server tablet's own `/kitchen/dispatch` page did not update in real-time. Changes only appeared after a 2-second poll cycle — or not at all.
+
+**Root Causes (two compounding bugs):**
+
+1. **Data mode not restored on page refresh.** The `dataMode` state in `data-mode.svelte.ts` defaulted to `'full-rxdb'` at module load time. `resolveDataMode()` was only called during login (`+page.svelte`'s `proceedWithLogin`), so a page refresh on a thin client silently reverted it to `full-rxdb`. This caused writes to go to local RxDB instead of the server's HTTP proxy — the server never received the data.
+
+   **Fix:** Added `restoreFromCache()` that reads `sessionStorage` at module initialization time, so `dataMode` has the correct value before any stores are created. Also added a `resolveDataMode()` call in the root `+layout.svelte` `onMount` for authenticated users, re-validating the mode on every page load.
+
+2. **Server browser used 2-second polling instead of SSE.** The original implementation excluded the server browser from SSE to avoid a "RESYNC storm" — Vite's HMR drops SSE connections frequently during dev, each reconnect triggered RESYNC on all 17 collections, which overwhelmed the circuit breaker. But this meant the server browser relied on a 2-second polling interval, so client writes (which go through the HTTP write endpoint → `CollectionStore.push()` → `emit()` → SSE) were never delivered instantly to the server's own UI.
+
+   **Fix:** Connected the server browser to the same SSE stream as all other devices. The RESYNC storm issue was solved with **gentle error handling for the server**: on SSE error, the server logs a warning and waits for auto-reconnect (no RESYNC). On reconnect, it does a **staggered resync of priority collections only** (100ms apart) instead of blasting all 17 at once. Secondary collections use a 10-second safety-net poll.
+
+**Full data flow (after fix):**
+```
+Client writes → HTTP POST /api/collections/[col]/write
+  → CollectionStore.push() (server memory)
+  → emit() to SSE listeners
+  → EventSource on ALL browsers (including server's own)
+  → RxDB pull stream RESYNC
+  → RxDB processes new docs → Svelte $state updates → UI re-renders
+```
+
+**Key Lessons:**
+- **Module-level initialization order matters.** Svelte 5 stores evaluate `$state()` at import time. If a helper like `getDataMode()` returns `full-rxdb` because `resolveDataMode()` hasn't run yet, every store created during module init will use the wrong data path.
+- **The server IS a client too.** The server's browser runs the same SvelteKit app as any thin client. When other devices write to the server's HTTP endpoints, the server's own browser must be notified — it doesn't magically see its own in-memory store changes.
+- **Gentle reconnect > no reconnect.** Excluding the server from SSE to avoid dev-mode noise created a real production bug. The better pattern: connect everyone to SSE, but make error handling role-aware (server = gentle, client = aggressive RESYNC).
+- **sessionStorage is critical for data mode persistence.** Without it, every page refresh is a race condition between module initialization and async `resolveDataMode()`.
+
+**Files changed:** `src/lib/stores/data-mode.svelte.ts`, `src/lib/db/replication.ts`, `src/routes/+layout.svelte`
 
 ---
 

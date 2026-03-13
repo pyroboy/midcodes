@@ -16,6 +16,15 @@ const ALL_COLLECTIONS = [
 	'floor_elements'
 ];
 
+/** Prefixes used by test/probe/diagnostic documents — must not leak to client replication */
+const TEST_DOC_PREFIXES = ['__repltest_', '__synctest_', '__syncprobe_', '__ping_', '__diag_'];
+
+function isTestDoc(doc: any): boolean {
+	const docId = doc?.id ?? doc?.stockItemId ?? '';
+	if (typeof docId !== 'string') return false;
+	return TEST_DOC_PREFIXES.some(p => docId.startsWith(p));
+}
+
 let _clientCounter = 0;
 let _activeClients = 0;
 
@@ -57,7 +66,14 @@ export const GET: RequestHandler = async (event) => {
 
 				const unsub = store.subscribe((changeEvent) => {
 					try {
-						const payload = JSON.stringify({ collection: name, ...changeEvent });
+						// Filter out test/probe docs that would poison client replication metadata
+						const filteredDocs = changeEvent.documents.filter((doc: any) => !isTestDoc(doc));
+						if (filteredDocs.length === 0) return;
+						const payload = JSON.stringify({
+							collection: name,
+							documents: filteredDocs,
+							checkpoint: changeEvent.checkpoint
+						});
 						controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
 					} catch {
 						// Client disconnected

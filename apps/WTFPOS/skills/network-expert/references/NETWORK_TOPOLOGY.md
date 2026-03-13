@@ -122,13 +122,20 @@ These are the collections POS staff and kitchen staff need for their core workfl
 ### Mode Selection Logic
 
 ```
-1. Call GET /api/device/identify → { isServer: boolean }
-2. If isServer === true → 'full-rxdb'
-3. Else, determine by session.role:
-   - staff, manager, kitchen → 'selective-rxdb'
-   - owner, admin → 'api-fetch'
-4. Result cached in sessionStorage ('wtfpos_data_mode') for reload performance
+ON MODULE LOAD (before any stores initialize):
+  1. Read sessionStorage('wtfpos_data_mode') → use as initial $state value
+     (prevents defaulting to 'full-rxdb' on thin clients after page refresh)
+
+ON MOUNT (root layout, every page load for authenticated users):
+  2. Call GET /api/device/identify → { isServer: boolean }
+  3. If isServer === true → 'full-rxdb'
+  4. Else, determine by session.role:
+     - staff, manager, kitchen → 'selective-rxdb'
+     - owner, admin → 'api-fetch'
+  5. Write result to sessionStorage for next reload
 ```
+
+> **Critical:** Step 1 (sessionStorage restore at module load) is essential. Without it, page refresh on thin clients defaults to `full-rxdb`, causing writes to route to local RxDB instead of the server proxy. This was a real bug — see SKILL.md Resolved Issues §1.
 
 ### Per-Mode Protocol Diagram
 
@@ -298,9 +305,15 @@ If priority sync stalls after **15 seconds** and the server has data (`total >= 
 
 **Exemption:** Server device (loopback IP) is never auto-recovered — its IndexedDB is canonical.
 
-### Server Polling Mode
+### Server Replication Mode (SSE + Safety-Net Poll)
 
-The **server device** (main tablet) does NOT use SSE for replication. Instead it polls every **2 seconds** by emitting `'RESYNC'` to all pull streams. This avoids Vite-induced RESYNC storms where the dev server's HMR drops SSE connections.
+The **server device** (main tablet) uses the **same SSE stream** as all other devices for instant change delivery. When a thin client writes to `/api/collections/[col]/write`, the server's in-memory `CollectionStore.push()` emits the change via SSE, and the server's own browser receives it immediately.
+
+**Gentle error handling:** Unlike thin clients (which fire RESYNC on all collections on SSE error), the server's SSE error handler simply logs a warning and waits for auto-reconnect. On reconnect, it does a **staggered resync of priority collections only** (100ms apart) to avoid overwhelming the circuit breaker.
+
+**Safety-net poll:** Secondary collections (Tier 2) poll every **10 seconds** as a fallback. Priority collections rely solely on SSE.
+
+> **History:** Previously, the server used 2-second polling (no SSE) to avoid Vite HMR-induced RESYNC storms during development. This caused a critical bug where client writes were not instantly visible on the server's own UI. Fixed 2026-03-13 — see SKILL.md §1.
 
 ### Circuit Breaker (Shared)
 
@@ -343,8 +356,8 @@ interface SyncActivity {
 ### Data Flow
 
 ```
-WRITE PATH (Tablet A → Server → Tablet B)
-──────────────────────────────────────────
+WRITE PATH (Tablet A → Server → ALL other devices including server browser)
+──────────────────────────────────────────────────────────────────────────
 Tablet A: RxDB.orders.insert({...order, updatedAt: now})
   ↓ [RxDB replication handler fires]
   POST /api/replication/orders/push
@@ -353,16 +366,26 @@ Tablet A: RxDB.orders.insert({...order, updatedAt: now})
   Server: CollectionStore.push()
     → compares assumedMasterState vs current → detects conflicts
     → if no conflict: updates Map + marks sorted index dirty
-    → emits change event to SSE subscribers
+    → emits change event to ALL SSE subscribers
+  ↓ (broadcast to every connected EventSource)
+  ├─ Tablet B (thin client): SSE → RESYNC → pull → RxDB → UI
+  └─ Server browser: SSE → RESYNC → pull → RxDB → UI  ← same path!
   ↓
-  Tablet B: SSE stream receives { collection: 'orders', documents: [...], checkpoint }
-  ↓
-  Tablet B: RxDB replication handler → pulls next batch
-    GET /api/replication/orders/pull?updatedAt=...&id=...&limit=500
+  Pull: GET /api/replication/orders/pull?updatedAt=...&id=...&limit=500
   ↓
   Server: binary search finds checkpoint → returns next 500 docs
   ↓
-  Tablet B: integrates into local RxDB/IndexedDB
+  Device: integrates into local RxDB/IndexedDB → Svelte $state → UI update
+
+THIN-CLIENT WRITE PATH (client → server HTTP → SSE broadcast)
+──────────────────────────────────────────────────────────────
+Client: App → write-proxy → HTTP POST /api/collections/orders/write
+  ↓
+  Server: validates → CollectionStore.push() → emit()
+  ↓ (SSE broadcast)
+  ├─ Server browser: instant update via SSE
+  ├─ Other thin clients: SSE → RESYNC → pull
+  └─ Client that wrote: server confirms synchronously (200 OK)
 ```
 
 ### Replicated Collections (17)
