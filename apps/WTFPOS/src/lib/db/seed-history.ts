@@ -692,6 +692,7 @@ export async function seedHistory(db: RxDatabase) {
 
             utilityAuditEntries.push({
                 id: nanoid(),
+                locationId: branch,
                 isoTimestamp: date.toISOString(),
                 timestamp: date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
                 user: 'Manager',

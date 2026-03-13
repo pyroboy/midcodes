@@ -47,6 +47,26 @@ function scheduleResync(collection: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Per-document write queue — serializes concurrent writes to the same doc ID.
+// Without this, concurrent incrementalModify calls (e.g. adding 15 items to an
+// order) all read the same stale base document and overwrite each other.
+// This mirrors what RxDB does internally for its incrementalModify.
+// ---------------------------------------------------------------------------
+
+const _writeQueues = new Map<string, Promise<any>>();
+
+function enqueue<T>(key: string, fn: () => Promise<T>): Promise<T> {
+	const prev = _writeQueues.get(key) ?? Promise.resolve();
+	const next = prev.then(fn, fn); // run fn even if previous write failed
+	_writeQueues.set(key, next);
+	// Clean up the map entry when the chain settles to avoid memory leaks
+	next.then(() => {
+		if (_writeQueues.get(key) === next) _writeQueues.delete(key);
+	});
+	return next;
+}
+
+// ---------------------------------------------------------------------------
 // Server-backed implementation (SSE / API-fetch modes)
 // ---------------------------------------------------------------------------
 
@@ -54,15 +74,16 @@ function createServerProxy(collectionName: string): CollectionProxy {
 	const baseUrl = `/api/collections/${collectionName}`;
 
 	async function serverFindOne(id: string): Promise<any | null> {
-		const res = await fetch(`${baseUrl}/read`);
+		// Use ?id= param to fetch a single document — avoids pulling the entire collection
+		// which can be huge for orders (hundreds of docs) and cause mobile timeouts.
+		const res = await fetch(`${baseUrl}/read?id=${encodeURIComponent(id)}`);
 		if (!res.ok) return null;
 		const data = await res.json();
-		// The read endpoint returns { documents: [...], checkpoint } — unwrap it
-		const docs: any[] = Array.isArray(data) ? data : (data.documents ?? []);
-		const pkField = getPk(collectionName);
-		// Filter out soft-deleted docs — they're still in the store but logically removed
-		return docs.find((d: any) => d[pkField] === id && !d._deleted) ?? null;
+		return data.document ?? null;
 	}
+
+	/** Queue key scoped to collection + document ID */
+	function qk(id: string) { return `${collectionName}:${id}`; }
 
 	return {
 		async insert(doc: any): Promise<any> {
@@ -83,31 +104,35 @@ function createServerProxy(collectionName: string): CollectionProxy {
 			};
 		},
 
-		async incrementalPatch(id: string, patch: Record<string, any>): Promise<any> {
-			const res = await fetch(`${baseUrl}/write`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ operation: 'patch', id, data: patch }),
+		incrementalPatch(id: string, patch: Record<string, any>): Promise<any> {
+			return enqueue(qk(id), async () => {
+				const res = await fetch(`${baseUrl}/write`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ operation: 'patch', id, data: patch }),
+				});
+				if (!res.ok) throw new Error(`Patch failed: ${res.status}`);
+				const result = await res.json();
+				scheduleResync(collectionName);
+				return result;
 			});
-			if (!res.ok) throw new Error(`Patch failed: ${res.status}`);
-			const result = await res.json();
-			scheduleResync(collectionName);
-			return result;
 		},
 
-		async incrementalModify(id: string, fn: (doc: any) => any): Promise<any> {
-			const current = await serverFindOne(id);
-			if (!current) throw new Error(`Document ${id} not found in ${collectionName}`);
-			const modified = fn(current);
-			const res = await fetch(`${baseUrl}/write`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ operation: 'patch', id, data: modified }),
+		incrementalModify(id: string, fn: (doc: any) => any): Promise<any> {
+			return enqueue(qk(id), async () => {
+				const current = await serverFindOne(id);
+				if (!current) throw new Error(`Document ${id} not found in ${collectionName}`);
+				const modified = fn(current);
+				const res = await fetch(`${baseUrl}/write`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ operation: 'patch', id, data: modified }),
+				});
+				if (!res.ok) throw new Error(`Modify failed: ${res.status}`);
+				const result = await res.json();
+				scheduleResync(collectionName);
+				return result;
 			});
-			if (!res.ok) throw new Error(`Modify failed: ${res.status}`);
-			const result = await res.json();
-			scheduleResync(collectionName);
-			return result;
 		},
 
 		async remove(id: string): Promise<void> {

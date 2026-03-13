@@ -60,18 +60,22 @@ export function tableSalesToday() {
 
 export function bestSellersMeat() {
 	const locId = session.locationId;
+	// Build lookup maps once — avoids O(N) .find() per deduction
+	const stockById = new Map(stockItems.value.map(s => [s.id, s]));
+	const menuById = new Map(menuItems.value.map(m => [m.id, m]));
+
 	const weightByItem: Record<string, number> = {};
 	for (const ded of deductions.value) {
-		const stockItem = stockItems.value.find(s => s.id === ded.stockItemId);
+		const stockItem = stockById.get(ded.stockItemId);
 		if (!stockItem) continue;
 		if (locId !== 'all' && stockItem.locationId !== locId) continue;
-		const menuItem = menuItems.value.find(m => m.id === stockItem.menuItemId && m.isWeightBased);
-		if (!menuItem) continue;
+		const menuItem = menuById.get(stockItem.menuItemId);
+		if (!menuItem || !menuItem.isWeightBased) continue;
 		weightByItem[menuItem.id] = (weightByItem[menuItem.id] ?? 0) + ded.qty;
 	}
 	return Object.entries(weightByItem)
 		.map(([id, weight]) => {
-			const item = menuItems.value.find(m => m.id === id)!;
+			const item = menuById.get(id)!;
 			const revenue = weight * (item.pricePerGram ?? 0);
 			return { name: item.name, weightGrams: weight, revenue };
 		})
@@ -80,11 +84,14 @@ export function bestSellersMeat() {
 }
 
 export function bestSellersAddons() {
+	// Build lookup map once — avoids O(N) .find() per order item
+	const menuById = new Map(menuItems.value.map(m => [m.id, m]));
+
 	const qtsByItem: Record<string, { name: string; qty: number; revenue: number }> = {};
 	for (const order of getOrders().filter(o => o.status === 'paid')) {
 		for (const item of order.items) {
 			if (item.tag === 'FREE' || item.tag === 'PKG') continue;
-			const menuItem = menuItems.value.find(m => m.id === item.menuItemId);
+			const menuItem = menuById.get(item.menuItemId);
 			if (!menuItem || menuItem.isWeightBased || menuItem.category === 'packages') continue;
 			if (!qtsByItem[item.menuItemId]) qtsByItem[item.menuItemId] = { name: item.menuItemName, qty: 0, revenue: 0 };
 			qtsByItem[item.menuItemId].qty += item.quantity;
@@ -941,18 +948,21 @@ export function bestSellersMeatPeriod(period?: 'today' | 'week' | 'month'): Retu
 	                        	return { start, end };
 	                        })();
 	const locId = session.locationId;
+	const stockById = new Map(stockItems.value.map(s => [s.id, s]));
+	const menuById = new Map(menuItems.value.map(m => [m.id, m]));
+
 	const weightByItem: Record<string, number> = {};
 	for (const ded of deductions.value.filter(d => isInRange(d.timestamp, start, end))) {
-		const stockItem = stockItems.value.find(s => s.id === ded.stockItemId);
+		const stockItem = stockById.get(ded.stockItemId);
 		if (!stockItem) continue;
 		if (locId !== 'all' && stockItem.locationId !== locId) continue;
-		const menuItem = menuItems.value.find(m => m.id === stockItem.menuItemId && m.isWeightBased);
-		if (!menuItem) continue;
+		const menuItem = menuById.get(stockItem.menuItemId);
+		if (!menuItem || !menuItem.isWeightBased) continue;
 		weightByItem[menuItem.id] = (weightByItem[menuItem.id] ?? 0) + ded.qty;
 	}
 	return Object.entries(weightByItem)
 		.map(([id, weight]) => {
-			const item = menuItems.value.find(m => m.id === id)!;
+			const item = menuById.get(id)!;
 			const revenue = weight * (item.pricePerGram ?? 0);
 			return { name: item.name, weightGrams: weight, revenue };
 		})
@@ -963,6 +973,8 @@ export function bestSellersMeatPeriod(period?: 'today' | 'week' | 'month'): Retu
 /** Period-aware best-sellers for add-ons */
 export function bestSellersAddonsPeriod(period?: 'today' | 'week' | 'month'): ReturnType<typeof bestSellersAddons> {
 	if (!period) return bestSellersAddons();
+	const menuById = new Map(menuItems.value.map(m => [m.id, m]));
+
 	const now = new Date();
 	const todayKey = now.toISOString().slice(0, 10);
 	const thisWeekKey = toWeekKey(now.toISOString());
@@ -977,7 +989,7 @@ export function bestSellersAddonsPeriod(period?: 'today' | 'week' | 'month'): Re
 	for (const order of filtered) {
 		for (const item of order.items) {
 			if (item.tag === 'FREE' || item.tag === 'PKG') continue;
-			const menuItem = menuItems.value.find(m => m.id === item.menuItemId);
+			const menuItem = menuById.get(item.menuItemId);
 			if (!menuItem || menuItem.isWeightBased || menuItem.category === 'packages') continue;
 			if (!qtsByItem[item.menuItemId]) qtsByItem[item.menuItemId] = { name: item.menuItemName, qty: 0, revenue: 0 };
 			qtsByItem[item.menuItemId].qty += item.quantity;

@@ -1,7 +1,17 @@
 /**
  * Pure item pricing logic — no side effects, safe to unit test.
  */
-import type { MenuItem } from '$lib/types';
+import type { MenuItem, OrderItem } from '$lib/types';
+
+/** Returns non-cancelled items from an order's item list. */
+export function getActiveItems(items: OrderItem[]): OrderItem[] {
+	return items.filter(i => i.status !== 'cancelled');
+}
+
+/** Returns billable items (active, non-FREE). */
+export function getBillableItems(items: OrderItem[]): OrderItem[] {
+	return items.filter(i => i.status !== 'cancelled' && i.tag !== 'FREE');
+}
 
 type ItemInput = Pick<MenuItem, 'category' | 'price' | 'isWeightBased' | 'pricePerGram' | 'isFree'>;
 

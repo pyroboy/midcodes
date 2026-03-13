@@ -72,7 +72,7 @@ export const floorElementSchema: RxJsonSchema<any> = {
 // ─── Order ───────────────────────────────────────────────────────────────────
 export const orderSchema: RxJsonSchema<any> = {
 	title: 'order schema',
-	version: 12,
+	version: 13,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -105,7 +105,11 @@ export const orderSchema: RxJsonSchema<any> = {
 					sentAt: { type: ['string', 'null'] },
 					tag: { type: ['string', 'null'] },
 					notes: { type: 'string' },
-					addedAt: { type: 'string' }
+					addedAt: { type: 'string' },
+					cancelReason: { type: 'string' },
+					cancelledAt: { type: 'string' },
+					acknowledgedBy: { type: 'string' },
+					acknowledgedAt: { type: 'string' }
 				},
 				required: ['id', 'menuItemId', 'menuItemName', 'quantity', 'unitPrice', 'status']
 			}
@@ -323,11 +327,13 @@ export const deductionSchema: RxJsonSchema<any> = {
 // ─── Stock Count ─────────────────────────────────────────────────────────────
 export const stockCountSchema: RxJsonSchema<any> = {
 	title: 'stock count schema',
-	version: 2,
+	version: 3,
 	primaryKey: 'stockItemId',
 	type: 'object',
 	properties: {
 		stockItemId: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
+		date: { type: ['string', 'null'], maxLength: 10 },
 		counted: {
 			type: 'object',
 			properties: {
@@ -338,8 +344,8 @@ export const stockCountSchema: RxJsonSchema<any> = {
 		},
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['stockItemId', 'counted', 'updatedAt'],
-	indexes: ['updatedAt']
+	required: ['stockItemId', 'locationId', 'counted', 'updatedAt'],
+	indexes: ['locationId', 'updatedAt']
 };
 
 // ─── Device ─────────────────────────────────────────────────────────────────
@@ -477,11 +483,12 @@ export const readingSchema: RxJsonSchema<any> = {
 // ─── Audit Log ───────────────────────────────────────────────────────────────
 export const auditLogSchema: RxJsonSchema<any> = {
 	title: 'audit log schema',
-	version: 0,
+	version: 1,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
 		id: { type: 'string', maxLength: 100 },
+		locationId: { type: 'string', maxLength: 100 },
 		isoTimestamp: { type: 'string', maxLength: 30 },
 		timestamp: { type: 'string' },
 		user: { type: 'string' },
@@ -492,8 +499,8 @@ export const auditLogSchema: RxJsonSchema<any> = {
 		meta: { type: 'string' },
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['id', 'isoTimestamp', 'timestamp', 'user', 'role', 'action', 'description', 'branch', 'updatedAt'],
-	indexes: ['isoTimestamp', 'action', 'updatedAt']
+	required: ['id', 'locationId', 'isoTimestamp', 'timestamp', 'user', 'role', 'action', 'description', 'branch', 'updatedAt'],
+	indexes: ['locationId', 'isoTimestamp', 'action', ['locationId', 'isoTimestamp'], 'updatedAt']
 };
 
 // ─── Shift (Cash Float / Opening Drawer) ─────────────────────────────────────
@@ -515,29 +522,6 @@ export const shiftsSchema: RxJsonSchema<any> = {
 	},
 	required: ['id', 'locationId', 'cashierName', 'openingFloat', 'startedAt', 'status', 'updatedAt'],
 	indexes: ['locationId', 'status', ['locationId', 'status'], 'updatedAt']
-};
-
-// ─── Kitchen Alert ───────────────────────────────────────────────────────────
-export const kitchenAlertSchema: RxJsonSchema<any> = {
-	title: 'kitchen alert schema',
-	version: 0,
-	primaryKey: 'id',
-	type: 'object',
-	properties: {
-		id: { type: 'string', maxLength: 100 },
-		orderId: { type: 'string', maxLength: 100 },
-		tableNumber: { type: ['number', 'null'] },
-		itemName: { type: 'string' },
-		reason: { type: 'string' },
-		createdAt: { type: 'string' },
-		acknowledgedBy: { type: 'string' },
-		acknowledgedAt: { type: 'string' },
-		itemId: { type: 'string' },
-		restoredStock: { type: 'boolean' },
-		updatedAt: { type: 'string', maxLength: 30 }
-	},
-	required: ['id', 'orderId', 'itemName', 'reason', 'createdAt', 'updatedAt'],
-	indexes: ['orderId', 'updatedAt']
 };
 
 // ─── Expense Template ───────────────────────────────────────────────────────

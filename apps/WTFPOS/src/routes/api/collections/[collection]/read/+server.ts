@@ -16,6 +16,14 @@ export const GET: RequestHandler = ({ params, url }) => {
 
 	const { documents, checkpoint } = store.pull(null, Infinity);
 
+	// Single-document lookup by ID — avoids sending the entire collection to thin clients
+	const docId = url.searchParams.get('id');
+	if (docId) {
+		const pkField = collection === 'stock_counts' ? 'stockItemId' : 'id';
+		const doc = documents.find((d: any) => d[pkField] === docId && !d._deleted) ?? null;
+		return json({ document: doc });
+	}
+
 	const locationId = url.searchParams.get('locationId');
 	const filtered = locationId
 		? documents.filter((doc: any) => doc.locationId === locationId)

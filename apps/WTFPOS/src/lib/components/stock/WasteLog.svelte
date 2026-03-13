@@ -152,13 +152,17 @@
 	async function handlePinConfirmed() {
 		if (!canSave || !selectedItem) return;
 		showPinModal = false;
-		await logWaste(selectedStockId, selectedItem.name, parseFloat(qty) || 0, unit, reason, session.userName);
-		selectedStockId = '';
-		qty = '';
-		reason = '';
-		if (saveTimer) clearTimeout(saveTimer);
-		saved = true;
-		saveTimer = setTimeout(() => { saved = false; showModal = false; }, 1500);
+		try {
+			await logWaste(selectedStockId, selectedItem.name, parseFloat(qty) || 0, unit, reason, session.userName);
+			selectedStockId = '';
+			qty = '';
+			reason = '';
+			if (saveTimer) clearTimeout(saveTimer);
+			saved = true;
+			saveTimer = setTimeout(() => { saved = false; showModal = false; }, 1500);
+		} catch (err) {
+			console.error('[WasteLog] logWaste failed:', err);
+		}
 	}
 </script>
 

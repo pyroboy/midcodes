@@ -51,8 +51,8 @@ const PRIORITY_COLLECTIONS = [
 
 // Priority tier 2: everything else (history, stock, reports)
 const SECONDARY_COLLECTIONS = [
-	'stock_items', 'deliveries', 'waste', 'deductions', 'adjustments',
-	'expenses', 'stock_counts', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
+	'stock_items', 'deliveries', 'stock_events', 'deductions',
+	'expenses', 'stock_counts', 'readings', 'audit_logs',
 	'shifts'
 ];
 

@@ -9,7 +9,7 @@ import { getWritableCollection } from '$lib/db/write-proxy';
 import { closeTable, tables } from '$lib/stores/pos/tables.svelte';
 import { orders } from '$lib/stores/pos/orders.svelte';
 import { getOrderLabel } from '$lib/stores/pos/label.utils';
-import { calculateEqualSplit } from '$lib/stores/pos/payment.utils';
+import { calculateEqualSplit, formatPaymentMethod } from '$lib/stores/pos/payment.utils';
 
 // ─── Direct Checkout (cash / GCash / Maya) ───────────────────────────────────
 
@@ -41,7 +41,7 @@ export async function checkoutOrder(
 
 	const order = orders.value.find(o => o.id === orderId);
 	const methodLabel = payments.length === 1
-		? (payments[0].method === 'gcash' ? 'GCash' : payments[0].method === 'maya' ? 'Maya' : 'Cash')
+		? formatPaymentMethod(payments[0].method)
 		: 'Split';
 	const label = getOrderLabel(order, tableId);
 
@@ -87,8 +87,9 @@ export async function confirmHeldPayment(orderId: string) {
 
 	if (order.tableId) await closeTable(order.tableId);
 
-	log.paymentConfirmed(label, order.total, method === 'gcash' ? 'GCash' : 'Maya');
-	log.tableClosed(label, order.total, method === 'gcash' ? 'GCash' : 'Maya', capturedElapsed ?? undefined);
+	const methodLabel = formatPaymentMethod(method);
+	log.paymentConfirmed(label, order.total, methodLabel);
+	log.tableClosed(label, order.total, methodLabel, capturedElapsed ?? undefined);
 }
 
 export async function cancelHeldPayment(orderId: string) {
@@ -225,8 +226,7 @@ export async function paySubBill(orderId: string, subBillId: string, method: Pay
 	});
 
 	const tableLabel = getOrderLabel(order, tableId);
-	const methodLabel = method === 'gcash' ? 'GCash' : method === 'maya' ? 'Maya' : method === 'card' ? 'Card' : 'Cash';
-	log.subBillPaid(guestLabel, tableLabel, amount, methodLabel);
+	log.subBillPaid(guestLabel, tableLabel, amount, formatPaymentMethod(method));
 
 	if (allPaid && tableId) {
 		const capturedElapsed = tables.value.find(t => t.id === tableId)?.elapsedSeconds ?? undefined;

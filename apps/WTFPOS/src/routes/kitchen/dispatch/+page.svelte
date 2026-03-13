@@ -3,7 +3,8 @@
 	import { orders, markItemServed } from '$lib/stores/pos.svelte';
 	import { log } from '$lib/stores/audit.svelte';
 	import type { KdsTicketItem } from '$lib/types';
-	import { formatCountdown, cn } from '$lib/utils';
+	import { cn } from '$lib/utils';
+	import { mergeTicketsByOrder, urgencyLevel, timerBadgeClass, timerText } from '$lib/stores/pos/kds.utils';
 	import { getPkgColors } from '$lib/stores/pos/utils';
 	import { untrack } from 'svelte';
 
@@ -33,35 +34,12 @@
 	}
 
 	const dispatchCards = $derived.by((): DispatchTableCard[] => {
-		// Merge all tickets by orderId
-		const byOrder = new Map<string, {
-			orderId: string;
-			tableNumber: number | null;
-			customerName?: string;
-			createdAt: string;
-			items: KdsTicketItem[];
-		}>();
-
-		for (const t of kdsTickets.value) {
-			const existing = byOrder.get(t.orderId);
-			if (existing) {
-				existing.items = [...existing.items, ...t.items];
-				if (t.createdAt < existing.createdAt) existing.createdAt = t.createdAt;
-			} else {
-				byOrder.set(t.orderId, {
-					orderId: t.orderId,
-					tableNumber: t.tableNumber,
-					customerName: t.customerName,
-					createdAt: t.createdAt,
-					items: [...t.items]
-				});
-			}
-		}
+		const merged = mergeTicketsByOrder(kdsTickets.value);
 
 		// Look up pax from orders store
 		const orderMap = new Map(orders.value.map((o) => [o.id, o]));
 
-		return Array.from(byOrder.values())
+		return merged
 			.map((ticket) => {
 				const active = ticket.items.filter((i) => i.status !== 'cancelled' && i.category !== 'packages');
 
@@ -246,26 +224,7 @@
 		}
 	}
 
-	// ── Urgency ──
-	const WARN_MS = 5 * 60_000;
-	const CRIT_MS = 10 * 60_000;
-
-	function urgencyLevel(createdAt: string): 'critical' | 'warning' | 'normal' {
-		const ms = now - new Date(createdAt).getTime();
-		if (ms > CRIT_MS) return 'critical';
-		if (ms > WARN_MS) return 'warning';
-		return 'normal';
-	}
-
-	function timerText(createdAt: string): string {
-		return formatCountdown(Math.floor((now - new Date(createdAt).getTime()) / 1000));
-	}
-
-	function timerBadgeClass(level: ReturnType<typeof urgencyLevel>) {
-		if (level === 'critical') return 'bg-status-red text-white';
-		if (level === 'warning') return 'bg-status-yellow text-gray-900';
-		return 'bg-gray-100 text-gray-600';
-	}
+	// Urgency, timer — from shared kds.utils
 
 	// ── Station status helpers ──
 	function stationStatusIcon(allDone: boolean, total: number): string {
@@ -413,7 +372,7 @@
 		{:else}
 			<div class="grid gap-3 sm:gap-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));">
 				{#each dispatchCards as card (card.orderId)}
-					{@const urgency = urgencyLevel(card.createdAt)}
+					{@const urgency = urgencyLevel(card.createdAt, now)}
 					{@const elapsedMin = Math.floor((now - new Date(card.createdAt).getTime()) / 60_000)}
 					{@const cardPkg = getPkgColors(card.packageId)}
 
@@ -447,7 +406,7 @@
 								{/if}
 							</div>
 							<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
-								{timerText(card.createdAt)}
+								{timerText(card.createdAt, now)}
 							</span>
 						</div>
 

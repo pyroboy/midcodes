@@ -2,6 +2,18 @@
  * Pure payment calculations — no side effects, safe to unit test.
  */
 
+const PAYMENT_LABELS: Record<string, string> = {
+	cash: 'Cash',
+	gcash: 'GCash',
+	maya: 'Maya',
+	card: 'Card',
+};
+
+/** Formats a payment method code to its display label. */
+export function formatPaymentMethod(method: string): string {
+	return PAYMENT_LABELS[method] ?? method;
+}
+
 /**
  * Distributes a total peso amount equally across N sub-bills.
  * When total doesn't divide evenly, the first `remainder` guests each pay ₱1 more.

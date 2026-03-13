@@ -133,6 +133,10 @@ export interface OrderItem {
 	tag: 'PKG' | 'FREE' | null;
 	notes?: string;
 	addedAt?: string;
+	cancelReason?: string;
+	cancelledAt?: string;
+	acknowledgedBy?: string;
+	acknowledgedAt?: string;
 }
 
 export interface DiscountEntry {

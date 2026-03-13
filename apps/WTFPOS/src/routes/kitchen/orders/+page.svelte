@@ -2,7 +2,8 @@
 	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, recallTicket, REFILL_NOTE, orders } from '$lib/stores/pos.svelte';
 	import type { KdsTicket, KdsTicketItem } from '$lib/types';
 	import { refuseItem } from '$lib/stores/alert.svelte';
-	import { formatCountdown, formatTimeAgo, formatDisplayId, cn } from '$lib/utils';
+	import { formatTimeAgo, formatDisplayId, cn } from '$lib/utils';
+	import { mergeTicketsByOrder, urgencyLevel as _urgencyLevel, timerBadgeClass, ticketBorderClass as _ticketBorderClass, timerText as _timerText, ticketProgress } from '$lib/stores/pos/kds.utils';
 	import { printKitchenOrder } from '$lib/stores/hardware.svelte';
 	import { TriangleAlert, Check, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { untrack } from 'svelte';
@@ -58,7 +59,7 @@
 	function ageMs(createdAt: string) { return now - new Date(createdAt).getTime(); }
 
 	function timerText(createdAt: string): string {
-		return formatCountdown(Math.floor(ageMs(createdAt) / 1000));
+		return _timerText(createdAt, now);
 	}
 
 	// ── Active Tickets (merged by orderId, sorted oldest-first) ──
@@ -274,35 +275,21 @@
 	}
 
 	// ── Urgency Styling ──
-	const WARN_MS  = 5  * 60_000;
-	const CRIT_MS  = 10 * 60_000;
-
-	function urgencyLevel(createdAt: string): 'critical' | 'warning' | 'normal' {
-		const ms = ageMs(createdAt);
-		if (ms > CRIT_MS) return 'critical';
-		if (ms > WARN_MS) return 'warning';
-		return 'normal';
+	function urgencyLevel(createdAt: string) {
+		return _urgencyLevel(createdAt, now);
 	}
 
+	// Orders page has custom border classes with bg-colors and yellow animation
 	function ticketBorderClass(level: ReturnType<typeof urgencyLevel>) {
 		if (level === 'critical') return 'border-status-red animate-border-pulse-red bg-status-red-light';
 		if (level === 'warning')  return 'border-status-yellow animate-border-pulse-yellow bg-status-yellow-light';
 		return 'border-border bg-surface';
 	}
 
-	function timerBadgeClass(level: ReturnType<typeof urgencyLevel>) {
-		if (level === 'critical') return 'bg-status-red text-white';
-		if (level === 'warning')  return 'bg-status-yellow text-gray-900';
-		return 'bg-gray-100 text-gray-600';
-	}
-
-	// ── Progress ──
-	function ticketProgress(ticket: KdsTicket) {
+	// ── Progress (filters cancelled first — different from shared ticketProgress) ──
+	function orderTicketProgress(ticket: KdsTicket) {
 		const active = ticket.items.filter(i => i.status !== 'cancelled');
-		const total = active.length;
-		const served = active.filter(i => i.status === 'served').length;
-		const pct = total > 0 ? (served / total) * 100 : 0;
-		return { served, total, pct };
+		return ticketProgress(active);
 	}
 
 	// ── Group Items (served items STAY visible, only cancelled + packages filtered out) ──
@@ -523,7 +510,7 @@
 	<div class="grid gap-3 sm:gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));">
 		{#each activeTickets as ticket (ticket.orderId)}
 			{@const grouped = groupItems(ticket.items)}
-			{@const progress = ticketProgress(ticket)}
+			{@const progress = orderTicketProgress(ticket)}
 			{@const isNew = newTicketIds.has(ticket.orderId)}
 			{@const urgency = urgencyLevel(ticket.createdAt)}
 			{@const printFailed = localPrintStatus.get(ticket.orderId) === 'failed'}

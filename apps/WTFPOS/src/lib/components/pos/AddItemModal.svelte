@@ -146,13 +146,13 @@
         }
     }
 
-    function chargeToOrder() {
+    async function chargeToOrder() {
         if (!order) return;
         const count = pendingItems.length;
         for (const p of pendingItems) {
             const noteParts = [p.isTakeout ? '[TAKEOUT]' : '', p.notes?.trim() ?? ''].filter(Boolean);
             const notes = noteParts.length > 0 ? noteParts.join(' — ') : undefined;
-            addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree, notes);
+            await addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree, notes);
         }
         pendingItems = [];
         oncharged?.(count);

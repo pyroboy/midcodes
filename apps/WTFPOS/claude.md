@@ -521,13 +521,13 @@ All data is persisted in **RxDB v16** using IndexedDB (Dexie) in the browser. Be
 | `waste`          | 3        | `id`         | Waste log entries                              |
 | `deductions`     | 2        | `id`         | Auto-deductions tied to order items            |
 | `adjustments`    | 3        | `id`         | Manual stock add/deduct adjustments            |
-| `stock_counts`   | 2        | `stockItemId`| AM10/PM4/PM10 count slots — one doc per item  |
+| `stock_counts`   | 3        | `stockItemId`| AM10/PM4/PM10 count slots — one doc per item + date/locationId for cloud archival |
 | `devices`        | 1        | `id`         | Device heartbeat registry                      |
 | `expenses`       | 3        | `id`         | Per-location cash/card expenses                |
 | `kds_tickets`    | 5        | `id`         | Kitchen display tickets; `bumpedAt` = history  |
 | `x_reads`        | 2        | `id`         | BIR X-Reading snapshots                        |
 | `z_reads`        | 0        | `id`         | EOD Z-Readings (business date close)           |
-| `audit_logs`     | 0        | `id`         | Immutable action log; `meta` is JSON string    |
+| `audit_logs`     | 1        | `id`         | Immutable action log; has `locationId` + legacy `branch` display string |
 | `kitchen_alerts` | 0        | `id`         | Refuse/out-of-stock alerts from kitchen        |
 
 > **Schema version bumps** require a migration strategy in `db/index.ts`. Never bump without a migration.

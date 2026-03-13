@@ -84,6 +84,9 @@ export interface Deduction {
 
 export interface StockCount {
 	stockItemId: string;
+	locationId: string;
+	/** Business date (YYYY-MM-DD) — null for legacy docs migrated before date tracking */
+	date: string | null;
 	counted: Record<CountPeriod, number | null>;
 	updatedAt: string;
 }
@@ -244,6 +247,8 @@ export const INITIAL_DEDUCTIONS: Deduction[] = [];
 
 export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => ({
 	stockItemId: s.id,
+	locationId: s.locationId,
+	date: new Date().toISOString().slice(0, 10),
 	counted: {
 		am10: getMorningCount(s.menuItemId, s.locationId),
 		pm4: getAfternoonCount(s.menuItemId, s.locationId),
@@ -308,16 +313,38 @@ export const countPeriods = $state<{ id: CountPeriod; label: string; time: strin
 	{ id: 'pm10', label: 'Evening',   time: '10:00 PM', status: 'pending' },
 ]);
 
-/** Get the current stock for a stock item, computed reactively */
+// ─── Memoized stock cache ─────────────────────────────────────────────────────
+// Pre-computes ALL stock levels in a single O(N) pass when underlying stores change.
+// Components call getCurrentStock(id) which is now O(1) lookup instead of O(N) per call.
+const _stockCache = $derived.by(() => {
+	// Build opening stock map
+	const cache = new Map<string, number>();
+	for (const item of stockItems.value) {
+		cache.set(item.id, item.openingStock);
+	}
+	// Add deliveries
+	for (const d of deliveries.value) {
+		const prev = cache.get(d.stockItemId);
+		if (prev !== undefined) cache.set(d.stockItemId, prev + d.qty);
+	}
+	// Subtract deductions
+	for (const d of deductions.value) {
+		const prev = cache.get(d.stockItemId);
+		if (prev !== undefined) cache.set(d.stockItemId, prev - d.qty);
+	}
+	// Apply stock events (waste/deduct subtract, add adds)
+	for (const e of stockEvents.value) {
+		const prev = cache.get(e.stockItemId);
+		if (prev === undefined) continue;
+		if (e.type === 'add') cache.set(e.stockItemId, prev + e.qty);
+		else cache.set(e.stockItemId, prev - e.qty); // waste or deduct
+	}
+	return cache;
+});
+
+/** Get the current stock for a stock item — O(1) lookup from memoized cache */
 export function getCurrentStock(stockItemId: string): number {
-	const item = stockItems.value.find(s => s.id === stockItemId);
-	if (!item) return 0;
-	const totalDelivered  = deliveries.value.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
-	const events = stockEvents.value.filter(e => e.stockItemId === stockItemId);
-	const totalEventsOut = events.filter(e => e.type === 'waste' || e.type === 'deduct').reduce((s, e) => s + e.qty, 0);
-	const totalEventsIn  = events.filter(e => e.type === 'add').reduce((s, e) => s + e.qty, 0);
-	const totalDeducted  = deductions.value.filter(d => d.stockItemId === stockItemId).reduce((s, d) => s + d.qty, 0);
-	return item.openingStock + totalDelivered - totalDeducted - totalEventsOut + totalEventsIn;
+	return _stockCache.get(stockItemId) ?? 0;
 }
 
 export function getStockStatus(stockItemId: string): StockStatus {
@@ -818,11 +845,15 @@ export async function transferStock(stockItemMenuItemId: string, qty: number, fr
 export async function submitCount(stockItemId: string, period: CountPeriod, value: number) {
 	if (!browser) return;
 	const col = getWritableCollection('stock_counts');
+	const now = new Date();
+	const businessDate = now.toISOString().slice(0, 10); // YYYY-MM-DD
 	const doc = await col.findOne(stockItemId).exec();
 	if (doc) {
 		await col.incrementalPatch(stockItemId, {
 			counted: { ...doc.counted, [period]: value },
-			updatedAt: new Date().toISOString(),
+			locationId: session.locationId || doc.locationId || '',
+			date: businessDate,
+			updatedAt: now.toISOString(),
 		});
 	}
 }

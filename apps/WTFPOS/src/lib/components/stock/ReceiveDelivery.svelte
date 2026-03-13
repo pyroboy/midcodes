@@ -112,18 +112,23 @@
 
 		const unitCost = parsedUnitCost > 0 ? parsedUnitCost : undefined;
 
-		await receiveDelivery(
-			item.id,
-			item.name,
-			parsedQty,
-			item.unit,
-			formSupplier.trim(),
-			formNotes,
-			formBatchNo || undefined,
-			formExpiryDate || undefined,
-			undefined,
-			unitCost
-		);
+		try {
+			await receiveDelivery(
+				item.id,
+				item.name,
+				parsedQty,
+				item.unit,
+				formSupplier.trim(),
+				formNotes,
+				formBatchNo || undefined,
+				formExpiryDate || undefined,
+				undefined,
+				unitCost
+			);
+		} catch (err) {
+			formError = `Failed to save delivery: ${err instanceof Error ? err.message : 'try again'}`;
+			return;
+		}
 
 		const result = {
 			itemName: item.name,

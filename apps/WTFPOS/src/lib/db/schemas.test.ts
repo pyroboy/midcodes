@@ -13,7 +13,6 @@ import {
 	kdsTicketSchema,
 	readingSchema,
 	auditLogSchema,
-	kitchenAlertSchema,
 	floorElementSchema
 } from './schemas';
 
@@ -31,7 +30,6 @@ const ALL_SCHEMAS = [
 	{ name: 'kdsTicketSchema', schema: kdsTicketSchema },
 	{ name: 'readingSchema', schema: readingSchema },
 	{ name: 'auditLogSchema', schema: auditLogSchema },
-	{ name: 'kitchenAlertSchema', schema: kitchenAlertSchema },
 	{ name: 'floorElementSchema', schema: floorElementSchema },
 ];
 
@@ -97,6 +95,6 @@ describe('RxDB schemas — structural integrity', () => {
 	});
 
 	it('covers all 15 schemas', () => {
-		expect(ALL_SCHEMAS).toHaveLength(15);
+		expect(ALL_SCHEMAS).toHaveLength(14);
 	});
 });

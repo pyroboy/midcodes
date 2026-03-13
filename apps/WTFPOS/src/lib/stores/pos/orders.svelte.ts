@@ -245,11 +245,12 @@ export async function voidOrder(orderId: string, reason?: 'mistake' | 'walkout' 
 		return doc;
 	});
 
-	// Restore stock outside incrementalModify so promises are properly awaited
-	for (const item of itemsToRestore) {
-		const restoreQty = item.weight ?? item.quantity;
-		if (restoreQty > 0) await restoreStock(item.menuItemId, restoreQty, order.id, order.locationId);
-	}
+	// Restore stock in parallel — each item is independent
+	await Promise.all(
+		itemsToRestore
+			.filter(item => (item.weight ?? item.quantity) > 0)
+			.map(item => restoreStock(item.menuItemId, item.weight ?? item.quantity, order.id, order.locationId))
+	);
 
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 	if (ticket) {
@@ -345,12 +346,13 @@ export async function rejectOrderItem(orderId: string, itemId: string, reason: s
 	if (!item || item.status === 'cancelled') return;
 
 	let finalTotal = order.total;
+	const now = new Date().toISOString();
 	await col.incrementalModify(orderId, (doc: Order) => {
-		doc.items = doc.items.map(i => i.id === itemId ? { ...i, status: 'cancelled' as const } : i);
+		doc.items = doc.items.map(i => i.id === itemId ? { ...i, status: 'cancelled' as const, cancelReason: reason, cancelledAt: now } : i);
 		const totals = calculateOrderTotals(doc);
 		Object.assign(doc, totals);
 		finalTotal = totals.total;
-		doc.updatedAt = new Date().toISOString();
+		doc.updatedAt = now;
 		return doc;
 	});
 

@@ -15,7 +15,7 @@
  */
 
 import { log } from './logger';
-import { runSelfTest } from './selftest';
+
 
 // Primary key field per collection (most use 'id')
 const PK_FIELD: Record<string, string> = {
@@ -300,8 +300,8 @@ class CollectionStore {
 
 const VALID_COLLECTIONS = new Set([
 	'tables', 'orders', 'menu_items', 'stock_items', 'deliveries',
-	'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'devices',
-	'kds_tickets', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
+	'stock_events', 'deductions', 'expenses', 'stock_counts', 'devices',
+	'kds_tickets', 'readings', 'audit_logs',
 	'floor_elements', 'shifts'
 ]);
 
@@ -349,10 +349,6 @@ export function recordPush(collection: string, docCount: number) {
 		log.info('ServerStore', `📦 ${total} total docs | ${colSummary} | last push: ${new Date(_lastPushAt!).toLocaleTimeString()}`);
 	}
 
-	// Run self-test after first meaningful data arrives
-	if (_totalDocs >= 50) {
-		runSelfTest();
-	}
 }
 
 // ─── Global broadcast (reset all devices) ────────────────────────────────────

@@ -2,8 +2,8 @@
 	import { kdsTickets } from '$lib/stores/pos/kds.svelte';
 	import { markItemServed } from '$lib/stores/pos.svelte';
 	import { printKitchenOrder } from '$lib/stores/hardware.svelte';
-	import type { KdsTicketItem } from '$lib/types';
-	import { formatCountdown, cn } from '$lib/utils';
+	import { cn } from '$lib/utils';
+	import { mergeTicketsByOrder, urgencyLevel, timerBadgeClass, ticketBorderClass, timerText, ticketProgress, type MergedTicket } from '$lib/stores/pos/kds.utils';
 	import { Printer } from 'lucide-svelte';
 	import { untrack } from 'svelte';
 
@@ -15,32 +15,8 @@
 	});
 
 	// ── Merge tickets by orderId, filter to dishes & drinks only ──
-	type StoveTicket = {
-		orderId: string;
-		tableNumber: number | null;
-		customerName?: string;
-		createdAt: string;
-		items: KdsTicketItem[];
-	};
-
-	const stoveTickets = $derived.by((): StoveTicket[] => {
-		const byOrder = new Map<string, StoveTicket>();
-		for (const t of kdsTickets.value) {
-			const existing = byOrder.get(t.orderId);
-			if (existing) {
-				existing.items = [...existing.items, ...t.items];
-				if (t.createdAt < existing.createdAt) existing.createdAt = t.createdAt;
-			} else {
-				byOrder.set(t.orderId, {
-					orderId: t.orderId,
-					tableNumber: t.tableNumber,
-					customerName: t.customerName,
-					createdAt: t.createdAt,
-					items: [...t.items]
-				});
-			}
-		}
-		return Array.from(byOrder.values())
+	const stoveTickets = $derived.by((): MergedTicket[] => {
+		return mergeTicketsByOrder(kdsTickets.value)
 			.map((ticket) => ({
 				...ticket,
 				items: ticket.items.filter(
@@ -62,14 +38,22 @@
 
 	// ── Actions ──
 	async function markDone(orderId: string, itemId: string) {
-		await markItemServed(orderId, itemId);
+		try {
+			await markItemServed(orderId, itemId);
+		} catch (err) {
+			console.error('[Stove] markDone failed:', err);
+		}
 	}
 
-	async function completeAll(ticket: StoveTicket) {
-		for (const item of ticket.items) {
-			if (item.status !== 'served') {
-				await markItemServed(ticket.orderId, item.id);
-			}
+	async function completeAll(ticket: MergedTicket) {
+		try {
+			await Promise.all(
+				ticket.items
+					.filter((i) => i.status !== 'served')
+					.map((i) => markItemServed(ticket.orderId, i.id))
+			);
+		} catch (err) {
+			console.error('[Stove] completeAll failed:', err);
 		}
 	}
 
@@ -87,40 +71,7 @@
 		setTimeout(() => { chitFeedback = null; }, 2000);
 	}
 
-	// ── Urgency ──
-	const WARN_MS = 5 * 60_000;
-	const CRIT_MS = 10 * 60_000;
-
-	function urgencyLevel(createdAt: string): 'critical' | 'warning' | 'normal' {
-		const ms = now - new Date(createdAt).getTime();
-		if (ms > CRIT_MS) return 'critical';
-		if (ms > WARN_MS) return 'warning';
-		return 'normal';
-	}
-
-	function ticketBorderClass(level: ReturnType<typeof urgencyLevel>) {
-		if (level === 'critical') return 'border-status-red animate-border-pulse-red';
-		if (level === 'warning') return 'border-status-yellow';
-		return 'border-border';
-	}
-
-	function timerBadgeClass(level: ReturnType<typeof urgencyLevel>) {
-		if (level === 'critical') return 'bg-status-red text-white';
-		if (level === 'warning') return 'bg-status-yellow text-gray-900';
-		return 'bg-gray-100 text-gray-600';
-	}
-
-	function timerText(createdAt: string): string {
-		return formatCountdown(Math.floor((now - new Date(createdAt).getTime()) / 1000));
-	}
-
-	// ── Progress ──
-	function ticketProgress(items: KdsTicketItem[]) {
-		const total = items.length;
-		const served = items.filter((i) => i.status === 'served').length;
-		const pct = total > 0 ? (served / total) * 100 : 0;
-		return { served, total, pct };
-	}
+	// Urgency, timer, progress — from shared kds.utils
 
 	// ── Live indicator staleness ──
 	let lastUpdated = $state(Date.now());
@@ -200,7 +151,7 @@
 	{#if dineInTickets.length > 0}
 		<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));">
 			{#each dineInTickets as ticket (ticket.orderId)}
-				{@const urgency = urgencyLevel(ticket.createdAt)}
+				{@const urgency = urgencyLevel(ticket.createdAt, now)}
 				{@const progress = ticketProgress(ticket.items)}
 
 				<div class={cn(
@@ -213,7 +164,7 @@
 						<div class="flex items-center gap-2">
 							<span class="text-sm font-bold text-gray-400 font-mono">{progress.served}/{progress.total}</span>
 							<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
-								{timerText(ticket.createdAt)}
+								{timerText(ticket.createdAt, now)}
 							</span>
 						</div>
 					</div>
@@ -284,7 +235,7 @@
 		</div>
 		<div class="grid gap-4 pb-4" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));">
 			{#each takeoutTickets as ticket (ticket.orderId)}
-				{@const urgency = urgencyLevel(ticket.createdAt)}
+				{@const urgency = urgencyLevel(ticket.createdAt, now)}
 				{@const progress = ticketProgress(ticket.items)}
 
 				<div class={cn(
@@ -300,7 +251,7 @@
 						<div class="flex items-center gap-2">
 							<span class="text-sm font-bold text-gray-400 font-mono">{progress.served}/{progress.total}</span>
 							<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
-								{timerText(ticket.createdAt)}
+								{timerText(ticket.createdAt, now)}
 							</span>
 						</div>
 					</div>

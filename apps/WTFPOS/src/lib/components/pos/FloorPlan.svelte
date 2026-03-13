@@ -4,7 +4,7 @@
     import { floorLayout } from '$lib/stores/floor-layout.svelte';
     import { session } from '$lib/stores/session.svelte';
     import { getRefillCount } from '$lib/stores/pos.svelte';
-    import { getPkgColors } from '$lib/stores/pos/utils';
+    import { getPkgColors, getPkgProtein } from '$lib/stores/pos/utils';
 
     interface Props {
         mainTables: Table[];
@@ -71,10 +71,7 @@
     }
 
     function pkgLabel(packageId: string | undefined | null): string {
-        if (packageId === 'pkg-pork') return 'PORK';
-        if (packageId === 'pkg-beef') return 'BEEF';
-        if (packageId === 'pkg-combo') return 'Beef+Pork';
-        return '';
+        return getPkgProtein(packageId) ?? '';
     }
 
     function pkgColor(packageId: string | undefined | null): string {

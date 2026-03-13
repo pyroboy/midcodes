@@ -4,10 +4,10 @@
 	import { formatPeso, formatTimeAgo, formatDisplayId, cn } from '$lib/utils';
 	import type { Order, MenuItem } from '$lib/types';
 
-	// ── Live timer ────────────────────────────────────────────────────────────
+	// ── Live timer (60s interval — time filters and "opened X ago" don't need per-second precision) ──
 	let now = $state(Date.now());
 	$effect(() => {
-		const id = setInterval(() => (now = Date.now()), 1000);
+		const id = setInterval(() => (now = Date.now()), 60_000);
 		return () => clearInterval(id);
 	});
 

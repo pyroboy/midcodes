@@ -23,8 +23,11 @@
 	let editImageUrl  = $state<string | undefined>(untrack(() => (editItem as any).image));
 	let editMinLevel  = $state(untrack(() => editItem.minLevel ?? 0));
 
+	let formError = $state('');
+
 	async function handleConfirm() {
 		if (!editName.trim()) return;
+		formError = '';
 
 		const updates = {
 			name: editName.trim(),
@@ -33,9 +36,13 @@
 			...(editImageUrl !== undefined && { image: editImageUrl })
 		};
 
-		const { updateStockItem } = await import('$lib/stores/stock.svelte');
-		await updateStockItem(editItem.id, updates as any);
-		onClose();
+		try {
+			const { updateStockItem } = await import('$lib/stores/stock.svelte');
+			await updateStockItem(editItem.id, updates as any);
+			onClose();
+		} catch (err) {
+			formError = `Failed to save: ${err instanceof Error ? err.message : 'try again'}`;
+		}
 	}
 </script>
 
@@ -101,7 +108,11 @@
 			</label>
 		</div>
 
-		<div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-border bg-gray-50 p-4">
+		<div class="flex flex-col gap-2 rounded-b-2xl border-t border-border bg-gray-50 p-4">
+			{#if formError}
+				<p class="text-xs text-status-red font-semibold">{formError}</p>
+			{/if}
+			<div class="flex items-center justify-end gap-3">
 			<button onclick={onClose} class="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">
 				Cancel
 			</button>
@@ -112,6 +123,7 @@
 			>
 				Save Changes
 			</button>
+			</div>
 		</div>
 	</div>
 </div>

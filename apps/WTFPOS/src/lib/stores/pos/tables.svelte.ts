@@ -163,7 +163,9 @@ export async function updateTableTimers() {
 
 		const updates: Partial<Table> = {};
 
-		if (seconds !== table.elapsedSeconds) {
+		// Only write elapsedSeconds every 30s — display shows minutes, so 30s granularity is invisible.
+		// This reduces RxDB writes from 8/sec to 8/30sec (30x reduction), cutting the reactive cascade.
+		if (seconds !== table.elapsedSeconds && seconds % 30 === 0) {
 			updates.elapsedSeconds = seconds;
 		}
 

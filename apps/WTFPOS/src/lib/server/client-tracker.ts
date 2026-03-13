@@ -45,6 +45,14 @@ function classifyContext(context: string): ConnectionType {
 /** All known clients by display IP */
 const knownClients = new Map<string, ClientInfo>();
 
+/** Module load timestamp — clients connecting within 10s of this are HMR reconnects, not new */
+const _moduleLoadedAt = Date.now();
+const HMR_RECONNECT_WINDOW_MS = 10_000;
+
+function isHmrReconnect(): boolean {
+	return Date.now() - _moduleLoadedAt < HMR_RECONNECT_WINDOW_MS;
+}
+
 // ─── Change notification ─────────────────────────────────────────────────────
 // Subscribers are notified when client state changes (new client, route change, etc.)
 type ClientChangeListener = () => void;
@@ -191,7 +199,11 @@ export function trackClient(rawIp: string, userAgent: string, context: string, r
 	knownClients.set(dip, info);
 	emitClientChange(); // New client connected — notify devices page
 
-	if (isServer) {
+	if (isHmrReconnect()) {
+		// HMR reload — suppress banners, just log a quiet reconnect line
+		const name = isServer ? 'Server' : (info.deviceName || info.userName || deviceHint);
+		log.debug('Clients', `♻️  ${isServer ? '💻' : '📱'} ${name} reconnected (HMR)`);
+	} else if (isServer) {
 		const name = devInfo?.name || devInfo?.userName || 'this machine';
 		const loc = LOCATION_NAMES[info.locationId] || info.locationId || '(pending)';
 		const status = '🟢 online';
@@ -281,8 +293,8 @@ function getServerDataStats(): { totalDocs: number; latestUpdatedAt: string | nu
 
 	const collections = [
 		'tables', 'orders', 'menu_items', 'stock_items', 'deliveries',
-		'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'devices',
-		'kds_tickets', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts', 'floor_elements'
+		'stock_events', 'deductions', 'expenses', 'stock_counts', 'devices',
+		'kds_tickets', 'readings', 'audit_logs', 'floor_elements'
 	];
 
 	for (const name of collections) {
@@ -330,8 +342,22 @@ function formatConnectionTypes(types: Set<ConnectionType>): string {
 	return labels.join('+') || '—';
 }
 
-/** Log a summary of all connected devices and their current routes */
+// ─── Throttle for route map banner ──────────────────────────────────────────
+// After HMR, server + client both reconnect fast — avoid flooding the console
+let _routeMapTimer: ReturnType<typeof setTimeout> | null = null;
+const ROUTE_MAP_THROTTLE_MS = 3_000;
+
+/** Log device route map (throttled — prints at most once per 3s) */
 export function logDeviceRoutes(): void {
+	if (_routeMapTimer) return; // already scheduled
+	_routeMapTimer = setTimeout(() => {
+		_routeMapTimer = null;
+		_logDeviceRoutesNow();
+	}, ROUTE_MAP_THROTTLE_MS);
+}
+
+/** Internal — actually prints the device route map */
+function _logDeviceRoutesNow(): void {
 	const clients = Array.from(knownClients.values());
 	if (clients.length === 0) {
 		log.info('Devices', 'No devices tracked yet');
@@ -378,10 +404,10 @@ export function logDeviceRoutes(): void {
 		const loc = LOCATION_NAMES[c.locationId] || c.locationId || '—';
 		const icon = c.isServer ? '💻' : '📱';
 		const role = c.role || (c.isServer ? 'server' : '—');
-		const status = c.isOnline ? '🟢' : '🔴';
+		const dot = c.isOnline ? '🟢' : '🔴';
 		const conn = formatConnectionTypes(c.connectionTypes);
-		const sync = c.isServer ? '' : ` | synced: ${timeAgo(c.lastSyncAt)}`;
-		lines.push(`${icon} ${status} ${name.padEnd(16)} ${role.padEnd(8)} @ ${loc.padEnd(12)} → ${c.currentRoute} [${conn}]${sync}`);
+		const sync = c.isServer ? '' : `  sync: ${timeAgo(c.lastSyncAt)}`;
+		lines.push(`${icon} ${dot} ${name.padEnd(14)} ${role.padEnd(7)} ${loc.padEnd(10)} → ${c.currentRoute.padEnd(5)} [${conn}]${sync}`);
 	}
 	log.banner(...lines);
 }

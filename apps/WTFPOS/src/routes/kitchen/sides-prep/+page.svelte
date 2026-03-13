@@ -2,7 +2,8 @@
 	import { kdsTickets } from '$lib/stores/pos/kds.svelte';
 	import { orders, markItemServed } from '$lib/stores/pos.svelte';
 	import type { KdsTicketItem } from '$lib/types';
-	import { formatCountdown, cn } from '$lib/utils';
+	import { cn } from '$lib/utils';
+	import { mergeTicketsByOrder, urgencyLevel, timerBadgeClass, ticketBorderClass, timerText, ticketProgress, type MergedTicket } from '$lib/stores/pos/kds.utils';
 
 	// ── Live timer ──
 	let now = $state(Date.now());
@@ -35,32 +36,8 @@
 	}
 
 	// ── Section 2: Sides queue — one card per table ──
-	type MergedSideTicket = {
-		orderId: string;
-		tableNumber: number | null;
-		customerName?: string;
-		createdAt: string;
-		items: KdsTicketItem[];
-	};
-
-	const sideTickets = $derived.by((): MergedSideTicket[] => {
-		const byOrder = new Map<string, MergedSideTicket>();
-		for (const t of kdsTickets.value) {
-			const existing = byOrder.get(t.orderId);
-			if (existing) {
-				existing.items = [...existing.items, ...t.items];
-				if (t.createdAt < existing.createdAt) existing.createdAt = t.createdAt;
-			} else {
-				byOrder.set(t.orderId, {
-					orderId: t.orderId,
-					tableNumber: t.tableNumber,
-					customerName: t.customerName,
-					createdAt: t.createdAt,
-					items: [...t.items]
-				});
-			}
-		}
-		return Array.from(byOrder.values())
+	const sideTickets = $derived.by((): MergedTicket[] => {
+		return mergeTicketsByOrder(kdsTickets.value)
 			.map((ticket) => ({
 				...ticket,
 				items: ticket.items.filter((i) => i.category === 'sides' && i.status !== 'cancelled')
@@ -70,14 +47,22 @@
 	});
 
 	async function markSideDone(orderId: string, itemId: string) {
-		await markItemServed(orderId, itemId);
+		try {
+			await markItemServed(orderId, itemId);
+		} catch (err) {
+			console.error('[SidesPrep] markSideDone failed:', err);
+		}
 	}
 
-	async function completeAllSides(ticket: MergedSideTicket) {
-		for (const item of ticket.items) {
-			if (item.status !== 'served') {
-				await markItemServed(ticket.orderId, item.id);
-			}
+	async function completeAllSides(ticket: MergedTicket) {
+		try {
+			await Promise.all(
+				ticket.items
+					.filter((i) => i.status !== 'served')
+					.map((i) => markItemServed(ticket.orderId, i.id))
+			);
+		} catch (err) {
+			console.error('[SidesPrep] completeAllSides failed:', err);
 		}
 	}
 
@@ -112,49 +97,14 @@
 		);
 	});
 
-	// ── Urgency ──
-	const WARN_MS = 5 * 60_000;
-	const CRIT_MS = 10 * 60_000;
+	// Urgency, timer, progress — from shared kds.utils
 
-	function urgencyLevel(createdAt: string): 'critical' | 'warning' | 'normal' {
-		const ms = now - new Date(createdAt).getTime();
-		if (ms > CRIT_MS) return 'critical';
-		if (ms > WARN_MS) return 'warning';
-		return 'normal';
-	}
-
-	function ticketBorderClass(level: ReturnType<typeof urgencyLevel>) {
-		if (level === 'critical') return 'border-status-red animate-border-pulse-red';
-		if (level === 'warning') return 'border-status-yellow';
-		return 'border-border';
-	}
-
-	function timerBadgeClass(level: ReturnType<typeof urgencyLevel>) {
-		if (level === 'critical') return 'bg-status-red text-white';
-		if (level === 'warning') return 'bg-status-yellow text-gray-900';
-		return 'bg-gray-100 text-gray-600';
-	}
-
-	// Service alerts escalate faster than sides tickets (3min warn / 5min crit vs 5min / 10min) — intentional.
+	// Service alerts escalate faster (3min warn / 5min crit vs 5min / 10min) — intentional.
 	function alertUrgency(waitingSince: string): 'normal' | 'warning' | 'critical' {
 		const mins = Math.floor((now - new Date(waitingSince).getTime()) / 60_000);
 		if (mins >= 5) return 'critical';
 		if (mins >= 3) return 'warning';
 		return 'normal';
-	}
-
-	// ── Progress ──
-	function sidesProgress(items: KdsTicketItem[]) {
-		const total = items.length; // already filtered to non-cancelled sides
-		const served = items.filter((i) => i.status === 'served').length;
-		const pct = total > 0 ? (served / total) * 100 : 0;
-		return { served, total, pct };
-	}
-
-	// ── Time formatting ──
-	function timerText(createdAt: string): string {
-		const secs = Math.floor((now - new Date(createdAt).getTime()) / 1000);
-		return formatCountdown(secs);
 	}
 
 	function timeAgo(isoStr: string): string {
@@ -249,8 +199,8 @@
 			</div>
 		{:else}
 			{#each sideTickets as ticket (ticket.orderId)}
-				{@const urgency = urgencyLevel(ticket.createdAt)}
-				{@const progress = sidesProgress(ticket.items)}
+				{@const urgency = urgencyLevel(ticket.createdAt, now)}
+				{@const progress = ticketProgress(ticket.items)}
 
 				<div class={cn(
 					'flex flex-col rounded-xl border-2 overflow-hidden bg-surface shadow-sm',
@@ -271,7 +221,7 @@
 						<div class="flex items-center gap-2">
 							<span class="text-sm font-bold text-gray-400 font-mono">{progress.served}/{progress.total}</span>
 							<span class={cn('rounded-full px-3 py-1 font-mono text-sm font-bold', timerBadgeClass(urgency))}>
-								{timerText(ticket.createdAt)}
+								{timerText(ticket.createdAt, now)}
 							</span>
 						</div>
 					</div>

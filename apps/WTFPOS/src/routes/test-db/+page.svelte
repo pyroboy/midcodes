@@ -129,10 +129,10 @@
         { path: '/stock/inventory', label: 'Inventory', group: 'Stock', collections: ['stock_items'] },
         { path: '/stock/deliveries', label: 'Deliveries', group: 'Stock', collections: ['deliveries', 'stock_items'] },
         { path: '/stock/counts', label: 'Stock Counts', group: 'Stock', collections: ['stock_counts', 'stock_items'] },
-        { path: '/stock/waste', label: 'Waste Log', group: 'Stock', collections: ['waste', 'stock_items'] },
+        { path: '/stock/waste', label: 'Waste Log', group: 'Stock', collections: ['stock_events', 'stock_items'] },
         // Reports
         { path: '/reports/x-read', label: 'X-Read', group: 'Reports', collections: ['orders', 'expenses'] },
-        { path: '/reports/eod', label: 'Z-Read / EOD', group: 'Reports', collections: ['orders', 'expenses', 'x_reads', 'z_reads'] },
+        { path: '/reports/eod', label: 'Z-Read / EOD', group: 'Reports', collections: ['orders', 'expenses', 'readings'] },
         { path: '/reports/sales-summary', label: 'Sales Summary', group: 'Reports', collections: ['orders'] },
         // Admin
         { path: '/admin/users', label: 'User Mgmt', group: 'Admin', collections: ['audit_logs'] },
@@ -215,7 +215,7 @@
 
             // 3. On CLIENT devices, location-scoped collections will have fewer local docs
             //    than the server store (server holds all locations). On SERVER, counts should match.
-            const LOCATION_SCOPED = new Set(['tables', 'floor_elements', 'devices', 'orders', 'kds_tickets', 'stock_items', 'deliveries', 'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts']);
+            const LOCATION_SCOPED = new Set(['tables', 'floor_elements', 'devices', 'orders', 'kds_tickets', 'stock_items', 'deliveries', 'stock_events', 'deductions', 'expenses', 'stock_counts', 'readings', 'audit_logs']);
             const onServer = isServerDevice;
 
             // 4. Evaluate each route

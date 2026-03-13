@@ -58,6 +58,10 @@ const _menuItems = createStore<MenuItem>('menu_items', db => db.menu_items.find(
 export const menuItems = {
 	get value(): MenuItem[] {
 		return _menuItems.value;
+	},
+	/** Lookup map keyed by menu item ID — avoids duplicate Map construction in consumers. */
+	get byId(): Map<string, MenuItem> {
+		return new Map(_menuItems.value.map(m => [m.id, m]));
 	}
 };
 

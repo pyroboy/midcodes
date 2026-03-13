@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import { getCollectionStore, subscribeBroadcast, getServerStoreSummary } from '$lib/server/replication-store';
 import { trackClient, isLoopbackIP, displayIP, subscribeClientChanges, getTrackedClients } from '$lib/server/client-tracker';
-import { log } from '$lib/server/logger';
+import { log, logSseEvent } from '$lib/server/logger';
 
 /**
  * Single multiplexed SSE stream for ALL collections.
@@ -11,8 +11,8 @@ import { log } from '$lib/server/logger';
 
 const ALL_COLLECTIONS = [
 	'tables', 'orders', 'menu_items', 'stock_items', 'deliveries',
-	'waste', 'deductions', 'adjustments', 'expenses', 'stock_counts', 'devices',
-	'kds_tickets', 'x_reads', 'z_reads', 'audit_logs', 'kitchen_alerts',
+	'stock_events', 'deductions', 'expenses', 'stock_counts', 'devices',
+	'kds_tickets', 'readings', 'audit_logs',
 	'floor_elements', 'shifts'
 ];
 
@@ -42,7 +42,7 @@ export const GET: RequestHandler = async (event) => {
 	const dataStatus = total > 0
 		? `server has ${total} docs, last push ${lastPushAt ? new Date(lastPushAt).toLocaleTimeString() : 'never'}`
 		: '⚠️ SERVER STORE EMPTY — no data to serve';
-	log.info('SSE', `✦ #${clientId} connected — ${label} (${_activeClients} active) | ${dataStatus}`);
+	logSseEvent(label, 'connect', _activeClients, dataStatus);
 
 	// Track whether we've already cleaned up to prevent double-decrement
 	let cleaned = false;
@@ -53,7 +53,7 @@ export const GET: RequestHandler = async (event) => {
 		cleaned = true;
 		unsubscribes.forEach(fn => fn());
 		_activeClients--;
-		log.info('SSE', `✧ #${clientId} disconnected — ${label} (${_activeClients} active)`);
+		logSseEvent(label, 'disconnect', _activeClients);
 	}
 
 	const stream = new ReadableStream({

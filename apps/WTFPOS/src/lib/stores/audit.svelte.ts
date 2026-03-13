@@ -13,6 +13,7 @@ export type ActionType = 'order' | 'payment' | 'stock' | 'auth' | 'admin' | 'exp
 
 export interface LogEntry {
 	id: string;
+	locationId: string;
 	timestamp: string;          // e.g. "3:45 PM"
 	isoTimestamp: string;       // for sorting
 	user: string;
@@ -48,13 +49,15 @@ export function writeLog(
 	if (!browser) return;
 
 	const now = new Date();
+	const locationId = session.locationId || 'tag';
 	const entry: LogEntry = {
 		id: nanoid(),
+		locationId,
 		isoTimestamp: now.toISOString(),
 		timestamp: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
 		user:   opts.user   ?? (session.userName || 'Staff'),
 		role:   opts.role   ?? session.role,
-		branch: opts.branch ?? (session.locationId === 'tag' ? 'TAG' : session.locationId === 'pgl' ? 'PGL' : session.locationId === 'wh-tag' ? 'WH-TAG' : session.locationId.toUpperCase()),
+		branch: opts.branch ?? (locationId === 'tag' ? 'TAG' : locationId === 'pgl' ? 'PGL' : locationId === 'wh-tag' ? 'WH-TAG' : locationId.toUpperCase()),
 		action,
 		description,
 		...(opts.meta && { meta: JSON.stringify(opts.meta) }),

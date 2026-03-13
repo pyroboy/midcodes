@@ -45,7 +45,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		}
 	}
 
-	log.info('Ping', `🏓 ${label} ping — token=${clientToken} store(${testCollection})=${storeCount} write=${body.testWrite ? (writeOk ? '✅' : `❌ ${writeError}`) : 'skip'}`);
+	log.info('Ping', `🏓 ${label} — store(${testCollection})=${storeCount} write=${body.testWrite ? (writeOk ? '✅' : `❌ ${writeError}`) : 'skip'}`);
 
 	return json({
 		echo: clientToken,

@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getCollectionStore } from '$lib/server/replication-store';
 import { trackClient, isLoopbackIP, recordClientSync } from '$lib/server/client-tracker';
-import { log } from '$lib/server/logger';
+import { log, logPullBatch } from '$lib/server/logger';
 
 export const GET: RequestHandler = async ({ params, url, request, getClientAddress }) => {
 	const store = getCollectionStore(params.collection);
@@ -25,8 +25,8 @@ export const GET: RequestHandler = async ({ params, url, request, getClientAddre
 	const col = params.collection;
 
 	if (docCount > 0 && !isServer) {
-		// iPad/LAN client receiving data — important to see at info level
-		log.info('Sync', `⬇ ${label} pulled ${docCount} docs ← ${col} (store=${store.count()})`);
+		// Batch client pulls into a single consolidated line
+		logPullBatch(label, col, docCount, store.count());
 	} else if (docCount > 0) {
 		// Server self-pull — debug noise
 		const level = col === 'devices' ? 'trace' : 'debug';

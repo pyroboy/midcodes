@@ -34,7 +34,7 @@ function setError(code: string, message: string) {
  * that pass schema validation but break app logic.
  */
 async function checkDataIntegrity(db: any) {
-	const collections = ['tables', 'orders', 'stock_items', 'deliveries', 'waste', 'expenses'];
+	const collections = ['tables', 'orders', 'stock_items', 'deliveries', 'stock_events', 'expenses'];
 
 	for (const col of collections) {
 		if (!db[col]) continue;

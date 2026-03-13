@@ -25,9 +25,12 @@
 		refillNumber: number;
 	}
 
+	// Build order lookup once (avoids N+1 .find() per ticket)
+	const orderMap = $derived(new Map(orders.value.map((o) => [o.id, o])));
+
 	const pendingMeatItems = $derived(
 		kdsTickets.value.flatMap((t) => {
-			const order = orders.value.find((o) => o.id === t.orderId);
+			const order = orderMap.get(t.orderId);
 			return t.items
 				.filter((i) => i.category === 'meats' && i.status === 'pending' && !i.weight)
 				.map((i): PendingMeat => {
@@ -62,7 +65,7 @@
 		for (const item of pendingMeatItems) {
 			let group = groups.get(item.orderId);
 			if (!group) {
-				const order = orders.value.find((o) => o.id === item.orderId);
+				const order = orderMap.get(item.orderId);
 				const pax = order?.pax ?? 1;
 				group = {
 					orderId: item.orderId,

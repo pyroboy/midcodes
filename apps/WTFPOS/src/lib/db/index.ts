@@ -19,7 +19,6 @@ import {
 	kdsTicketSchema,
 	readingSchema,
 	auditLogSchema,
-	kitchenAlertSchema,
 	floorElementSchema,
 	shiftsSchema
 } from './schemas';
@@ -235,7 +234,9 @@ export async function getDb() {
 								d.discountEntries = migrated;
 							}
 							return d;
-						}
+						},
+						// v13: added cancelReason/cancelledAt/acknowledgedBy/acknowledgedAt to items — no backfill needed
+						13: (d: any) => d
 					}
 				},
 				menu_items: {
@@ -345,7 +346,8 @@ export async function getDb() {
 								}
 							};
 						},
-						2: (d: any) => addUpdatedAt(d)
+						2: (d: any) => addUpdatedAt(d),
+						3: (d: any) => ({ ...d, locationId: '', date: null })
 					}
 				},
 				readings: {
@@ -355,10 +357,16 @@ export async function getDb() {
 					}
 				},
 				audit_logs: {
-					schema: auditLogSchema
-				},
-				kitchen_alerts: {
-					schema: kitchenAlertSchema
+					schema: auditLogSchema,
+					migrationStrategies: {
+						1: (d: any) => {
+							const branchMap: Record<string, string> = {
+								'TAG': 'tag', 'PGL': 'pgl', 'WH-TAG': 'wh-tag', 'ALL': 'all'
+							};
+							d.locationId = branchMap[d.branch] ?? d.branch?.toLowerCase() ?? 'tag';
+							return d;
+						}
+					}
 				},
 				shifts: {
 					schema: shiftsSchema
