@@ -73,14 +73,17 @@ function tryServerReidentify(
 	if (!devicesStore) return null;
 
 	const { documents } = devicesStore.pull(null, 1000);
-	const staleThreshold = Date.now() - 24 * 60 * 60 * 1000;
+	// Match devices seen within last 7 days — these are candidates for re-identification.
+	// Devices offline >7 days are too stale to confidently re-identify (hardware may have changed hands).
+	const staleThreshold = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
 	for (const doc of documents) {
 		if (doc.userAgent !== userAgent) continue;
 		if (deviceType && doc.deviceType !== deviceType) continue;
 		if (screenWidth !== null && Math.abs(doc.screenWidth - screenWidth) > 50) continue;
 		const lastSeen = new Date(doc.lastSeenAt).getTime();
-		if (lastSeen >= staleThreshold) continue;
+		// Skip devices that are too old — only match recently active ones
+		if (lastSeen < staleThreshold) continue;
 		return doc.id;
 	}
 

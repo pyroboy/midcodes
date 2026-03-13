@@ -274,7 +274,7 @@ async function upsertDevice() {
 	const now = new Date().toISOString();
 	const existing = await col.findOne(deviceId).exec();
 	if (existing) {
-		await col.incrementalPatch(deviceId, {
+		const patch: Record<string, any> = {
 			lastSeenAt: now,
 			isOnline: connectionState.isOnline,
 			locationId: session.locationId || '',
@@ -289,7 +289,17 @@ async function upsertDevice() {
 			ipAddress: deviceIdentity.ipAddress,
 			dataMode: getDataMode(),
 			updatedAt: now
-		});
+		};
+		// Auto-fix "Unnamed Device": if a user has since logged in, update the name
+		// (only if user hasn't manually renamed it via admin UI)
+		const currentName = typeof existing.toJSON === 'function' ? existing.toJSON().name : existing.name;
+		if (currentName === 'Unnamed Device' && !localStorage.getItem(DEVICE_NAME_KEY)) {
+			const betterName = getDeviceName();
+			if (betterName !== 'Unnamed Device') {
+				patch.name = betterName;
+			}
+		}
+		await col.incrementalPatch(deviceId, patch);
 	} else {
 		const record: DeviceRecord = {
 			id: deviceId,
@@ -339,15 +349,15 @@ async function tryReidentify() {
 
 		// Search for an orphaned device record matching this hardware profile
 		const allDevices = await db.devices.find().exec();
-		const staleThreshold = Date.now() - 24 * 60 * 60 * 1000; // offline >24h = candidate
+		const staleThreshold = Date.now() - 7 * 24 * 60 * 60 * 1000; // offline >7 days = too old
 		const candidate = allDevices.find((d: any) => {
 			if (d.id === currentId) return false;
 			if (d.userAgent !== ua) return false;
 			if (d.deviceType !== type) return false;
 			if (Math.abs(d.screenWidth - width) > 50) return false; // allow small viewport drift
-			// Only re-identify stale devices (haven't been seen recently)
+			// Match devices seen within 7 days — skip truly stale ones
 			const lastSeen = new Date(d.lastSeenAt).getTime();
-			return lastSeen < staleThreshold;
+			return lastSeen >= staleThreshold;
 		});
 
 		if (candidate) {

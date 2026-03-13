@@ -61,10 +61,11 @@ async function fetchDeviceIdentity(): Promise<DeviceIdentity> {
 }
 
 function modeForRole(role: Role): DataMode {
-	if (role === 'staff' || role === 'manager') return 'selective-rxdb';
-	if (role === 'kitchen') return 'selective-rxdb';
-	// owner, admin
-	return 'api-fetch';
+	// Phase 1: ALL client devices use RxDB for LAN replication.
+	// Owner/admin/manager need all collections (reports, stock, expenses, etc.).
+	// Staff/kitchen only need POS collections — lighter sync, less storage.
+	if (role === 'owner' || role === 'admin' || role === 'manager') return 'full-rxdb';
+	return 'selective-rxdb';
 }
 
 /**
@@ -93,8 +94,25 @@ export async function resolveDataMode(): Promise<DataMode> {
 		resolved = modeForRole(session.role);
 	}
 
+	const previousMode = dataMode;
 	dataMode = resolved;
 	sessionStorage.setItem(STORAGE_KEY, resolved);
+
+	// If replication scope changed (e.g. staff→owner login), restart with new collections
+	if (previousMode !== resolved && isRxDbMode()) {
+		import('$lib/db/replication').then(async ({ stopReplication, startReplication }) => {
+			const { getDb } = await import('$lib/db');
+			const db = await getDb();
+			await stopReplication();
+			if (isFullRxDbMode()) {
+				startReplication(db as any);
+			} else {
+				startReplication(db as any, { collections: [...SELECTIVE_COLLECTIONS] });
+			}
+			console.log(`[DataMode] Replication restarted: ${previousMode} → ${resolved}`);
+		}).catch(() => { /* replication not available yet */ });
+	}
+
 	return resolved;
 }
 

@@ -8,9 +8,71 @@ function getPk(collection: string, doc: any): string {
 	return doc[PK_FIELD[collection] ?? 'id'];
 }
 
-function findDocById(store: ReturnType<typeof getCollectionStore>, collection: string, id: string) {
+function getAllDocs(store: ReturnType<typeof getCollectionStore>): any[] {
 	const { documents } = store!.pull(null, Infinity);
-	return documents.find((doc: any) => getPk(collection, doc) === id) ?? null;
+	return documents;
+}
+
+function findDocById(store: ReturnType<typeof getCollectionStore>, collection: string, id: string) {
+	return getAllDocs(store).find((doc: any) => getPk(collection, doc) === id) ?? null;
+}
+
+// ─── Business Logic Guards ───────────────────────────────────────────────────
+// These prevent multi-device race conditions where two thin clients can both
+// see a table as "available" and independently create orders for it.
+
+/**
+ * Guard: Reject dine-in order insert if the table already has an open order.
+ * Returns the existing order if found (idempotent), or null to proceed.
+ */
+function guardDuplicateTableOrder(
+	data: any
+): { existingOrder: any } | null {
+	if (data.orderType !== 'dine-in' || !data.tableId) return null;
+
+	const ordersStore = getCollectionStore('orders');
+	if (!ordersStore) return null;
+
+	const allOrders = getAllDocs(ordersStore);
+	const existingOrder = allOrders.find(
+		(o: any) =>
+			o.tableId === data.tableId &&
+			o.status === 'open' &&
+			!o._deleted &&
+			o.id !== data.id // don't match against itself
+	);
+
+	if (existingOrder) {
+		console.warn(
+			`[Write Guard] Blocked duplicate order for table ${data.tableId} — ` +
+			`existing order: ${existingOrder.id}, attempted: ${data.id}`
+		);
+		return { existingOrder };
+	}
+
+	return null;
+}
+
+/**
+ * Guard: Reject table patch to 'occupied' if it's already occupied.
+ * Returns the current table doc (idempotent no-op) so the client isn't confused.
+ */
+function guardDuplicateTableOccupancy(
+	collection: string,
+	id: string,
+	data: any,
+	existing: any
+): { currentDoc: any } | null {
+	if (collection !== 'tables') return null;
+	if (data.status !== 'occupied') return null;
+	if (existing.status !== 'occupied') return null;
+
+	// Table is already occupied — return current state, don't overwrite
+	console.warn(
+		`[Write Guard] Blocked duplicate table occupancy for ${id} — ` +
+		`already occupied with order ${existing.currentOrderId}`
+	);
+	return { currentDoc: existing };
 }
 
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -40,6 +102,20 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			if (!data.updatedAt) {
 				data.updatedAt = new Date().toISOString();
 			}
+
+			// Guard: prevent duplicate dine-in orders for the same table
+			if (collection === 'orders') {
+				const guard = guardDuplicateTableOrder(data);
+				if (guard) {
+					return json({
+						document: guard.existingOrder,
+						conflicts: [],
+						guarded: true,
+						reason: `Table ${data.tableId} already has open order ${guard.existingOrder.id}`
+					});
+				}
+			}
+
 			const conflicts = store.push([
 				{ newDocumentState: data, assumedMasterState: null }
 			]);
@@ -54,6 +130,18 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			if (!existing) {
 				return json({ error: `Document not found: ${id}` }, { status: 404 });
 			}
+
+			// Guard: prevent patching a table to occupied when it's already occupied
+			const tableGuard = guardDuplicateTableOccupancy(collection, id, data, existing);
+			if (tableGuard) {
+				return json({
+					document: tableGuard.currentDoc,
+					conflicts: [],
+					guarded: true,
+					reason: `Table ${id} is already occupied`
+				});
+			}
+
 			const merged = {
 				...existing,
 				...data,

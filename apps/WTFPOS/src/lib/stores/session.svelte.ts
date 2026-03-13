@@ -120,6 +120,9 @@ export function setSession(userName: string, role: Role, locationId: LocationId 
 			isLocked:     session.isLocked,
 			kitchenFocus: session.kitchenFocus,
 		}));
+		// Re-resolve data mode on login — role change may require different replication scope
+		// (e.g. staff=6 collections, owner=18 collections)
+		import('./data-mode.svelte').then(({ resolveDataMode }) => resolveDataMode());
 	}
 }
 

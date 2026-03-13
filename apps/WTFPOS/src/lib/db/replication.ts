@@ -73,6 +73,8 @@ if (!_global.__wtfposRepl) {
 		activeReplications: new Map<string, any>(),
 		sharedEventSource: null as EventSource | null,
 		serverBreaker: new CircuitBreaker({ failureThreshold: 20, resetTimeoutMs: 15_000 }),
+		startingReplication: false,
+		replicationStarted: false,
 	};
 }
 const activeReplications: Map<string, any> = _global.__wtfposRepl.activeReplications;
@@ -259,8 +261,6 @@ async function getServerCounts(): Promise<Record<string, number>> {
 
 // ─── Start replication ──────────────────────────────────────────────────────
 
-let _startingReplication = false;
-
 export async function startReplication(db: RxDatabase, options?: { generation?: number; collections?: string[] }) {
 	// Count local docs so the server console can see if this device has data to push
 	const localCounts: Record<string, number> = {};
@@ -278,19 +278,27 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 
 	remoteLog('info', `startReplication() entered`, {
 		hasGenOption: !!options?.generation,
-		alreadyStarting: _startingReplication,
+		alreadyStarting: _global.__wtfposRepl.startingReplication,
+		alreadyStarted: _global.__wtfposRepl.replicationStarted,
 		localTotal,
 		localCounts,
 		isServer: isServerBrowser(),
 	});
 
-	// Prevent concurrent starts (HMR reloads can trigger multiple calls)
-	if (_startingReplication && !options?.generation) {
-		console.log('[Replication] Already starting — skipping duplicate call');
-		remoteLog('warn', 'startReplication() blocked by _startingReplication guard');
+	// Skip if replication already running and this isn't a forced re-sync (generation bump)
+	if (!options?.generation && _global.__wtfposRepl.replicationStarted && getSharedEventSource()?.readyState !== EventSource.CLOSED) {
+		console.log('[Replication] Already running with active SSE — skipping duplicate start');
+		remoteLog('info', 'startReplication() skipped — already running');
 		return;
 	}
-	_startingReplication = true;
+
+	// Prevent concurrent starts (HMR reloads can trigger multiple calls)
+	if (_global.__wtfposRepl.startingReplication && !options?.generation) {
+		console.log('[Replication] Already starting — skipping duplicate call');
+		remoteLog('warn', 'startReplication() blocked by startingReplication guard');
+		return;
+	}
+	_global.__wtfposRepl.startingReplication = true;
 	const serverUrl = getServerUrl();
 	const gen = options?.generation ?? getSyncGeneration();
 
@@ -610,7 +618,8 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 		// (Removed: "first activity detected" remoteLog — fires 13× per reconnect with zero diagnostic value)
 	}
 
-	_startingReplication = false;
+	_global.__wtfposRepl.startingReplication = false;
+	_global.__wtfposRepl.replicationStarted = true;
 	const streamType = isServerDevice ? 'SSE+poll/10s' : 'SSE';
 	console.log(`[Replication] Started push+pull for ${started} collections (gen=${gen}, ${streamType}, ${localTotal} local docs)${options?.generation ? ' — full re-push triggered' : ''}`);
 	remoteLog('info', `Replication started push+pull (${streamType}) | ${localTotal} local docs${isServerDevice ? ' (SERVER — canonical data source)' : ' (LAN client)'}${localTotal === 0 ? ' ⚠️ LOCAL DB EMPTY — needs data from server' : ''}`, {
@@ -812,6 +821,8 @@ async function verifySync(db: RxDatabase): Promise<{ collection: string; local: 
 // ─── Stop / force sync ──────────────────────────────────────────────────────
 
 export async function stopReplication() {
+	_global.__wtfposRepl.replicationStarted = false;
+	_global.__wtfposRepl.startingReplication = false;
 	getSharedEventSource()?.close();
 	setSharedEventSource(null);
 	// Clear server polling interval if active

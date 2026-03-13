@@ -50,7 +50,8 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 	const ordersCol = getWritableCollection('orders');
 	const orderId = nanoid();
 
-	await tablesCol.incrementalPatch(tableId, {
+	// Patch table to occupied — server may reject if already occupied (race condition guard)
+	const patchResult = await tablesCol.incrementalPatch(tableId, {
 		status: 'occupied',
 		sessionStartedAt: new Date().toISOString(),
 		elapsedSeconds: 0,
@@ -58,7 +59,14 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 		billTotal: 0,
 	});
 
-	await ordersCol.insert({
+	// If the server guard blocked this (table already occupied), return the existing order
+	if (patchResult?.guarded && patchResult?.document?.currentOrderId) {
+		console.warn(`[openTable] Server blocked: table ${tableId} already occupied with order ${patchResult.document.currentOrderId}`);
+		return patchResult.document.currentOrderId;
+	}
+
+	// Insert the order — server may also reject if a duplicate dine-in order exists
+	const insertResult = await ordersCol.insert({
 		id: orderId,
 		locationId: table.locationId,
 		orderType: 'dine-in',
@@ -85,6 +93,12 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 		notes: '',
 		updatedAt: new Date().toISOString()
 	});
+
+	// If the server guard blocked the order insert, return the existing order's ID
+	if (insertResult?.guarded && insertResult?.document?.id) {
+		console.warn(`[openTable] Server blocked order insert: table ${tableId} already has order ${insertResult.document.id}`);
+		return insertResult.document.id;
+	}
 
 	log.tableOpened(table.label, packageName ?? null, pax);
 	return orderId;
