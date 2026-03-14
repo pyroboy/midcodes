@@ -19,7 +19,7 @@ function item(unitPrice: number, quantity = 1, tag: OrderItem['tag'] = null): Or
 
 describe('calculateOrderTotals — no discount', () => {
 	it('includes 12% VAT inclusive in the total', () => {
-		// subtotal 1120, VAT = round(1120 - 1120/1.12) = round(120) = 120
+		// subtotal 1120, VAT = round2(1120 - 1120/1.12) = 120
 		const result = calculateOrderTotals({ items: [item(1120)], discountType: 'none', discountPax: 0, pax: 4 });
 		expect(result.subtotal).toBe(1120);
 		expect(result.discountAmount).toBe(0);
@@ -39,12 +39,13 @@ describe('calculateOrderTotals — no discount', () => {
 	});
 });
 
-describe('calculateOrderTotals — SC/PWD discount', () => {
-	it('applies 20% on net-of-VAT for all qualifying pax (full table)', () => {
+describe('calculateOrderTotals — SC/PWD discount (BIR-compliant)', () => {
+	it('applies VAT exemption + 20% discount for full table SC', () => {
 		// subtotal 1120, 1/1 pax qualifies
-		// qualifyingShare = 1120, disc = round((1120/1.12)*0.20) = round(200) = 200
-		// vat = 0 (no non-qualifying share)
-		// total = 1120 - 200 = 920
+		// vatExemptSale = 1120/1.12 = 1000
+		// disc = 1000 * 0.20 = 200
+		// exemptedVat = 1120 - 1000 = 120
+		// total = 1120 - 120 - 200 = 800
 		const result = calculateOrderTotals({
 			items: [item(1120)],
 			discountType: 'senior',
@@ -54,14 +55,17 @@ describe('calculateOrderTotals — SC/PWD discount', () => {
 		expect(result.subtotal).toBe(1120);
 		expect(result.discountAmount).toBe(200);
 		expect(result.vatAmount).toBe(0);
-		expect(result.total).toBe(920);
+		expect(result.total).toBe(800);
 	});
 
-	it('applies pro-rata discount for partial qualifying pax', () => {
+	it('applies pro-rata VAT exemption + discount for partial qualifying pax', () => {
 		// subtotal 1120, 2/4 pax qualify
-		// qualifyingShare = 560, disc = round((560/1.12)*0.20) = round(100) = 100
-		// taxableShare = 560, vat = round(560 - 560/1.12) = round(60) = 60
-		// total = 1120 - 100 = 1020
+		// qualifyingShare = 560, taxableShare = 560
+		// vatExemptSale = 560/1.12 = 500
+		// disc = 500 * 0.20 = 100
+		// exemptedVat = 560 - 500 = 60
+		// vat = round2(560 - 500) = 60
+		// total = 1120 - 60 - 100 = 960
 		const result = calculateOrderTotals({
 			items: [item(1120)],
 			discountType: 'pwd',
@@ -71,7 +75,7 @@ describe('calculateOrderTotals — SC/PWD discount', () => {
 		expect(result.subtotal).toBe(1120);
 		expect(result.discountAmount).toBe(100);
 		expect(result.vatAmount).toBe(60);
-		expect(result.total).toBe(1020);
+		expect(result.total).toBe(960);
 	});
 
 	it('caps qualifying pax at total pax', () => {
@@ -89,6 +93,67 @@ describe('calculateOrderTotals — SC/PWD discount', () => {
 			pax: 4
 		});
 		expect(capped.discountAmount).toBe(full.discountAmount);
+		expect(capped.total).toBe(full.total);
+	});
+});
+
+describe('calculateOrderTotals — BIR centavo precision', () => {
+	it('₱3,300 / 4 pax all SC: correct VAT exemption + discount', () => {
+		// subtotal = 3300, 4/4 pax qualify
+		// vatExemptSale = 3300/1.12 = 2946.43
+		// disc = 2946.43 * 0.20 = 589.29
+		// exemptedVat = 3300 - 2946.43 = 353.57
+		// total = 3300 - 353.57 - 589.29 = 2357.14
+		const result = calculateOrderTotals({
+			items: [item(825, 4, 'PKG')],
+			discountType: 'senior',
+			discountPax: 4,
+			pax: 4
+		});
+		expect(result.subtotal).toBe(3300);
+		expect(result.discountAmount).toBe(589.29);
+		expect(result.vatAmount).toBe(0);
+		expect(result.total).toBe(2357.14);
+	});
+
+	it('₱499/head, 3 pax, 2 SC: user-reported scenario', () => {
+		// subtotal = 1497, 2/3 qualify
+		// qualifyingShare = 998, taxableShare = 499
+		// vatExemptSale = 998/1.12 = 891.07
+		// disc = 891.07 * 0.20 = 178.21
+		// exemptedVat = 998 - 891.07 = 106.93
+		// vat = round2(499 - 499/1.12) = round2(53.46) = 53.46
+		// total = 1497 - 106.93 - 178.21 = 1211.86
+		const result = calculateOrderTotals({
+			items: [item(499, 3, 'PKG')],
+			discountType: 'senior',
+			discountPax: 2,
+			pax: 3
+		});
+		expect(result.subtotal).toBe(1497);
+		expect(result.discountAmount).toBe(178.21);
+		expect(result.vatAmount).toBe(53.46);
+		expect(result.total).toBe(1211.86);
+	});
+
+	it('₱3,300 / 4 pax, 2 SC: partial pax centavo precision', () => {
+		// subtotal = 3300, 2/4 qualify
+		// qualifyingShare = 1650, taxableShare = 1650
+		// vatExemptSale = 1650/1.12 = 1473.21
+		// disc = 1473.21 * 0.20 = 294.64
+		// exemptedVat = 1650 - 1473.21 = 176.79
+		// vat = round2(1650 - 1650/1.12) = 176.79
+		// total = 3300 - 176.79 - 294.64 = 2828.57
+		const result = calculateOrderTotals({
+			items: [item(825, 4, 'PKG')],
+			discountType: 'senior',
+			discountPax: 2,
+			pax: 4
+		});
+		expect(result.subtotal).toBe(3300);
+		expect(result.discountAmount).toBe(294.64);
+		expect(result.vatAmount).toBe(176.79);
+		expect(result.total).toBe(2828.57);
 	});
 });
 
@@ -144,15 +209,16 @@ describe('calculateOrderTotals — SC edge cases', () => {
 
 	it('guards against pax=0 by treating it as 1', () => {
 		// Math.max(1, 0) = 1, discountPax capped to 1 → full table qualifies
+		// vatExemptSale = 1120/1.12 = 1000, disc = 200, exemptedVat = 120
+		// total = 1120 - 120 - 200 = 800
 		const result = calculateOrderTotals({
 			items: [item(1120)],
 			discountType: 'senior',
 			discountPax: 1,
 			pax: 0
 		});
-		// Identical to full-table SC discount with pax=1
 		expect(result.discountAmount).toBe(200);
-		expect(result.total).toBe(920);
+		expect(result.total).toBe(800);
 	});
 });
 

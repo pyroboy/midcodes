@@ -60,16 +60,16 @@
 		return null;
 	}
 
-	// [01] Multi-entry discount awareness: true when discountType is set OR discountEntries has keys
+	// [01] Multi-entry discount awareness: true when a real discount was applied (amount > 0)
 	const hasDiscount = $derived.by(() => {
-		if (!order) return false;
+		if (!order || order.discountAmount <= 0) return false;
 		return order.discountType !== 'none' || Object.keys(order.discountEntries ?? {}).length > 0;
 	});
 
 	// Discount summary — clean one-liner per type
 	type DiscountLine = { label: string; pax: number; type: string };
 	const discountLines = $derived.by((): DiscountLine[] => {
-		if (!order) return [];
+		if (!order || order.discountAmount <= 0) return [];
 		const lines: DiscountLine[] = [];
 
 		const typeLabel = (t: string) =>
@@ -77,19 +77,56 @@
 
 		if (order.discountEntries && Object.keys(order.discountEntries).length > 0) {
 			for (const [type, entry] of Object.entries(order.discountEntries) as [string, DiscountEntry | undefined][]) {
-				if (!entry) continue;
+				if (!entry || (entry.pax ?? 0) <= 0) continue;
 				lines.push({ label: typeLabel(type), pax: entry.pax ?? 1, type });
 			}
-		} else if (order.discountType !== 'none' && (order.discountType === 'senior' || order.discountType === 'pwd')) {
+		} else if (order.discountType !== 'none' && (order.discountType === 'senior' || order.discountType === 'pwd') && (order.discountPax ?? 0) > 0) {
 			lines.push({ label: typeLabel(order.discountType), pax: order.discountPax ?? 1, type: order.discountType });
 		}
 		return lines;
+	});
+
+	// BIR VAT breakdown: compute VAT-exempt sale and taxable sale from order data
+	const birBreakdown = $derived.by(() => {
+		if (!order || !hasDiscount) return null;
+
+		let qualifyingPax = 0;
+		if (order.discountEntries && Object.keys(order.discountEntries).length > 0) {
+			for (const entry of Object.values(order.discountEntries)) {
+				if (entry) qualifyingPax += entry.pax ?? entry.discountPax ?? 0;
+			}
+		} else {
+			qualifyingPax = order.discountPax ?? 0;
+		}
+
+		const totalPax = Math.max(1, order.pax);
+		const clampedQualifying = Math.min(qualifyingPax, totalPax);
+		const nonQualifyingPax = totalPax - clampedQualifying;
+
+		const qualifyingShare = order.subtotal * (clampedQualifying / totalPax);
+		const taxableShare = order.subtotal * (nonQualifyingPax / totalPax);
+
+		// VAT-exempt sale = qualifying share net of 12% VAT
+		const vatExemptSale = Math.round(qualifyingShare / 1.12 * 100) / 100;
+		// VAT removed from qualifying share (SC/PWD are VAT-free)
+		const exemptedVat = Math.round((qualifyingShare - vatExemptSale) * 100) / 100;
+		// Taxable sale = non-qualifying share net of VAT
+		const taxableSale = Math.round(taxableShare / 1.12 * 100) / 100;
+		// VAT on taxable portion only
+		const vatOnTaxable = Math.round((taxableShare - taxableShare / 1.12) * 100) / 100;
+
+		return { vatExemptSale, exemptedVat, taxableSale, vatOnTaxable };
 	});
 </script>
 
 {#if isOpen && order}
 	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
 		<div class="pos-card w-full max-w-[380px] flex flex-col gap-0 overflow-hidden p-0">
+			<!-- BIR disclaimer — top -->
+			<div class="bg-gray-900 text-white text-center py-1.5 px-4">
+				<span class="text-[10px] font-bold tracking-widest uppercase">This is not an official receipt</span>
+			</div>
+
 			<!-- Receipt Header -->
 			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-5 bg-surface">
 				<!-- [04] Branch name -->
@@ -145,37 +182,59 @@
 					<span>Subtotal</span>
 					<span>{formatPeso(order.subtotal)}</span>
 				</div>
-				{#if hasDiscount}
+				{#if hasDiscount && birBreakdown}
+					<!-- BIR-compliant SC/PWD breakdown (per RR 16-2005, RA 9994) -->
+					<div class="flex justify-between text-gray-600 text-xs">
+						<span>VAT Exempt Sale</span>
+						<span>{formatPeso(birBreakdown.vatExemptSale)}</span>
+					</div>
+					{#if birBreakdown.exemptedVat > 0}
+						<div class="flex justify-between text-gray-500 text-xs">
+							<span>Less: VAT (exempt)</span>
+							<span class="whitespace-nowrap">-{formatPeso(birBreakdown.exemptedVat)}</span>
+						</div>
+					{/if}
 					<div class="flex justify-between text-status-green">
 						<span class="flex-1 pr-2">
-							Discount ({discountLines.map(l => `${l.pax} ${l.label}`).join(' + ')})
+							Less: {discountLines.map(l => `${l.label} 20%`).join(' + ')} ({discountLines.map(l => `${l.pax}p`).join('+')}/{order.pax}p)
 						</span>
 						<span class="whitespace-nowrap">-{formatPeso(order.discountAmount)}</span>
 					</div>
-					<!-- BIR-required: SC/PWD beneficiary details -->
-					<div class="text-[10px] text-gray-500 mt-1">
-						<span class="font-bold">VAT EXEMPT SALE</span>
-					</div>
-					{#if order.discountEntries}
-						{#each Object.entries(order.discountEntries) as [type, discEntry]}
-							{#if discEntry}
-								{#each Array.from({ length: discEntry.pax }) as _, idx}
-									<div class="text-[10px] text-gray-600 mt-0.5">
-										<span>{type === 'senior' ? 'SC' : 'PWD'}: {discEntry.names?.[idx] || '—'}</span>
-										<span class="ml-1">ID: {discEntry.ids?.[idx] || '—'}</span>
-										{#if discEntry.tins?.[idx]}
-											<span class="ml-1">TIN: {discEntry.tins[idx]}</span>
-										{/if}
-									</div>
-								{/each}
-							{/if}
-						{/each}
+					{#if birBreakdown.taxableSale > 0}
+						<div class="flex justify-between text-gray-600 text-xs">
+							<span>Taxable Sale</span>
+							<span>{formatPeso(birBreakdown.taxableSale)}</span>
+						</div>
 					{/if}
+					<div class="flex justify-between text-gray-500 text-xs">
+						<span>12% VAT{birBreakdown.vatOnTaxable === 0 ? ' (all exempt)' : ''}</span>
+						<span>{formatPeso(birBreakdown.vatOnTaxable)}</span>
+					</div>
+					<!-- BIR-required: SC/PWD beneficiary details -->
+					{#if order.discountEntries}
+						<div class="border-t border-dashed border-gray-200 mt-1 pt-1">
+							{#each Object.entries(order.discountEntries) as [type, discEntry]}
+								{#if discEntry}
+									{#each Array.from({ length: discEntry.pax }) as _, idx}
+										<div class="text-[10px] text-gray-600 mt-0.5">
+											<span class="font-semibold">{type === 'senior' ? 'SC' : 'PWD'}:</span>
+											<span>{discEntry.names?.[idx] || '—'}</span>
+											<span class="ml-1">ID: {discEntry.ids?.[idx] || '—'}</span>
+											{#if discEntry.tins?.[idx]}
+												<span class="ml-1">TIN: {discEntry.tins[idx]}</span>
+											{/if}
+										</div>
+									{/each}
+								{/if}
+							{/each}
+						</div>
+					{/if}
+				{:else}
+					<div class="flex justify-between text-gray-500 text-xs">
+						<span>Incl. VAT (12%)</span>
+						<span>{formatPeso(order.vatAmount)}</span>
+					</div>
 				{/if}
-				<div class="flex justify-between text-gray-500 text-xs">
-					<span>{hasDiscount ? 'VAT (exempt)' : 'Incl. VAT (12%)'}</span>
-					<span>{formatPeso(order.vatAmount)}</span>
-				</div>
 				<div class="flex justify-between font-bold text-gray-900 text-base border-t border-gray-200 pt-1">
 					<span>TOTAL</span>
 					<span>{formatPeso(order.total)}</span>
@@ -228,6 +287,12 @@
 					{(order.closedAt ? new Date(order.closedAt) : new Date()).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
 				</span>
 				<span class="text-[10px] text-gray-400 font-mono">WTF! Samgyupsal — Thank you!</span>
+				<span class="text-[9px] text-gray-400 mt-1">Please ask cashier for BIR official receipt.</span>
+			</div>
+
+			<!-- BIR disclaimer — bottom -->
+			<div class="bg-gray-900 text-white text-center py-1.5 px-4">
+				<span class="text-[10px] font-bold tracking-widest uppercase">This is not an official receipt</span>
 			</div>
 
 			<div class="flex gap-3 px-6 py-4">

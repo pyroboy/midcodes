@@ -201,7 +201,15 @@
         for (const [k, v] of Object.entries(localDiscountEntries)) {
             if (v && v.pax > 0) cleaned[k as DiscountType] = v;
         }
-        recalcOrder(order, { discountEntries: Object.keys(cleaned).length > 0 ? JSON.parse(JSON.stringify(cleaned)) : null });
+        const hasDiscount = Object.keys(cleaned).length > 0;
+        recalcOrder(order, {
+            discountEntries: hasDiscount ? JSON.parse(JSON.stringify(cleaned)) : null,
+            // Clear legacy fields when all discounts are removed to prevent
+            // calculateOrderTotals from falling through to the discountType path
+            discountType: hasDiscount ? order.discountType : 'none' as DiscountType,
+            discountPax: hasDiscount ? order.discountPax : 0,
+            discountIds: hasDiscount ? order.discountIds : [],
+        });
     }
 
     function applyScPwdPax(type: DiscountType, newPax: number) {
@@ -209,7 +217,10 @@
         const otherPax = localDiscountEntries[otherType as DiscountType]?.pax ?? 0;
         const maxForType = order.pax - otherPax;
         const validatedPax = Math.max(0, Math.min(newPax, maxForType));
-        if (localDiscountEntries[type]) {
+        if (validatedPax === 0) {
+            // Fully remove the entry so no stale discount lingers
+            delete localDiscountEntries[type];
+        } else if (localDiscountEntries[type]) {
             localDiscountEntries[type]!.pax = validatedPax;
             localDiscountEntries[type]!.names = Array.from({ length: validatedPax }, (_, i) => localDiscountEntries[type]!.names?.[i] ?? '');
             localDiscountEntries[type]!.ids = Array.from({ length: validatedPax }, (_, i) => localDiscountEntries[type]!.ids[i] ?? '');
@@ -445,7 +456,7 @@
                         </div>
                     {/if}
                     <div class="flex justify-between text-[11px] text-gray-400">
-                        <span>{order.discountType === 'senior' || order.discountType === 'pwd' ? 'VAT Exempt' : 'Incl. VAT 12%'}</span>
+                        <span>{order.discountAmount > 0 && (order.discountType === 'senior' || order.discountType === 'pwd') ? 'VAT Exempt' : 'Incl. VAT 12%'}</span>
                         <span class="font-mono">{formatPeso(order.vatAmount)}</span>
                     </div>
                 </div>
