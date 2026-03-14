@@ -26,12 +26,20 @@ function connectionLogger(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [connectionLogger(), basicSsl(), sveltekit()],
+	plugins: [connectionLogger(), sveltekit()],
 	define: {
 		__BUILD_DATE__: JSON.stringify(new Date().toISOString()),
 		__BUILD_MODE__: JSON.stringify(process.env.NODE_ENV ?? 'development'),
 		'process.env': {},
 		'process': { env: {} }
+	},
+	build: {
+		target: ['es2020', 'safari15']
+	},
+	optimizeDeps: {
+		esbuildOptions: {
+			target: 'safari15'
+		}
 	},
 	server: {
 		host: '0.0.0.0', // expose on LAN for tablet access
