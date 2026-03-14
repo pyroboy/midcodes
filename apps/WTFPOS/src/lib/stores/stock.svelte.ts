@@ -83,10 +83,11 @@ export interface Deduction {
 }
 
 export interface StockCount {
+	id: string;
 	stockItemId: string;
 	locationId: string;
-	/** Business date (YYYY-MM-DD) — null for legacy docs migrated before date tracking */
-	date: string | null;
+	/** Business date (YYYY-MM-DD) */
+	date: string;
 	counted: Record<CountPeriod, number | null>;
 	updatedAt: string;
 }
@@ -245,17 +246,21 @@ export const INITIAL_STOCK_EVENTS: StockEvent[] = [
 
 export const INITIAL_DEDUCTIONS: Deduction[] = [];
 
-export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => ({
-	stockItemId: s.id,
-	locationId: s.locationId,
-	date: new Date().toISOString().slice(0, 10),
-	counted: {
-		am10: getMorningCount(s.menuItemId, s.locationId),
-		pm4: getAfternoonCount(s.menuItemId, s.locationId),
-		pm10: null,
-	},
-	updatedAt: new Date().toISOString(),
-}));
+export const INITIAL_STOCK_COUNTS: StockCount[] = INITIAL_STOCK_ITEMS.map(s => {
+	const date = new Date().toISOString().slice(0, 10);
+	return {
+		id: `${s.id}-${s.locationId}-${date}`,
+		stockItemId: s.id,
+		locationId: s.locationId,
+		date,
+		counted: {
+			am10: getMorningCount(s.menuItemId, s.locationId),
+			pm4: getAfternoonCount(s.menuItemId, s.locationId),
+			pm10: null,
+		},
+		updatedAt: new Date().toISOString(),
+	};
+});
 
 export const INITIAL_ADJUSTMENT_EVENTS: StockEvent[] = [
 	// ── Warehouse deductions for today's Tagbilaran transfers ──────────────────────────
@@ -305,7 +310,7 @@ export const adjustments = {
 	get initialized() { return _stockEvents.initialized; }
 };
 export const deductions = createStore<Deduction>('deductions', db => db.deductions.find());
-export const stockCounts = createStore<StockCount>('stock_counts', db => db.stock_counts.find(), { primaryKey: 'stockItemId' });
+export const stockCounts = createStore<StockCount>('stock_counts', db => db.stock_counts.find());
 
 export const countPeriods = $state<{ id: CountPeriod; label: string; time: string; status: 'done' | 'pending' }[]>([
 	{ id: 'am10', label: 'Morning',   time: '10:00 AM', status: 'done' },
@@ -861,12 +866,25 @@ export async function submitCount(stockItemId: string, period: CountPeriod, valu
 	const col = getWritableCollection('stock_counts');
 	const now = new Date();
 	const businessDate = now.toISOString().slice(0, 10); // YYYY-MM-DD
-	const doc = await col.findOne(stockItemId).exec();
-	if (doc) {
-		await col.incrementalPatch(stockItemId, {
-			counted: { ...doc.counted, [period]: value },
-			locationId: session.locationId || doc.locationId || '',
+	const locationId = session.locationId || '';
+
+	// Find existing count doc for this item + location + date
+	const existing = stockCounts.value.find(
+		c => c.stockItemId === stockItemId && c.locationId === locationId && c.date === businessDate
+	);
+
+	if (existing) {
+		await col.incrementalPatch(existing.id, {
+			counted: { ...existing.counted, [period]: value },
+			updatedAt: now.toISOString(),
+		});
+	} else {
+		await col.insert({
+			id: nanoid(),
+			stockItemId,
+			locationId,
 			date: businessDate,
+			counted: { am10: null, pm4: null, pm10: null, [period]: value },
 			updatedAt: now.toISOString(),
 		});
 	}

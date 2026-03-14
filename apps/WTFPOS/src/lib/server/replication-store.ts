@@ -18,9 +18,7 @@ import { log } from './logger';
 
 
 // Primary key field per collection (most use 'id')
-const PK_FIELD: Record<string, string> = {
-	stock_counts: 'stockItemId'
-};
+const PK_FIELD: Record<string, string> = {};
 
 function pk(collection: string, doc: any): string {
 	return doc[PK_FIELD[collection] ?? 'id'];

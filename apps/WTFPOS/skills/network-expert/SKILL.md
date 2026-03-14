@@ -1,14 +1,15 @@
 ---
 name: network-expert
 description: >
-  Network topology and synchronization expert for WTFPOS. Use this skill when evaluating network
-  architecture decisions — LAN replication, SSE vs Ably, offline-first guarantees, cross-branch
-  connectivity, device sync health, connection monitoring, or bandwidth/latency planning. Also
-  triggers on "network", "topology", "sync", "replication", "SSE", "offline", "LAN", "WiFi",
-  "latency", "bandwidth", "connection", "cross-branch", "device sync", "server restart recovery",
-  "multiplexed stream", or "conflict resolution". This skill is the network lens; architecture
-  is the full-stack lens.
-version: 2.0.0
+  Network topology, synchronization, and write guard expert for WTFPOS. Use this skill when evaluating
+  network architecture decisions — LAN replication, SSE vs Ably, offline-first guarantees, cross-branch
+  connectivity, device sync health, connection monitoring, bandwidth/latency planning, or multi-device
+  write guard logic. Also triggers on "network", "topology", "sync", "replication", "SSE", "offline",
+  "LAN", "WiFi", "latency", "bandwidth", "connection", "cross-branch", "device sync", "server restart
+  recovery", "multiplexed stream", "conflict resolution", "write guard", "race condition", "duplicate
+  order", "orphan order", "guard log", "state machine", or "stock negative". This skill is the network
+  lens; architecture is the full-stack lens.
+version: 3.0.0
 ---
 
 # WTFPOS — Network Expert
@@ -59,6 +60,10 @@ Read `BACKUP_REGIMEN.md` before implementing any backup, restore, or disaster re
 | What happens when a thin client writes? | HTTP POST to `/api/collections/[col]/write` → server's `CollectionStore.push()` → `emit()` → SSE broadcasts instantly to **all** connected devices (including the server's own browser). |
 | How does a device know if it's the server? | `GET /api/device/identify` checks client IP against `os.networkInterfaces()`. Loopback or matching local IP = server. |
 | Can two branches sync directly? | **No.** Branches are blind to each other. Cross-branch = cloud only (Neon merge). |
+| What prevents duplicate orders from two tablets? | **Server-side write guards.** Both the write API and replication push check for existing open orders on the same table. If found, cross-checks the table document for orphan detection. See §Server-Side Write Guards. |
+| What if a guard blocks my write? | The server returns `{ guarded: true, document: existingDoc }`. The client uses the existing document instead of the new one. Guard events appear in the Live status panel's Guard Log. |
+| How do I debug guard events? | Click the "Live" pill (top-right) → Guard Log section. Each event shows layer (client/write-api/replication), type, table, order IDs, and timestamp. All guards also write to `audit_logs`. |
+| Can guards block the POS during service? | **Only table/order guards block.** Stock negativity detection is non-blocking (alert only). KDS dedup merges instead of blocking. The POS never freezes. |
 | Do branches need to know about each other? | **No.** Each branch uploads to Neon independently. Owner queries Neon for cross-branch views. |
 | When do I add Ably? | **Only after Neon is working**, and only if the owner needs instant cross-branch alerts. It's a luxury, not a requirement. |
 
@@ -138,9 +143,123 @@ Layer 5: REAL-TIME ALERTS 100-300ms Ably one-way publish (Phase 2b, optional lux
 | `src/routes/api/device/identify/+server.ts` | Device identity + server detection + re-identification |
 | `src/routes/api/device/route/+server.ts` | Route reporting via sendBeacon |
 | `src/routes/api/device/clients/+server.ts` | Active client snapshot endpoint |
+| `src/routes/api/pos/transfer/+server.ts` | Atomic table transfer (server-side, 4 writes in 1 call) |
+| `src/routes/api/reports/x-read/+server.ts` | Server-side X-Read snapshot (consistent point-in-time) |
 | `src/routes/api/replication/reset/+server.ts` | RESET_ALL broadcast + epoch bump |
 | `src/routes/api/replication/client-log/+server.ts` | Client error log relay |
 | `src/routes/api/replication/ping/+server.ts` | Diagnostic echo + store test |
+
+---
+
+## Server-Side Write Guards
+
+Multi-device race conditions are the biggest data integrity risk on LAN. The server enforces **12 guards** across 2 layers (write API + replication push) to prevent duplicates, invalid transitions, orphaned data, stock errors, and BIR compliance violations.
+
+### Guard Architecture
+
+```
+Thin Client ──HTTP POST──► Write API (/api/collections/[col]/write)
+                              │
+                              ├─ guardDuplicateTableOrder()       ← orders insert (+ orphan auto-heal)
+                              ├─ guardDuplicateKdsTicket()        ← kds_tickets insert (merge, not block)
+                              ├─ guardDuplicateZRead()            ← readings insert (z-read dedup)
+                              ├─ guardDuplicateActiveShift()      ← shifts insert (one open per location)
+                              ├─ guardDuplicateTableOccupancy()   ← tables patch
+                              ├─ guardTableStateTransition()      ← tables patch (state machine)
+                              ├─ guardTableCloseWithOpenOrder()   ← tables patch (order must be closed)
+                              ├─ guardOrderStateTransition()      ← orders patch (status state machine)
+                              └─ detectStockNegativity()          ← deductions insert (non-blocking alert)
+
+Server (RxDB) ──replication push──► Push Endpoint (/api/replication/[col]/push)
+                                       │
+                                       ├─ filterDuplicateTableOrders()     (+ orphan auto-heal)
+                                       ├─ filterInvalidTableTransitions()
+                                       ├─ filterDuplicateKdsTickets()      (merge, not drop)
+                                       ├─ filterInvalidOrderTransitions()
+                                       ├─ filterDuplicateZReads()
+                                       └─ filterDuplicateActiveShifts()
+```
+
+### Guard Summary
+
+| Guard | GuardType | Layer | Behavior |
+|-------|-----------|-------|----------|
+| **Duplicate order** | `duplicate-order` | Write API + Replication | Blocks insert; cross-checks table doc for orphan auto-heal |
+| **Orphan auto-heal** | `orphan-auto-healed` | Write API + Replication | Auto-cancels stale orders when table document disagrees |
+| **Duplicate occupancy** | `duplicate-occupancy` | Write API | Blocks table re-occupy when already occupied |
+| **Table state machine** | `invalid-state-transition` | Write API + Replication | Rejects invalid status transitions (e.g. `available→billing`) |
+| **Table close guard** | `table-close-with-open-order` | Write API | Blocks table release if order is still `open`/`pending_payment` |
+| **Order state machine** | `invalid-order-transition` | Write API + Replication | Prevents double checkout (`paid→paid`), void after payment |
+| **KDS ticket dedup** | `duplicate-kds-ticket` | Write API + Replication | Merges items into existing active ticket instead of duplicating |
+| **Stock negativity** | `stock-negative` | Write API + Client | Non-blocking alert when deduction pushes stock below zero |
+| **Duplicate Z-Read** | `duplicate-z-read` | Write API + Replication | Prevents two EOD closes per business date (BIR compliance) |
+| **Duplicate shift** | `duplicate-active-shift` | Write API + Replication | Prevents two open cash floats per location |
+| **Client pre-check** | `table-unavailable` | Client only | Rejects table open if status ≠ `available` before server call |
+
+### Valid State Machines
+
+**Table transitions:**
+```
+available   → occupied, maintenance
+occupied    → warning, critical, billing, available
+warning     → critical, billing, available
+critical    → billing, available
+billing     → available
+maintenance → available
+```
+
+**Order transitions:**
+```
+open              → pending_payment, paid, cancelled
+pending_payment   → paid, open, cancelled
+paid              → (terminal — no transitions)
+cancelled         → (terminal — no transitions)
+```
+
+Any transition not listed is rejected by both the write API and replication push. State machine guards should fail-open for unknown source states (log warning, allow transition).
+
+### Orphan Detection (Table ↔ Order Cross-Check)
+
+The most important guard innovation: before blocking an order insert, the server **cross-references the table document**. If the table says `available` or its `currentOrderId` doesn't match the "blocking" order, that order is an **orphan** — stale from a previous session where the order's status update was lost. The guard auto-cancels the orphan with `cancelReason: 'orphan-auto-healed'` and allows the new order.
+
+### Server-Side Atomic Endpoints
+
+Two operations are performed atomically on the server to avoid multi-write races:
+
+| Endpoint | Purpose | Fallback |
+|----------|---------|----------|
+| `POST /api/pos/transfer` | Table transfer (4 writes in 1 call with pre-validation) | Client multi-write if offline |
+| `POST /api/reports/x-read` | BIR X-Read snapshot from consistent server-side data | Client local computation if offline |
+
+### Guard Observability
+
+All guard events flow to 4 destinations:
+1. **Server console** — `console.warn` with `[Write Guard]` or `[Sync Guard]` prefix
+2. **Audit log** — `audit_logs` collection with structured `meta` JSON (guardType, guardLayer, tableId, orderIds)
+3. **Client guard store** — in-memory `guard.svelte.ts` tracks events with red dot indicator on the "Live" status pill
+4. **Guard Log panel** — expandable section in `ConnectionStatus.svelte` showing all guard events with layer badges and icons
+
+### Rules for Adding New Guards
+
+- **Blocking guards** return `{ guarded: true, document: existingDoc }` — the client uses the existing document
+- **Non-blocking guards** (stock negativity) detect + alert but never prevent the write
+- **Merge guards** (KDS dedup) combine data instead of blocking
+- **All guards** write to `audit_logs` for traceability
+- Guard types are defined in `src/lib/stores/guard.svelte.ts` — add new types there first
+- Icon mapping lives in `ConnectionStatus.svelte` — update the `typeIcon` ternary
+
+### Guard-Related Key Files
+
+| File | What It Does |
+|------|-------------|
+| `src/routes/api/collections/[collection]/write/+server.ts` | 9 server guards + stock detection |
+| `src/routes/api/replication/[collection]/push/+server.ts` | 6 replication filters chained |
+| `src/lib/stores/guard.svelte.ts` | Client-side guard event store (in-memory, reactive) |
+| `src/lib/stores/pos/tables.svelte.ts` | Client guard handling for table operations |
+| `src/lib/stores/stock.svelte.ts` | Client-side stock negativity detection |
+| `src/lib/components/ConnectionStatus.svelte` | Guard log UI + red dot indicator |
+| `src/routes/api/pos/transfer/+server.ts` | Atomic table transfer endpoint |
+| `src/routes/api/reports/x-read/+server.ts` | Atomic X-Read snapshot endpoint |
 
 ---
 

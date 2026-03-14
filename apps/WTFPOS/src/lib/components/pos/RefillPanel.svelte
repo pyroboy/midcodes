@@ -3,6 +3,7 @@
 	import { menuItems, addItemToOrder, addRefillRequest, addServiceRequest, REFILL_NOTE, getRefillCount } from '$lib/stores/pos.svelte';
 	import { cn } from '$lib/utils';
 	import { X, RotateCcw, UtensilsCrossed, Beef, LeafyGreen, Wrench, Plus } from 'lucide-svelte';
+	import { playSound } from '$lib/utils/audio';
 
 	interface Props {
 		isOpen: boolean;
@@ -28,6 +29,7 @@
 	async function requestService(text: string) {
 		if (!order?.id || !text.trim()) return;
 		await addServiceRequest(order.id, text.trim());
+		playSound('click');
 		sentServiceKey = text;
 		customService = '';
 		showCustomInput = false;
@@ -79,6 +81,7 @@
 	async function requestMeat(meat: MenuItem) {
 		if (!order) return;
 		await addRefillRequest(order.id, meat);
+		playSound('click');
 		addedItemId = meat.id;
 		setTimeout(() => { addedItemId = null; }, 1200);
 	}
@@ -87,6 +90,7 @@
 		if (!order) return;
 		if (side.id === ICE_TEA_PITCHER_ID) return;
 		await addItemToOrder(order.id, side, 1, undefined, true);
+		playSound('click');
 		addedItemId = side.id;
 		sentSideIds = new Set([...sentSideIds, side.id]);
 		setTimeout(() => { addedItemId = null; }, 1200);
@@ -98,6 +102,7 @@
 			if (pendingRefillMeatIds.has(meat.id)) continue;
 			await addRefillRequest(order.id, meat);
 		}
+		playSound('success');
 		repeatConfirmed = true;
 		setTimeout(() => { repeatConfirmed = false; }, 1500);
 	}

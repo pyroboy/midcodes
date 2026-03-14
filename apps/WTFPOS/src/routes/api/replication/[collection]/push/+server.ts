@@ -47,7 +47,7 @@ function writeReplicationGuardAudit(
 // ─── Valid Table State Transitions ───────────────────────────────────────────
 const VALID_TABLE_TRANSITIONS: Record<string, string[]> = {
 	available: ['occupied', 'maintenance'],
-	occupied: ['warning', 'critical', 'billing'],
+	occupied: ['warning', 'critical', 'billing', 'available'],
 	warning: ['critical', 'billing', 'available'],
 	critical: ['billing', 'available'],
 	billing: ['available'],
@@ -92,6 +92,63 @@ function filterInvalidTableTransitions(
 					'invalid-state-transition', tableId, doc.locationId,
 					assumed.currentOrderId ?? '—', doc.currentOrderId ?? '—',
 					`[Sync Guard] Dropped invalid table state transition for ${tableId} — ${fromStatus} → ${toStatus}`
+				);
+				dropped++;
+				continue;
+			}
+		}
+
+		allowed.push(row);
+	}
+
+	return { allowed, dropped };
+}
+
+// ─── Valid Order State Transitions ───────────────────────────────────────────
+const VALID_ORDER_TRANSITIONS: Record<string, string[]> = {
+	open: ['pending_payment', 'paid', 'cancelled'],
+	pending_payment: ['paid', 'open', 'cancelled'],
+	// paid and cancelled are terminal — no transitions allowed
+};
+
+// ─── Business Logic Guard: Invalid Order State Transitions ──────────────────
+// When an order status change is pushed via replication, validate that the
+// transition is allowed. Drop invalid transitions silently.
+function filterInvalidOrderTransitions(
+	changeRows: any[],
+	collection: string
+): { allowed: any[]; dropped: number } {
+	if (collection !== 'orders') return { allowed: changeRows, dropped: 0 };
+
+	const allowed: any[] = [];
+	let dropped = 0;
+
+	for (const row of changeRows) {
+		const doc = row.newDocumentState;
+		const assumed = row.assumedMasterState;
+
+		// Only check updates (not inserts) that include a status change
+		if (
+			doc &&
+			assumed &&
+			doc.status &&
+			assumed.status &&
+			doc.status !== assumed.status
+		) {
+			const fromStatus: string = assumed.status;
+			const toStatus: string = doc.status;
+			const validTargets = VALID_ORDER_TRANSITIONS[fromStatus];
+
+			if (!validTargets || !validTargets.includes(toStatus)) {
+				const orderId = doc.id || 'unknown';
+				log.warn('Sync',
+					`[Guard] Dropped invalid order state transition for ${orderId} — ` +
+					`${fromStatus} → ${toStatus} is not allowed`
+				);
+				writeReplicationGuardAudit(
+					'invalid-order-transition', orderId, doc.locationId,
+					assumed.id ?? '—', doc.id ?? '—',
+					`[Sync Guard] Dropped invalid order state transition for ${orderId} — ${fromStatus} → ${toStatus}`
 				);
 				dropped++;
 				continue;
@@ -286,6 +343,113 @@ function filterDuplicateKdsTickets(
 	return { allowed, dropped };
 }
 
+// ─── Business Logic Guard: Duplicate Active Shifts ──────────────────────────
+// When a new open shift is pushed for a location that already has an active shift,
+// silently drop the duplicate from the push. Only one shift can be open per location.
+function filterDuplicateActiveShifts(
+	changeRows: any[],
+	collection: string
+): { allowed: any[]; dropped: number } {
+	if (collection !== 'shifts') return { allowed: changeRows, dropped: 0 };
+
+	const shiftsStore = getCollectionStore('shifts');
+	if (!shiftsStore) return { allowed: changeRows, dropped: 0 };
+
+	const allShifts = shiftsStore.pull(null, Infinity).documents;
+	const allowed: any[] = [];
+	let dropped = 0;
+
+	for (const row of changeRows) {
+		const doc = row.newDocumentState;
+		if (
+			doc &&
+			doc.status === 'open' &&
+			!doc._deleted &&
+			// Only guard new inserts (assumedMasterState is null)
+			!row.assumedMasterState
+		) {
+			const existingShift = allShifts.find(
+				(s: any) =>
+					s.locationId === doc.locationId &&
+					s.status === 'open' &&
+					!s._deleted &&
+					s.id !== doc.id
+			);
+			if (existingShift) {
+				log.warn('Sync',
+					`[Guard] Dropped duplicate active shift for location ${doc.locationId} — ` +
+					`existing shift: ${existingShift.id}, attempted: ${doc.id}`
+				);
+				writeReplicationGuardAudit(
+					'duplicate-active-shift', doc.locationId, doc.locationId,
+					existingShift.id, doc.id,
+					`[Sync Guard] Dropped duplicate active shift for location ${doc.locationId} — existing: ${existingShift.id.slice(0, 8)}…, attempted: ${doc.id.slice(0, 8)}…`
+				);
+				dropped++;
+				continue;
+			}
+		}
+		allowed.push(row);
+	}
+
+	return { allowed, dropped };
+}
+
+// ─── Business Logic Guard: Duplicate Z-Reads ────────────────────────────────
+// Z-Reads are BIR end-of-day permanent closes — exactly one per date per location.
+// When a z-read is pushed for a date+location that already has one, drop it.
+function filterDuplicateZReads(
+	changeRows: any[],
+	collection: string
+): { allowed: any[]; dropped: number } {
+	if (collection !== 'readings') return { allowed: changeRows, dropped: 0 };
+
+	const readingsStore = getCollectionStore('readings');
+	if (!readingsStore) return { allowed: changeRows, dropped: 0 };
+
+	const allReadings = readingsStore.pull(null, Infinity).documents;
+	const allowed: any[] = [];
+	let dropped = 0;
+
+	for (const row of changeRows) {
+		const doc = row.newDocumentState;
+		if (
+			doc &&
+			doc.type === 'z-read' &&
+			doc.date &&
+			doc.locationId &&
+			!doc._deleted &&
+			// Only guard new inserts (assumedMasterState is null)
+			!row.assumedMasterState
+		) {
+			const existingReading = allReadings.find(
+				(r: any) =>
+					r.type === 'z-read' &&
+					r.date === doc.date &&
+					r.locationId === doc.locationId &&
+					!r._deleted &&
+					r.id !== doc.id
+			);
+			if (existingReading) {
+				log.warn('Sync',
+					`[Guard] Dropped duplicate Z-Read for ${doc.date} at ${doc.locationId} — ` +
+					`existing: ${existingReading.id}, attempted: ${doc.id}`
+				);
+				writeReplicationGuardAudit(
+					'duplicate-z-read', doc.locationId, doc.locationId,
+					existingReading.id, doc.id,
+					`[Sync Guard] Dropped duplicate Z-Read for ${doc.date} at ${doc.locationId} — existing: ${existingReading.id.slice(0, 8)}…, attempted: ${doc.id.slice(0, 8)}…`
+				);
+				dropped++;
+				continue;
+			}
+		}
+		allowed.push(row);
+	}
+
+	return { allowed, dropped };
+}
+
 export const POST: RequestHandler = async ({ params, request, getClientAddress }) => {
 	const store = getCollectionStore(params.collection);
 	if (!store) throw error(404, `Unknown collection: ${params.collection}`);
@@ -302,9 +466,12 @@ export const POST: RequestHandler = async ({ params, request, getClientAddress }
 	const orderGuard = filterDuplicateTableOrders(changeRows, params.collection);
 	const tableGuard = filterInvalidTableTransitions(orderGuard.allowed, params.collection);
 	const kdsGuard = filterDuplicateKdsTickets(tableGuard.allowed, params.collection);
+	const orderStateGuard = filterInvalidOrderTransitions(kdsGuard.allowed, params.collection);
+	const shiftGuard = filterDuplicateActiveShifts(orderStateGuard.allowed, params.collection);
+	const zReadGuard = filterDuplicateZReads(shiftGuard.allowed, params.collection);
 
-	const allowed = kdsGuard.allowed;
-	const dropped = orderGuard.dropped + tableGuard.dropped + kdsGuard.dropped;
+	const allowed = zReadGuard.allowed;
+	const dropped = orderGuard.dropped + tableGuard.dropped + kdsGuard.dropped + orderStateGuard.dropped + shiftGuard.dropped + zReadGuard.dropped;
 
 	const conflicts = allowed.length > 0 ? store.push(allowed) : [];
 

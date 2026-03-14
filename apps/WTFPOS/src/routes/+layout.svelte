@@ -24,6 +24,20 @@
 	const isLoginPage = $derived(page.url.pathname === '/');
 	const showSidebar = $derived(!isLoginPage);
 
+	// Server reset recovery: show "Preparing Server" overlay until replication finishes pushing
+	let serverPreparing = $state(browser && !!localStorage.getItem('wtfpos_server_preparing'));
+	let prepProgress = $state(0);
+	let prepPhase = $state('Initializing database...');
+	let prepCompleted = $state<string[]>([]);
+	let prepTotal = $state(0);
+	let prepLogs = $state<string[]>(['Starting server preparation...']);
+	let prepShowSkip = $state(false); // show skip button after timeout
+
+	function dismissServerPrep() {
+		serverPreparing = false;
+		try { localStorage.removeItem('wtfpos_server_preparing'); } catch { /* noop */ }
+	}
+
 	// P0: Redirect unauthenticated users to login
 	$effect(() => {
 		if (browser && !isLoginPage && !session.userName) {
@@ -97,6 +111,61 @@
 		initDbHealthCheck();
 		pruneOldData(); // background cleanup — non-blocking
 
+		// Server reset recovery: listen for replication to finish so we can dismiss overlay
+		if (serverPreparing) {
+			prepLogs = [...prepLogs, 'Waiting for RxDB initialization...'];
+
+			// Fallback: show skip button after 30s, auto-dismiss after 90s
+			const skipTimer = setTimeout(() => {
+				prepShowSkip = true;
+				prepLogs = [...prepLogs, '⚠ Taking longer than expected — you can skip below'];
+			}, 30_000);
+			const autoSkipTimer = setTimeout(() => {
+				if (serverPreparing) {
+					console.warn('[ServerPrep] Auto-dismissing after 90s timeout');
+					dismissServerPrep();
+				}
+			}, 90_000);
+
+			import('$lib/db/replication').then(({ subscribeSyncActivity }) => {
+				prepLogs = [...prepLogs, 'Replication module loaded'];
+				const unsub = subscribeSyncActivity((activity) => {
+					prepPhase = activity.phase;
+					prepCompleted = activity.completedCollections;
+					prepTotal = activity.totalCollections;
+					prepProgress = prepTotal > 0
+						? Math.round((activity.completedCollections.length / prepTotal) * 100)
+						: 0;
+
+					// Add log entries for newly completed collections
+					for (const col of activity.completedCollections) {
+						const logEntry = `✓ ${col}`;
+						if (!prepLogs.includes(logEntry)) {
+							prepLogs = [...prepLogs, logEntry];
+						}
+					}
+
+					if (activity.prioritySyncDone && !prepLogs.includes('★ Priority sync complete')) {
+						prepLogs = [...prepLogs, '★ Priority sync complete'];
+					}
+
+					if (activity.initialSyncDone) {
+						prepLogs = [...prepLogs, '✅ All collections synced — server ready!'];
+						clearTimeout(skipTimer);
+						clearTimeout(autoSkipTimer);
+						setTimeout(() => {
+							serverPreparing = false;
+							unsub();
+						}, 800); // brief pause so user sees 100%
+					}
+				});
+			}).catch(() => {
+				clearTimeout(skipTimer);
+				clearTimeout(autoSkipTimer);
+				serverPreparing = false;
+			});
+		}
+
 		// Ensure data mode is resolved on every page load (not just login).
 		// The sessionStorage cache provides the initial value instantly,
 		// but this call re-validates against the device identity endpoint.
@@ -160,6 +229,63 @@
 		};
 	});
 </script>
+
+<!-- ═══ Server Preparing: blocks UI after reset until data is pushed to store ═══ -->
+{#if serverPreparing}
+	<div id="wtfpos-reset-overlay" class="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-gray-900 text-white p-6">
+		<div class="flex flex-col items-center w-full max-w-md gap-6">
+			<!-- Header -->
+			<div class="text-center">
+				<div class="text-5xl sm:text-6xl mb-3">🔧</div>
+				<div class="text-2xl sm:text-3xl font-black tracking-wider">PREPARING SERVER</div>
+			</div>
+
+			<!-- Progress bar -->
+			<div class="w-full">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs font-mono text-gray-400">{prepPhase}</span>
+					<span class="text-xs font-mono font-bold text-accent">{prepProgress}%</span>
+				</div>
+				<div class="h-3 w-full rounded-full bg-gray-800 overflow-hidden">
+					<div
+						class="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+						style="width: {prepProgress}%"
+					></div>
+				</div>
+				{#if prepTotal > 0}
+					<div class="mt-1.5 text-[10px] font-mono text-gray-500 text-right">
+						{prepCompleted.length} / {prepTotal} collections
+					</div>
+				{/if}
+			</div>
+
+			<!-- Live log -->
+			<div class="w-full rounded-lg bg-gray-800/80 border border-gray-700 p-3 max-h-48 overflow-y-auto font-mono text-[11px] leading-relaxed">
+				{#each prepLogs as log}
+					<div class={log.startsWith('✅') ? 'text-status-green font-bold' : log.startsWith('★') ? 'text-accent font-bold' : log.startsWith('✓') ? 'text-gray-300' : 'text-gray-500'}>
+						{log}
+					</div>
+				{/each}
+			</div>
+
+			<!-- Spinner -->
+			{#if prepProgress < 100}
+				<div class="h-8 w-8 rounded-full border-3 border-gray-700 border-t-accent animate-spin"></div>
+			{/if}
+
+			<!-- Skip button — appears after 30s timeout -->
+			{#if prepShowSkip}
+				<button
+					onclick={dismissServerPrep}
+					class="mt-2 rounded-lg bg-gray-700 px-6 py-3 text-sm font-semibold text-white hover:bg-gray-600 transition-colors"
+					style="min-height: unset"
+				>
+					Skip — Continue Anyway
+				</button>
+			{/if}
+		</div>
+	</div>
+{/if}
 
 <!-- ═══ Sync Gate: blocks client devices until server data arrives ═══ -->
 {#if needsSyncGate && !syncGateOpen}

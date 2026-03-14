@@ -497,6 +497,32 @@ export async function setTakeoutStatus(orderId: string, status: TakeoutStatus): 
 // ─── Table Transfer & Merge ───────────────────────────────────────────────────
 
 export async function transferTable(fromTableId: string, toTableId: string): Promise<{ success: boolean; error?: string }> {
+	// Try server-side atomic transfer first (prevents race conditions across devices)
+	try {
+		const res = await fetch('/api/pos/transfer', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ fromTableId, toTableId })
+		});
+		const result = await res.json();
+		if (result.success) {
+			// Trigger resync for affected collections so local RxDB picks up changes
+			try {
+				const { getActiveReplication } = await import('$lib/db/replication');
+				for (const col of ['tables', 'orders', 'kds_tickets']) {
+					const rep = getActiveReplication(col);
+					if (rep && typeof rep.reSync === 'function') rep.reSync();
+				}
+			} catch { /* best-effort resync */ }
+			log.tableTransferred(result.fromLabel, result.toLabel);
+			return { success: true };
+		}
+		return { success: false, error: result.error };
+	} catch {
+		// Fallback to client-side multi-write if server is unreachable (offline mode)
+	}
+
+	// ── Offline fallback: 4 sequential client-side writes ──
 	const fromTable = tables.value.find(t => t.id === fromTableId);
 	const toTable = tables.value.find(t => t.id === toTableId);
 	if (!fromTable || !toTable || toTable.status !== 'available' || !fromTable.currentOrderId) return { success: false, error: 'Invalid tables or table not available' };

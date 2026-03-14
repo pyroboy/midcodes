@@ -10,6 +10,7 @@
 	import { printMeatLabel } from '$lib/stores/hardware.svelte';
 	import { Bluetooth, Printer } from 'lucide-svelte';
 	import { browser } from '$app/environment';
+	import { playSound } from '$lib/utils/audio';
 
 	const SUGGESTED_GRAMS_PER_PAX = 150;
 
@@ -182,11 +183,13 @@
 	});
 
 	function selectItem(item: PendingMeat) {
+		playSound('click');
 		selectedItem = item;
 		weightInput = '';
 	}
 
 	function handleNumpad(key: string) {
+		playSound('click');
 		if (key === 'C') {
 			weightInput = '';
 			return;
@@ -204,6 +207,7 @@
 		if (isNaN(grams) || grams <= 0) return;
 
 		await dispatchMeatWeight(selectedItem.orderId, selectedItem.itemId, grams);
+		playSound('success');
 
 		// Track manual dispatches for [08] dismiss hint
 		if (!btConnected) manualDispatchCount += 1;

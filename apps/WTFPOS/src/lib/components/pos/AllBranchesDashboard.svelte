@@ -50,7 +50,8 @@
         const isHoriz = sideName === 'top' || sideName === 'bottom';
         const spanW = isHoriz ? W : H;
 
-        if (side.type === 'lounge') {
+        // Bench types: lounge, l-shape (legacy), diner (legacy) all render as bench
+        if (side.type === 'lounge' || side.type === 'l-shape' || side.type === 'diner') {
             const cw = isHoriz ? spanW - CHAIR_GAP * 2 : CHAIR_THICKNESS;
             const ch = isHoriz ? CHAIR_THICKNESS : spanW - CHAIR_GAP * 2;
             const cx = isHoriz ? table.x + CHAIR_GAP : (sideName === 'left' ? table.x - CHAIR_THICKNESS - CHAIR_GAP : table.x + W + CHAIR_GAP);
@@ -70,23 +71,41 @@
                 return { x, y, w: chairW, h: chairH };
             });
         }
-        if (side.type === 'diner') {
-            const halfSpan = (spanW - CHAIR_GAP * 3) / 2;
-            if (isHoriz) {
-                const y = sideName === 'top' ? table.y - CHAIR_THICKNESS - CHAIR_GAP : table.y + H + CHAIR_GAP;
-                return [
-                    { x: table.x + CHAIR_GAP, y, w: halfSpan, h: CHAIR_THICKNESS },
-                    { x: table.x + CHAIR_GAP * 2 + halfSpan, y, w: halfSpan, h: CHAIR_THICKNESS }
-                ];
-            } else {
-                const x = sideName === 'left' ? table.x - CHAIR_THICKNESS - CHAIR_GAP : table.x + W + CHAIR_GAP;
-                return [
-                    { x, y: table.y + CHAIR_GAP, w: CHAIR_THICKNESS, h: halfSpan },
-                    { x, y: table.y + CHAIR_GAP * 2 + halfSpan, w: CHAIR_THICKNESS, h: halfSpan }
-                ];
-            }
-        }
         return [];
+    }
+
+    // ─── Auto corner-fill: curved connector where adjacent bench sides meet ─
+    function isBenchType(s: ChairSide): boolean {
+        return s.type === 'lounge' || s.type === 'l-shape' || s.type === 'diner';
+    }
+
+    function cornerFillPaths(table: Table): Array<{ d: string; color: string; opacity: number }> {
+        if (!table.chairConfig) return [];
+        const cfg = table.chairConfig;
+        const W = table.width ?? 82;
+        const H = table.height ?? 80;
+        const crx = Math.min(table.borderRadius ?? 8, W / 2, H / 2);
+        const ri = crx + CHAIR_GAP;
+        const ro = crx + CHAIR_GAP + CHAIR_THICKNESS;
+        const fills: Array<{ d: string; color: string; opacity: number }> = [];
+
+        if (isBenchType(cfg.top) && isBenchType(cfg.right)) {
+            const acx = table.x + W - crx, acy = table.y + crx;
+            fills.push({ d: `M${acx},${acy - ro} A${ro},${ro} 0 0,1 ${acx + ro},${acy} L${acx + ri},${acy} A${ri},${ri} 0 0,0 ${acx},${acy - ri} Z`, color: cfg.top.color ?? '#9ca3af', opacity: Math.min(cfg.top.opacity ?? 0.85, cfg.right.opacity ?? 0.85) });
+        }
+        if (isBenchType(cfg.right) && isBenchType(cfg.bottom)) {
+            const acx = table.x + W - crx, acy = table.y + H - crx;
+            fills.push({ d: `M${acx + ro},${acy} A${ro},${ro} 0 0,1 ${acx},${acy + ro} L${acx},${acy + ri} A${ri},${ri} 0 0,0 ${acx + ri},${acy} Z`, color: cfg.right.color ?? '#9ca3af', opacity: Math.min(cfg.right.opacity ?? 0.85, cfg.bottom.opacity ?? 0.85) });
+        }
+        if (isBenchType(cfg.bottom) && isBenchType(cfg.left)) {
+            const acx = table.x + crx, acy = table.y + H - crx;
+            fills.push({ d: `M${acx},${acy + ro} A${ro},${ro} 0 0,1 ${acx - ro},${acy} L${acx - ri},${acy} A${ri},${ri} 0 0,0 ${acx},${acy + ri} Z`, color: cfg.bottom.color ?? '#9ca3af', opacity: Math.min(cfg.bottom.opacity ?? 0.85, cfg.left.opacity ?? 0.85) });
+        }
+        if (isBenchType(cfg.left) && isBenchType(cfg.top)) {
+            const acx = table.x + crx, acy = table.y + crx;
+            fills.push({ d: `M${acx - ro},${acy} A${ro},${ro} 0 0,1 ${acx},${acy - ro} L${acx},${acy - ri} A${ri},${ri} 0 0,0 ${acx - ri},${acy} Z`, color: cfg.left.color ?? '#9ca3af', opacity: Math.min(cfg.left.opacity ?? 0.85, cfg.top.opacity ?? 0.85) });
+        }
+        return fills;
     }
 
     function elementColor(type: string, color?: string | null): string {
@@ -203,6 +222,9 @@
                                                 <rect x={r.x} y={r.y} width={r.w} height={r.h} rx="3" fill={side.color ?? '#9ca3af'} opacity={side.opacity ?? 0.85} />
                                             {/each}
                                         {/if}
+                                    {/each}
+                                    {#each cornerFillPaths(t) as cf}
+                                        <path d={cf.d} fill={cf.color} opacity={cf.opacity} />
                                     {/each}
                                 {/if}
                                 <rect

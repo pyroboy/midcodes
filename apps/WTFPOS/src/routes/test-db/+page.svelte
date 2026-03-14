@@ -344,7 +344,7 @@
                 updatedAt: new Date().toISOString(),
                 locationId: 'test',
             };
-            if (col === 'stock_counts') probeDoc.stockItemId = testId;
+            if (col === 'stock_counts') { probeDoc.stockItemId = testId; probeDoc.date = new Date().toISOString().slice(0, 10); }
 
             const pushRes = await fetch(`/api/replication/${col}/push`, {
                 method: 'POST',
@@ -363,8 +363,7 @@
                 if (verifyRes.ok) {
                     const data = await verifyRes.json();
                     const docs = data.documents ?? [];
-                    const pkField = col === 'stock_counts' ? 'stockItemId' : 'id';
-                    writeOk = docs.some((d: any) => d[pkField] === testId);
+                    writeOk = docs.some((d: any) => d.id === testId);
                 }
 
                 // Cleanup

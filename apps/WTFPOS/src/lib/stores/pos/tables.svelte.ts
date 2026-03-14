@@ -11,6 +11,14 @@ import { getWritableCollection } from '$lib/db/write-proxy';
 import { recordGuardEvent } from '$lib/stores/guard.svelte';
 import { browser } from '$app/environment';
 
+// Try to load designed floor layout from seed file (exported via floor editor)
+let _floorSeed: { tables: any[]; floorElements: any[] } | null = null;
+try {
+	// Dynamic import — file may not exist yet (first run before floor editor export)
+	const mod = await import(/* @vite-ignore */ '../../db/floor-seed.json');
+	_floorSeed = mod.default ?? mod;
+} catch { /* no seed file yet — use generated defaults */ }
+
 const FLOOR_POSITIONS = [
 	{ x: 40,  y: 50  }, { x: 200, y: 35  }, { x: 360, y: 52  }, { x: 520, y: 38  },
 	{ x: 45,  y: 205 }, { x: 205, y: 195 }, { x: 368, y: 212 }, { x: 528, y: 198 },
@@ -18,6 +26,19 @@ const FLOOR_POSITIONS = [
 ];
 
 function makeTables(): Table[] {
+	// Use designed seed if available
+	if (_floorSeed?.tables?.length) {
+		return _floorSeed.tables.map((t: any) => ({
+			...t,
+			status: 'available' as const,
+			sessionStartedAt: null,
+			elapsedSeconds: null,
+			currentOrderId: null,
+			billTotal: null,
+			updatedAt: new Date().toISOString()
+		}));
+	}
+	// Fallback: generate default grid
 	const gen = (locationId: string, prefix: string) => [
 		...Array.from({ length: 8 }, (_, i) => ({
 			id: `${prefix}-T${i + 1}`, locationId, number: i + 1, label: `T${i + 1}`, zone: 'main' as TableZone, capacity: i < 6 ? 4 : 2,
@@ -32,6 +53,9 @@ function makeTables(): Table[] {
 }
 
 export const INITIAL_TABLES = makeTables();
+
+/** Floor elements from designed seed (used by seed.ts) */
+export const INITIAL_FLOOR_ELEMENTS = _floorSeed?.floorElements ?? [];
 
 const _tables = createStore<Table>('tables', db => db.tables.find());
 

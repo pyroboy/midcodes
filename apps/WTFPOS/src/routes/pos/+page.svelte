@@ -28,6 +28,7 @@
     import { session, isWarehouseSession } from '$lib/stores/session.svelte';
     import { formatPeso } from '$lib/utils';
     import { Info } from 'lucide-svelte';
+    import { playSound } from '$lib/utils/audio';
     import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
@@ -406,6 +407,7 @@
     function handleTableClick(table: Table) {
         selectedTakeoutId = null;
         if (table.status === 'maintenance') return; // Can't interact with maintenance tables
+        playSound('click');
         if (table.status === 'available') {
             paxModalTable = table;
             selectedTableId = table.id; // show ring immediately while PaxModal is open
@@ -428,6 +430,7 @@
     async function handleFreeGhostTable() {
         const tbl = ghostTable;
         if (!tbl) return;
+        playSound('warning');
         ghostTableId = null;
         // Void empty order if present, then close table
         const order = tbl.currentOrderId
@@ -441,6 +444,7 @@
     }
 
     function handleToggleMaintenance(table: Table) {
+        playSound('click');
         if (table.status === 'maintenance') {
             setTableMaintenance(table.id, false);
         } else if (table.status === 'available') {
@@ -449,6 +453,7 @@
     }
 
     function handleTakeoutClick(order: Order) {
+        playSound('click');
         selectedTableId = null;
         selectedTakeoutId = order.id;
         showAddItem = false;
@@ -493,6 +498,7 @@
     }
 
     function handleSplitComplete(paidOrder: Order) {
+        playSound('sale');
         showSplitBill = false;
         splitBillOrderId = null;
         // P2-03: Show receipt with the split order summary before clearing bill
@@ -555,6 +561,7 @@
             if (barcodeBuffer.length >= 3) {
                 const matchedItem = menuItems.find((i: MenuItem) => i.isRetail && (i.id === barcodeBuffer || i.id === `ret-${barcodeBuffer}`));
                 if (matchedItem) {
+                    playSound('success');
                     addItemToOrder(currentActiveOrder.id, matchedItem, 1);
                 }
                 barcodeBuffer = '';
@@ -742,7 +749,7 @@
             <div class="pos-sheet-mobile fixed inset-0 z-50 flex flex-col lg:hidden" role="dialog" aria-label="Running bill">
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div class="flex-1 bg-black/30" onclick={closeBill} role="presentation"></div>
-                <div class="flex flex-col bg-surface rounded-t-2xl shadow-2xl overflow-hidden max-h-[85vh]">
+                <div class="flex flex-col bg-surface rounded-t-2xl shadow-2xl max-h-[85vh]">
                     <!-- Drag handle -->
                     <div class="flex justify-center py-2 shrink-0">
                         <div class="h-1 w-10 rounded-full bg-gray-300"></div>

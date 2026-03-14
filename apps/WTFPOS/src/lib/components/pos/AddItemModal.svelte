@@ -5,6 +5,7 @@
     import { formatPeso, cn } from '$lib/utils';
     import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
     import { btScale } from '$lib/stores/bluetooth-scale.svelte';
+    import { playSound } from '$lib/utils/audio';
 
     export interface ChargeItem {
         item: MenuItem;
@@ -35,6 +36,7 @@
     }
 
     function discardAndClose() {
+        playSound('warning');
         pendingItems = [];
         confirmingClose = false;
         onclose();
@@ -107,6 +109,7 @@
     );
 
     function tapItem(item: MenuItem) {
+        playSound('click');
         if (item.category === 'packages') {
             // Preserve any existing ala carte items, but clear old packages & auto-included items
             pendingItems = pendingItems.filter(p => p.item.category !== 'packages' && !p.forceFree);
@@ -142,10 +145,12 @@
         if (!weightScreenItem || isNaN(weight) || weight <= 0) return;
         pendingItems.push({ item: weightScreenItem, qty: 1, weight, forceFree: true });
         weightScreenItem = null;
+        playSound('click');
     }
 
     function changeQty(idx: number, delta: number) {
         const p = pendingItems[idx];
+        playSound('click');
         if (p.item.isWeightBased) {
             p.weight = Math.max(0, (p.weight || 0) + delta * 50);
             if (p.weight === 0) pendingItems.splice(idx, 1);
@@ -172,6 +177,7 @@
         // Close modal FIRST so the animation plays on the open floor plan
         onclose();
         // Delegate DB writes + sound + animation to parent
+        playSound('success');
         oncharge?.(orderId, items);
     }
 
@@ -199,20 +205,20 @@
                 <button onclick={tryClose} class="flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-gray-600" aria-label="Close modal">✕</button>
             </div>
 
-            <div class="flex gap-2 border-b border-border bg-surface-secondary px-3 sm:px-6 py-2 sm:py-3">
+            <div class="flex gap-1.5 sm:gap-2 border-b border-border bg-surface-secondary px-3 sm:px-6 py-2 sm:py-3">
                 {#each visibleCategories as cat}
                     <button
                         onclick={() => (activeCategory = cat.id)}
                         class={cn(
-                            'flex flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95',
+                            'flex flex-1 items-center justify-center gap-1.5 sm:flex-col sm:gap-1 rounded-lg sm:rounded-xl transition-all active:scale-95',
                             activeCategory === cat.id
                                 ? 'bg-accent text-white shadow-md'
                                 : 'border border-border bg-surface text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                         )}
-                        style="min-height: 72px"
+                        style="min-height: 44px"
                     >
-                        <span class="text-2xl leading-none">{cat.label.split(' ')[0]}</span>
-                        <span class="text-[11px] font-bold uppercase tracking-wide">{cat.label.split(' ').slice(1).join(' ')}</span>
+                        <span class="text-lg sm:text-2xl leading-none">{cat.label.split(' ')[0]}</span>
+                        <span class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide">{cat.label.split(' ').slice(1).join(' ')}</span>
                     </button>
                 {/each}
             </div>
@@ -257,22 +263,22 @@
                     </div>
                 {:else}
                     {#if activeCategory === 'dishes'}
-                        <div class="mb-5">
+                        <div class="mb-3 sm:mb-5">
                             <input
                                 type="text"
                                 bind:value={dishSearch}
                                 placeholder="Search dishes..."
-                                class="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent shadow-sm"
+                                class="w-full rounded-lg sm:rounded-xl border border-border bg-surface px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent shadow-sm"
                             />
                         </div>
                     {/if}
-                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
                         {#each filteredItems as item (item.id)}
                             <button
                                 onclick={() => item.available && tapItem(item)}
                                 disabled={!item.available}
                                 class={cn(
-                                    'relative flex flex-col gap-2.5 rounded-xl border text-left transition-all overflow-hidden',
+                                    'relative flex flex-col rounded-lg sm:rounded-xl border text-left transition-all overflow-hidden',
                                     !item.available
                                         ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
                                         : pendingItems.some(p => p.item.id === item.id)
@@ -285,18 +291,18 @@
                             >
                                 {#if !item.available}
                                     <div class="absolute inset-0 z-10 flex items-center justify-center">
-                                        <span class="rounded-lg bg-gray-900/70 px-3 py-1.5 text-xs font-bold text-white uppercase tracking-wider">Sold Out</span>
+                                        <span class="rounded-lg bg-gray-900/70 px-2.5 py-1 text-[10px] sm:text-xs font-bold text-white uppercase tracking-wider">Sold Out</span>
                                     </div>
                                 {/if}
                                 {#if item.image}
-                                    <div class="w-full h-28 bg-gray-100">
+                                    <div class="w-full h-20 sm:h-28 bg-gray-100">
                                         <img src={item.image} alt={item.name} class="w-full h-full object-cover" />
                                     </div>
                                 {/if}
-                                <div class={cn('flex flex-col gap-2.5 px-5 pb-5', item.image ? 'pt-3' : 'pt-5')}>
+                                <div class={cn('flex flex-col gap-1 sm:gap-2 px-3 pb-3 sm:px-4 sm:pb-4', item.image ? 'pt-2 sm:pt-3' : 'pt-3 sm:pt-4')}>
                                     {#if item.protein}
                                         <span class={cn(
-                                            "absolute top-3 right-3 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                                            "absolute top-2 right-2 sm:top-3 sm:right-3 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide",
                                             item.protein === 'beef' ? 'bg-red-100 text-red-700' : '',
                                             item.protein === 'pork' ? 'bg-orange-100 text-orange-700' : '',
                                             item.protein === 'chicken' ? 'bg-yellow-100 text-yellow-700' : ''
@@ -305,33 +311,33 @@
                                         </span>
                                     {/if}
                                     {#if item.category === 'packages'}
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-base font-bold text-gray-900">{item.name}</span>
+                                        <div class="flex items-center justify-between gap-1">
+                                            <span class="text-sm sm:text-base font-bold text-gray-900 leading-tight">{item.name}</span>
                                             {#if pendingItems.some(p => p.item.id === item.id)}
-                                                <span class="rounded bg-accent px-2 py-0.5 text-[10px] font-bold text-white">ACTIVE</span>
+                                                <span class="rounded bg-accent px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-white shrink-0">ACTIVE</span>
                                             {/if}
                                         </div>
-                                        {#if item.desc}<p class="text-sm text-gray-500">{item.desc}</p>{/if}
+                                        {#if item.desc}<p class="text-[10px] sm:text-xs text-gray-500 leading-snug">{item.desc}</p>{/if}
                                         {#if activeChildPax > 0 || activeFreePax > 0}
-                                            <div class="font-mono text-xs text-gray-700 leading-relaxed">
+                                            <div class="font-mono text-[10px] sm:text-xs text-gray-700 leading-relaxed">
                                                 {#if activeAdultPax > 0}<div>₱{item.price} × {activeAdultPax} adult{activeAdultPax !== 1 ? 's' : ''}</div>{/if}
-                                                {#if activeChildPax > 0}<div>₱{item.childPrice ?? item.price} × {activeChildPax} child{activeChildPax !== 1 ? 'ren' : ''} (6–9)</div>{/if}
-                                                {#if activeFreePax > 0}<div class="text-gray-400">Free × {activeFreePax} (&lt;5)</div>{/if}
+                                                {#if activeChildPax > 0}<div>₱{item.childPrice ?? item.price} × {activeChildPax} kid{activeChildPax !== 1 ? 's' : ''}</div>{/if}
+                                                {#if activeFreePax > 0}<div class="text-gray-400">Free × {activeFreePax}</div>{/if}
                                             </div>
                                         {:else}
-                                            <p class="font-mono text-sm font-bold text-gray-900">₱{item.price}/pax</p>
+                                            <p class="font-mono text-xs sm:text-sm font-bold text-gray-900">₱{item.price}/pax</p>
                                         {/if}
-                                        {#if item.perks}<p class="text-xs text-status-green">✓ {item.perks}</p>{/if}
+                                        {#if item.perks}<p class="text-[10px] sm:text-xs text-status-green leading-snug">✓ {item.perks}</p>{/if}
                                     {:else if item.isWeightBased}
-                                        <span class="text-sm font-semibold text-gray-900">{item.name}</span>
-                                        <span class="text-xs text-gray-400">tap to enter weight</span>
-                                        <span class="font-mono text-xs font-bold text-gray-700">₱{((item.pricePerGram ?? 0) * 100).toFixed(0)}/100g</span>
+                                        <span class="text-xs sm:text-sm font-semibold text-gray-900">{item.name}</span>
+                                        <span class="text-[10px] sm:text-xs text-gray-400">tap to weigh</span>
+                                        <span class="font-mono text-[10px] sm:text-xs font-bold text-gray-700">₱{((item.pricePerGram ?? 0) * 100).toFixed(0)}/100g</span>
                                     {:else}
-                                        <span class="text-sm font-semibold text-gray-900">{item.name}</span>
+                                        <span class="text-xs sm:text-sm font-semibold text-gray-900">{item.name}</span>
                                         {#if item.isFree}
-                                            <span class="text-xs font-semibold text-status-green">FREE</span>
+                                            <span class="text-[10px] sm:text-xs font-semibold text-status-green">FREE</span>
                                         {:else}
-                                            <span class="font-mono text-sm font-bold text-gray-900">{formatPeso(item.price)}</span>
+                                            <span class="font-mono text-xs sm:text-sm font-bold text-gray-900">{formatPeso(item.price)}</span>
                                         {/if}
                                     {/if}
                                 </div>

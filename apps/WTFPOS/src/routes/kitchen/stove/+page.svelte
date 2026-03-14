@@ -6,6 +6,7 @@
 	import { mergeTicketsByOrder, urgencyLevel, timerBadgeClass, ticketBorderClass, timerText, ticketProgress, type MergedTicket } from '$lib/stores/pos/kds.utils';
 	import { Printer } from 'lucide-svelte';
 	import { untrack } from 'svelte';
+	import { playSound } from '$lib/utils/audio';
 
 	// ── Live timer ──
 	let now = $state(Date.now());
@@ -40,6 +41,7 @@
 	async function markDone(orderId: string, itemId: string) {
 		try {
 			await markItemServed(orderId, itemId);
+			playSound('click');
 		} catch (err) {
 			console.error('[Stove] markDone failed:', err);
 		}
@@ -52,6 +54,7 @@
 					.filter((i) => i.status !== 'served')
 					.map((i) => markItemServed(ticket.orderId, i.id))
 			);
+			playSound('success');
 		} catch (err) {
 			console.error('[Stove] completeAll failed:', err);
 		}
@@ -66,6 +69,7 @@
 		// Find any KDS ticket for this order to pass its ID
 		const ticket = kdsTickets.value.find(t => t.orderId === orderId);
 		const result = await printKitchenOrder(ticket?.id ?? orderId);
+		playSound('click');
 		chitFeedback = { orderId, success: result.success };
 		printingChitFor = null;
 		setTimeout(() => { chitFeedback = null; }, 2000);

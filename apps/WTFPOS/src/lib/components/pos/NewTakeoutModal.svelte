@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { playSound } from '$lib/utils/audio';
+
 	interface Props {
 		isOpen: boolean;
 		onClose: () => void;
@@ -10,6 +12,7 @@
 	let takeoutName = $state('');
 
 	function handleConfirm() {
+		playSound('success');
 		onConfirm(takeoutName.trim() || 'Walk-in');
 		takeoutName = '';
 	}

@@ -183,7 +183,7 @@
 			]}
 			{@const isAllLocation = session.locationId === 'all'}
 			<!-- P0-7: overflow-hidden prevents quick action elements from extending outside sidebar bounds -->
-			<div class="px-2 py-1 md:py-1.5 group-data-[collapsible=icon]:px-1 overflow-hidden">
+			<div class="px-2 py-1 md:py-1.5 group-data-[collapsible=icon]:hidden overflow-hidden">
 				<div class="mb-1 md:mb-1.5 flex items-center justify-between group-data-[collapsible=icon]:hidden">
 					<p class="px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">
 						Quick Actions
@@ -204,7 +204,7 @@
 								isActive(qa.href)
 									? 'bg-accent text-white'
 									: 'border border-dashed border-gray-200 bg-white text-gray-600 hover:border-accent/40 hover:bg-accent-light hover:text-accent',
-								'group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-md group-data-[collapsible=icon]:flex-row'
+								''
 							)}
 						>
 							<qa.Icon class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />

@@ -49,10 +49,6 @@ function createFloorEditorStore() {
 	let snapEnabled = $state(true);
 	let gridVisible = $state(true);
 
-	// Chair editor modal
-	let chairModalOpen = $state(false);
-	let chairModalTableId = $state<string | null>(null);
-
 	const isDirty = $derived(
 		pendingTableUpdates.size > 0 ||
 		pendingElements.size > 0 ||
@@ -74,9 +70,6 @@ function createFloorEditorStore() {
 		get snapEnabled() { return snapEnabled; },
 		get gridVisible() { return gridVisible; },
 		get isDirty() { return isDirty; },
-		get chairModalOpen() { return chairModalOpen; },
-		get chairModalTableId() { return chairModalTableId; },
-
 		select(id: string, type: 'table' | 'element') {
 			selectedId = id;
 			selectedType = type;
@@ -125,8 +118,8 @@ function createFloorEditorStore() {
 			if (selectedId === id) { selectedId = null; selectedType = null; }
 		},
 
-		patchElement(id: string, patch: Partial<FloorElement>) {
-			const existing = pendingElements.get(id);
+		patchElement(id: string, patch: Partial<FloorElement>, fallback?: FloorElement) {
+			const existing = pendingElements.get(id) ?? fallback;
 			if (existing) {
 				pendingElements.set(id, { ...existing, ...patch });
 				pendingElements = new Map(pendingElements);
@@ -141,15 +134,6 @@ function createFloorEditorStore() {
 		setPan(x: number, y: number) { panX = x; panY = y; },
 		toggleSnap() { snapEnabled = !snapEnabled; },
 		toggleGrid() { gridVisible = !gridVisible; },
-
-		openChairModal(tableId: string) {
-			chairModalTableId = tableId;
-			chairModalOpen = true;
-		},
-		closeChairModal() {
-			chairModalOpen = false;
-			chairModalTableId = null;
-		},
 
 		discard() {
 			pendingTableUpdates = new Map();

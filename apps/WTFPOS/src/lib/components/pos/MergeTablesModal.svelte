@@ -3,6 +3,7 @@
 	import { session, MANAGER_PIN } from '$lib/stores/session.svelte';
 	import { cn, formatPeso } from '$lib/utils';
 	import type { Table } from '$lib/types';
+	import { playSound } from '$lib/utils/audio';
 
 	let {
 		primaryTable,
@@ -56,6 +57,7 @@
 	});
 
 	function selectTarget(tableId: string) {
+		playSound('click');
 		selectedTargetId = tableId;
 		mergeError = null;
 		
@@ -78,12 +80,14 @@
 	async function confirmMerge() {
 		if (pin !== MANAGER_PIN) {
 			pinError = true;
+			playSound('error');
 			return;
 		}
 		if (!selectedTargetId) return;
-		
+
 		const result = await mergeTables(primaryTable.id, selectedTargetId);
 		if (result.success) {
+			playSound('success');
 			onmerge(selectedTargetId);
 		} else {
 			mergeError = result.error ?? 'Merge failed';
@@ -240,13 +244,13 @@
 			<div class="grid grid-cols-3 gap-2">
 				{#each [1,2,3,4,5,6,7,8,9] as num}
 					<button
-						onclick={() => { pinError = false; if (pin.length < 4) pin += String(num); }}
+						onclick={() => { pinError = false; if (pin.length < 4) { pin += String(num); playSound('click'); } }}
 						class="btn-secondary h-12 text-lg font-bold"
 						style="min-height: 48px"
 					>{num}</button>
 				{/each}
 				<button onclick={() => { pin = ''; pinError = false; }} class="btn-ghost h-12 text-sm" style="min-height: 48px">Clear</button>
-				<button onclick={() => { pinError = false; if (pin.length < 4) pin += '0'; }} class="btn-secondary h-12 text-lg font-bold" style="min-height: 48px">0</button>
+				<button onclick={() => { pinError = false; if (pin.length < 4) { pin += '0'; playSound('click'); } }} class="btn-secondary h-12 text-lg font-bold" style="min-height: 48px">0</button>
 				<button onclick={() => { pin = pin.slice(0, -1); pinError = false; }} class="btn-ghost h-12 text-sm" style="min-height: 48px">⌫</button>
 			</div>
 

@@ -411,6 +411,36 @@ export const xReadHistory = {
 };
 
 export async function generateXRead(): Promise<Reading> {
+	// Try server-side snapshot first — guarantees consistency even if a
+	// checkout completes mid-generation (no reactive store race).
+	try {
+		const res = await fetch('/api/reports/x-read', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ locationId: session.locationId }),
+		});
+		if (res.ok) {
+			const reading: Reading = await res.json();
+			// Server doesn't know the client's userName — stamp it here
+			reading.generatedBy = session.userName || 'Staff';
+			// The server already inserted into its store; schedule a reSync
+			// so the reading appears in local RxDB / UI without waiting for SSE.
+			try {
+				const { getActiveReplication } = await import('$lib/db/replication');
+				const rep = getActiveReplication('readings');
+				if (rep && typeof rep.reSync === 'function') rep.reSync();
+			} catch { /* best-effort */ }
+			log.xReadGenerated();
+			return reading;
+		}
+		// Non-OK response — fall through to local fallback
+		console.warn('[X-Read] Server returned', res.status, '— falling back to local computation');
+	} catch (err) {
+		// Network error (offline) — fall through to local fallback
+		console.warn('[X-Read] Server unreachable — falling back to local computation', err);
+	}
+
+	// ── Local fallback (offline mode) ──
 	const summary = eodSummary();
 	const voids = getOrders().filter(o => o.status === 'cancelled');
 	const discounted = getOrders().filter(o =>
@@ -814,7 +844,25 @@ export async function saveZRead(params: Omit<Reading, 'id' | 'type' | 'updatedAt
 	const now = new Date().toISOString();
 	const snapshot: Reading = { id: nanoid(), type: 'z-read' as const, updatedAt: now, ...params };
 	const col = getWritableCollection('readings');
-	await col.insert(snapshot);
+	const result = await col.insert(snapshot);
+
+	// Check if the server guard blocked this as a duplicate Z-Read
+	if (result && typeof result === 'object' && 'guarded' in result && result.guarded) {
+		const { recordGuardEvent } = await import('$lib/stores/guard.svelte');
+		recordGuardEvent({
+			type: 'duplicate-z-read',
+			layer: 'write-api',
+			tableId: params.locationId ?? 'unknown',
+			tableLabel: `Z-Read ${params.date ?? ''}`,
+			existingOrderId: result.document?.id ?? null,
+			attemptedOrderId: snapshot.id,
+			reason: result.reason ?? `Z-Read already exists for ${params.date} at ${params.locationId}`,
+		});
+		// Return the existing Z-Read so the UI can display it
+		const existingReading: Reading = result.document as Reading;
+		return existingReading;
+	}
+
 	writeLog('admin', 'EOD Z-Read submitted', { meta: { date: params.date ?? '', netSales: params.netSales } });
 	return snapshot;
 }

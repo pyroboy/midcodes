@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
+	import { playSound } from '$lib/utils/audio';
 
 	interface Props {
 		isOpen: boolean;
@@ -19,6 +20,7 @@
 	const finalReason = $derived(showCustom ? customReason.trim() : (selectedPreset ?? ''));
 
 	function selectPreset(reason: string) {
+		playSound('click');
 		showCustom = false;
 		customReason = '';
 		selectedPreset = reason;
@@ -31,6 +33,7 @@
 
 	function handleConfirm() {
 		if (finalReason) {
+			playSound('warning');
 			onConfirm(finalReason);
 			reset();
 		}

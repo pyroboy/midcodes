@@ -30,6 +30,15 @@
     const orderMap = $derived(new Map(orders.filter(o => o.status !== 'paid' && o.status !== 'cancelled').map(o => [o.id, o])));
 
     // ─── Table rendering helpers ─────────────────────────────────────────────
+    /** Classify the table's order state for color-coding */
+    function orderState(order: Order | undefined): 'empty-order' | 'alacarte' | 'ayce' | 'none' {
+        if (!order) return 'none';
+        const activeItems = order.items.filter(i => i.status !== 'cancelled');
+        if (activeItems.length === 0) return 'empty-order'; // occupied but no items added
+        if (order.packageId) return 'ayce';
+        return 'alacarte';
+    }
+
     function tableFill(t: Table, order: Order | undefined): string {
         if (t.status === 'maintenance') return '#e5e7eb';
         if (t.status === 'available') return t.color ?? '#ffffff';
@@ -37,11 +46,14 @@
             if (order?.status === 'pending_payment') return '#ecfeff';
             return '#fff7ed';
         }
-        if (order?.packageId) {
-            const c = getPkgColors(order.packageId);
+        const state = orderState(order);
+        if (state === 'ayce') {
+            const c = getPkgColors(order!.packageId);
             if (c) return c.fill;
         }
-        return '#ecfdf5';
+        if (state === 'alacarte') return '#fef3c7'; // amber-100 — warm yellow tint
+        if (state === 'empty-order') return '#ede9fe'; // violet-100 — needs attention
+        return '#f3f4f6'; // gray-100 — occupied but no order found (syncing)
     }
 
     function tableStroke(t: Table, order: Order | undefined): string {
@@ -53,11 +65,14 @@
         }
         if (t.status === 'critical') return '#ef4444';
         if (t.status === 'warning') return '#eab308';
-        if (order?.packageId) {
-            const c = getPkgColors(order.packageId);
+        const state = orderState(order);
+        if (state === 'ayce') {
+            const c = getPkgColors(order!.packageId);
             if (c) return c.stroke;
         }
-        return '#10b981';
+        if (state === 'alacarte') return '#d97706'; // amber-600
+        if (state === 'empty-order') return '#7c3aed'; // violet-600 — stands out
+        return '#6b7280'; // gray-500
     }
 
     function timerColor(t: Table, order: Order | undefined): string {
@@ -67,7 +82,11 @@
             if (order?.status === 'pending_payment') return '#06b6d4';
             return '#f97316';
         }
-        return '#10b981';
+        const state = orderState(order);
+        if (state === 'ayce') return '#10b981'; // green
+        if (state === 'alacarte') return '#d97706'; // amber
+        if (state === 'empty-order') return '#7c3aed'; // violet
+        return '#6b7280'; // gray
     }
 
     function pkgLabel(packageId: string | undefined | null): string {
@@ -117,7 +136,8 @@
         const isHoriz = sideName === 'top' || sideName === 'bottom';
         const spanW = isHoriz ? W : H;
 
-        if (side.type === 'lounge') {
+        // Bench types: lounge, l-shape (legacy), diner (legacy) all render as bench
+        if (side.type === 'lounge' || side.type === 'l-shape' || side.type === 'diner') {
             const cw = isHoriz ? spanW - CHAIR_GAP * 2 : CHAIR_THICKNESS;
             const ch = isHoriz ? CHAIR_THICKNESS : spanW - CHAIR_GAP * 2;
             const cx = isHoriz ? table.x + CHAIR_GAP : (sideName === 'left' ? table.x - CHAIR_THICKNESS - CHAIR_GAP : table.x + W + CHAIR_GAP);
@@ -137,23 +157,66 @@
                 return { x, y, w: chairW, h: chairH };
             });
         }
-        if (side.type === 'diner') {
-            const halfSpan = (spanW - CHAIR_GAP * 3) / 2;
-            if (isHoriz) {
-                const y = sideName === 'top' ? table.y - CHAIR_THICKNESS - CHAIR_GAP : table.y + H + CHAIR_GAP;
-                return [
-                    { x: table.x + CHAIR_GAP, y, w: halfSpan, h: CHAIR_THICKNESS },
-                    { x: table.x + CHAIR_GAP * 2 + halfSpan, y, w: halfSpan, h: CHAIR_THICKNESS }
-                ];
-            } else {
-                const x = sideName === 'left' ? table.x - CHAIR_THICKNESS - CHAIR_GAP : table.x + W + CHAIR_GAP;
-                return [
-                    { x, y: table.y + CHAIR_GAP, w: CHAIR_THICKNESS, h: halfSpan },
-                    { x, y: table.y + CHAIR_GAP * 2 + halfSpan, w: CHAIR_THICKNESS, h: halfSpan }
-                ];
-            }
-        }
         return [];
+    }
+
+    // ─── Auto corner-fill: curved connector where adjacent bench sides meet ─
+    function isBenchType(s: ChairSide): boolean {
+        return s.type === 'lounge' || s.type === 'l-shape' || s.type === 'diner';
+    }
+
+    function cornerFillPaths(table: Table): Array<{ d: string; color: string; opacity: number }> {
+        if (!table.chairConfig) return [];
+        const cfg = table.chairConfig;
+        const W = table.width ?? 112;
+        const H = table.height ?? 112;
+        const crx = Math.min(table.borderRadius ?? 10, W / 2, H / 2);
+        const ri = crx + CHAIR_GAP;
+        const ro = crx + CHAIR_GAP + CHAIR_THICKNESS;
+        const fills: Array<{ d: string; color: string; opacity: number }> = [];
+
+        // NE: top + right
+        if (isBenchType(cfg.top) && isBenchType(cfg.right)) {
+            const acx = table.x + W - crx;
+            const acy = table.y + crx;
+            fills.push({
+                d: `M${acx},${acy - ro} A${ro},${ro} 0 0,1 ${acx + ro},${acy} L${acx + ri},${acy} A${ri},${ri} 0 0,0 ${acx},${acy - ri} Z`,
+                color: cfg.top.color ?? '#9ca3af',
+                opacity: Math.min(cfg.top.opacity ?? 0.85, cfg.right.opacity ?? 0.85)
+            });
+        }
+        // SE: right + bottom
+        if (isBenchType(cfg.right) && isBenchType(cfg.bottom)) {
+            const acx = table.x + W - crx;
+            const acy = table.y + H - crx;
+            fills.push({
+                d: `M${acx + ro},${acy} A${ro},${ro} 0 0,1 ${acx},${acy + ro} L${acx},${acy + ri} A${ri},${ri} 0 0,0 ${acx + ri},${acy} Z`,
+                color: cfg.right.color ?? '#9ca3af',
+                opacity: Math.min(cfg.right.opacity ?? 0.85, cfg.bottom.opacity ?? 0.85)
+            });
+        }
+        // SW: bottom + left
+        if (isBenchType(cfg.bottom) && isBenchType(cfg.left)) {
+            const acx = table.x + crx;
+            const acy = table.y + H - crx;
+            fills.push({
+                d: `M${acx},${acy + ro} A${ro},${ro} 0 0,1 ${acx - ro},${acy} L${acx - ri},${acy} A${ri},${ri} 0 0,0 ${acx},${acy + ri} Z`,
+                color: cfg.bottom.color ?? '#9ca3af',
+                opacity: Math.min(cfg.bottom.opacity ?? 0.85, cfg.left.opacity ?? 0.85)
+            });
+        }
+        // NW: left + top
+        if (isBenchType(cfg.left) && isBenchType(cfg.top)) {
+            const acx = table.x + crx;
+            const acy = table.y + crx;
+            fills.push({
+                d: `M${acx - ro},${acy} A${ro},${ro} 0 0,1 ${acx},${acy - ro} L${acx},${acy - ri} A${ri},${ri} 0 0,0 ${acx - ri},${acy} Z`,
+                color: cfg.left.color ?? '#9ca3af',
+                opacity: Math.min(cfg.left.opacity ?? 0.85, cfg.top.opacity ?? 0.85)
+            });
+        }
+
+        return fills;
     }
 </script>
 
@@ -243,6 +306,11 @@
                                 <rect x={r.x} y={r.y} width={r.w} height={r.h} rx="4" fill={side.color ?? '#9ca3af'} opacity={side.opacity ?? 0.85} />
                             {/each}
                         {/if}
+                    {/each}
+
+                    <!-- Auto corner-fill: curved connector where adjacent bench sides meet -->
+                    {#each cornerFillPaths(table) as cf}
+                        <path d={cf.d} fill={cf.color} opacity={cf.opacity} />
                     {/each}
                 {/if}
 

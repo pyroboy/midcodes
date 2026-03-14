@@ -2,6 +2,7 @@
 	import { kdsTicketHistory, recallTicket } from '$lib/stores/pos.svelte';
 	import { cn } from '$lib/utils';
 	import { format, isToday, isYesterday } from 'date-fns';
+	import { playSound } from '$lib/utils/audio';
 	import type { KdsTicket } from '$lib/types';
 
 	interface Props {
@@ -16,6 +17,7 @@
 	}
 
 	function handleRecall(orderId: string) {
+		playSound('warning');
 		recallTicket(orderId);
 	}
 

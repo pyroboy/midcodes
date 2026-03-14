@@ -27,6 +27,7 @@
 		"@sveltejs/kit": "^2.27.3",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@types/node": "^22.10.1",
+		"@vitejs/plugin-basic-ssl": "^2.2.0",
 		"@vitest/ui": "^4.0.18",
 		"autoprefixer": "^10.4.20",
 		"bits-ui": "^1.8.0",

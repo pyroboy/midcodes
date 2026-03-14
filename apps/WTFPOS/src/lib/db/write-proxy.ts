@@ -18,7 +18,7 @@ export interface CollectionProxy {
 // Primary key resolution
 // ---------------------------------------------------------------------------
 
-const PK_FIELD: Record<string, string> = { stock_counts: 'stockItemId' };
+const PK_FIELD: Record<string, string> = {};
 
 function getPk(collection: string): string {
 	return PK_FIELD[collection] ?? 'id';

@@ -359,7 +359,24 @@ export async function getDb() {
 							};
 						},
 						2: (d: any) => addUpdatedAt(d),
-						3: (d: any) => ({ ...d, locationId: '', date: null })
+						3: (d: any) => ({ ...d, locationId: '', date: null }),
+						// Migration: stock_counts v3 → v4
+						// Changes primary key from stockItemId to unique id
+						// Generates a deterministic id from stockItemId + locationId + date
+						4: (d: any) => {
+							d.id = `${d.stockItemId}-${d.locationId || 'noloc'}-${d.date || 'nodate'}`;
+							return d;
+						},
+						// Migration: stock_counts v4 → v5
+						// Makes date required (non-nullable) — backfills null dates
+						5: (d: any) => {
+							if (!d.date) {
+								d.date = new Date().toISOString().slice(0, 10);
+								// Re-derive id to match the now-populated date
+								d.id = `${d.stockItemId}-${d.locationId || 'noloc'}-${d.date}`;
+							}
+							return d;
+						}
 					}
 				},
 				readings: {

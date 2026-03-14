@@ -683,6 +683,9 @@
 									: event.type === 'orphan-auto-healed' ? '🧹'
 									: event.type === 'stock-negative' ? '📉'
 									: event.type === 'table-close-with-open-order' ? '🔒'
+									: event.type === 'invalid-order-transition' ? '💳'
+									: event.type === 'duplicate-active-shift' ? '💰'
+									: event.type === 'duplicate-z-read' ? '📋'
 									: '🚫'}
 								<div class={cn(
 									'border-b border-gray-50 last:border-0 px-2.5 py-2',

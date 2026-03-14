@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { getCollectionStore, isValidCollection } from '$lib/server/replication-store';
 import { nanoid } from 'nanoid';
 
-const PK_FIELD: Record<string, string> = { stock_counts: 'stockItemId' };
+const PK_FIELD: Record<string, string> = {};
 
 function getPk(collection: string, doc: any): string {
 	return doc[PK_FIELD[collection] ?? 'id'];
@@ -58,11 +58,18 @@ function writeServerGuardAudit(
 // ─── Valid Table State Transitions ───────────────────────────────────────────
 const VALID_TABLE_TRANSITIONS: Record<string, string[]> = {
 	available: ['occupied', 'maintenance'],
-	occupied: ['warning', 'critical', 'billing'],
+	occupied: ['warning', 'critical', 'billing', 'available'],
 	warning: ['critical', 'billing', 'available'],
 	critical: ['billing', 'available'],
 	billing: ['available'],
 	maintenance: ['available'],
+};
+
+// ─── Valid Order State Transitions ───────────────────────────────────────────
+const VALID_ORDER_TRANSITIONS: Record<string, string[]> = {
+	open: ['pending_payment', 'paid', 'cancelled'],
+	pending_payment: ['paid', 'open', 'cancelled'],
+	// paid and cancelled are terminal — no transitions allowed
 };
 
 // ─── Business Logic Guards ───────────────────────────────────────────────────
@@ -236,6 +243,71 @@ function guardDuplicateKdsTicket(
 }
 
 /**
+ * Guard: Reject new open shift insert if the location already has an active shift.
+ * Returns the existing shift if found (idempotent), or null to proceed.
+ */
+function guardDuplicateActiveShift(
+	data: any
+): { existingShift: any } | null {
+	if (data.status !== 'open') return null;
+
+	const shiftsStore = getCollectionStore('shifts');
+	if (!shiftsStore) return null;
+
+	const allShifts = getAllDocs(shiftsStore);
+	const existingShift = allShifts.find(
+		(s: any) =>
+			s.locationId === data.locationId &&
+			s.status === 'open' &&
+			!s._deleted &&
+			s.id !== data.id
+	);
+
+	if (!existingShift) return null;
+
+	console.warn(
+		`[Write Guard] Blocked duplicate active shift for location ${data.locationId} — ` +
+		`existing shift: ${existingShift.id}, attempted: ${data.id}`
+	);
+	writeServerGuardAudit('duplicate-active-shift', 'write-api', data.locationId, data.locationId, existingShift.id, data.id);
+	return { existingShift };
+}
+
+/**
+ * Guard: Reject duplicate Z-Read for the same business date + location.
+ * Z-Reads are BIR end-of-day permanent closes — exactly one per date per location.
+ * Returns the existing reading if found (idempotent), or null to proceed.
+ */
+function guardDuplicateZRead(
+	data: any
+): { existingReading: any } | null {
+	if (data.type !== 'z-read') return null;
+	if (!data.date || !data.locationId) return null;
+
+	const readingsStore = getCollectionStore('readings');
+	if (!readingsStore) return null;
+
+	const allReadings = getAllDocs(readingsStore);
+	const existingReading = allReadings.find(
+		(r: any) =>
+			r.type === 'z-read' &&
+			r.date === data.date &&
+			r.locationId === data.locationId &&
+			!r._deleted &&
+			r.id !== data.id
+	);
+
+	if (!existingReading) return null;
+
+	console.warn(
+		`[Write Guard] Blocked duplicate Z-Read for ${data.date} at ${data.locationId} — ` +
+		`existing: ${existingReading.id}, attempted: ${data.id}`
+	);
+	writeServerGuardAudit('duplicate-z-read', 'write-api', data.locationId, data.locationId, existingReading.id, data.id);
+	return { existingReading };
+}
+
+/**
  * Guard: Reject table close (status → 'available') if the associated order is still open.
  * Prevents "reverse orphan" where a table gets released but its order remains open/pending.
  * Returns the current table doc to block the close, or null to allow it.
@@ -274,6 +346,39 @@ function guardTableCloseWithOpenOrder(
 	}
 
 	// Order is paid/cancelled — allow the close
+	return null;
+}
+
+/**
+ * Guard: Reject order status patch if the transition is invalid.
+ * `paid` and `cancelled` are terminal — no further transitions allowed.
+ * Returns the current order doc (idempotent no-op) so the client stays consistent.
+ */
+function guardOrderStateTransition(
+	collection: string,
+	id: string,
+	data: any,
+	existing: any
+): { currentDoc: any } | null {
+	if (collection !== 'orders') return null;
+	if (!data.status) return null;
+
+	const fromStatus: string = existing.status;
+	const toStatus: string = data.status;
+
+	// Same status is a no-op, not an invalid transition
+	if (fromStatus === toStatus) return null;
+
+	const allowed = VALID_ORDER_TRANSITIONS[fromStatus];
+	if (!allowed || !allowed.includes(toStatus)) {
+		console.warn(
+			`[Write Guard] Blocked invalid order state transition for ${id} — ` +
+			`${fromStatus} → ${toStatus} is not allowed`
+		);
+		writeServerGuardAudit('invalid-order-transition', 'write-api', id, existing.locationId, existing.id, null);
+		return { currentDoc: existing };
+	}
+
 	return null;
 }
 
@@ -390,6 +495,19 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				}
 			}
 
+			// Guard: prevent duplicate active shifts per location
+			if (collection === 'shifts') {
+				const shiftGuard = guardDuplicateActiveShift(data);
+				if (shiftGuard) {
+					return json({
+						document: shiftGuard.existingShift,
+						conflicts: [],
+						guarded: true,
+						reason: `Active shift already exists for location ${data.locationId} (cashier: ${shiftGuard.existingShift.cashierName})`
+					});
+				}
+			}
+
 			// Guard: prevent duplicate active KDS tickets — merge items instead
 			if (collection === 'kds_tickets') {
 				const kdsGuard = guardDuplicateKdsTicket(data);
@@ -413,6 +531,19 @@ export const POST: RequestHandler = async ({ params, request }) => {
 						guarded: true,
 						merged: true,
 						reason: `Merged items into existing active ticket ${kdsGuard.existingTicket.id} for order ${data.orderId}`
+					});
+				}
+			}
+
+			// Guard: prevent duplicate Z-Reads per business date per location
+			if (collection === 'readings') {
+				const zReadGuard = guardDuplicateZRead(data);
+				if (zReadGuard) {
+					return json({
+						document: zReadGuard.existingReading,
+						conflicts: [],
+						guarded: true,
+						reason: `Z-Read already exists for ${data.date} at ${data.locationId}`
 					});
 				}
 			}
@@ -468,6 +599,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
 					conflicts: [],
 					guarded: true,
 					reason: `Table ${id} cannot close — order ${existing.currentOrderId} is still open`
+				});
+			}
+
+			// Guard: prevent invalid order state transitions (e.g. paid→paid, paid→cancelled)
+			const orderStateGuard = guardOrderStateTransition(collection, id, data, existing);
+			if (orderStateGuard) {
+				return json({
+					document: orderStateGuard.currentDoc,
+					conflicts: [],
+					guarded: true,
+					reason: `Invalid order state transition: ${existing.status} → ${data.status}`
 				});
 			}
 

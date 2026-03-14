@@ -125,6 +125,11 @@ export interface SyncActivity {
 	initialSyncDone: boolean;
 	/** Whether priority collections (tables, orders, menu, floor) have finished */
 	prioritySyncDone: boolean;
+	/** Per-collection sync completion tracking (for progress display) */
+	completedCollections: string[];
+	totalCollections: number;
+	/** Current phase description */
+	phase: string;
 }
 
 let currentActivity: SyncActivity = {
@@ -132,7 +137,10 @@ let currentActivity: SyncActivity = {
 	activeCount: 0,
 	activeCollections: [],
 	initialSyncDone: false,
-	prioritySyncDone: false
+	prioritySyncDone: false,
+	completedCollections: [],
+	totalCollections: 0,
+	phase: 'Initializing...',
 };
 
 function emitActivity(activity: SyncActivity) {
@@ -164,11 +172,10 @@ function updateActivity() {
 		if (isActive) activeNames.push(name);
 	}
 	emitActivity({
+		...currentActivity,
 		active: activeNames.length > 0,
 		activeCount: activeNames.length,
 		activeCollections: activeNames,
-		initialSyncDone: currentActivity.initialSyncDone,
-		prioritySyncDone: currentActivity.prioritySyncDone
 	});
 }
 
@@ -364,7 +371,7 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 
 	// Reset activity tracking
 	activeStates.clear();
-	emitActivity({ active: false, activeCount: 0, activeCollections: [], initialSyncDone: false, prioritySyncDone: false });
+	emitActivity({ active: false, activeCount: 0, activeCollections: [], initialSyncDone: false, prioritySyncDone: false, completedCollections: [], totalCollections: 0, phase: 'Idle' });
 
 	// Detect server device — uses polling instead of SSE (SSE to self is unstable on Vite)
 	const isServerDevice = isServerBrowser();
@@ -513,6 +520,15 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 	// Set up replication per collection
 	let started = 0;
 	const initialSyncPromises: Promise<void>[] = [];
+	const completedSyncCollections = new Set<string>();
+
+	// Emit initial phase with total count
+	emitActivity({
+		...currentActivity,
+		totalCollections: collectionsToSync.length,
+		completedCollections: [],
+		phase: 'Starting replication...',
+	});
 
 	for (const name of collectionsToSync) {
 		const collection = db.collections[name];
@@ -615,10 +631,41 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 			});
 		});
 
-		// Track initial sync completion
+		// Track initial sync completion (per-collection for progress display).
+		// awaitInitialReplication() never rejects — it hangs forever if replication
+		// keeps erroring (circuit breaker, network issues). Race with a 30s timeout
+		// so one stuck collection doesn't block the entire overlay.
+		const PER_COLLECTION_TIMEOUT_MS = 30_000;
+		const awaitWithTimeout = Promise.race([
+			replicationState.awaitInitialReplication().then(() => 'synced' as const),
+			new Promise<'timeout'>(resolve =>
+				setTimeout(() => resolve('timeout'), PER_COLLECTION_TIMEOUT_MS)
+			),
+		]);
+
 		initialSyncPromises.push(
-			replicationState.awaitInitialReplication().catch(() => {
+			awaitWithTimeout.then((result) => {
+				completedSyncCollections.add(name);
+				const label = result === 'timeout' ? 'timed out' : 'synced';
+				emitActivity({
+					...currentActivity,
+					completedCollections: [...completedSyncCollections],
+					phase: result === 'timeout'
+						? `${name} ${label} (${completedSyncCollections.size}/${collectionsToSync.length})`
+						: `Synced ${name} (${completedSyncCollections.size}/${collectionsToSync.length})`,
+				});
+				if (result === 'timeout') {
+					console.warn(`[Replication] ${name} initial sync timed out after ${PER_COLLECTION_TIMEOUT_MS / 1000}s — counting as done`);
+					remoteLog('warn', `${name} awaitInitialReplication() timed out — counting as done`);
+				}
+			}).catch(() => {
 				// non-fatal — collection will keep retrying in background
+				completedSyncCollections.add(name); // count as done to avoid hanging
+				emitActivity({
+					...currentActivity,
+					completedCollections: [...completedSyncCollections],
+					phase: `${name} skipped (${completedSyncCollections.size}/${collectionsToSync.length})`,
+				});
 			})
 		);
 
@@ -728,7 +775,8 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 	Promise.allSettled(priorityPromises).then(() => {
 		emitActivity({
 			...currentActivity,
-			prioritySyncDone: true
+			prioritySyncDone: true,
+			phase: 'Priority collections ready — syncing secondary...',
 		});
 		console.log('[Replication] Priority collections synced (tables, orders, menu, floor, kds, devices)');
 	});
@@ -738,7 +786,9 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 		emitActivity({
 			...currentActivity,
 			initialSyncDone: true,
-			prioritySyncDone: true
+			prioritySyncDone: true,
+			completedCollections: [...completedSyncCollections],
+			phase: 'All collections synced — server ready!',
 		});
 		console.log('[Replication] Initial sync complete for all collections');
 
@@ -747,6 +797,16 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 			fetch(`${serverUrl}/api/replication/server-ready`, { method: 'POST' })
 				.then(() => console.log('[Replication] SERVER_READY broadcast sent'))
 				.catch(() => console.warn('[Replication] Failed to broadcast SERVER_READY'));
+
+			// Clear the "preparing" flag and overlay if this was a post-reset reload
+			try {
+				if (localStorage.getItem('wtfpos_server_preparing')) {
+					localStorage.removeItem('wtfpos_server_preparing');
+					const overlay = document.getElementById('wtfpos-reset-overlay');
+					if (overlay) overlay.remove();
+					console.log('[Replication] Server preparation complete — overlay removed');
+				}
+			} catch { /* noop */ }
 		}
 	});
 
@@ -862,7 +922,7 @@ export async function stopReplication() {
 	}
 	activeReplications.clear();
 	activeStates.clear();
-	emitActivity({ active: false, activeCount: 0, activeCollections: [], initialSyncDone: false, prioritySyncDone: false });
+	emitActivity({ active: false, activeCount: 0, activeCollections: [], initialSyncDone: false, prioritySyncDone: false, completedCollections: [], totalCollections: 0, phase: 'Idle' });
 }
 
 /**
@@ -912,9 +972,10 @@ async function reportLocalCounts(db: any) {
 					updatedAt: new Date().toISOString(),
 					locationId: 'test',
 				};
-				// stock_counts uses stockItemId as PK
+				// stock_counts needs stockItemId and date fields for schema validation
 				if (name === 'stock_counts') {
 					probeDoc.stockItemId = testId;
+					probeDoc.date = new Date().toISOString().slice(0, 10);
 				}
 
 				// Push
@@ -936,8 +997,7 @@ async function reportLocalCounts(db: any) {
 					if (verifyRes.ok) {
 						const data = await verifyRes.json();
 						const docs = data.documents ?? [];
-						const pkField = name === 'stock_counts' ? 'stockItemId' : 'id';
-						const found = docs.some((d: any) => d[pkField] === testId);
+						const found = docs.some((d: any) => d.id === testId);
 						writeOk = found;
 					}
 
@@ -991,6 +1051,8 @@ export async function performFullReset() {
 	if (isServer) {
 		// ── SERVER: prepare immediately ──────────────────────────────────
 		showResetOverlay('server');
+		// Flag survives reload — tells the server to show overlay until store is populated
+		try { localStorage.setItem('wtfpos_server_preparing', '1'); } catch { /* noop */ }
 		await stopReplication();
 		clearSyncKeys();
 		await deleteLocalDb();

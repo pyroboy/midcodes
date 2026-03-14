@@ -329,13 +329,14 @@ export const deductionSchema: RxJsonSchema<any> = {
 // ─── Stock Count ─────────────────────────────────────────────────────────────
 export const stockCountSchema: RxJsonSchema<any> = {
 	title: 'stock count schema',
-	version: 3,
-	primaryKey: 'stockItemId',
+	version: 5,
+	primaryKey: 'id',
 	type: 'object',
 	properties: {
+		id: { type: 'string', maxLength: 100 },
 		stockItemId: { type: 'string', maxLength: 100 },
 		locationId: { type: 'string', maxLength: 100 },
-		date: { type: ['string', 'null'], maxLength: 10 },
+		date: { type: 'string', maxLength: 10 },
 		counted: {
 			type: 'object',
 			properties: {
@@ -346,8 +347,8 @@ export const stockCountSchema: RxJsonSchema<any> = {
 		},
 		updatedAt: { type: 'string', maxLength: 30 }
 	},
-	required: ['stockItemId', 'locationId', 'counted', 'updatedAt'],
-	indexes: ['locationId', 'updatedAt']
+	required: ['id', 'stockItemId', 'locationId', 'date', 'counted', 'updatedAt'],
+	indexes: ['locationId', 'updatedAt', ['stockItemId', 'locationId', 'date']]
 };
 
 // ─── Device ─────────────────────────────────────────────────────────────────

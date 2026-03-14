@@ -1,5 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, type Plugin } from 'vitest/config';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 /** Vite plugin that detects new LAN devices at the TCP socket level */
 function connectionLogger(): Plugin {
@@ -25,7 +26,7 @@ function connectionLogger(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [connectionLogger(), sveltekit()],
+	plugins: [connectionLogger(), basicSsl(), sveltekit()],
 	define: {
 		__BUILD_DATE__: JSON.stringify(new Date().toISOString()),
 		__BUILD_MODE__: JSON.stringify(process.env.NODE_ENV ?? 'development'),

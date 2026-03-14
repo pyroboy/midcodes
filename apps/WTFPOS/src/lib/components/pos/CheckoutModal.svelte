@@ -10,6 +10,7 @@
     import ManagerPinModal from './ManagerPinModal.svelte';
     import PhotoCapture from '$lib/components/PhotoCapture.svelte';
     import { ChevronDown, ChevronUp, Minus, Plus, X, Check, Pause, Banknote, Smartphone, Camera } from 'lucide-svelte';
+    import { playSound } from '$lib/utils/audio';
 
     interface Props {
         order: Order;
@@ -41,7 +42,7 @@
     let paymentEntries = $state<PaymentEntry[]>([{ method: 'cash', amount: 0 }]);
 
     // Reset payment amounts to 0 whenever the modal opens for a *different* order.
-    let prevOrderId = $state(order?.id);
+    let prevOrderId = $state(untrack(() => order?.id));
     $effect(() => {
         const _id = order?.id;
         if (_id && _id !== prevOrderId) {
@@ -62,6 +63,7 @@
     function hasMethod(m: PaymentMethod) { return paymentEntries.some(e => e.method === m); }
 
     function toggleMethod(m: PaymentMethod) {
+        playSound('click');
         if (hasMethod(m)) {
             if (paymentEntries.length > 1) {
                 paymentEntries = paymentEntries.filter(e => e.method !== m);
@@ -80,6 +82,7 @@
     }
 
     function selectCashPreset(amount: number) {
+        playSound('click');
         if (hasMethod('cash')) setAmount('cash', amount);
     }
 
@@ -89,6 +92,7 @@
     }
 
     function selectEwalletPreset(m: PaymentMethod, amount: number) {
+        playSound('click');
         setAmount(m, amount);
     }
 
@@ -347,6 +351,7 @@
 
         checkoutError = '';
         checkoutLoading = false;
+        playSound('sale');
         onsuccess(snapshot, actualChange, methodLabel);
     }
 
@@ -902,7 +907,7 @@
                 <div class="grid grid-cols-3 gap-2">
                     {#each [1,2,3,4,5,6,7,8,9] as num}
                         <button
-                            onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) discountConfirmPin += String(num); }}
+                            onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) { discountConfirmPin += String(num); playSound('click'); } }}
                             class="flex items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-bold text-gray-800 hover:bg-gray-50 active:bg-gray-100 transition-colors"
                             style="min-height: 52px"
                         >{num}</button>
@@ -913,7 +918,7 @@
                         style="min-height: 52px"
                     >Clear</button>
                     <button
-                        onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) discountConfirmPin += '0'; }}
+                        onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) { discountConfirmPin += '0'; playSound('click'); } }}
                         class="flex items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-bold text-gray-800 hover:bg-gray-50 active:bg-gray-100 transition-colors"
                         style="min-height: 52px"
                     >0</button>
@@ -934,7 +939,8 @@
                 </button>
                 <button
                     onclick={() => {
-                        if (discountConfirmPin !== MANAGER_PIN) { discountConfirmPinError = true; return; }
+                        if (discountConfirmPin !== MANAGER_PIN) { discountConfirmPinError = true; playSound('error'); return; }
+                        playSound('success');
                         pinGraceUntil = Date.now() + 60000;
                         showDiscountConfirm = false;
                         confirmCheckout();

@@ -14,7 +14,7 @@ import { session } from '$lib/stores/session.svelte';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type GuardType = 'duplicate-order' | 'duplicate-occupancy' | 'table-unavailable' | 'orphan-auto-healed' | 'table-close-with-open-order' | 'stock-negative';
+export type GuardType = 'duplicate-order' | 'duplicate-occupancy' | 'table-unavailable' | 'orphan-auto-healed' | 'table-close-with-open-order' | 'stock-negative' | 'duplicate-active-shift' | 'invalid-order-transition' | 'duplicate-z-read';
 export type GuardLayer = 'replication' | 'write-api' | 'client';
 
 export interface GuardEvent {

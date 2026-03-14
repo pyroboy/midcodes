@@ -7,7 +7,8 @@
 	import { resolveDataMode } from '$lib/stores/data-mode.svelte';
 	import { devices } from '$lib/stores/device.svelte';
 	import { differenceInSeconds, parseISO } from 'date-fns';
-	import { AlertTriangle, Trash2 } from 'lucide-svelte';
+	import { AlertTriangle, Trash2, Download, Share } from 'lucide-svelte';
+	import { browser } from '$app/environment';
 
 	// ─── Accounts ─────────────────────────────────────────────────────────────
 	import type { LocationId } from '$lib/stores/session.svelte';
@@ -51,13 +52,29 @@
 		'all':    { label: 'All',          cls: 'bg-purple-50 text-purple-700 border-purple-200' },
 	};
 
-	const TEST_GROUPS: { heading: string; usernames: string[] }[] = [
-		{ heading: '🏠 Alta Citta · POS / Management', usernames: ['maria', 'juan']                  },
-		{ heading: '🔥 Alta Citta · Kitchen',          usernames: ['lito', 'benny', 'corazon'] },
-		{ heading: '🏠 Alona Beach · POS / Management',usernames: ['ana', 'carlo']                   },
-		{ heading: '🔥 Alona Beach · Kitchen',         usernames: ['romy', 'dante', 'nena']  },
-		{ heading: '🏭 Tagbilaran Warehouse',          usernames: ['noel']                           },
-		{ heading: '💼 Management',                    usernames: ['chris']                          },
+	// Branch columns for 2-column layout
+	const BRANCH_COLUMNS: { branch: string; emoji: string; groups: { heading: string; usernames: string[] }[] }[] = [
+		{
+			branch: 'Alta Citta · Tagbilaran',
+			emoji: '🏢',
+			groups: [
+				{ heading: 'POS / Management', usernames: ['maria', 'juan'] },
+				{ heading: 'Kitchen',          usernames: ['lito', 'benny', 'corazon'] },
+			]
+		},
+		{
+			branch: 'Alona Beach · Panglao',
+			emoji: '🏖️',
+			groups: [
+				{ heading: 'POS / Management', usernames: ['ana', 'carlo'] },
+				{ heading: 'Kitchen',          usernames: ['romy', 'dante', 'nena'] },
+			]
+		}
+	];
+
+	const GLOBAL_GROUPS: { heading: string; usernames: string[] }[] = [
+		{ heading: '🏭 Warehouse',  usernames: ['noel']  },
+		{ heading: '💼 Management', usernames: ['chris'] },
 	];
 
 	// ─── Form state ───────────────────────────────────────────────────────────
@@ -164,6 +181,46 @@
 
 	const canLogin = $derived(username.trim().length > 0 && password.length > 0);
 
+	// ─── PWA Install Prompt ───────────────────────────────────────────────────
+	let deferredPrompt = $state<BeforeInstallPromptEvent | null>(null);
+	let showIosInstructions = $state(false);
+	let isStandalone = $state(false);
+
+	// Detect platform
+	const isIos = $derived(browser && /iPad|iPhone|iPod/.test(navigator.userAgent));
+	const isSafari = $derived(browser && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS/.test(navigator.userAgent));
+	const canShowInstall = $derived(!isStandalone && (!!deferredPrompt || (isIos && isSafari)));
+
+	interface BeforeInstallPromptEvent extends Event {
+		prompt(): Promise<void>;
+		userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+	}
+
+	$effect(() => {
+		if (!browser) return;
+
+		// Already running as installed PWA?
+		isStandalone = window.matchMedia('(display-mode: standalone)').matches
+			|| (navigator as any).standalone === true;
+
+		const handler = (e: Event) => {
+			e.preventDefault();
+			deferredPrompt = e as BeforeInstallPromptEvent;
+		};
+		window.addEventListener('beforeinstallprompt', handler);
+		return () => window.removeEventListener('beforeinstallprompt', handler);
+	});
+
+	async function installPwa() {
+		if (deferredPrompt) {
+			await deferredPrompt.prompt();
+			const { outcome } = await deferredPrompt.userChoice;
+			if (outcome === 'accepted') deferredPrompt = null;
+		} else if (isIos) {
+			showIosInstructions = !showIosInstructions;
+		}
+	}
+
 	let resetting = $state(false);
 	async function resetDb() {
 		if (!import.meta.env.DEV) { alert('Database reset is only available in dev mode.'); return; }
@@ -190,14 +247,59 @@
 	}
 </script>
 
-<!-- Full page: login card + test credentials side panel -->
-<div class="flex min-h-screen items-center justify-center gap-8 bg-surface-secondary p-6">
+{#snippet userRow(u: string)}
+	{@const acct = ACCOUNTS[u]}
+	{@const rb = roleBadge[acct.role]}
+	<button
+		onclick={() => quickLogin(u)}
+		class={cn(
+			'w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all hover:bg-gray-50 active:scale-[0.98]',
+			username === u && 'bg-accent/5'
+		)}
+		style="min-height: unset"
+	>
+		<div class={cn(
+			'h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold select-none',
+			acct.role === 'staff' ? 'bg-blue-100 text-blue-700' :
+			acct.role === 'manager' ? 'bg-orange-100 text-accent' :
+			acct.role === 'kitchen' ? 'bg-emerald-100 text-emerald-700' :
+			acct.role === 'owner' ? 'bg-purple-100 text-purple-700' :
+			'bg-gray-100 text-gray-600'
+		)}>
+			{acct.displayName[0]}
+		</div>
+		<div class="flex-1 min-w-0">
+			<p class="text-sm font-semibold text-gray-900 truncate leading-tight">{acct.displayName}</p>
+			<div class="flex items-center gap-1 mt-0.5 flex-wrap">
+				<span class={cn('rounded border px-1.5 py-0 text-[10px] font-semibold leading-4', rb.cls)}>
+					{rb.label}
+				</span>
+				{#if acct.requiresPin}
+					<span class="rounded border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-orange-700">PIN</span>
+				{/if}
+				{#if acct.kitchenFocus === 'butcher'}
+					<span class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-amber-700">⚖️ Butcher</span>
+				{:else if acct.kitchenFocus === 'dispatch'}
+					<span class="rounded border border-cyan-200 bg-cyan-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-cyan-700">📋 Dispatch</span>
+				{:else if acct.kitchenFocus === 'stove'}
+					<span class="rounded border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-orange-700">🍳 Stove</span>
+				{:else if acct.kitchenFocus === 'sides'}
+					<span class="rounded border border-green-200 bg-green-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-green-700">🥗 Sides</span>
+				{/if}
+			</div>
+		</div>
+		<span class="text-gray-300 text-xs flex-shrink-0">›</span>
+	</button>
+{/snippet}
+
+<!-- Full-page login -->
+<div class="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-50 via-white to-orange-50/40 p-4 sm:p-6">
 
 	<!-- ─── Login Card ───────────────────────────────────────────────────── -->
-	<div class="pos-card w-full max-w-[440px] flex flex-col gap-7 p-10">
+	<div class="pos-card w-full max-w-[420px] flex flex-col gap-6 p-8 sm:p-10 shadow-xl shadow-gray-200/60">
 		<!-- Brand header -->
 		<div class="flex flex-col items-center gap-2 text-center">
-			<span class="text-5xl leading-none">🔥</span>
+			<span class="text-5xl leading-none drop-shadow-sm">🔥</span>
 			<h1 class="text-3xl font-extrabold tracking-tight text-gray-900">WTF! SAMGYUP</h1>
 			<p class="text-sm font-medium tracking-[3px] text-gray-400 uppercase">Restaurant POS</p>
 			<div class="h-[3px] w-12 rounded-full bg-accent"></div>
@@ -206,14 +308,12 @@
 		<!-- Inputs -->
 		<div class="flex flex-col gap-4">
 			<div class="flex flex-col gap-1.5">
-				<label for="username" class="text-xs font-semibold uppercase tracking-wide text-gray-600">
-					Username
-				</label>
+				<label for="username" class="text-xs font-semibold uppercase tracking-wide text-gray-600">Username</label>
 				<input
 					id="username"
 					type="text"
 					bind:value={username}
-					placeholder="e.g. staff"
+					placeholder="e.g. maria"
 					class="pos-input"
 					autocomplete="username"
 					onkeydown={(e) => e.key === 'Enter' && login()}
@@ -221,9 +321,7 @@
 			</div>
 
 			<div class="flex flex-col gap-1.5">
-				<label for="password" class="text-xs font-semibold uppercase tracking-wide text-gray-600">
-					Password
-				</label>
+				<label for="password" class="text-xs font-semibold uppercase tracking-wide text-gray-600">Password</label>
 				<div class="relative">
 					<input
 						id="password"
@@ -245,23 +343,42 @@
 				</div>
 			</div>
 
-			<!-- Error message -->
 			{#if error}
-				<p class="rounded-md bg-status-red-light px-3 py-2 text-sm font-medium text-status-red">
-					{error}
-				</p>
+				<p class="rounded-md bg-status-red-light px-3 py-2 text-sm font-medium text-status-red">{error}</p>
 			{/if}
 		</div>
 
 		<!-- Submit -->
-		<button onclick={login} disabled={!canLogin} class="btn-primary w-full text-base disabled:opacity-40">
-			LOGIN →
-		</button>
+		<button onclick={login} disabled={!canLogin} class="btn-primary w-full text-base disabled:opacity-40">LOGIN</button>
 
-		<div class="flex flex-col items-center gap-1.5 mt-1">
-			<p class="text-xs text-gray-400">
-				WTF! Samgyupsal POS · v0.1-alpha
-			</p>
+		<div class="flex flex-col items-center gap-1.5">
+			<p class="text-xs text-gray-400">WTF! Samgyupsal POS · v0.1-alpha</p>
+
+			{#if canShowInstall}
+				<button
+					onclick={installPwa}
+					class="flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2 text-xs font-semibold text-accent hover:bg-accent/10 active:scale-[0.97] transition-all"
+					style="min-height: unset"
+				>
+					{#if isIos}
+						<Share size={14} />
+						Install App
+					{:else}
+						<Download size={14} />
+						Install App
+					{/if}
+				</button>
+				{#if showIosInstructions}
+					<div class="rounded-lg border border-border bg-surface p-3 text-xs text-gray-600 max-w-[280px] text-center leading-relaxed shadow-sm">
+						<p class="font-semibold text-gray-900 mb-1">Install on iPhone/iPad</p>
+						<p>1. Tap the <span class="font-semibold">Share</span> button <span class="text-base leading-none align-middle">⬆</span> in Safari</p>
+						<p>2. Scroll down and tap <span class="font-semibold">"Add to Home Screen"</span></p>
+						<p>3. Tap <span class="font-semibold">"Add"</span></p>
+						<p class="text-gray-400 mt-1.5">Must use Safari — other browsers don't support this on iOS.</p>
+					</div>
+				{/if}
+			{/if}
+
 			<div class="flex items-center gap-3">
 				<button
 					onclick={() => quickLogin('sysadmin')}
@@ -281,83 +398,66 @@
 						tabindex={-1}
 					>
 						<Trash2 size={10} />
-						{resetting ? 'Resetting…' : 'Reset Local DB'}
+						{resetting ? 'Resetting...' : 'Reset Local DB'}
 					</button>
 				{/if}
 			</div>
 		</div>
 	</div>
 
-	<!-- ─── Test Credentials Panel ───────────────────────────────────────── -->
-	<div class="w-[300px] flex flex-col gap-3">
-		<!-- Dev badge header -->
-		<div class="flex items-center gap-2 px-1">
+	<!-- ─── Test Accounts — 2-Column Grid ────────────────────────────────── -->
+	<div class="w-full max-w-[700px] mt-6 flex flex-col gap-3">
+		<!-- Header -->
+		<div class="flex items-center justify-center gap-2">
+			<div class="h-px flex-1 bg-gray-200"></div>
 			<span class="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-				🧪 Dev — Test Accounts
+				🧪 Dev — Quick Login
 			</span>
-			<span class="text-xs text-gray-400">click to login</span>
+			<div class="h-px flex-1 bg-gray-200"></div>
 		</div>
 
-		{#each TEST_GROUPS as group}
-			<div class="rounded-xl border border-border bg-surface overflow-hidden">
-				<!-- Group heading -->
-				<div class="bg-gray-50 border-b border-border px-3 py-2">
-					<p class="text-xs font-semibold text-gray-500">{group.heading}</p>
-				</div>
+		<!-- Branch columns -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+			{#each BRANCH_COLUMNS as col}
+				<div class="rounded-xl border border-border bg-surface overflow-hidden shadow-sm">
+					<!-- Branch header -->
+					<div class="bg-gray-50 border-b border-border px-3 py-2 flex items-center gap-2">
+						<span class="text-base leading-none">{col.emoji}</span>
+						<p class="text-xs font-bold text-gray-700 uppercase tracking-wide">{col.branch}</p>
+					</div>
 
-				<!-- User rows -->
-				<div class="divide-y divide-border">
-					{#each group.usernames as u (u)}
-						{@const acct = ACCOUNTS[u]}
-						{@const rb = roleBadge[acct.role]}
-						{@const lb = locationBadge[acct.locationId]}
-						<button
-							onclick={() => quickLogin(u)}
-							class={cn(
-								'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-secondary active:scale-[0.99]',
-								username === u && 'bg-accent-light'
-							)}
-							style="min-height: unset"
-						>
-							<!-- Avatar initial -->
-							<div class="h-8 w-8 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600 select-none">
-								{acct.displayName[0]}
-							</div>
-
-							<!-- Name + badges -->
-							<div class="flex-1 min-w-0">
-								<p class="text-sm font-semibold text-gray-900 truncate leading-tight">{acct.displayName}</p>
-								<div class="flex items-center gap-1 mt-0.5 flex-wrap">
-									<span class={cn('rounded border px-1.5 py-0 text-[10px] font-semibold leading-4', rb.cls)}>
-										{rb.label}
-									</span>
-									<span class={cn('rounded border px-1.5 py-0 text-[10px] font-semibold leading-4', lb.cls)}>
-										{lb.label}
-									</span>
-									{#if acct.requiresPin}
-										<span class="rounded border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-orange-700">
-											PIN
-										</span>
-									{/if}
-									{#if acct.kitchenFocus === 'butcher'}
-										<span class="rounded border border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-amber-700">⚖️ Butcher</span>
-									{:else if acct.kitchenFocus === 'dispatch'}
-										<span class="rounded border border-cyan-200 bg-cyan-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-cyan-700">📋 Dispatch</span>
-									{:else if acct.kitchenFocus === 'stove'}
-										<span class="rounded border border-orange-200 bg-orange-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-orange-700">🍳 Stove</span>
-									{:else if acct.kitchenFocus === 'sides'}
-										<span class="rounded border border-green-200 bg-green-50 px-1.5 py-0 text-[10px] font-semibold leading-4 text-green-700">🥗 Sides</span>
-									{/if}
-								</div>
-							</div>
-
-							<!-- Arrow -->
-							<span class="text-gray-300 text-sm flex-shrink-0">›</span>
-						</button>
+					{#each col.groups as group, gi}
+						{#if gi > 0}
+							<div class="border-t border-border"></div>
+						{/if}
+						<div class="px-3 pt-2 pb-0.5">
+							<p class="text-[10px] font-bold uppercase tracking-widest text-gray-400">{group.heading}</p>
+						</div>
+						<div class="divide-y divide-border/60">
+							{#each group.usernames as u (u)}
+								{@render userRow(u)}
+							{/each}
+						</div>
 					{/each}
 				</div>
-			</div>
-		{/each}
+			{/each}
+		</div>
+
+		<!-- Global accounts row -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+			{#each GLOBAL_GROUPS as group}
+				<div class="rounded-xl border border-border bg-surface overflow-hidden shadow-sm">
+					<div class="bg-gray-50 border-b border-border px-3 py-2">
+						<p class="text-xs font-bold text-gray-700 uppercase tracking-wide">{group.heading}</p>
+					</div>
+					<div class="divide-y divide-border/60">
+						{#each group.usernames as u (u)}
+							{@render userRow(u)}
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
 	</div>
 </div>
 

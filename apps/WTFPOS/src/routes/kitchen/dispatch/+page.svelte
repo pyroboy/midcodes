@@ -7,6 +7,7 @@
 	import { mergeTicketsByOrder, urgencyLevel, timerBadgeClass, timerText } from '$lib/stores/pos/kds.utils';
 	import { getPkgColors } from '$lib/stores/pos/utils';
 	import { untrack } from 'svelte';
+	import { playSound } from '$lib/utils/audio';
 
 	// ── Live timer ──
 	let now = $state(Date.now());
@@ -93,6 +94,7 @@
 	async function markSideDone(orderId: string, itemId: string) {
 		try {
 			await markItemServed(orderId, itemId);
+			playSound('click');
 		} catch (err) {
 			console.error('[Dispatch] markSideDone failed:', err);
 			showToast(`Failed to update — ${err instanceof Error ? err.message : 'try again'}`);
@@ -104,76 +106,13 @@
 			for (const item of items) {
 				if (item.status !== 'served') {
 					await markItemServed(orderId, item.id);
+					playSound('click');
 				}
 			}
 		} catch (err) {
 			console.error('[Dispatch] completeAllSides failed:', err);
 			showToast(`Failed to update — ${err instanceof Error ? err.message : 'try again'}`);
 		}
-	}
-
-	// ── Connectivity Test ──
-	let pingResult = $state<string>('');
-	let pingRunning = $state(false);
-
-	async function runConnectivityTest() {
-		pingRunning = true;
-		pingResult = '⏳ Testing...';
-		const steps: string[] = [];
-
-		try {
-			// Step 1: HTTP round-trip
-			const token = `ping-${Date.now()}`;
-			const res = await fetch('/api/replication/ping', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ token, collection: 'orders', testWrite: true,
-					testFields: { locationId: 'test', tableNumber: 0, items: [], total: 0 }
-				})
-			});
-			if (!res.ok) {
-				steps.push(`❌ HTTP: ${res.status}`);
-			} else {
-				const data = await res.json();
-				steps.push(`✅ HTTP round-trip OK`);
-				steps.push(`✅ Server sees us as: ${data.deviceLabel}`);
-				steps.push(`${data.storeCount > 0 ? '✅' : '⚠️'} Orders in store: ${data.storeCount}`);
-				if (data.writeOk === true) steps.push('✅ Server write OK');
-				else if (data.writeOk === false) steps.push(`❌ Server write FAILED: ${data.writeError}`);
-			}
-
-			// Step 2: Test the actual write proxy path (what DONE button uses)
-			const testOrder = orders.value[0];
-			if (testOrder) {
-				try {
-					// Read the order via the same path the write proxy uses
-					const readRes = await fetch(`/api/collections/orders/read`);
-					if (readRes.ok) {
-						const readData = await readRes.json();
-						const docs = Array.isArray(readData) ? readData : (readData.documents ?? []);
-						steps.push(`✅ Collection read: ${docs.length} orders`);
-						const found = docs.find((d: any) => d.id === testOrder.id);
-						steps.push(found ? `✅ Can find order ${testOrder.id.slice(0,8)}…` : `❌ Order ${testOrder.id.slice(0,8)}… NOT in server store`);
-					} else {
-						steps.push(`❌ Collection read failed: ${readRes.status}`);
-					}
-				} catch (e: any) {
-					steps.push(`❌ Collection read error: ${e.message}`);
-				}
-			} else {
-				steps.push('⚠️ No orders in local store to test with');
-			}
-
-			// Step 3: Check KDS tickets
-			steps.push(`📋 Local KDS tickets: ${kdsTickets.value.length}`);
-			steps.push(`📋 Local orders: ${orders.value.length}`);
-
-		} catch (err: any) {
-			steps.push(`❌ Network error: ${err.message}`);
-		}
-
-		pingResult = steps.join('\n');
-		pingRunning = false;
 	}
 
 	// ── Toast ──
@@ -213,6 +152,7 @@
 				}
 			}
 			log.dispatchOrderCleared(card.tableNumber);
+			playSound('success');
 
 			const label = card.tableNumber !== null ? `T${card.tableNumber}` : (card.customerName ?? 'Takeout');
 			showToast(`✓ ${label} — Order cleared`, () => {
@@ -544,27 +484,6 @@
 	</div>
 
 
-</div>
-
-<!-- Connectivity Test Panel -->
-<div class="fixed bottom-20 right-3 sm:right-4 z-50">
-	<button
-		onclick={runConnectivityTest}
-		disabled={pingRunning}
-		class="rounded-full bg-gray-800 text-white shadow-lg w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center text-lg active:scale-95 transition-all"
-		title="Test server connection"
-	>
-		{pingRunning ? '⏳' : '🏓'}
-	</button>
-	{#if pingResult}
-		<div class="absolute bottom-14 right-0 w-[calc(100vw-2rem)] max-w-80 rounded-xl bg-gray-900 text-white p-4 shadow-xl text-xs font-mono">
-			<div class="flex justify-between items-center mb-2">
-				<span class="font-bold text-sm">Connection Test</span>
-				<button onclick={() => { pingResult = ''; }} class="text-white/60 hover:text-white">&times;</button>
-			</div>
-			<pre class="whitespace-pre-wrap">{pingResult}</pre>
-		</div>
-	{/if}
 </div>
 
 <!-- Undo Toast -->

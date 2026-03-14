@@ -10,9 +10,11 @@
 	import { nanoid } from 'nanoid';
 	import { writeLog } from '$lib/stores/audit.svelte';
 	import { cn } from '$lib/utils';
+	import { playSound } from '$lib/utils/audio';
+	import { dev } from '$app/environment';
 	import TableSVG from '$lib/components/floor-editor/TableSVG.svelte';
 	import FloorElementSVG from '$lib/components/floor-editor/FloorElementSVG.svelte';
-	import ChairEditorModal from '$lib/components/floor-editor/ChairEditorModal.svelte';
+	import ChairSidePopover from '$lib/components/floor-editor/ChairSidePopover.svelte';
 
 	// ─── Location selector ────────────────────────────────────────────────────
 	const retailLocations = LOCATIONS.filter(l => l.type === 'retail');
@@ -119,14 +121,21 @@
 		};
 	}
 
+	// Keep a copy of the dragged element so patchElement can bootstrap persisted elements into pendingElements
+	let dragSourceElement = $state<FloorElement | null>(null);
+
 	function startDrag(e: PointerEvent, item: Table | FloorElement, type: 'table' | 'element') {
 		e.stopPropagation();
+		chairPopover = null;
+		// Capture pointer so move/up events keep firing even if pointer leaves the SVG
+		svgEl?.setPointerCapture(e.pointerId);
 		floorEditor.select(item.id, type);
 		dragId = item.id;
 		dragType = type;
 		dragMode = 'move';
 		dragStartMouse = { x: e.clientX, y: e.clientY };
 		dragStartPos = { x: item.x, y: item.y };
+		dragSourceElement = type === 'element' ? (item as FloorElement) : null;
 	}
 
 	function startResize(corner: 'nw' | 'ne' | 'sw' | 'se', e: PointerEvent, table: Table) {
@@ -153,6 +162,7 @@
 
 	function startRotateElement(e: PointerEvent, el: FloorElement) {
 		e.stopPropagation();
+		svgEl?.setPointerCapture(e.pointerId);
 		dragId = el.id;
 		dragType = 'element';
 		dragMode = 'rotate';
@@ -160,10 +170,12 @@
 		dragStartPos = { x: el.x, y: el.y };
 		dragStartSize = { w: el.width, h: el.height };
 		dragStartRotation = el.rotation ?? 0;
+		dragSourceElement = el;
 	}
 
 	function startResizeElement(corner: 'nw' | 'ne' | 'sw' | 'se', e: PointerEvent, el: FloorElement) {
 		e.stopPropagation();
+		svgEl?.setPointerCapture(e.pointerId);
 		dragId = el.id;
 		dragType = 'element';
 		dragMode = `resize-${corner}`;
@@ -171,6 +183,7 @@
 		dragStartPos = { x: el.x, y: el.y };
 		dragStartSize = { w: el.width, h: el.height };
 		dragStartRotation = el.rotation ?? 0;
+		dragSourceElement = el;
 	}
 
 	function onPointerMove(e: PointerEvent) {
@@ -189,7 +202,7 @@
 			if (dragType === 'table') {
 				floorEditor.patchTable(dragId, { x: snapVal(dragStartPos.x + dx), y: snapVal(dragStartPos.y + dy) });
 			} else {
-				floorEditor.patchElement(dragId, { x: snapVal(dragStartPos.x + dx), y: snapVal(dragStartPos.y + dy) });
+				floorEditor.patchElement(dragId, { x: snapVal(dragStartPos.x + dx), y: snapVal(dragStartPos.y + dy) }, dragSourceElement ?? undefined);
 			}
 			return;
 		}
@@ -205,7 +218,7 @@
 			if (dragType === 'table') {
 				floorEditor.patchTable(dragId, { rotation: angle });
 			} else {
-				floorEditor.patchElement(dragId, { rotation: angle });
+				floorEditor.patchElement(dragId, { rotation: angle }, dragSourceElement ?? undefined);
 			}
 			return;
 		}
@@ -247,18 +260,23 @@
 			if (dragType === 'table') {
 				floorEditor.patchTable(dragId, { x: newX, y: newY, width: newW, height: newH });
 			} else {
-				floorEditor.patchElement(dragId, { x: newX, y: newY, width: newW, height: newH });
+				floorEditor.patchElement(dragId, { x: newX, y: newY, width: newW, height: newH }, dragSourceElement ?? undefined);
 			}
 		}
 	}
 
-	function onPointerUp() {
+	function onPointerUp(e: PointerEvent) {
+		if (svgEl?.hasPointerCapture(e.pointerId)) {
+			svgEl.releasePointerCapture(e.pointerId);
+		}
 		dragId = null;
 		dragType = null;
+		dragSourceElement = null;
 		isPanning = false;
 	}
 
 	function onCanvasPointerDown(e: PointerEvent) {
+		chairPopover = null;
 		if (e.button === 1) {
 			isPanning = true;
 			panStart = { x: e.clientX, y: e.clientY };
@@ -270,13 +288,18 @@
 
 	function onWheel(e: WheelEvent) {
 		e.preventDefault();
+		chairPopover = null;
 		const delta = e.deltaY > 0 ? 0.97 : 1.03;
 		floorEditor.setZoom(floorEditor.zoom * delta);
 	}
 
 	// ─── Keyboard shortcuts ───────────────────────────────────────────────────
 	function onKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Escape') { floorEditor.deselect(); return; }
+		if (e.key === 'Escape') {
+			if (chairPopover) { chairPopover = null; return; }
+			floorEditor.deselect();
+			return;
+		}
 		if ((e.key === 'Delete' || e.key === 'Backspace') && floorEditor.selectedId) {
 			if (floorEditor.selectedType === 'table') {
 				const t = locationTables.find(t => t.id === floorEditor.selectedId);
@@ -400,12 +423,45 @@
 		writeLog('admin', `Saved floor layout for ${selectedLocationId}`);
 	}
 
-	// Chair modal table (with pending patches merged)
-	const chairModalTable = $derived(
-		floorEditor.chairModalTableId
-			? locationTables.find(t => t.id === floorEditor.chairModalTableId) ?? null
-			: null
-	);
+	// ─── Save to Seed File (dev only) ─────────────────────────────────────────
+	let seedSaving = $state(false);
+	let seedResult = $state<{ success: boolean; message: string } | null>(null);
+
+	async function saveToSeed() {
+		seedSaving = true;
+		seedResult = null;
+		try {
+			const res = await fetch('/api/admin/save-floor-seed', { method: 'POST' });
+			const data = await res.json();
+			if (data.success) {
+				playSound('success');
+				seedResult = { success: true, message: `Saved ${data.tables} tables + ${data.floorElements} elements to seed` };
+			} else {
+				playSound('error');
+				seedResult = { success: false, message: data.error ?? 'Failed' };
+			}
+		} catch (err) {
+			playSound('error');
+			seedResult = { success: false, message: String(err) };
+		}
+		seedSaving = false;
+		setTimeout(() => { seedResult = null; }, 4000);
+	}
+
+	// ─── Inline chair editor (popover on table edges) ────────────────────────
+	let chairPopover = $state<{ tableId: string; side: 'top' | 'bottom' | 'left' | 'right'; x: number; y: number } | null>(null);
+
+	const chairPopoverTable = $derived.by(() => {
+		const cp = chairPopover;
+		if (!cp) return null;
+		return locationTables.find(t => t.id === cp.tableId) ?? null;
+	});
+
+	function handleChairSideClick(tableId: string, side: 'top' | 'bottom' | 'left' | 'right', e: MouseEvent) {
+		chairPopover = { tableId, side, x: e.clientX, y: e.clientY };
+	}
+
+	function closeChairPopover() { chairPopover = null; }
 </script>
 
 <svelte:window onkeydown={onKeyDown} />
@@ -483,6 +539,23 @@
 		<button onclick={save} disabled={!floorEditor.isDirty} class="btn-primary text-xs px-4 disabled:opacity-40">
 			Save Floor
 		</button>
+
+		{#if dev}
+			<div class="w-px h-5 bg-gray-200"></div>
+			<button
+				onclick={saveToSeed}
+				disabled={seedSaving || floorEditor.isDirty}
+				class="text-xs px-3 py-1.5 rounded-md border border-status-purple/40 bg-status-purple/5 text-status-purple font-semibold hover:bg-status-purple/10 transition-colors disabled:opacity-40"
+				title={floorEditor.isDirty ? 'Save floor changes first before exporting to seed' : 'Export current floor layout to seed file (dev only)'}
+			>
+				{seedSaving ? '⏳ Saving...' : '💾 Save to Seed'}
+			</button>
+			{#if seedResult}
+				<span class={cn('text-xs px-2 py-1 rounded-md border', seedResult.success ? 'bg-status-green/10 border-status-green/30 text-status-green' : 'bg-status-red/10 border-status-red/30 text-status-red')}>
+					{seedResult.message}
+				</span>
+			{/if}
+		{/if}
 	</div>
 
 	<!-- ── Canvas + Inspector ── -->
@@ -543,6 +616,7 @@
 							onpointerdown={(e) => startDrag(e, table, 'table')}
 							onresizestart={(corner, e) => startResize(corner, e, table)}
 							onrotatestart={(e) => startRotate(e, table)}
+							onchairsideclick={(side, e) => handleChairSideClick(table.id, side, e)}
 						/>
 					{/each}
 				</g>
@@ -683,13 +757,10 @@
 						/>
 					</label>
 
-					<!-- Chair editor CTA -->
-					<button
-						onclick={() => floorEditor.openChairModal(selectedTable!.id)}
-						class="btn-secondary w-full text-sm flex items-center justify-center gap-2 py-2.5"
-					>
-						<span>🪑</span> Edit Chairs…
-					</button>
+					<!-- Chair editing hint -->
+					<p class="text-xs text-gray-400 text-center bg-gray-50 rounded-lg py-2 px-3 border border-gray-100">
+						Click the dashed zones around the table edges to add or edit chairs
+					</p>
 
 					<div class="h-px bg-gray-100"></div>
 
@@ -815,7 +886,15 @@
 	</div>
 </div>
 
-<!-- Chair Editor Modal (portal-style, full-screen overlay) -->
-{#if floorEditor.chairModalOpen && chairModalTable}
-	<ChairEditorModal table={chairModalTable} />
+<!-- Inline chair editor popover (anchored to table edge) -->
+{#if chairPopover && chairPopoverTable}
+	{#key `${chairPopover.tableId}-${chairPopover.side}`}
+		<ChairSidePopover
+			table={chairPopoverTable}
+			side={chairPopover.side}
+			x={chairPopover.x}
+			y={chairPopover.y}
+			onclose={closeChairPopover}
+		/>
+	{/key}
 {/if}

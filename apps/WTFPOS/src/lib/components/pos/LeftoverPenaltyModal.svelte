@@ -61,90 +61,93 @@
 </script>
 
 {#if isOpen && order}
-<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+<div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
     {#if !showPin}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-2xl pos-card flex flex-col gap-6" onclick={(e) => e.stopPropagation()}>
-            <button onclick={onClose} class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg">✕</button>
-            
-            <!-- Table / order orientation anchor -->
-            <div class="flex items-center justify-center">
-                <span class="rounded-md bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent tracking-wide">
-                    {order.orderType === 'takeout'
-                        ? `Takeout${order.customerName ? ` — ${order.customerName}` : ''}`
-                        : order.tableId ?? 'Table'}
-                    {order.pax ? ` · ${order.pax} pax` : ''}
-                </span>
+        <div class="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl bg-surface shadow-2xl pos-card flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden" onclick={(e) => e.stopPropagation()}>
+            <!-- Header — compact, fixed -->
+            <div class="flex items-center justify-between px-4 pt-3 pb-2 sm:px-5 sm:pt-4 border-b border-gray-100">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-white text-[10px] font-bold">1</span>
+                        <h2 class="text-sm sm:text-base font-black text-gray-900">Leftover Check</h2>
+                    </div>
+                    <span class="text-gray-300 text-xs">→</span>
+                    <span class="text-[10px] sm:text-xs text-gray-400 font-medium">Payment</span>
+                </div>
+                <button onclick={onClose} class="text-gray-400 hover:text-gray-600 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg shrink-0">✕</button>
             </div>
 
-            <!-- Step progress indicator -->
-            <div class="flex items-center justify-center gap-2 text-sm">
-                <span class="flex items-center gap-1.5 font-semibold text-accent">
-                    <span class="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-white text-xs font-bold">1</span>
-                    Leftover Check
-                </span>
-                <span class="text-gray-300">→</span>
-                <span class="flex items-center gap-1.5 text-gray-400">
-                    <span class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-gray-300 text-xs font-bold text-gray-400">2</span>
-                    Payment
-                </span>
-            </div>
-
-            <div>
-                <div class="flex items-center gap-2">
-                    <h2 class="text-xl font-black text-gray-900">Leftover Check</h2>
+            <!-- Scrollable content -->
+            <div class="flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4 flex flex-col gap-3 sm:gap-4">
+                <!-- Order badge + policy -->
+                <div class="flex items-center justify-between">
+                    <span class="rounded-md bg-accent/10 px-2 py-0.5 text-[10px] sm:text-xs font-bold text-accent tracking-wide">
+                        {order.orderType === 'takeout'
+                            ? `Takeout${order.customerName ? ` — ${order.customerName}` : ''}`
+                            : order.tableId ?? 'Table'}
+                        {order.pax ? ` · ${order.pax} pax` : ''}
+                    </span>
                     <button
                         onclick={() => showPolicyTip = !showPolicyTip}
-                        class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500 hover:bg-gray-200 transition-colors"
+                        class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-500 hover:bg-gray-200 transition-colors"
+                        style="min-height: unset"
                         aria-label="Show leftover policy"
                     >ℹ</button>
                 </div>
+
                 {#if showPolicyTip}
-                    <p class="mt-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                    <p class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800 leading-relaxed">
                         AYCE leftover policy: uneaten meat is charged per gram. Enter the total weight of leftover meat.
                     </p>
                 {/if}
-                <p class="text-sm text-gray-500 mt-1">Weigh any uneaten meat. Leftovers over 100g are charged at <span class="font-semibold text-accent">₱{rate}/100g</span>. Enter 0 if plate is clean.</p>
+
+                <p class="text-xs sm:text-sm text-gray-500 leading-relaxed">Weigh uneaten meat. Charged at <span class="font-semibold text-accent">₱{rate}/100g</span>. Enter 0 if clean.</p>
+
+                {#if btScale.connectionStatus === 'connected'}
+                    <BluetoothWeightInput
+                        id="leftover-weight"
+                        value={weightStr}
+                        onValueChange={(v) => { weightStr = v; }}
+                        theme="light"
+                    />
+                {/if}
+
+                <!-- Weight display — compact -->
+                <div class="flex items-center justify-center gap-3 rounded-xl bg-gray-50 px-4 py-3 border border-border">
+                    <span class="text-2xl sm:text-3xl font-black font-mono {weightGrams > 0 ? 'text-accent' : 'text-gray-300'}">{weightGrams}<span class="text-base sm:text-lg ml-0.5">g</span></span>
+                    <span class={cn('text-xs sm:text-sm font-bold rounded-full px-2.5 py-1', weightGrams > 0 ? 'bg-status-red/10 text-status-red' : 'bg-gray-100 text-gray-400')}>
+                        {weightGrams > 0 ? `+${formatPeso(penaltyAmount)}` : 'No penalty'}
+                    </span>
+                </div>
+
+                <!-- Numpad — tighter on mobile -->
+                <div class="grid grid-cols-3 gap-1.5 sm:gap-2">
+                    {#each ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as digit}
+                        <button onclick={() => handleNumpad(digit)} class="rounded-lg sm:rounded-xl border border-gray-200 bg-white py-3 sm:py-3.5 text-lg sm:text-xl font-bold active:scale-95 active:bg-gray-50 transition-all">{digit}</button>
+                    {/each}
+                    <button onclick={handleClear} class="rounded-lg sm:rounded-xl border border-gray-200 bg-gray-100 py-3 sm:py-3.5 text-xs font-bold text-gray-500 active:scale-95">CLR</button>
+                    <button onclick={() => handleNumpad('0')} class="rounded-lg sm:rounded-xl border border-gray-200 bg-white py-3 sm:py-3.5 text-lg sm:text-xl font-bold active:scale-95 active:bg-gray-50 transition-all">0</button>
+                    <button onclick={handleBackspace} class="rounded-lg sm:rounded-xl border border-gray-200 bg-gray-100 py-3 sm:py-3.5 text-lg sm:text-xl font-bold active:scale-95">⌫</button>
+                </div>
             </div>
 
-            {#if btScale.connectionStatus === 'connected'}
-                <BluetoothWeightInput
-                    id="leftover-weight"
-                    value={weightStr}
-                    onValueChange={(v) => { weightStr = v; }}
-                    theme="light"
-                />
-            {/if}
-
-            <div class="flex flex-col items-center justify-center gap-2 rounded-xl bg-gray-50 p-4 border border-border">
-                <span class="text-3xl font-black {weightGrams > 0 ? 'text-accent' : 'text-gray-300'}">{weightGrams} g</span>
-                <span class="text-sm font-semibold text-status-red">{weightGrams > 0 ? `+ ${formatPeso(penaltyAmount)}` : 'No penalty'}</span>
-            </div>
-
-            <div class="grid grid-cols-3 gap-2">
-                {#each ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as digit}
-                    <button onclick={() => handleNumpad(digit)} class="rounded-xl border border-gray-200 bg-white py-4 text-xl font-bold shadow-sm active:scale-95">{digit}</button>
-                {/each}
-                <button onclick={handleClear} class="rounded-xl border border-gray-200 bg-gray-100 py-4 text-sm font-bold text-gray-500 shadow-sm active:scale-95">CLR</button>
-                <button onclick={() => handleNumpad('0')} class="rounded-xl border border-gray-200 bg-white py-4 text-xl font-bold shadow-sm active:scale-95">0</button>
-                <button onclick={handleBackspace} class="rounded-xl border border-gray-200 bg-gray-100 py-4 text-xl font-bold shadow-sm active:scale-95">⌫</button>
-            </div>
-
-            <div class="flex flex-col gap-2">
+            <!-- Actions — fixed at bottom -->
+            <div class="px-4 py-3 sm:px-5 sm:py-4 border-t border-gray-100 bg-white">
                 {#if weightGrams > 0}
                     <div class="flex gap-2">
-                        <button onclick={handleSkip} class="btn-ghost flex-1 py-3 text-xs">Manager Override (no weigh)</button>
-                        <button onclick={handleApply} class="btn-primary flex-[2] py-3 text-sm shadow-xl shadow-orange-500/20">
-                            Apply & Checkout
+                        <button onclick={handleSkip} class="btn-ghost flex-1 py-2.5 text-[10px] sm:text-xs">Override</button>
+                        <button onclick={handleApply} class="btn-primary flex-[2] py-2.5 text-sm font-bold shadow-lg shadow-orange-500/20">
+                            Apply +{formatPeso(penaltyAmount)} & Checkout
                         </button>
                     </div>
                 {:else}
-                    <button onclick={onPreCheckout} class="btn-success w-full py-3 text-sm font-bold shadow-xl text-white bg-status-green hover:bg-emerald-600">
-                        ✓ No Leftovers — Proceed to Checkout
+                    <button onclick={onPreCheckout} class="w-full rounded-xl py-3 text-sm font-bold text-white bg-status-green hover:bg-emerald-600 active:scale-[0.98] transition-all shadow-lg">
+                        ✓ No Leftovers — Checkout
                     </button>
-                    <button onclick={handleSkip} class="btn-ghost w-full py-2 text-xs text-gray-400 hover:text-gray-600">
-                        Manager Override (no weigh) →
+                    <button onclick={handleSkip} class="w-full mt-1.5 py-2 text-[10px] sm:text-xs text-gray-400 hover:text-gray-600 transition-colors" style="min-height: unset">
+                        Manager Override →
                     </button>
                 {/if}
             </div>

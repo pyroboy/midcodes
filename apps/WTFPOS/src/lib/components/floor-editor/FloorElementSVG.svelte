@@ -59,6 +59,14 @@
 	onpointerdown={onpointerdown}
 	style="cursor: grab;"
 >
+	<!-- Invisible hit area so the entire bounding box is draggable -->
+	<rect
+		x={element.x} y={element.y}
+		width={element.width} height={element.height}
+		fill="transparent"
+		stroke="none"
+	/>
+
 	{#if element.shape === 'rect'}
 		<rect
 			x={element.x} y={element.y}
@@ -69,6 +77,7 @@
 			stroke-dasharray="6 3"
 			{opacity}
 			rx="4"
+			pointer-events="none"
 		/>
 	{:else if element.shape === 'circle'}
 		<ellipse
@@ -79,6 +88,7 @@
 			stroke-width={selected ? 2 : 1.5}
 			stroke-dasharray="6 3"
 			{opacity}
+			pointer-events="none"
 		/>
 	{:else if element.shape === 'line'}
 		<line
@@ -88,6 +98,7 @@
 			stroke-width="2"
 			stroke-dasharray="6 3"
 			{opacity}
+			pointer-events="none"
 		/>
 	{/if}
 

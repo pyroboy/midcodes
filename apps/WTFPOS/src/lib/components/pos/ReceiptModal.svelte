@@ -3,6 +3,7 @@
 	import { formatPeso } from '$lib/utils';
 	import { printReceipt } from '$lib/stores/hardware.svelte';
 	import { LOCATIONS } from '$lib/stores/session.svelte';
+	import { playSound } from '$lib/utils/audio';
 
 	interface Props {
 		isOpen: boolean;
@@ -231,14 +232,14 @@
 
 			<div class="flex gap-3 px-6 py-4">
 				<button
-					onclick={() => order && printReceipt(order.id)}
+					onclick={() => { playSound('click'); order && printReceipt(order.id); }}
 					class="btn-secondary flex-1"
 					style="min-height: 44px"
 				>
 					🖨 Print
 				</button>
 				<button
-					onclick={onClose}
+					onclick={() => { playSound('click'); onClose(); }}
 					class="btn-primary flex-1"
 					style="min-height: 44px"
 				>

@@ -1,5 +1,5 @@
 import type { RxDatabase } from 'rxdb';
-import { INITIAL_TABLES as sourceTables, INITIAL_MENU_ITEMS as sourceMenu } from '$lib/stores/pos.svelte';
+import { INITIAL_TABLES as sourceTables, INITIAL_MENU_ITEMS as sourceMenu, INITIAL_FLOOR_ELEMENTS as sourceFloorElements } from '$lib/stores/pos.svelte';
 import { 
     INITIAL_STOCK_ITEMS, 
     INITIAL_DELIVERIES, 
@@ -70,8 +70,16 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
             if (t3) { t3.status = 'occupied'; t3.currentOrderId = 'order-t3-mock'; t3.sessionStartedAt = new Date(Date.now() - 5 * 60000).toISOString(); }
             
             await db.tables.bulkInsert(tablesWithOrders);
+
+            // 2.5. Seed Floor Elements from designed layout (if exported from floor editor)
+            if (sourceFloorElements.length > 0) {
+                const existingElements = await db.floor_elements.find().exec();
+                if (existingElements.length === 0) {
+                    await db.floor_elements.bulkInsert(JSON.parse(JSON.stringify(sourceFloorElements)));
+                }
+            }
         }
-        
+
         // 3. Seed other collections if menu was empty (assume full seed needed)
         if (existingMenu.length === 0) {
             const mappedStockItems = INITIAL_STOCK_ITEMS.map(s => ({

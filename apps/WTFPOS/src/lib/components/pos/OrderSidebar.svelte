@@ -9,6 +9,7 @@
 	import { session } from '$lib/stores/session.svelte';
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
 	import { TriangleAlert } from 'lucide-svelte';
+	import { playSound } from '$lib/utils/audio';
 
 	interface Props {
 		order: Order | undefined;
@@ -328,7 +329,7 @@
 	</div>
 {/snippet}
 
-<div class="pos-order-sidebar flex w-full lg:w-[380px] shrink-0 flex-col lg:border-l border-border bg-surface overflow-hidden">
+<div class="pos-order-sidebar flex w-full lg:w-[380px] shrink-0 flex-col lg:border-l border-border bg-surface overflow-hidden min-h-0">
 	{#if !order}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center select-none">
 			<div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-secondary text-3xl">
@@ -351,39 +352,40 @@
 		</div>
 	{:else}
 		<!-- ── Header ── -->
-		<div class="flex flex-col gap-2 border-b border-border px-4 py-3">
+		<div class="flex flex-col gap-1.5 sm:gap-2 border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
 			<div class="flex items-center justify-between">
-				<div class="flex items-center gap-2 flex-wrap">
+				<div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
 					{#if order.orderType === 'takeout'}
-						<span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">TAKEOUT</span>
-						<span class="text-lg font-extrabold text-gray-900">{order.customerName ?? 'Walk-in'}</span>
+						<span class="rounded-md bg-accent px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-white">TAKEOUT</span>
+						<span class="text-base sm:text-lg font-extrabold text-gray-900">{order.customerName ?? 'Walk-in'}</span>
 					{:else}
-						<span class="text-lg font-extrabold text-gray-900">{table?.label}</span>
+						<span class="text-base sm:text-lg font-extrabold text-gray-900">{table?.label}</span>
 						<button
 							onclick={onchangepax}
-							class="flex items-center gap-1 rounded-full bg-surface-secondary px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-accent transition-colors cursor-pointer"
+							class="flex items-center gap-1 rounded-full bg-surface-secondary px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-accent transition-colors cursor-pointer"
+							style="min-height: unset"
 							title="Change guest count"
 						>
-							{order.pax} pax ✎
+							{order.pax}p ✎
 						</button>
 						{#if table?.elapsedSeconds !== null}
-							<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+							<span class="rounded-full bg-gray-100 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium text-gray-500">
 								{Math.floor((table?.elapsedSeconds ?? 0) / 60)}m
 							</span>
 						{/if}
 					{/if}
 				</div>
-				<button onclick={onclose} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gray-100 lg:bg-transparent text-gray-500 lg:text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors text-lg font-bold">✕</button>
+				<button onclick={onclose} class="flex min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] items-center justify-center rounded-full bg-gray-100 lg:bg-transparent text-gray-500 lg:text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors text-base sm:text-lg font-bold">✕</button>
 			</div>
 
 			{#if order.orderType === 'takeout'}
 				{@const tStatus = order.takeoutStatus ?? 'new'}
-				<div class="flex items-center justify-between rounded-lg bg-orange-50 border border-dashed border-orange-200 px-3 py-1.5">
-					<div class="flex items-center gap-2">
-						<span class="font-mono text-xs font-bold text-accent">{takeoutLabel(order)}</span>
-						<span class="text-xs text-gray-400">{formatTimeAgo(order.createdAt)}</span>
+				<div class="flex items-center justify-between rounded-lg bg-orange-50 border border-dashed border-orange-200 px-2.5 sm:px-3 py-1">
+					<div class="flex items-center gap-1.5 sm:gap-2">
+						<span class="font-mono text-[10px] sm:text-xs font-bold text-accent">{takeoutLabel(order)}</span>
+						<span class="text-[10px] sm:text-xs text-gray-400">{formatTimeAgo(order.createdAt)}</span>
 						<span class={cn(
-							'rounded px-1.5 py-0.5 text-[10px] font-bold text-white',
+							'rounded px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-white',
 							tStatus === 'new' ? 'bg-blue-500' :
 							tStatus === 'preparing' ? 'bg-yellow-500' :
 							tStatus === 'ready' ? 'bg-status-green' :
@@ -398,39 +400,41 @@
 							class="text-[10px] font-semibold text-accent hover:underline"
 							style="min-height: unset"
 						>
-							Mark Picked Up
+							Picked Up
 						</button>
 					{/if}
 				</div>
 			{:else if order.packageName}
-				<div class="text-sm font-semibold text-gray-700">{order.packageName}</div>
-				{#if refillCount > 0}
-					<span class="inline-flex items-center gap-1 rounded-full bg-status-green/10 px-2 py-0.5 text-[11px] font-semibold text-status-green">
-						{refillCount} refill{refillCount === 1 ? '' : 's'}
-					</span>
-				{/if}
+				<div class="flex items-center gap-2">
+					<span class="text-xs sm:text-sm font-semibold text-gray-700">{order.packageName}</span>
+					{#if refillCount > 0}
+						<span class="inline-flex items-center gap-0.5 rounded-full bg-status-green/10 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-status-green">
+							{refillCount}× refill
+						</span>
+					{/if}
+				</div>
 			{/if}
 
 			<!-- Action buttons: REFILL + ADD ITEM for AYCE, or plain ADD for others -->
 			{#if order.orderType === 'dine-in' && order.packageId && order.status === 'open'}
-				<div class="flex gap-2">
+				<div class="flex gap-1.5 sm:gap-2">
 					<button
-						onclick={onrefill}
-						class="flex-[2] rounded-xl bg-accent text-lg font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
-						style="min-height: 56px"
+						onclick={() => { playSound('click'); onrefill(); }}
+						class="flex-[2] rounded-lg sm:rounded-xl bg-accent text-sm sm:text-lg font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
+						style="min-height: 40px"
 					>
 						Refill
 					</button>
 					<button
-						onclick={onadditem}
-						class="flex-1 rounded-xl border-2 border-accent bg-accent-light px-4 text-lg font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
-						style="min-height: 56px"
+						onclick={() => { playSound('click'); onadditem(); }}
+						class="flex-1 rounded-lg sm:rounded-xl border-2 border-accent bg-accent-light px-3 sm:px-4 text-sm sm:text-lg font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
+						style="min-height: 40px"
 					>
-						Add Item
+						+ Add
 					</button>
 				</div>
 			{:else if order.status === 'open'}
-				<button onclick={onadditem} class="btn-primary w-full text-lg" style="min-height: 56px">+ Add Item</button>
+				<button onclick={() => { playSound('click'); onadditem(); }} class="btn-primary w-full text-sm sm:text-lg rounded-lg sm:rounded-xl" style="min-height: 40px">+ Add Item</button>
 			{/if}
 		</div>
 
@@ -557,14 +561,14 @@
 
 		<!-- ── Meat Stats Bar ── -->
 		{#if totalMeatGrams > 0}
-			<div class="mx-4 mb-2 flex items-center justify-between rounded-lg bg-surface-secondary px-3 py-2">
+			<div class="mx-4 mb-2 flex items-center justify-between rounded-lg bg-surface-secondary px-3 py-2 shrink-0">
 				<span class="text-xs font-semibold text-gray-500">Meat dispatched</span>
 				<span class="font-mono text-xs font-bold text-gray-700">{(totalMeatGrams / 1000).toFixed(2)}kg ({totalMeatGrams}g)</span>
 			</div>
 		{/if}
 
 		<!-- ── Bill Total ── -->
-		<div class="border-t border-border px-4 py-3 flex items-center justify-between">
+		<div class="border-t border-border px-4 py-3 flex items-center justify-between shrink-0">
 			<div class="flex flex-col gap-0.5">
 				<span class="text-base font-bold text-gray-900">BILL</span>
 				<span class="text-xs text-gray-400">{activeItemCount} items</span>
@@ -578,7 +582,7 @@
 		</div>
 
 		<!-- ── Primary Actions ── -->
-		<div class="flex flex-col gap-2 px-4 pb-4">
+		<div class="flex flex-col gap-2 px-4 pb-4 shrink-0">
 			{#if order.status === 'pending_payment'}
 				<div class="flex items-center justify-center gap-2 rounded-lg bg-cyan-50 border border-cyan-200 px-3 py-2 mb-1">
 					<span class="text-xs font-bold text-cyan-700 uppercase tracking-wider">Awaiting {order.pendingPaymentMethod === 'maya' ? 'Maya' : 'GCash'} Confirmation</span>
@@ -595,7 +599,7 @@
 						<p class="text-xs font-semibold text-status-red">Cancel this table? Pax entry will be removed.</p>
 						<div class="flex gap-2">
 							<button onclick={() => confirmCancel = false} class="btn-ghost flex-1 text-xs border border-gray-300" style="min-height: 40px">Keep</button>
-							<button onclick={() => { confirmCancel = false; oncanceltable?.(); }} class="btn-danger flex-1 text-xs" style="min-height: 40px">Yes, Cancel</button>
+							<button onclick={() => { playSound('warning'); confirmCancel = false; oncanceltable?.(); }} class="btn-danger flex-1 text-xs" style="min-height: 40px">Yes, Cancel</button>
 						</div>
 					</div>
 				{:else}
@@ -606,11 +610,11 @@
 			{:else}
 				<!-- Secondary actions row: Print + Void (smaller, less prominent) -->
 				<div class="flex gap-2">
-					<button onclick={() => printBill(order.id)} disabled={activeItemCount === 0} class={cn('btn-secondary flex-1 px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Print</button>
-					<button onclick={onvoid} disabled={activeItemCount === 0} class={cn('btn-ghost flex-1 px-3 text-sm border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Void</button>
+					<button onclick={() => { playSound('click'); printBill(order.id); }} disabled={activeItemCount === 0} class={cn('btn-secondary flex-1 px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Print</button>
+					<button onclick={() => { playSound('warning'); onvoid(); }} disabled={activeItemCount === 0} class={cn('btn-ghost flex-1 px-3 text-sm border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Void</button>
 				</div>
 				<!-- Primary CTA: Checkout — full width, visually dominant -->
-				<button onclick={oncheckout} disabled={activeItemCount === 0} class={cn('w-full rounded-xl text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 56px">✓ Checkout</button>
+				<button onclick={() => { playSound('click'); oncheckout(); }} disabled={activeItemCount === 0} class={cn('w-full rounded-xl text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 56px">✓ Checkout</button>
 			{/if}
 			{/if}
 
@@ -696,6 +700,7 @@
 					style="min-height: 44px"
 					disabled={!voidItemReason}
 					onclick={() => {
+						playSound('warning');
 						if (order && removePinItemId) removeOrderItem(order.id, removePinItemId, voidItemReason || undefined);
 						showVoidReasonSelector = false;
 						removePinItemId = null;

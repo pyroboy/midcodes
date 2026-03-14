@@ -7,9 +7,7 @@
  * the client and server have identical data without comparing every document.
  */
 
-const PK_FIELD: Record<string, string> = {
-	stock_counts: 'stockItemId'
-};
+const PK_FIELD: Record<string, string> = {};
 
 function getPk(collection: string, doc: any): string {
 	return doc[PK_FIELD[collection] ?? 'id'];

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import { MANAGER_PIN } from '$lib/stores/session.svelte';
+	import { playSound } from '$lib/utils/audio';
 
 	interface Props {
 		isOpen: boolean;
@@ -16,7 +17,10 @@
 
 	function handleNumber(num: string) {
 		voidPinError = false;
-		if (voidPin.length < 4) voidPin += num;
+		if (voidPin.length < 4) {
+			voidPin += num;
+			playSound('click');
+		}
 	}
 
 	function handleClear() {
@@ -32,8 +36,10 @@
 	function handleConfirm() {
 		if (voidPin !== MANAGER_PIN) {
 			voidPinError = true;
+			playSound('error');
 			return;
 		}
+		playSound('warning');
 		onConfirm(voidReason, voidPin);
 		voidPin = '';
 		voidPinError = false;

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { cn } from '$lib/utils';
+    import { playSound } from '$lib/utils/audio';
     import { stockItems } from '$lib/stores/stock.svelte';
     import { session } from '$lib/stores/session.svelte';
     import { log } from '$lib/stores/audit.svelte';
@@ -41,6 +42,7 @@
     const numpadKeys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C', '0', '⌫'];
 
     function handleNumpad(key: string) {
+        playSound('click');
         const current = activeField === 'raw' ? rawWeightInput : trimmedWeightInput;
         let next = current;
 
@@ -73,6 +75,7 @@
     }
 
     function handlePinVerify() {
+        playSound('success');
         const item = meatItems.find(m => m.id === selectedMeatId);
         log.yieldRecorded(item?.name || 'Unknown', rawWeight, trimmedWeight, yieldPct);
         showPin = false;

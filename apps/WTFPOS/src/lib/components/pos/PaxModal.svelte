@@ -2,6 +2,7 @@
     import type { Table } from '$lib/types';
     import { cn } from '$lib/utils';
     import { Users } from 'lucide-svelte';
+    import { playSound } from '$lib/utils/audio';
 
     interface Props {
         table: Table | null;
@@ -50,7 +51,11 @@
         min = 0,
         max = Infinity
     ) {
-        setter(Math.min(max, Math.max(min, getter() + delta)));
+        const next = Math.min(max, Math.max(min, getter() + delta));
+        if (next !== getter()) {
+            setter(next);
+            playSound('click');
+        }
     }
 </script>
 
@@ -266,7 +271,7 @@
             <div class="flex gap-2 px-5 pt-3 pb-5 mt-1">
                 <button class="btn-ghost flex-1" onclick={oncancel}>Cancel</button>
                 <button
-                    onclick={() => onconfirm(total, children, free, scCount, pwdCount)}
+                    onclick={() => { playSound('success'); onconfirm(total, children, free, scCount, pwdCount); }}
                     disabled={total < 1}
                     class={cn(
                         'flex-1 rounded-lg font-semibold text-sm transition-colors',

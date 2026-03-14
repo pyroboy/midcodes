@@ -193,7 +193,7 @@ export function createServerStore<T extends Record<string, any>>(
 	collectionName: string,
 	opts?: ServerStoreOpts<T>
 ) {
-	const pkField = opts?.primaryKey ?? (collectionName === 'stock_counts' ? 'stockItemId' : 'id');
+	const pkField = opts?.primaryKey ?? 'id';
 	const sortFn = opts?.sort;
 
 	let docs = $state<T[]>([]);

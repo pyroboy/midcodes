@@ -3,6 +3,7 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { formatPeso, formatTimeAgo, formatDisplayId, cn } from '$lib/utils';
 	import type { Order, MenuItem } from '$lib/types';
+	import { playSound } from '$lib/utils/audio';
 
 	// ── Live timer (60s interval — time filters and "opened X ago" don't need per-second precision) ──
 	let now = $state(Date.now());
@@ -187,6 +188,7 @@
 	let itemNote = $state('');
 
 	function openOrderModal(order: Order) {
+		playSound('click');
 		selectedOrder = order;
 		tempOrderNotes = order.notes ?? '';
 		editingOrderNotes = false;
@@ -199,6 +201,7 @@
 
 	function confirmAddItem() {
 		if (selectedOrder && selectedMenuItem) {
+			playSound('success');
 			addItemToOrder(selectedOrder.id, selectedMenuItem, 1, undefined, false, itemNote);
 			selectedMenuItem = null;
 			itemNote = '';
