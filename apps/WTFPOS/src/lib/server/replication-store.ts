@@ -307,6 +307,21 @@ const VALID_COLLECTIONS = new Set([
 
 const stores = new Map<string, CollectionStore>();
 
+// ── Startup banner (once per process, survives HMR re-evaluations) ───────────
+const _global = globalThis as any;
+if (!_global.__wtfpos_db_banner) {
+	_global.__wtfpos_db_banner = true;
+	log.banner(
+		'',
+		'  🟢  SERVER STARTED  🟢',
+		'',
+		`  In-memory replication store initialized`,
+		`  ${VALID_COLLECTIONS.size} collections registered`,
+		`  ${new Date().toLocaleString('en-PH')}`,
+		''
+	);
+}
+
 export function getCollectionStore(name: string): CollectionStore | null {
 	if (!VALID_COLLECTIONS.has(name)) return null;
 	if (!stores.has(name)) stores.set(name, new CollectionStore(name));
@@ -363,12 +378,38 @@ export function subscribeBroadcast(fn: BroadcastListener): () => void {
 
 export function emitBroadcast(signal: string) {
 	if (signal === 'RESET_ALL') {
-		log.warn('ReplicationStore', 'RESET_ALL — clearing all stores and bumping epoch');
 		for (const store of stores.values()) {
 			store.clear();
 		}
+		_totalDocs = 0;
+		_lastSummaryTotal = 0;
+		_lastPushAt = null;
 		// Bump epoch so clients that reconnect later detect the reset
 		import('./epoch').then(m => m.bumpServerEpoch()).catch(() => {});
+
+		log.banner(
+			'',
+			'  🔥  DATABASE RESET  🔥',
+			'',
+			`  All ${VALID_COLLECTIONS.size} collections cleared`,
+			`  Epoch bumped — clients will resync`,
+			`  ${new Date().toLocaleString('en-PH')}`,
+			''
+		);
+	}
+	if (signal === 'SERVER_READY') {
+		const { total, collections } = getServerStoreSummary();
+		const colSummary = Object.entries(collections).map(([k, v]) => `${k}:${v}`).join(' ');
+		log.banner(
+			'',
+			'  ✅  SERVER READY  ✅',
+			'',
+			`  ${total} docs across ${Object.keys(collections).length} collections`,
+			`  ${colSummary}`,
+			`  Clients may now sync`,
+			`  ${new Date().toLocaleString('en-PH')}`,
+			''
+		);
 	}
 	for (const fn of broadcastListeners) {
 		try { fn(signal); } catch { /* noop */ }

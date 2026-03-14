@@ -17,6 +17,7 @@
     let resettingAll = $state(false);
 
     async function resetAllDevices() {
+        if (!import.meta.env.DEV) { alert('Database reset is only available in dev mode.'); return; }
         if (!confirm('This will clear the database on ALL connected devices and re-seed. Continue?')) return;
         resettingAll = true;
         try {

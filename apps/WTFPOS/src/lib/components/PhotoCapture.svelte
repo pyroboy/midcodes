@@ -66,7 +66,9 @@
 </script>
 
 <div class="flex flex-col gap-2">
-	<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">{label}</span>
+	{#if label}
+		<span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">{label}</span>
+	{/if}
 
 	<!-- Thumbnails + Add button -->
 	<div class="flex flex-wrap gap-2">
@@ -95,12 +97,12 @@
 				onclick={openPicker}
 				class={cn(
 					'flex h-16 w-16 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed transition-colors',
-					'border-gray-200 text-gray-400 hover:border-accent hover:text-accent hover:bg-accent-light'
+					'border-accent/40 text-accent bg-accent/5 hover:border-accent hover:bg-accent-light'
 				)}
 			>
-				<Camera class="w-4 h-4" />
-				<span class="text-[9px] font-medium">
-					{photos.length === 0 ? 'Add' : `${photos.length}/${max}`}
+				<Camera class="w-5 h-5" />
+				<span class="text-[9px] font-bold">
+					{photos.length === 0 ? 'ID Photo' : `${photos.length}/${max}`}
 				</span>
 			</button>
 		{/if}

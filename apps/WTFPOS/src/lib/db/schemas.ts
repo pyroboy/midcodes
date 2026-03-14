@@ -72,7 +72,7 @@ export const floorElementSchema: RxJsonSchema<any> = {
 // ─── Order ───────────────────────────────────────────────────────────────────
 export const orderSchema: RxJsonSchema<any> = {
 	title: 'order schema',
-	version: 13,
+	version: 14,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {
@@ -123,7 +123,9 @@ export const orderSchema: RxJsonSchema<any> = {
 				properties: {
 					// v12+ canonical fields
 					pax:      { type: 'number' },
+					names:    { type: 'array', items: { type: 'string' } },
 					ids:      { type: 'array', items: { type: 'string' } },
+					tins:     { type: 'array', items: { type: 'string' } },
 					idPhotos: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
 					// legacy fields (v10/v11 — kept optional for backwards compat)
 					discountPax:      { type: 'number' },

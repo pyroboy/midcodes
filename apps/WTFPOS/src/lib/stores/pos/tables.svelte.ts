@@ -8,6 +8,7 @@ import { log } from '$lib/stores/audit.svelte';
 import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 import { createStore } from '$lib/stores/create-store.svelte';
 import { getWritableCollection } from '$lib/db/write-proxy';
+import { recordGuardEvent } from '$lib/stores/guard.svelte';
 import { browser } from '$app/environment';
 
 const FLOOR_POSITIONS = [
@@ -44,7 +45,19 @@ export const tables = {
 export async function openTable(tableId: string, pax: number = 4, packageName?: string, childPax: number = 0, freePax: number = 0, scCount: number = 0, pwdCount: number = 0): Promise<string> {
 	if (isWarehouseSession()) return '';
 	const table = tables.value.find((t) => t.id === tableId);
-	if (!table || table.status !== 'available') return table?.currentOrderId ?? '';
+	if (!table || table.status !== 'available') {
+		if (table && table.status !== 'available') {
+			recordGuardEvent({
+				type: 'table-unavailable',
+				layer: 'client',
+				tableId,
+				tableLabel: table.label,
+				existingOrderId: table.currentOrderId,
+				reason: `Table ${table.label} is ${table.status} — cannot open (pre-check)`,
+			});
+		}
+		return table?.currentOrderId ?? '';
+	}
 
 	const tablesCol = getWritableCollection('tables');
 	const ordersCol = getWritableCollection('orders');
@@ -61,7 +74,15 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 
 	// If the server guard blocked this (table already occupied), return the existing order
 	if (patchResult?.guarded && patchResult?.document?.currentOrderId) {
-		console.warn(`[openTable] Server blocked: table ${tableId} already occupied with order ${patchResult.document.currentOrderId}`);
+		recordGuardEvent({
+			type: 'duplicate-occupancy',
+			layer: 'write-api',
+			tableId,
+			tableLabel: table.label,
+			existingOrderId: patchResult.document.currentOrderId,
+			attemptedOrderId: orderId,
+			reason: `Table ${table.label} already occupied — server rejected occupancy patch`,
+		});
 		return patchResult.document.currentOrderId;
 	}
 
@@ -96,7 +117,15 @@ export async function openTable(tableId: string, pax: number = 4, packageName?: 
 
 	// If the server guard blocked the order insert, return the existing order's ID
 	if (insertResult?.guarded && insertResult?.document?.id) {
-		console.warn(`[openTable] Server blocked order insert: table ${tableId} already has order ${insertResult.document.id}`);
+		recordGuardEvent({
+			type: 'duplicate-order',
+			layer: 'write-api',
+			tableId,
+			tableLabel: table.label,
+			existingOrderId: insertResult.document.id,
+			attemptedOrderId: orderId,
+			reason: `Table ${table.label} already has an open order — server rejected insert`,
+		});
 		return insertResult.document.id;
 	}
 
@@ -110,13 +139,27 @@ export async function closeTable(tableId: string) {
 
 	const col = getWritableCollection('tables');
 	try {
-		await col.incrementalPatch(tableId, {
+		const result = await col.incrementalPatch(tableId, {
 			status: 'available',
 			sessionStartedAt: null,
 			elapsedSeconds: null,
 			currentOrderId: null,
 			billTotal: null,
 		});
+
+		// Server guard: table close blocked because order is still open/pending
+		if (result?.guarded) {
+			recordGuardEvent({
+				type: 'table-close-with-open-order',
+				layer: 'write-api',
+				tableId,
+				tableLabel: table.label,
+				existingOrderId: table.currentOrderId,
+				reason: `Table ${table.label} cannot close — order is still open`,
+			});
+			console.warn(`[closeTable] Blocked — table ${table.label} has an open order (${table.currentOrderId})`);
+			return;
+		}
 	} catch (e) {
 		console.warn(`[closeTable] Table ${tableId} not found`);
 	}

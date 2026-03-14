@@ -236,7 +236,19 @@ export async function getDb() {
 							return d;
 						},
 						// v13: added cancelReason/cancelledAt/acknowledgedBy/acknowledgedAt to items — no backfill needed
-						13: (d: any) => d
+						13: (d: any) => d,
+						// v14: added names[] and tins[] to discountEntries for BIR SC/PWD compliance (RR 7-2010 / RR 5-2017)
+						14: (d: any) => {
+							if (d.discountEntries) {
+								for (const entry of Object.values(d.discountEntries as Record<string, any>)) {
+									if (entry && typeof entry === 'object') {
+										entry.names = entry.names ?? Array.from({ length: entry.pax ?? 1 }, () => '');
+										entry.tins = entry.tins ?? Array.from({ length: entry.pax ?? 1 }, () => '');
+									}
+								}
+							}
+							return d;
+						}
 					}
 				},
 				menu_items: {

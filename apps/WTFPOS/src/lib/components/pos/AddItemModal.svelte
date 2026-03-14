@@ -6,13 +6,22 @@
     import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
     import { btScale } from '$lib/stores/bluetooth-scale.svelte';
 
+    export interface ChargeItem {
+        item: MenuItem;
+        qty: number;
+        weight?: number;
+        forceFree: boolean;
+        notes?: string;
+    }
+
     interface Props {
         order: Order;
         onclose: () => void;
-        oncharged?: (count: number) => void;
+        oncharged?: (count: number, itemNames?: string[]) => void;
+        oncharge?: (orderId: string, items: ChargeItem[]) => void;
     }
 
-    let { order, onclose, oncharged }: Props = $props();
+    let { order, onclose, oncharged, oncharge }: Props = $props();
 
     // P0-2: close-guard state — show confirm when pending items exist
     let confirmingClose = $state(false);
@@ -146,17 +155,24 @@
         }
     }
 
-    async function chargeToOrder() {
+    function chargeToOrder() {
         if (!order) return;
-        const count = pendingItems.length;
-        for (const p of pendingItems) {
+        const items: ChargeItem[] = pendingItems.map(p => {
             const noteParts = [p.isTakeout ? '[TAKEOUT]' : '', p.notes?.trim() ?? ''].filter(Boolean);
-            const notes = noteParts.length > 0 ? noteParts.join(' — ') : undefined;
-            await addItemToOrder(order.id, p.item, p.qty, p.weight, p.forceFree, notes);
-        }
+            return {
+                item: p.item,
+                qty: p.qty,
+                weight: p.weight,
+                forceFree: p.forceFree ?? false,
+                notes: noteParts.length > 0 ? noteParts.join(' — ') : undefined
+            };
+        });
+        const orderId = order.id;
         pendingItems = [];
-        oncharged?.(count);
+        // Close modal FIRST so the animation plays on the open floor plan
         onclose();
+        // Delegate DB writes + sound + animation to parent
+        oncharge?.(orderId, items);
     }
 
     function undoPending() { pendingItems = []; }

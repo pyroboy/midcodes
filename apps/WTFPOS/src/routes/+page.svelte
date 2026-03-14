@@ -166,6 +166,7 @@
 
 	let resetting = $state(false);
 	async function resetDb() {
+		if (!import.meta.env.DEV) { alert('Database reset is only available in dev mode.'); return; }
 		if (!confirm('Clear local database and reload? Data will re-sync from server.')) return;
 		resetting = true;
 		try { sessionStorage.clear(); } catch { /* noop */ }
@@ -270,17 +271,19 @@
 				>
 					System Admin
 				</button>
-				<span class="text-gray-200">·</span>
-				<button
-					onclick={resetDb}
-					disabled={resetting}
-					class="flex items-center gap-1 text-[10px] font-semibold tracking-wide text-gray-300 hover:text-status-red uppercase transition-colors disabled:opacity-50"
-					style="min-height: unset"
-					tabindex={-1}
-				>
-					<Trash2 size={10} />
-					{resetting ? 'Resetting…' : 'Reset DB'}
-				</button>
+				{#if import.meta.env.DEV}
+					<span class="text-gray-200">·</span>
+					<button
+						onclick={resetDb}
+						disabled={resetting}
+						class="flex items-center gap-1 text-[10px] font-semibold tracking-wide text-gray-300 hover:text-status-red uppercase transition-colors disabled:opacity-50"
+						style="min-height: unset"
+						tabindex={-1}
+					>
+						<Trash2 size={10} />
+						{resetting ? 'Resetting…' : 'Reset Local DB'}
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>

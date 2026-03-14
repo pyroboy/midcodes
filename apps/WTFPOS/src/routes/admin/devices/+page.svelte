@@ -246,7 +246,8 @@
 
 	let isResetting = $state(false);
 	async function handleReset() {
-		if (!confirm('WARNING: This will wipe ALL data on ALL connected devices and re-seed with mock data. Continue?')) return;
+		if (!confirm('WARNING: This will wipe ALL data on ALL connected devices. Continue?')) return;
+		if (!confirm('Are you absolutely sure? This cannot be undone.')) return;
 		isResetting = true;
 		try {
 			// 1. Tell server to clear its stores + broadcast RESET_ALL to other clients

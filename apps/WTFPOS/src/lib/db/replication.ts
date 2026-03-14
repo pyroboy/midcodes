@@ -741,6 +741,13 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 			prioritySyncDone: true
 		});
 		console.log('[Replication] Initial sync complete for all collections');
+
+		// Server: broadcast SERVER_READY so clients waiting after a reset can proceed
+		if (isServerDevice) {
+			fetch(`${serverUrl}/api/replication/server-ready`, { method: 'POST' })
+				.then(() => console.log('[Replication] SERVER_READY broadcast sent'))
+				.catch(() => console.warn('[Replication] Failed to broadcast SERVER_READY'));
+		}
 	});
 
 	// ── Auto-recovery: if priority sync hasn't completed in 15s, clear DB and reload ──
@@ -969,14 +976,107 @@ async function reportLocalCounts(db: any) {
 /**
  * Full reset: stop replication, clear sync state, delete IndexedDB, reload.
  * Called when receiving RESET_ALL broadcast OR directly from the admin UI.
+ *
+ * Server device: shows "Preparing server..." overlay, reloads immediately.
+ *   After reload, getDb() seeds → startReplication() pushes → broadcasts SERVER_READY.
+ *
+ * Client device: shows "Waiting on server..." overlay, waits for SERVER_READY
+ *   broadcast, THEN deletes local DB and reloads to sync from populated server.
  */
 export async function performFullReset() {
 	console.log('[Replication] performFullReset() — stopping replication');
 
-	// 1. Stop all active replications + SSE
-	await stopReplication();
+	const isServer = isServerBrowser();
 
-	// 2. Clear all sync-related localStorage keys
+	if (isServer) {
+		// ── SERVER: prepare immediately ──────────────────────────────────
+		showResetOverlay('server');
+		await stopReplication();
+		clearSyncKeys();
+		await deleteLocalDb();
+		console.log('[Replication] Server reloading for fresh seed...');
+		window.location.reload();
+	} else {
+		// ── CLIENT: wait for server to finish preparing ──────────────────
+		showResetOverlay('client');
+		await stopReplication();
+
+		// Listen for SERVER_READY via SSE before proceeding
+		console.log('[Replication] Client waiting for SERVER_READY broadcast...');
+		await waitForServerReady();
+
+		// Server is populated — safe to delete local DB and resync
+		updateOverlayStatus('Server ready — resyncing...');
+		clearSyncKeys();
+		await deleteLocalDb();
+		console.log('[Replication] Client reloading to sync from populated server...');
+		window.location.reload();
+	}
+}
+
+function showResetOverlay(mode: 'server' | 'client') {
+	if (typeof document === 'undefined') return;
+
+	const emoji = mode === 'server' ? '🔧' : '⏳';
+	const title = mode === 'server' ? 'PREPARING SERVER' : 'WAITING ON SERVER';
+	const subtitle = mode === 'server'
+		? 'Reseeding database and populating server store...'
+		: 'Server is resetting — your data will sync once ready...';
+
+	const overlay = document.createElement('div');
+	overlay.id = 'wtfpos-reset-overlay';
+	overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111827;color:white;gap:clamp(12px,3vw,24px);padding:24px;text-align:center';
+	overlay.innerHTML = `
+		<div style="font-size:clamp(48px,12vw,96px)">${emoji}</div>
+		<div style="font-size:clamp(28px,8vw,64px);font-weight:900;letter-spacing:2px;line-height:1.1">${title}</div>
+		<div id="wtfpos-reset-status" style="font-size:clamp(14px,3vw,24px);color:#9ca3af;max-width:90vw">${subtitle}</div>
+		<div style="margin-top:clamp(8px,2vw,20px);width:clamp(36px,8vw,64px);height:clamp(36px,8vw,64px);border:4px solid #374151;border-top-color:#f97316;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+		<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+	`;
+	document.body.appendChild(overlay);
+}
+
+function updateOverlayStatus(message: string) {
+	const el = document.getElementById('wtfpos-reset-status');
+	if (el) el.textContent = message;
+}
+
+/** Wait for SERVER_READY broadcast via a temporary SSE connection. */
+function waitForServerReady(): Promise<void> {
+	return new Promise((resolve) => {
+		// Safety timeout: don't hang forever (60s)
+		const timeout = setTimeout(() => {
+			console.warn('[Replication] SERVER_READY timeout — proceeding anyway');
+			es.close();
+			resolve();
+		}, 60_000);
+
+		const es = new EventSource(`${getServerUrl()}/api/replication/stream`);
+
+		es.addEventListener('broadcast', (event: any) => {
+			try {
+				const data = JSON.parse(event.data);
+				if (data.signal === 'SERVER_READY') {
+					console.log('[Replication] SERVER_READY received — proceeding with reset');
+					clearTimeout(timeout);
+					es.close();
+					resolve();
+				}
+			} catch { /* ignore */ }
+		});
+
+		es.onerror = () => {
+			// SSE disconnected — server might be restarting. EventSource auto-reconnects.
+			updateOverlayStatus('Server restarting — reconnecting...');
+		};
+
+		es.onopen = () => {
+			updateOverlayStatus('Connected — waiting for server to finish preparing...');
+		};
+	});
+}
+
+function clearSyncKeys() {
 	const SYNC_KEYS = [
 		'wtfpos-sync-gen',
 		'wtfpos-sync-epoch',
@@ -987,28 +1087,24 @@ export async function performFullReset() {
 		try { localStorage.removeItem(key); } catch { /* noop */ }
 	}
 	console.log('[Replication] Cleared sync localStorage keys');
+}
 
-	// 3. Delete IndexedDB and WAIT for it to complete
+async function deleteLocalDb() {
 	try {
 		const { getDb } = await import('$lib/db');
 		const db = await getDb();
 		await db.remove();
 		console.log('[Replication] RxDB database removed via db.remove()');
 	} catch {
-		// Fallback: raw IndexedDB delete with proper wait
 		console.log('[Replication] Falling back to indexedDB.deleteDatabase()');
 		await new Promise<void>((resolve) => {
 			const req = window.indexedDB.deleteDatabase('wtfpos_db');
 			req.onsuccess = () => resolve();
-			req.onerror = () => resolve(); // resolve anyway — reload will recover
+			req.onerror = () => resolve();
 			req.onblocked = () => resolve();
-			// Safety timeout: don't hang forever
 			setTimeout(resolve, 3000);
 		});
 	}
-
-	console.log('[Replication] Reloading page for fresh seed...');
-	window.location.reload();
 }
 
 /** Get the active replication state for a specific collection (for targeted reSync). */

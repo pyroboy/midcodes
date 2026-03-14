@@ -736,6 +736,20 @@ export async function deductFromStock(menuItemId: string, qty: number, tableId: 
 			updatedAt: new Date().toISOString(),
 		});
 
+		// ── Stock negativity detection (non-blocking) ──
+		// Re-read stock after the deduction write to catch race conditions
+		const postDeductionStock = getCurrentStock(item.id);
+		if (postDeductionStock < 0) {
+			import('$lib/stores/guard.svelte').then(({ recordGuardEvent }) => {
+				recordGuardEvent({
+					type: 'stock-negative',
+					layer: 'client',
+					tableId,
+					reason: `Stock for ${item.name} went negative: ${postDeductionStock}${item.unit} after deduction of ${deductQty}${item.unit}`,
+				});
+			}).catch(() => { /* guard not available */ });
+		}
+
 		// Process FIFO queue for batches
 		let remainingToDeduct = deductQty;
 		// Oldest deliveries first (assuming array is prepended via unshift, so reverse or findLast-ish)

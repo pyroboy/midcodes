@@ -151,6 +151,25 @@
 						</span>
 						<span class="whitespace-nowrap">-{formatPeso(order.discountAmount)}</span>
 					</div>
+					<!-- BIR-required: SC/PWD beneficiary details -->
+					<div class="text-[10px] text-gray-500 mt-1">
+						<span class="font-bold">VAT EXEMPT SALE</span>
+					</div>
+					{#if order.discountEntries}
+						{#each Object.entries(order.discountEntries) as [type, discEntry]}
+							{#if discEntry}
+								{#each Array.from({ length: discEntry.pax }) as _, idx}
+									<div class="text-[10px] text-gray-600 mt-0.5">
+										<span>{type === 'senior' ? 'SC' : 'PWD'}: {discEntry.names?.[idx] || '—'}</span>
+										<span class="ml-1">ID: {discEntry.ids?.[idx] || '—'}</span>
+										{#if discEntry.tins?.[idx]}
+											<span class="ml-1">TIN: {discEntry.tins[idx]}</span>
+										{/if}
+									</div>
+								{/each}
+							{/if}
+						{/each}
+					{/if}
 				{/if}
 				<div class="flex justify-between text-gray-500 text-xs">
 					<span>{hasDiscount ? 'VAT (exempt)' : 'Incl. VAT (12%)'}</span>

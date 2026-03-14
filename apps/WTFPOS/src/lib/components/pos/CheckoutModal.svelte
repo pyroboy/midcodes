@@ -9,6 +9,7 @@
     import { formatPeso, cn } from '$lib/utils';
     import ManagerPinModal from './ManagerPinModal.svelte';
     import PhotoCapture from '$lib/components/PhotoCapture.svelte';
+    import { ChevronDown, ChevronUp, Minus, Plus, X, Check, Pause, Banknote, Smartphone, Camera } from 'lucide-svelte';
 
     interface Props {
         order: Order;
@@ -29,13 +30,17 @@
     $effect(() => { if (showDiscountConfirm) { discountConfirmPin = ''; discountConfirmPinError = false; } });
     let pendingDiscountType = $state<DiscountType>('none');
 
+    // ─── Discount section expand/collapse ──────────────────────────────────────
+    let discountExpanded = $state(
+        untrack(() => (order.scCount ?? 0) > 0 || (order.pwdCount ?? 0) > 0 || Object.keys(order.discountEntries ?? {}).length > 0)
+    );
+
     // ─── Multi-method payment state ─────────────────────────────────────────
     type PaymentMethod = 'cash' | 'gcash' | 'maya';
     interface PaymentEntry { method: PaymentMethod; amount: number }
     let paymentEntries = $state<PaymentEntry[]>([{ method: 'cash', amount: 0 }]);
 
     // Reset payment amounts to 0 whenever the modal opens for a *different* order.
-    // Track the previous ID so RxDB mutations on the same order don't re-zero amounts.
     let prevOrderId = $state(order?.id);
     $effect(() => {
         const _id = order?.id;
@@ -50,6 +55,9 @@
     const totalPaid = $derived(paymentEntries.reduce((s, e) => s + (e.amount || 0), 0));
     const cashEntry = $derived(paymentEntries.find(e => e.method === 'cash'));
     const cashChange = $derived(cashEntry ? Math.max(0, (cashEntry.amount || 0) - (order.total - (totalPaid - (cashEntry.amount || 0)))) : 0);
+    const paymentProgress = $derived(order.total > 0 ? Math.min(100, (totalPaid / order.total) * 100) : 0);
+    const isFullyPaid = $derived(totalPaid >= order.total);
+    const shortAmount = $derived(Math.max(0, order.total - totalPaid));
 
     function hasMethod(m: PaymentMethod) { return paymentEntries.some(e => e.method === m); }
 
@@ -75,7 +83,6 @@
         if (hasMethod('cash')) setAmount('cash', amount);
     }
 
-    // Fill the exact remaining balance for a given e-wallet method
     function exactForMethod(m: PaymentMethod) {
         const otherTotal = paymentEntries.filter(e => e.method !== m).reduce((s, e) => s + (e.amount || 0), 0);
         setAmount(m, Math.max(0, order.total - otherTotal));
@@ -87,11 +94,7 @@
 
     // Manager PIN grace period state
     let pinGraceUntil = $state<number>(0);
-
-    // Reactive countdown for the PIN grace window (updates every second via effect)
     let pinGraceSecondsLeft = $state(0);
-    // NOTE: Do NOT use Date.now() in $derived — it's evaluated once and becomes stale.
-    // Derive from pinGraceSecondsLeft which is kept current by the setInterval below.
     const hasPinGrace = $derived(pinGraceSecondsLeft > 0);
     $effect(() => {
         if (pinGraceUntil === 0) { pinGraceSecondsLeft = 0; return; }
@@ -104,38 +107,47 @@
         return () => clearInterval(id);
     });
 
-    // Local discount state — never mutate the RxDB proxy directly.
-    // Ensure we parse the DB state into a local deep copy.
+    // Local discount state
     let localDiscountEntries = $state<Partial<Record<DiscountType, import('$lib/types').DiscountEntry>>>(
         untrack(() => {
-            if (order.discountEntries) return JSON.parse(JSON.stringify(order.discountEntries));
-            // Backwards compatibility for old discountType format
+            if (order.discountEntries) {
+                // Backfill names/tins for entries migrated from pre-v14
+                const parsed = JSON.parse(JSON.stringify(order.discountEntries));
+                for (const entry of Object.values(parsed) as any[]) {
+                    if (entry && typeof entry === 'object') {
+                        entry.names = entry.names ?? Array.from({ length: entry.pax ?? 1 }, () => '');
+                        entry.tins = entry.tins ?? Array.from({ length: entry.pax ?? 1 }, () => '');
+                    }
+                }
+                return parsed;
+            }
             if (order.discountType !== 'none') {
+                const pax = order.discountPax ?? 1;
                 return {
                     [order.discountType]: {
-                        pax: order.discountPax ?? 1,
+                        pax,
+                        names: Array.from({ length: pax }, () => ''),
                         ids: order.discountIds ?? [],
-                        idPhotos: Array.from({ length: order.discountPax ?? 1 }, (_, i) => order.discountIdPhotos?.[i] ? [order.discountIdPhotos[i]] : [])
+                        tins: Array.from({ length: pax }, () => ''),
+                        idPhotos: Array.from({ length: pax }, (_, i) => order.discountIdPhotos?.[i] ? [order.discountIdPhotos[i]] : [])
                     }
                 };
             }
-            // Auto-activate SC/PWD from table-open declaration (mutually exclusive per person)
             const auto: Partial<Record<DiscountType, import('$lib/types').DiscountEntry>> = {};
             let remaining = order.pax;
             if ((order.scCount ?? 0) > 0) {
                 const pax = Math.min(order.scCount!, remaining);
-                auto['senior'] = { pax, ids: Array.from({ length: pax }, () => ''), idPhotos: Array.from({ length: pax }, () => []) };
+                auto['senior'] = { pax, names: Array.from({ length: pax }, () => ''), ids: Array.from({ length: pax }, () => ''), tins: Array.from({ length: pax }, () => ''), idPhotos: Array.from({ length: pax }, () => []) };
                 remaining -= pax;
             }
             if ((order.pwdCount ?? 0) > 0 && remaining > 0) {
                 const pax = Math.min(order.pwdCount!, remaining);
-                auto['pwd'] = { pax, ids: Array.from({ length: pax }, () => ''), idPhotos: Array.from({ length: pax }, () => []) };
+                auto['pwd'] = { pax, names: Array.from({ length: pax }, () => ''), ids: Array.from({ length: pax }, () => ''), tins: Array.from({ length: pax }, () => ''), idPhotos: Array.from({ length: pax }, () => []) };
             }
             return auto;
         })
     );
 
-    // Auto-recalc totals on mount if SC/PWD were pre-activated
     $effect(() => {
         untrack(() => {
             if (Object.keys(localDiscountEntries).length > 0 && !order.discountEntries) {
@@ -152,35 +164,35 @@
     const hasActiveDiscount = $derived(activeScPwdTypes.length > 0);
 
     const hasItems = $derived(order.items.filter(i => i.status !== 'cancelled').length > 0);
-    
+
     const canConfirmCheckout = $derived(
         hasItems && totalPaid >= order.total &&
         activeScPwdTypes.every(type => {
             const entry = localDiscountEntries[type]!;
-            return entry.ids.length === entry.pax && entry.ids.every(id => id.trim() !== '');
+            const hasAllNames = (entry.names?.length ?? 0) >= entry.pax && entry.names.every(n => n.trim() !== '');
+            const hasAllIds = entry.ids.length >= entry.pax && entry.ids.every(id => id.trim() !== '');
+            return hasAllNames && hasAllIds;
         })
     );
 
-    // Human-readable reason why Confirm is blocked — shown as a hint above the button.
     const checkoutBlockReason = $derived.by((): string | null => {
         if (canConfirmCheckout) return null;
         if (!hasItems) return 'No active items on this order.';
-        const missingIds = activeScPwdTypes.filter(type => {
+        const missingFields = activeScPwdTypes.filter(type => {
             const entry = localDiscountEntries[type]!;
-            return entry.ids.some(id => id.trim() === '');
+            return entry.ids.some(id => id.trim() === '') || (entry.names ?? []).some(n => n.trim() === '');
         });
-        if (missingIds.length > 0) {
-            const labels = missingIds.map(t => t === 'senior' ? 'SC' : 'PWD').join(' & ');
-            return `Enter all ${labels} ID numbers above to confirm.`;
+        if (missingFields.length > 0) {
+            const labels = missingFields.map(t => t === 'senior' ? 'SC' : 'PWD').join(' & ');
+            return `Fill in ${labels} name and ID to confirm`;
         }
         if (totalPaid < order.total) {
-            return `Still short by ${formatPeso(order.total - totalPaid)} — add more payment.`;
+            return `Short by ${formatPeso(order.total - totalPaid)}`;
         }
         return null;
     });
 
     function recalcWithEntries() {
-        // Only persist entries with pax > 0 to the order — keeps receipt and totals clean
         const cleaned: typeof localDiscountEntries = {};
         for (const [k, v] of Object.entries(localDiscountEntries)) {
             if (v && v.pax > 0) cleaned[k as DiscountType] = v;
@@ -189,14 +201,15 @@
     }
 
     function applyScPwdPax(type: DiscountType, newPax: number) {
-        // SC + PWD combined must not exceed total pax
         const otherType = type === 'senior' ? 'pwd' : 'senior';
         const otherPax = localDiscountEntries[otherType as DiscountType]?.pax ?? 0;
         const maxForType = order.pax - otherPax;
         const validatedPax = Math.max(0, Math.min(newPax, maxForType));
         if (localDiscountEntries[type]) {
             localDiscountEntries[type]!.pax = validatedPax;
+            localDiscountEntries[type]!.names = Array.from({ length: validatedPax }, (_, i) => localDiscountEntries[type]!.names?.[i] ?? '');
             localDiscountEntries[type]!.ids = Array.from({ length: validatedPax }, (_, i) => localDiscountEntries[type]!.ids[i] ?? '');
+            localDiscountEntries[type]!.tins = Array.from({ length: validatedPax }, (_, i) => localDiscountEntries[type]!.tins?.[i] ?? '');
             localDiscountEntries[type]!.idPhotos = Array.from({ length: validatedPax }, (_, i) => localDiscountEntries[type]!.idPhotos[i] ?? []);
         }
         recalcWithEntries();
@@ -206,12 +219,10 @@
         recalcWithEntries();
     }
 
-    // Compute a preview of the discount amount for a given type + pax count.
-    // Used in the PIN modal description so the manager knows what they're approving.
     function previewDiscountAmount(type: DiscountType, paxCount: number): number {
         const testEntries: Partial<Record<DiscountType, import('$lib/types').DiscountEntry>> = {
             ...JSON.parse(JSON.stringify(localDiscountEntries)),
-            [type]: { pax: paxCount, ids: [], idPhotos: [] }
+            [type]: { pax: paxCount, names: [], ids: [], tins: [], idPhotos: [] }
         };
         const { discountAmount } = calculateOrderTotals({
             ...order,
@@ -226,7 +237,6 @@
     function applyDiscount(type: DiscountType) {
         if (!hasPinGrace) {
             pendingDiscountType = type;
-            // Build a human-readable description with the estimated discount amount
             if (type === 'senior' || type === 'pwd') {
                 const declared = type === 'senior' ? (order.scCount ?? 0) : (order.pwdCount ?? 0);
                 const prefillPax = Math.max(1, Math.min(declared || 1, order.pax));
@@ -257,20 +267,23 @@
             const prefillPax = Math.max(1, Math.min(declared || 1, order.pax));
             localDiscountEntries[type] = {
                 pax: prefillPax,
+                names: Array.from({ length: prefillPax }, () => ''),
                 ids: Array.from({ length: prefillPax }, () => ''),
+                tins: Array.from({ length: prefillPax }, () => ''),
                 idPhotos: Array.from({ length: prefillPax }, () => [])
             };
-            log.discountApplied(tableLabel, type, 0); // amount is logged as 0 here since recalculation happens async
+            log.discountApplied(tableLabel, type, 0);
+            discountExpanded = true;
         }
         recalcWithEntries();
     }
 
     function handlePinConfirmed() {
         showPinForDiscount = false;
-        pinGraceUntil = Date.now() + 60000; // 60-second grace period
-        
+        pinGraceUntil = Date.now() + 60000;
+
         toggleDiscountInternal(pendingDiscountType);
-        
+
         log.managerPinVerified(`${pendingDiscountType} discount`);
         pendingDiscountType = 'none';
     }
@@ -305,7 +318,6 @@
     async function finalizeCheckout() {
         if (!order) { checkoutLoading = false; return; }
 
-        // Build the payments array (only include entries with amount > 0)
         const activePayments = paymentEntries
             .filter(e => (e.amount || 0) > 0)
             .map(e => ({ method: e.method, amount: e.amount }));
@@ -337,351 +349,470 @@
         checkoutLoading = false;
         onsuccess(snapshot, actualChange, methodLabel);
     }
+
+    // ─── Method display helpers ───────────────────────────────────────────────
+    const methodMeta: Record<PaymentMethod, { label: string; color: string; activeColor: string; iconType: 'banknote' | 'phone' }> = {
+        cash:  { label: 'Cash',  color: 'border-status-green/40 text-status-green', activeColor: 'bg-status-green text-white shadow-lg shadow-status-green/20', iconType: 'banknote' },
+        gcash: { label: 'GCash', color: 'border-status-cyan/40 text-status-cyan', activeColor: 'bg-status-cyan text-white shadow-lg shadow-status-cyan/20', iconType: 'phone' },
+        maya:  { label: 'Maya',  color: 'border-status-purple/40 text-status-purple', activeColor: 'bg-status-purple text-white shadow-lg shadow-status-purple/20', iconType: 'phone' },
+    };
 </script>
 
-<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
-    <div class="w-full h-full sm:h-auto sm:max-w-[460px] sm:max-h-[95vh] flex flex-col gap-0 p-0 overflow-hidden bg-surface border border-border sm:rounded-xl shadow-2xl">
-        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-border px-4 sm:px-6 py-3 sm:py-4 shrink-0 bg-surface">
-            <div class="flex items-center gap-3">
-                <span class="text-lg font-bold text-gray-900">Checkout</span>
-                {#if order.orderType === 'takeout'}
-                    <span class="rounded-md bg-accent px-2 py-0.5 text-[10px] font-bold text-white">TAKEOUT</span>
-                {:else}
-                    <span class="text-sm font-semibold text-gray-500">{table?.label}</span>
+<!-- ═══ CHECKOUT MODAL ═══════════════════════════════════════════════════════ -->
+<div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div class="w-full h-[95vh] sm:h-auto sm:max-w-[480px] sm:max-h-[92vh] flex flex-col overflow-hidden bg-white sm:rounded-2xl shadow-2xl">
+
+        <!-- ─── HEADER ─────────────────────────────────────────────────────── -->
+        <div class="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
+                    <Banknote class="h-4 w-4 text-accent" />
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-sm font-bold text-gray-900">Checkout</span>
+                    <span class="text-[11px] text-gray-400">
+                        {#if order.orderType === 'takeout'}
+                            Takeout — {order.customerName ?? 'Walk-in'}
+                        {:else}
+                            {table?.label ?? 'Table'} · {order.pax} pax
+                        {/if}
+                    </span>
+                </div>
+            </div>
+            <button onclick={onclose} class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <X class="h-5 w-5" />
+            </button>
+        </div>
+
+        <!-- ─── SCROLLABLE CONTENT ─────────────────────────────────────────── -->
+        <div class="flex-1 overflow-y-auto">
+
+            <!-- ═══ SECTION 1: TOTAL HERO ═══════════════════════════════════ -->
+            <div class="px-5 pt-5 pb-4">
+                <!-- Total amount — big and bold -->
+                <div class="text-center">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Total Due</p>
+                    <p class="font-mono text-4xl font-extrabold text-gray-900 tracking-tight">{formatPeso(order.total)}</p>
+                </div>
+
+                <!-- Compact summary -->
+                <div class="mt-3 flex flex-col gap-1">
+                    <div class="flex items-center justify-between text-xs text-gray-500">
+                        <span>Subtotal ({order.packageId ? `${order.pax} pax` : `${order.items.filter(i => i.status !== 'cancelled').length} items`})</span>
+                        <span class="font-mono font-medium">{formatPeso(order.subtotal)}</span>
+                    </div>
+                    {#if order.packageId && ((order.childPax ?? 0) > 0 || (order.freePax ?? 0) > 0)}
+                        {@const pkgItem = order.items.find(i => i.tag === 'PKG' && i.status !== 'cancelled')}
+                        {@const adultPax = Math.max(0, order.pax - (order.childPax ?? 0) - (order.freePax ?? 0))}
+                        {#if adultPax > 0 && pkgItem}
+                            <div class="flex justify-between text-[11px] text-gray-400 font-mono pl-2">
+                                <span>{adultPax} adult × {formatPeso(pkgItem.unitPrice)}</span>
+                                <span>{formatPeso(pkgItem.unitPrice * adultPax)}</span>
+                            </div>
+                        {/if}
+                        {#if (order.childPax ?? 0) > 0 && pkgItem}
+                            <div class="flex justify-between text-[11px] text-gray-400 font-mono pl-2">
+                                <span>{order.childPax} child × {formatPeso(pkgItem.childUnitPrice ?? pkgItem.unitPrice)}</span>
+                                <span>{formatPeso((pkgItem.childUnitPrice ?? pkgItem.unitPrice) * (order.childPax ?? 0))}</span>
+                            </div>
+                        {/if}
+                        {#if (order.freePax ?? 0) > 0}
+                            <div class="flex justify-between text-[11px] text-gray-400 font-mono pl-2">
+                                <span>{order.freePax} free (&lt;5)</span>
+                                <span>-</span>
+                            </div>
+                        {/if}
+                    {/if}
+                    {#if order.discountEntries && Object.keys(order.discountEntries).length > 0 && order.discountAmount > 0}
+                        {#each Object.entries(order.discountEntries) as [type, entry]}
+                            <div class="flex justify-between text-xs text-status-green">
+                                <span>{type === 'senior' ? 'SC' : 'PWD'} 20% ({entry.pax} of {order.pax} pax)</span>
+                            </div>
+                        {/each}
+                        <div class="flex justify-between text-xs text-status-green font-bold">
+                            <span>Discount</span>
+                            <span class="font-mono">-{formatPeso(order.discountAmount)}</span>
+                        </div>
+                    {:else if order.discountType !== 'none' && order.discountAmount > 0}
+                        <div class="flex justify-between text-xs text-status-green">
+                            <span>Discount</span>
+                            <span class="font-mono font-medium">-{formatPeso(order.discountAmount)}</span>
+                        </div>
+                    {/if}
+                    <div class="flex justify-between text-[11px] text-gray-400">
+                        <span>{order.discountType === 'senior' || order.discountType === 'pwd' ? 'VAT Exempt' : 'Incl. VAT 12%'}</span>
+                        <span class="font-mono">{formatPeso(order.vatAmount)}</span>
+                    </div>
+                </div>
+
+                <!-- Payment progress bar -->
+                <div class="mt-4 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                        class={cn(
+                            'h-full rounded-full transition-all duration-300',
+                            isFullyPaid ? 'bg-status-green' : paymentProgress > 50 ? 'bg-status-yellow' : 'bg-accent'
+                        )}
+                        style="width: {paymentProgress}%"
+                    ></div>
+                </div>
+            </div>
+
+            <!-- ═══ SECTION 2: PAYMENT ══════════════════════════════════════ -->
+            <div class="px-5 pb-4">
+                <!-- Method toggle pills -->
+                <div class="flex gap-2 mb-4">
+                    {#each (['cash', 'gcash', 'maya'] as const) as method}
+                        {@const meta = methodMeta[method]}
+                        {@const active = hasMethod(method)}
+                        <button
+                            onclick={() => toggleMethod(method)}
+                            class={cn(
+                                'flex-1 flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold transition-all active:scale-[0.97]',
+                                active
+                                    ? meta.activeColor
+                                    : 'border-2 border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                            )}
+                            style="min-height: 50px"
+                        >
+                            {#if meta.iconType === 'banknote'}
+                                <Banknote class="h-4 w-4" />
+                            {:else}
+                                <Smartphone class="h-4 w-4" />
+                            {/if}
+                            {meta.label}
+                        </button>
+                    {/each}
+                </div>
+
+                <!-- Amount inputs for each active method -->
+                {#each paymentEntries as entry (entry.method)}
+                    {@const meta = methodMeta[entry.method]}
+                    <div class="mb-3 rounded-xl border border-gray-200 bg-gray-50/50 overflow-hidden">
+                        <!-- Method label + exact button -->
+                        <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                            <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">{meta.label}</span>
+                            <button
+                                onclick={() => exactForMethod(entry.method)}
+                                class="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors min-h-[36px] px-2"
+                            >
+                                Fill exact amount
+                            </button>
+                        </div>
+
+                        <!-- Amount display -->
+                        <div class="px-4 py-3">
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-lg text-gray-400 font-mono font-bold">₱</span>
+                                <input
+                                    type="number"
+                                    value={entry.amount || ''}
+                                    oninput={(e) => setAmount(entry.method, parseFloat((e.target as HTMLInputElement).value) || 0)}
+                                    class="w-full rounded-xl border border-gray-200 bg-white py-3.5 pl-9 pr-4 text-center font-mono text-2xl font-extrabold text-gray-900 focus:border-accent focus:ring-2 focus:ring-accent/20 focus:outline-none transition-all"
+                                    min="0"
+                                    placeholder="0"
+                                    inputmode="numeric"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- Preset buttons -->
+                        <div class="px-4 pb-3">
+                            {#if entry.method === 'cash'}
+                                <div class="grid grid-cols-3 gap-1.5">
+                                    {#each [500, 1000, 1500, 2000, 3000, 5000] as amount}
+                                        <button
+                                            onclick={() => selectCashPreset(amount)}
+                                            class={cn(
+                                                'rounded-lg py-2.5 font-mono text-sm font-bold transition-all active:scale-[0.97]',
+                                                entry.amount === amount
+                                                    ? 'bg-gray-900 text-white'
+                                                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
+                                            )}
+                                            style="min-height: 44px"
+                                        >
+                                            {amount >= 1000 ? `${(amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1)}K` : `₱${amount}`}
+                                        </button>
+                                    {/each}
+                                </div>
+                            {:else}
+                                <div class="grid grid-cols-3 gap-1.5">
+                                    {#each [500, 1000, 2000] as amount}
+                                        <button
+                                            onclick={() => selectEwalletPreset(entry.method, amount)}
+                                            class={cn(
+                                                'rounded-lg py-2.5 font-mono text-sm font-bold transition-all active:scale-[0.97]',
+                                                entry.amount === amount
+                                                    ? 'bg-gray-900 text-white'
+                                                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
+                                            )}
+                                            style="min-height: 44px"
+                                        >
+                                            {amount >= 1000 ? `${amount / 1000}K` : `₱${amount}`}
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                    </div>
+                {/each}
+
+                <!-- ═══ CHANGE / SHORT STATUS ═══════════════════════════════ -->
+                {#if cashEntry && cashEntry.amount > 0 && isFullyPaid}
+                    <div class="flex items-center justify-between rounded-xl bg-status-green/10 border border-status-green/25 px-5 py-4 mt-1">
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-semibold uppercase tracking-wider text-status-green/70">Cash Change</span>
+                            <span class="text-xs text-gray-500 mt-0.5">Paid {formatPeso(totalPaid)}</span>
+                        </div>
+                        <span class="font-mono text-3xl font-extrabold text-status-green">{formatPeso(cashChange)}</span>
+                    </div>
+                {:else if totalPaid > 0 && !isFullyPaid}
+                    <div class="flex items-center justify-between rounded-xl bg-status-red/5 border border-status-red/20 px-5 py-3 mt-1">
+                        <span class="text-xs font-semibold text-status-red/80">Remaining</span>
+                        <span class="font-mono text-lg font-bold text-status-red">{formatPeso(shortAmount)}</span>
+                    </div>
+                {:else if isFullyPaid && !cashEntry}
+                    <div class="flex items-center justify-center gap-2 rounded-xl bg-status-green/10 border border-status-green/25 px-5 py-3 mt-1">
+                        <Check class="h-4 w-4 text-status-green" />
+                        <span class="text-sm font-bold text-status-green">Payment Complete — {formatPeso(totalPaid)}</span>
+                    </div>
                 {/if}
             </div>
-            <button onclick={onclose} class="min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 text-lg">✕</button>
-        </div>
 
-        <div class="flex-1 overflow-y-auto flex flex-col">
-
-        <div class="flex flex-col gap-2 border-b border-border px-4 sm:px-6 py-4 bg-surface-secondary">
-            {#if order.packageId && ((order.childPax ?? 0) > 0 || (order.freePax ?? 0) > 0)}
-                {@const pkgItem = order.items.find(i => i.tag === 'PKG' && i.status !== 'cancelled')}
-                {@const adultPax = Math.max(0, order.pax - (order.childPax ?? 0) - (order.freePax ?? 0))}
-                <div class="flex flex-col gap-0.5 text-xs text-gray-500 font-mono">
-                    {#if adultPax > 0 && pkgItem}
-                        <div class="flex justify-between">
-                            <span>{adultPax} adult{adultPax !== 1 ? 's' : ''} × ₱{pkgItem.unitPrice}</span>
-                            <span>{formatPeso(pkgItem.unitPrice * adultPax)}</span>
-                        </div>
-                    {/if}
-                    {#if (order.childPax ?? 0) > 0 && pkgItem}
-                        <div class="flex justify-between">
-                            <span>{order.childPax} child{(order.childPax ?? 0) !== 1 ? 'ren' : ''} × ₱{pkgItem.childUnitPrice ?? pkgItem.unitPrice}</span>
-                            <span>{formatPeso((pkgItem.childUnitPrice ?? pkgItem.unitPrice) * (order.childPax ?? 0))}</span>
-                        </div>
-                    {/if}
-                    {#if (order.freePax ?? 0) > 0}
-                        <div class="flex justify-between text-gray-400">
-                            <span>{order.freePax} free (&lt;5)</span>
-                            <span>₱0</span>
-                        </div>
-                    {/if}
-                </div>
-            {/if}
-            <div class="flex justify-between text-sm text-gray-600">
-                <span>Subtotal ({order.packageId ? `${order.pax} pax` : `${order.items.filter(i => i.status !== 'cancelled').length} items`})</span>
-                <span class="font-mono font-semibold">{formatPeso(order.subtotal)}</span>
-            </div>
-            {#if order.discountEntries && Object.keys(order.discountEntries).length > 0 && order.discountAmount > 0}
-                {#each Object.entries(order.discountEntries) as [type, entry]}
-                    {@const discountLabel =
-                        type === 'senior' ? `Senior Citizen 20% (${entry.pax} of ${order.pax} pax)` :
-                        `PWD 20% (${entry.pax} of ${order.pax} pax)`}
-                    <div class="flex justify-between text-sm text-status-green">
-                        <span>{discountLabel}</span>
-                    </div>
-                {/each}
-                <div class="flex justify-between text-sm text-status-green font-bold border-t border-status-green/20 pt-1 mt-1">
-                    <span>Total Discount ({Object.keys(order.discountEntries).length} applied)</span>
-                    <span class="font-mono">-{formatPeso(order.discountAmount)}</span>
-                </div>
-            {:else if order.discountType !== 'none' && order.discountAmount > 0}
-                <div class="flex justify-between text-sm text-status-green">
-                    <span>Discount</span>
-                    <span class="font-mono font-semibold">-{formatPeso(order.discountAmount)}</span>
-                </div>
-            {/if}
-            <div class="flex justify-between border-t border-border pt-2 mt-1">
-                <span class="text-base font-bold text-gray-900">TOTAL</span>
-                <span class="font-mono text-2xl font-extrabold text-gray-900">{formatPeso(order.total)}</span>
-            </div>
-            <div class="flex justify-between text-xs text-gray-500 mt-1">
-                <span>{order.discountType === 'senior' || order.discountType === 'pwd' ? 'VAT Exempt' : 'Incl. VAT (12%):'}</span>
-                <span class="font-mono">{formatPeso(order.vatAmount)}</span>
-            </div>
-        </div>
-
-        <div class="flex flex-col gap-2 border-b border-border px-4 sm:px-6 py-3">
-            <span class="text-xs font-semibold text-gray-500">Discount:</span>
-            <!-- SC and PWD: primary row — most common discounts, always visible -->
-            <div class="grid grid-cols-2 gap-2">
-                {#each [
-                    { id: 'senior' as const, label: '👴 Senior Citizen (20%)', shortLabel: 'SC' },
-                    { id: 'pwd' as const, label: '♿ PWD (20%)', shortLabel: 'PWD' }
-                ] as discount}
-                    {@const entry = localDiscountEntries[discount.id]}
-                    <button
-                        onclick={() => applyDiscount(discount.id)}
-                        class={cn(
-                            'rounded-xl px-3 font-semibold transition-all text-sm min-h-[44px]',
-                            entry
-                                ? 'bg-status-green text-white shadow-md'
-                                : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
-                        )}
-                    >
-                        {discount.label}
-                        {#if entry}
-                            <span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">{entry.pax}</span>
-                        {/if}
-                    </button>
-                {/each}
-            </div>
-            {#if pinGraceSecondsLeft > 0}
-                <div class="flex items-center gap-1.5 rounded-lg bg-status-yellow/10 px-3 py-1.5 text-xs text-status-yellow font-semibold w-fit">
-                    ⏱ PIN grace: {pinGraceSecondsLeft}s remaining
-                </div>
-            {/if}
-        </div>
-
-        {#each [
-            { type: 'senior' as DiscountType, label: 'Senior Citizen', shortLabel: 'SC', declared: order.scCount ?? 0 },
-            { type: 'pwd' as DiscountType, label: 'PWD', shortLabel: 'PWD', declared: order.pwdCount ?? 0 }
-        ].filter(d => d.declared > 0 || !!localDiscountEntries[d.type]) as disc}
-            {@const entry = localDiscountEntries[disc.type]}
-            {@const currentPax = entry?.pax ?? 0}
-            {@const otherPax = localDiscountEntries[disc.type === 'senior' ? 'pwd' : 'senior']?.pax ?? 0}
-            <div class="flex flex-col gap-3 border-b border-border px-4 sm:px-6 py-4 bg-surface-secondary">
-                <!-- Qualifying pax stepper — always visible when declared -->
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-col gap-0.5">
-                        <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                            {disc.shortLabel} Qualifying Persons
-                        </span>
-                        <span class="text-[10px] text-gray-400">
-                            {#if currentPax > 0}
-                                {currentPax} of {order.pax} pax qualify for 20% discount
-                            {:else}
-                                Declared {disc.declared} {disc.shortLabel} — tap + to apply discount
-                            {/if}
-                        </span>
-                    </div>
+            <!-- ═══ SECTION 3: DISCOUNTS (COLLAPSIBLE) ══════════════════════ -->
+            <div class="border-t border-gray-100">
+                <!-- Accordion header -->
+                <button
+                    onclick={() => discountExpanded = !discountExpanded}
+                    class="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
+                    style="min-height: 44px"
+                >
                     <div class="flex items-center gap-2">
-                        <button
-                            onclick={() => {
-                                if (currentPax === 1 && entry) {
-                                    applyScPwdPax(disc.type, 0);
-                                } else if (currentPax > 1 && entry) {
-                                    applyScPwdPax(disc.type, currentPax - 1);
-                                }
-                            }}
-                            disabled={currentPax <= 0}
-                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
-                        >−</button>
-                        <span class={cn('w-8 text-center font-mono text-xl font-extrabold', currentPax > 0 ? 'text-gray-900' : 'text-gray-300')}>{currentPax}</span>
-                        <button
-                            onclick={() => {
-                                if (!entry) {
-                                    // Re-add the discount entry at 1 pax
-                                    localDiscountEntries[disc.type] = {
-                                        pax: 1,
-                                        ids: [''],
-                                        idPhotos: [[]]
-                                    };
-                                    recalcWithEntries();
-                                } else {
-                                    applyScPwdPax(disc.type, currentPax + 1);
-                                }
-                            }}
-                            disabled={currentPax >= order.pax - otherPax}
-                            class="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-30"
-                        >+</button>
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Discounts</span>
+                        {#if hasActiveDiscount}
+                            <span class="rounded-full bg-status-green/15 px-2 py-0.5 text-[10px] font-bold text-status-green">
+                                {activeScPwdTypes.length} active
+                            </span>
+                        {/if}
+                        {#if hasDeclaredScPwd && !hasActiveDiscount}
+                            <span class="rounded-full bg-status-yellow/15 px-2 py-0.5 text-[10px] font-bold text-status-yellow">
+                                SC/PWD declared
+                            </span>
+                        {/if}
                     </div>
-                </div>
-                {#if entry}
-                    <div class="flex flex-col gap-2">
-                        <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ID Numbers (required to confirm checkout)</span>
-                        {#each entry.ids as _, i}
-                            <div class="flex flex-col gap-1.5">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-20 shrink-0 text-xs font-semibold text-gray-500">
-                                        {disc.shortLabel} ID #{i + 1}
-                                    </span>
-                                    <input
-                                        type="text"
-                                        bind:value={entry.ids[i]}
-                                        oninput={() => syncDiscountIds(disc.type)}
-                                        placeholder="e.g. 12345678"
-                                        class="pos-input flex-1 text-sm"
-                                    />
+                    {#if discountExpanded}
+                        <ChevronUp class="h-4 w-4 text-gray-400" />
+                    {:else}
+                        <ChevronDown class="h-4 w-4 text-gray-400" />
+                    {/if}
+                </button>
+
+                {#if discountExpanded}
+                    <div class="px-5 pb-4">
+                        <!-- SC / PWD toggle buttons -->
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            {#each [
+                                { id: 'senior' as const, label: 'Senior Citizen 20%' },
+                                { id: 'pwd' as const, label: 'Person with Disability 20%' }
+                            ] as discount}
+                                {@const entry = localDiscountEntries[discount.id]}
+                                <button
+                                    onclick={() => applyDiscount(discount.id)}
+                                    class={cn(
+                                        'rounded-xl px-3 py-2.5 font-semibold transition-all text-sm flex items-center justify-center gap-2',
+                                        entry
+                                            ? 'bg-status-green text-white shadow-md'
+                                            : 'border-2 border-dashed border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                                    )}
+                                    style="min-height: 48px"
+                                >
+                                    <span>{discount.label}</span>
+                                    {#if entry}
+                                        <span class="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-bold">{entry.pax}</span>
+                                    {/if}
+                                </button>
+                            {/each}
+                        </div>
+
+                        {#if pinGraceSecondsLeft > 0}
+                            <div class="flex items-center gap-1.5 rounded-lg bg-status-yellow/10 px-3 py-1.5 text-[11px] text-status-yellow font-semibold mb-3">
+                                PIN grace: {pinGraceSecondsLeft}s remaining
+                            </div>
+                        {/if}
+
+                        <!-- Per-type detail sections -->
+                        {#each [
+                            { type: 'senior' as DiscountType, label: 'Senior Citizen', shortLabel: 'SC', declared: order.scCount ?? 0 },
+                            { type: 'pwd' as DiscountType, label: 'PWD', shortLabel: 'PWD', declared: order.pwdCount ?? 0 }
+                        ].filter(d => d.declared > 0 || !!localDiscountEntries[d.type]) as disc}
+                            {@const entry = localDiscountEntries[disc.type]}
+                            {@const currentPax = entry?.pax ?? 0}
+                            {@const otherPax = localDiscountEntries[disc.type === 'senior' ? 'pwd' : 'senior']?.pax ?? 0}
+                            {@const needsAttention = entry && entry.pax > 0 && (entry.ids.some(id => id.trim() === '') || (entry.names ?? []).some(n => n.trim() === ''))}
+                            <div class={cn(
+                                'rounded-xl p-4 mb-3 transition-all',
+                                needsAttention
+                                    ? 'bg-accent/5 border-2 border-accent shadow-[0_0_12px_rgba(234,88,12,0.25)] animate-border-pulse-accent'
+                                    : entry && entry.pax > 0 && entry.ids.every(id => id.trim() !== '')
+                                        ? 'bg-status-green/5 border border-status-green/30'
+                                        : 'bg-gray-50 border border-gray-100'
+                            )}>
+                                <!-- Pax stepper -->
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex flex-col">
+                                        <span class={cn('text-xs font-bold', needsAttention ? 'text-accent-dark' : 'text-gray-700')}>{disc.shortLabel} Qualifying Pax</span>
+                                        <span class={cn('text-[10px]', needsAttention ? 'text-accent-dark/70' : 'text-gray-400')}>
+                                            {#if currentPax > 0}
+                                                {currentPax} of {order.pax} qualify
+                                            {:else}
+                                                Declared {disc.declared} — tap + to apply
+                                            {/if}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <button
+                                            onclick={() => {
+                                                if (currentPax === 1 && entry) applyScPwdPax(disc.type, 0);
+                                                else if (currentPax > 1 && entry) applyScPwdPax(disc.type, currentPax - 1);
+                                            }}
+                                            disabled={currentPax <= 0}
+                                            class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-25 transition-colors"
+                                        ><Minus class="h-3.5 w-3.5" /></button>
+                                        <span class={cn('w-8 text-center font-mono text-lg font-extrabold', currentPax > 0 ? 'text-gray-900' : 'text-gray-300')}>{currentPax}</span>
+                                        <button
+                                            onclick={() => {
+                                                if (!entry) {
+                                                    localDiscountEntries[disc.type] = { pax: 1, names: [''], ids: [''], tins: [''], idPhotos: [[]] };
+                                                    recalcWithEntries();
+                                                } else {
+                                                    applyScPwdPax(disc.type, currentPax + 1);
+                                                }
+                                            }}
+                                            disabled={currentPax >= order.pax - otherPax}
+                                            class="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-25 transition-colors"
+                                        ><Plus class="h-3.5 w-3.5" /></button>
+                                    </div>
                                 </div>
-                                <PhotoCapture
-                                    photos={entry.idPhotos[i] ?? []}
-                                    onchange={(photos) => {
-                                        entry.idPhotos[i] = photos;
-                                        recalcWithEntries();
-                                    }}
-                                    max={1}
-                                    label="📷 Attach ID photo"
-                                />
+
+                                <!-- Per-person fields (BIR compliance) -->
+                                {#if entry}
+                                    <div class={cn('flex flex-col gap-3 mt-3 pt-3', needsAttention ? 'border-t border-accent/20' : 'border-t border-gray-200')}>
+                                        {#each entry.ids as _, i}
+                                            {@const nameEmpty = (entry.names?.[i] ?? '').trim() === ''}
+                                            {@const idEmpty = entry.ids[i].trim() === ''}
+                                            {@const personIncomplete = nameEmpty || idEmpty}
+                                            <div class={cn(
+                                                'flex flex-col gap-1.5 rounded-lg p-2.5',
+                                                personIncomplete ? 'bg-accent/5' : 'bg-status-green/5'
+                                            )}>
+                                                <span class={cn('text-[11px] font-bold', personIncomplete ? 'text-accent-dark' : 'text-status-green')}>{disc.shortLabel} #{i + 1}</span>
+                                                <!-- Name (required) -->
+                                                <input
+                                                    type="text"
+                                                    bind:value={entry.names[i]}
+                                                    oninput={() => syncDiscountIds(disc.type)}
+                                                    placeholder="Full name *"
+                                                    class={cn(
+                                                        'w-full rounded-lg px-3 py-2 text-sm focus:outline-none transition-all',
+                                                        nameEmpty
+                                                            ? 'border-2 border-accent bg-white animate-border-pulse-accent placeholder:text-accent/60 placeholder:font-bold focus:border-accent focus:ring-2 focus:ring-accent/30'
+                                                            : 'border border-status-green/40 bg-white focus:border-status-green focus:ring-2 focus:ring-status-green/20'
+                                                    )}
+                                                />
+                                                <!-- ID + Photo (required) -->
+                                                <div class="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        bind:value={entry.ids[i]}
+                                                        oninput={() => syncDiscountIds(disc.type)}
+                                                        placeholder="{disc.shortLabel} ID number *"
+                                                        class={cn(
+                                                            'flex-1 min-w-0 rounded-lg px-3 py-2 text-sm focus:outline-none transition-all',
+                                                            idEmpty
+                                                                ? 'border-2 border-accent bg-white animate-border-pulse-accent placeholder:text-accent/60 placeholder:font-bold focus:border-accent focus:ring-2 focus:ring-accent/30'
+                                                                : 'border border-status-green/40 bg-white focus:border-status-green focus:ring-2 focus:ring-status-green/20'
+                                                        )}
+                                                    />
+                                                    <PhotoCapture
+                                                        photos={entry.idPhotos[i] ?? []}
+                                                        onchange={(photos) => {
+                                                            entry.idPhotos[i] = photos;
+                                                            recalcWithEntries();
+                                                        }}
+                                                        max={1}
+                                                        label=""
+                                                    />
+                                                </div>
+                                                <!-- TIN (optional) -->
+                                                <input
+                                                    type="text"
+                                                    bind:value={entry.tins[i]}
+                                                    oninput={() => syncDiscountIds(disc.type)}
+                                                    placeholder="TIN (optional)"
+                                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-accent focus:ring-2 focus:ring-accent/20 focus:outline-none transition-all"
+                                                />
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/if}
                             </div>
                         {/each}
                     </div>
                 {/if}
             </div>
-        {/each}
-
-        <!-- Payment method toggles + amount inputs -->
-        <div class="flex flex-col gap-3 px-4 sm:px-6 py-4">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Payment Method</span>
-                <span class="text-xs text-gray-400">Tap to add/remove</span>
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-                {#each [
-                    { id: 'cash' as const, label: '💵 Cash' },
-                    { id: 'gcash' as const, label: '📱 GCash' },
-                    { id: 'maya' as const, label: '📱 Maya' }
-                ] as method}
-                    <button
-                        onclick={() => toggleMethod(method.id)}
-                        class={cn(
-                            'flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all active:scale-95',
-                            hasMethod(method.id)
-                                ? 'bg-accent text-white shadow-md'
-                                : 'border border-border bg-surface text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                        )}
-                        style="min-height: 48px"
-                    >
-                        {method.label}
-                    </button>
-                {/each}
-            </div>
-
-            <!-- Amount inputs for each active method -->
-            {#each paymentEntries as entry (entry.method)}
-                <div class="flex flex-col gap-2 rounded-xl bg-surface-secondary border border-border p-4">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-gray-600">
-                            {entry.method === 'cash' ? '💵 Cash' : entry.method === 'gcash' ? '📱 GCash' : '📱 Maya'}
-                        </span>
-                        {#if entry.method === 'cash'}
-                            <button onclick={exactCash} class="text-xs font-semibold text-accent hover:bg-accent/10 rounded-md min-h-[44px] px-3 transition-colors shrink-0">Exact</button>
-                        {:else}
-                            <button onclick={() => exactForMethod(entry.method)} class="text-xs font-semibold text-accent hover:bg-accent/10 rounded-md min-h-[44px] px-3 transition-colors shrink-0">Exact</button>
-                        {/if}
-                    </div>
-                    <input
-                        type="number"
-                        value={entry.amount || 0}
-                        oninput={(e) => setAmount(entry.method, parseFloat((e.target as HTMLInputElement).value) || 0)}
-                        class="pos-input text-center font-mono text-xl font-bold"
-                        min="0"
-                        placeholder="0"
-                    />
-                    {#if entry.method === 'cash'}
-                        <!-- Cash preset buttons -->
-                        <div class="grid grid-cols-4 gap-1.5">
-                            {#each [20, 50, 100, 200, 500, 1000, 2000, 5000] as amount}
-                                <button
-                                    onclick={() => selectCashPreset(amount)}
-                                    class={cn(
-                                        'rounded-lg py-1.5 font-mono text-xs font-bold transition-all active:scale-95 min-h-[44px]',
-                                        entry.amount === amount
-                                            ? 'bg-accent text-white'
-                                            : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
-                                    )}
-                                >
-                                    ₱{amount.toLocaleString()}
-                                </button>
-                            {/each}
-                        </div>
-                    {:else}
-                        <!-- GCash / Maya preset buttons — common e-wallet amounts -->
-                        <div class="grid grid-cols-5 gap-1.5">
-                            {#each [100, 500, 1000, 2000, 5000] as amount}
-                                <button
-                                    onclick={() => selectEwalletPreset(entry.method, amount)}
-                                    class={cn(
-                                        'rounded-lg py-1.5 font-mono text-xs font-bold transition-all active:scale-95 min-h-[44px]',
-                                        entry.amount === amount
-                                            ? 'bg-accent text-white'
-                                            : 'border border-border bg-surface text-gray-700 hover:bg-gray-50'
-                                    )}
-                                >
-                                    ₱{amount.toLocaleString()}
-                                </button>
-                            {/each}
-                        </div>
-                    {/if}
-                </div>
-            {/each}
         </div>
 
-        <!-- Running totals — inside scroll area so they don't crowd the footer -->
-        <div class="flex flex-col gap-2 px-4 sm:px-6 py-4 border-t border-border">
-            <div class="flex items-center justify-between rounded-lg bg-surface px-3 py-2 border border-border">
-                <span class="text-sm font-semibold text-gray-600">Total Paid</span>
-                <span class={cn('font-mono text-lg font-extrabold', totalPaid >= order.total ? 'text-status-green' : 'text-gray-900')}>
-                    {formatPeso(totalPaid)}
-                </span>
-            </div>
-
-            {#if cashEntry && cashEntry.amount > 0 && totalPaid >= order.total}
-                <div class="flex items-center justify-between rounded-xl bg-status-green-light border border-status-green/20 px-4 py-3">
-                    <span class="text-sm font-semibold text-status-green">Cash Change</span>
-                    <span class="font-mono text-2xl font-extrabold text-status-green">{formatPeso(cashChange)}</span>
-                </div>
-            {:else if totalPaid > 0 && totalPaid < order.total}
-                <div class="flex items-center justify-between rounded-xl bg-status-red-light border border-status-red/20 px-4 py-2">
-                    <span class="text-xs font-semibold text-status-red">Short by {formatPeso(order.total - totalPaid)}</span>
-                </div>
-            {/if}
-        </div>
-        </div>
-
-        <div class="shrink-0 flex flex-col gap-3 px-4 sm:px-6 py-4 bg-surface border-t border-border shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-10">
+        <!-- ─── FOOTER (STICKY) ────────────────────────────────────────────── -->
+        <div class="shrink-0 border-t border-gray-100 bg-white px-5 py-4 shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
             {#if checkoutError}
-                <div class="bg-red-50 border border-red-200 rounded-xl flex flex-col items-center text-center gap-2 p-4">
-                    <p class="text-sm font-bold text-red-700">Hardware Error</p>
-                    <p class="text-sm text-red-600">{checkoutError}</p>
-                    <div class="flex gap-3 w-full mt-2">
-                        <button class="btn-secondary flex-1 border-red-200 hover:bg-red-100 text-red-700 font-semibold" onclick={skipReceipt}>Skip Receipt</button>
-                        <button class="btn-primary flex-1 bg-red-600 hover:bg-red-700" onclick={confirmCheckout}>Retry Print</button>
+                <div class="rounded-xl bg-status-red/5 border border-status-red/20 p-4 mb-3">
+                    <p class="text-sm font-bold text-status-red mb-1">Printer Error</p>
+                    <p class="text-xs text-status-red/80 mb-3">{checkoutError}</p>
+                    <div class="flex gap-2">
+                        <button onclick={skipReceipt} class="flex-1 rounded-lg border border-status-red/30 bg-white py-2.5 text-sm font-semibold text-status-red hover:bg-status-red/5 transition-colors" style="min-height: 44px">
+                            Skip Receipt
+                        </button>
+                        <button onclick={confirmCheckout} class="flex-1 rounded-lg bg-status-red py-2.5 text-sm font-bold text-white hover:bg-red-600 transition-colors" style="min-height: 44px">
+                            Retry Print
+                        </button>
                     </div>
                 </div>
             {/if}
 
             {#if checkoutBlockReason && !checkoutError}
-                <div class="flex items-center gap-2 rounded-lg bg-status-yellow/10 border border-status-yellow/30 px-3 py-2">
-                    <span class="text-status-yellow text-sm leading-none shrink-0">⚠</span>
-                    <span class="text-xs font-semibold text-yellow-700">{checkoutBlockReason}</span>
+                <div class="flex items-center justify-center rounded-lg bg-status-yellow/10 border border-status-yellow/25 px-4 py-3 mb-3">
+                    <span class="text-sm font-bold text-yellow-700">{checkoutBlockReason}</span>
                 </div>
             {/if}
 
             {#if !checkoutError}
-                <div class="flex gap-3">
+                <div class="flex gap-2.5">
+                    <!-- Hold for Manager -->
                     <button
                         onclick={onhold ?? onclose}
-                        class="btn-secondary flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 bg-white shadow-sm"
-                        style="min-height: 48px"
                         disabled={checkoutLoading}
-                        title="Pause payment entry — manager required to resume."
+                        class="flex items-center justify-center gap-1.5 rounded-xl border-2 border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-[0.97]"
+                        style="min-height: 52px"
+                        title="Pause payment — manager required to resume"
                     >
-                        ⏸ Hold for Manager
+                        <Pause class="h-4 w-4" />
+                        <span class="hidden sm:inline">Hold</span>
                     </button>
+
+                    <!-- Pending e-wallet (only when single e-wallet selected) -->
                     {#if paymentEntries.length === 1 && paymentEntries[0].method !== 'cash'}
                         <button
                             onclick={() => { holdPayment(order.id, paymentEntries[0].method === 'maya' ? 'maya' : 'gcash'); onclose(); }}
-                            class="btn-secondary flex-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
-                            style="min-height: 48px"
                             disabled={!hasItems || checkoutLoading}
-                            title="Mark order as pending e-wallet confirmation — cashier will confirm once payment clears."
+                            class="flex items-center justify-center gap-1.5 rounded-xl border-2 border-status-cyan/30 bg-white px-4 text-sm font-semibold text-status-cyan hover:bg-status-cyan/5 transition-all active:scale-[0.97] disabled:opacity-40"
+                            style="min-height: 52px"
+                            title="Await e-wallet confirmation"
                         >
-                            ⏸ Pending {paymentEntries[0].method === 'maya' ? 'Maya' : 'GCash'}
+                            <Pause class="h-4 w-4" />
+                            <span class="text-xs">Pending</span>
                         </button>
                     {/if}
+
+                    <!-- Confirm button -->
                     <button
                         onclick={() => {
                             if (order.discountAmount > 0 && !hasPinGrace) {
@@ -692,20 +823,19 @@
                         }}
                         disabled={!canConfirmCheckout || checkoutLoading}
                         class={cn(
-                            'flex flex-1 items-center justify-center gap-2 rounded-xl text-white text-base font-bold active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed',
-                            order.discountAmount > 0
-                                ? 'bg-status-green hover:bg-emerald-600'
-                                : 'bg-status-green hover:bg-emerald-600'
+                            'flex flex-1 items-center justify-center gap-2 rounded-xl text-white text-base font-bold transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed',
+                            isFullyPaid
+                                ? 'bg-status-green hover:bg-emerald-600 shadow-lg shadow-status-green/25'
+                                : 'bg-gray-300 cursor-not-allowed'
                         )}
-                        style="min-height: 48px"
+                        style="min-height: 52px"
                     >
                         {#if checkoutLoading}
-                            <span class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            <span class="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                             Printing...
-                        {:else if order.discountAmount > 0}
-                            ✓ Confirm Discount
                         {:else}
-                            ✓ Confirm Payment
+                            <Check class="h-5 w-5" />
+                            Confirm {formatPeso(order.total)}
                         {/if}
                     </button>
                 </div>
@@ -714,6 +844,7 @@
     </div>
 </div>
 
+<!-- ═══ MANAGER PIN MODAL (DISCOUNT AUTH) ════════════════════════════════════ -->
 <ManagerPinModal
     isOpen={showPinForDiscount}
     title={`Authorize ${pendingDiscountType === 'senior' ? 'Senior Citizen' : pendingDiscountType === 'pwd' ? 'PWD' : 'Discount'}`}
@@ -723,35 +854,23 @@
     onConfirm={handlePinConfirmed}
 />
 
+<!-- ═══ DISCOUNT CONFIRM + PIN MODAL ════════════════════════════════════════ -->
 {#if showDiscountConfirm}
     <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-        <div class="pos-card w-full max-w-[400px] flex flex-col gap-0 p-0 overflow-hidden max-h-[95vh] overflow-y-auto">
-            <div class="px-6 py-4 border-b border-border bg-surface">
+        <div class="w-full max-w-[400px] flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl max-h-[95vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-100">
                 <h3 class="text-lg font-bold text-gray-900">Confirm Discount</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Manager PIN required to authorize</p>
+                <p class="text-xs text-gray-400 mt-0.5">Manager PIN required to authorize</p>
             </div>
             <div class="flex flex-col gap-3 px-6 py-4">
-                <div class="flex flex-col gap-2 rounded-xl bg-surface-secondary border border-border px-4 py-3">
-                    {#if (order.scCount ?? 0) > 0}
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-semibold text-gray-700">👴 Senior Citizen</span>
-                            <span class="font-mono font-bold text-gray-900">{order.scCount} pax</span>
-                        </div>
-                    {/if}
-                    {#if (order.pwdCount ?? 0) > 0}
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-semibold text-gray-700">♿ PWD</span>
-                            <span class="font-mono font-bold text-gray-900">{order.pwdCount} pax</span>
-                        </div>
-                    {/if}
-                </div>
+                <!-- Discount summary -->
                 {#if hasActiveDiscount}
-                    <div class="flex flex-col gap-1 rounded-xl bg-status-green/10 border border-status-green/20 px-4 py-3">
+                    <div class="flex flex-col gap-1 rounded-xl bg-status-green/5 border border-status-green/15 px-4 py-3">
                         {#each activeScPwdTypes as type}
                             {@const entry = localDiscountEntries[type]!}
                             <div class="flex items-center justify-between text-sm">
                                 <span class="text-gray-700">{type === 'senior' ? 'SC' : 'PWD'} 20%</span>
-                                <span class="font-mono font-semibold text-status-green">{entry.pax} pax · −{formatPeso(order.discountAmount)}</span>
+                                <span class="font-mono font-semibold text-status-green">{entry.pax} pax · -{formatPeso(order.discountAmount)}</span>
                             </div>
                         {/each}
                     </div>
@@ -763,13 +882,13 @@
 
                 <!-- PIN dots -->
                 <div class="flex flex-col gap-2 mt-1">
-                    <span class="text-xs font-semibold text-gray-500 text-center">Enter Manager PIN</span>
+                    <span class="text-xs font-semibold text-gray-400 text-center">Enter Manager PIN</span>
                     <div class="flex justify-center gap-3">
                         {#each [0, 1, 2, 3] as idx}
                             <div class={cn(
-                                'h-4 w-4 rounded-full border-2 transition-all',
+                                'h-3.5 w-3.5 rounded-full border-2 transition-all',
                                 idx < discountConfirmPin.length
-                                    ? (discountConfirmPinError ? 'bg-status-red border-status-red' : 'bg-accent border-accent')
+                                    ? (discountConfirmPinError ? 'bg-status-red border-status-red' : 'bg-gray-900 border-gray-900')
                                     : 'border-gray-300'
                             )}></div>
                         {/each}
@@ -784,34 +903,34 @@
                     {#each [1,2,3,4,5,6,7,8,9] as num}
                         <button
                             onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) discountConfirmPin += String(num); }}
-                            class="btn-secondary h-12 text-lg font-bold"
-                            style="min-height: 48px"
+                            class="flex items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-bold text-gray-800 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                            style="min-height: 52px"
                         >{num}</button>
                     {/each}
                     <button
                         onclick={() => { discountConfirmPin = ''; discountConfirmPinError = false; }}
-                        class="btn-ghost h-12 text-sm"
-                        style="min-height: 48px"
+                        class="flex items-center justify-center rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
+                        style="min-height: 52px"
                     >Clear</button>
                     <button
                         onclick={() => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) discountConfirmPin += '0'; }}
-                        class="btn-secondary h-12 text-lg font-bold"
-                        style="min-height: 48px"
+                        class="flex items-center justify-center rounded-xl border border-gray-200 bg-white text-lg font-bold text-gray-800 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                        style="min-height: 52px"
                     >0</button>
                     <button
                         onclick={() => { discountConfirmPin = discountConfirmPin.slice(0, -1); discountConfirmPinError = false; }}
-                        class="btn-ghost h-12 text-sm"
-                        style="min-height: 48px"
-                    >⌫</button>
+                        class="flex items-center justify-center rounded-xl text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+                        style="min-height: 52px"
+                    >&#9003;</button>
                 </div>
             </div>
-            <div class="flex gap-3 px-6 py-4 border-t border-border bg-surface">
+            <div class="flex gap-3 px-6 py-4 border-t border-gray-100">
                 <button
                     onclick={() => { showDiscountConfirm = false; }}
-                    class="btn-secondary flex-1"
+                    class="flex-1 rounded-xl border-2 border-gray-200 bg-white py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
                     style="min-height: 48px"
                 >
-                    ← Go Back
+                    Go Back
                 </button>
                 <button
                     onclick={() => {
@@ -821,10 +940,11 @@
                         confirmCheckout();
                     }}
                     disabled={discountConfirmPin.length !== 4}
-                    class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-base font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-status-green text-white text-sm font-bold hover:bg-emerald-600 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     style="min-height: 48px"
                 >
-                    ✓ Proceed
+                    <Check class="h-4 w-4" />
+                    Proceed
                 </button>
             </div>
         </div>

@@ -62,6 +62,7 @@ export default {
 				'border-pulse-red': 'borderPulseRed 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 				'border-pulse-yellow': 'borderPulseYellow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 				'border-pulse-bluetooth': 'borderPulseBluetooth 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'border-pulse-accent': 'borderPulseAccent 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 			},
 			keyframes: {
 				borderPulseRed: {
@@ -75,6 +76,10 @@ export default {
 				borderPulseBluetooth: {
 					'0%, 100%': { borderColor: 'rgba(59, 130, 246, 1)' }, // blue-500
 					'50%': { borderColor: 'rgba(59, 130, 246, 0.3)' },
+				},
+				borderPulseAccent: {
+					'0%, 100%': { borderColor: 'rgba(234, 88, 12, 1)', boxShadow: '0 0 12px rgba(234, 88, 12, 0.25)' }, // accent orange
+					'50%': { borderColor: 'rgba(234, 88, 12, 0.4)', boxShadow: '0 0 4px rgba(234, 88, 12, 0.1)' },
 				}
 			}
 		}

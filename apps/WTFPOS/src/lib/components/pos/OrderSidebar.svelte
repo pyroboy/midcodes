@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { slide } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import type { Table, Order } from '$lib/types';
 	import { formatPeso, formatTimeAgo, cn } from '$lib/utils';
 	import { menuItems, printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus, getRefillCount } from '$lib/stores/pos.svelte';
@@ -12,6 +14,7 @@
 		order: Order | undefined;
 		table: Table | null;
 		hasTakeoutOrders?: boolean;
+		newItemIds?: Set<string>;
 		onclose: () => void;
 		onadditem: () => void;
 		onrefill: () => void;
@@ -44,6 +47,7 @@
 		onmerge,
 		onattachtakeout,
 		hasTakeoutOrders = false,
+		newItemIds = new Set(),
 		oncanceltable,
 		pendingRejections = [],
 		onacknowledgeRejection,
@@ -53,6 +57,16 @@
 	let showMoreActions = $state(false);
 	let sidesExpanded = $state(false);
 	let confirmCancel = $state(false);
+
+	// Auto-expand sides during charge animation, collapse after delay
+	let _sidesCollapseTimer: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => {
+		if (newItemIds.size > 0) {
+			sidesExpanded = true;
+			if (_sidesCollapseTimer) clearTimeout(_sidesCollapseTimer);
+			_sidesCollapseTimer = setTimeout(() => { sidesExpanded = false; }, 3000);
+		}
+	});
 
 	// Grace period item removal state
 	let removePinItemId = $state<string | null>(null);
@@ -250,10 +264,12 @@
 <!-- Shared item row snippet — used in AYCE grouped sections and non-AYCE flat list -->
 {#snippet itemRow(item: Order['items'][number], dimmed = false)}
 	{@const badge = itemBadge(item)}
+	{@const isNew = newItemIds.has(item.id)}
 	<div class={cn(
-		'flex items-start justify-between py-2.5',
+		'flex items-start justify-between py-2.5 transition-all',
 		item.status === 'cancelled' && 'opacity-40',
-		dimmed && 'opacity-40'
+		dimmed && 'opacity-40',
+		isNew && 'charge-item-flash'
 	)}>
 		<div class="flex flex-col gap-0.5 flex-1 min-w-0 pr-2">
 			<div class="flex items-center gap-1.5 flex-wrap">
@@ -357,7 +373,7 @@
 						{/if}
 					{/if}
 				</div>
-				<button onclick={onclose} class="flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-gray-600">✕</button>
+				<button onclick={onclose} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gray-100 lg:bg-transparent text-gray-500 lg:text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors text-lg font-bold">✕</button>
 			</div>
 
 			{#if order.orderType === 'takeout'}
@@ -390,7 +406,7 @@
 				<div class="text-sm font-semibold text-gray-700">{order.packageName}</div>
 				{#if refillCount > 0}
 					<span class="inline-flex items-center gap-1 rounded-full bg-status-green/10 px-2 py-0.5 text-[11px] font-semibold text-status-green">
-						🔄 {refillCount} refill{refillCount === 1 ? '' : 's'}
+						{refillCount} refill{refillCount === 1 ? '' : 's'}
 					</span>
 				{/if}
 			{/if}
@@ -400,21 +416,21 @@
 				<div class="flex gap-2">
 					<button
 						onclick={onrefill}
-						class="flex-[2] rounded-xl bg-accent text-sm font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
+						class="flex-[2] rounded-xl bg-accent text-lg font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
 						style="min-height: 56px"
 					>
-						🔄 Refill
+						Refill
 					</button>
 					<button
 						onclick={onadditem}
-						class="flex-1 rounded-xl border-2 border-accent bg-accent-light px-4 text-sm font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
+						class="flex-1 rounded-xl border-2 border-accent bg-accent-light px-4 text-lg font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
 						style="min-height: 56px"
 					>
 						Add Item
 					</button>
 				</div>
 			{:else if order.status === 'open'}
-				<button onclick={onadditem} class="btn-primary w-full text-sm" style="min-height: 44px">+ Add Item</button>
+				<button onclick={onadditem} class="btn-primary w-full text-lg" style="min-height: 56px">+ Add Item</button>
 			{/if}
 		</div>
 
@@ -515,9 +531,11 @@
 								<span class="text-[10px] text-gray-400">{sidesExpanded ? '▲ hide' : '▼ show'}</span>
 							</button>
 							{#if sidesExpanded}
-								{#each groupedItems.liveSides as item (item.id)}
-									{@render itemRow(item, true)}
-								{/each}
+								<div transition:slide={{ duration: 300, easing: cubicOut }}>
+									{#each groupedItems.liveSides as item (item.id)}
+										{@render itemRow(item, true)}
+									{/each}
+								</div>
 							{/if}
 						{/if}
 
@@ -688,4 +706,31 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	.charge-item-flash {
+		animation: itemSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both,
+		           itemHighlight 1.5s ease-out 0.15s both;
+	}
+
+	@keyframes itemSlideIn {
+		from {
+			opacity: 0;
+			transform: translateX(-12px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(0);
+		}
+	}
+
+	@keyframes itemHighlight {
+		0% {
+			background-color: rgba(234, 88, 12, 0.15);
+		}
+		100% {
+			background-color: transparent;
+		}
+	}
+</style>
 

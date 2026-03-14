@@ -6,7 +6,8 @@
 	import { getSseConnectionState } from '$lib/stores/server-store.svelte';
 	import { APP_VERSION, BUILD_DATE } from '$lib/version';
 	import { cn } from '$lib/utils';
-	import { Wifi, WifiOff, Radio, Server, Smartphone, RefreshCw, ChevronDown, ChevronUp, X, Rss, Users, Monitor, Tablet } from 'lucide-svelte';
+	import { guardEvents, markAllSeen, clearGuardEvents, type GuardEvent } from '$lib/stores/guard.svelte';
+	import { Wifi, WifiOff, Radio, Server, Smartphone, RefreshCw, ChevronDown, ChevronUp, X, Rss, Users, Monitor, Tablet, ShieldAlert, Trash2 } from 'lucide-svelte';
 	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
 
@@ -16,6 +17,10 @@
 	const sseState = $derived(usesSse ? getSseConnectionState() : 'disconnected');
 	let showPanel = $state(false);
 	let showCollectionDetail = $state(false);
+	let showGuardLog = $state(false);
+
+	const guardCount = $derived(guardEvents.unseenCount);
+	const hasGuardEvents = $derived(guardEvents.value.length > 0);
 
 	const tierLabel = $derived(
 		connectionState.connectivityTier === 'full' ? 'Online' :
@@ -334,7 +339,7 @@
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 {#if isLoggedIn}
 	<button
-		onclick={() => { showPanel = !showPanel; if (showPanel) checkSync(); }}
+		onclick={() => { showPanel = !showPanel; if (showPanel) { checkSync(); markAllSeen(); } }}
 		class={cn(
 			'fixed top-2.5 right-3 z-50 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold text-white shadow-md transition-all active:scale-95',
 			pillColor
@@ -348,6 +353,12 @@
 			connectionState.connectivityTier !== 'full' && 'animate-pulse'
 		)}></span>
 		<span>Live</span>
+		<!-- Guard event red dot -->
+		{#if guardCount > 0}
+			<span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-status-red text-[8px] font-black text-white ring-2 ring-white animate-pulse">
+				{guardCount > 9 ? '9+' : guardCount}
+			</span>
+		{/if}
 	</button>
 
 	<!-- ─── Live Status Panel ──────────────────────────────────────────── -->
@@ -619,6 +630,104 @@
 								</tbody>
 							</table>
 						</div>
+					{/if}
+				</div>
+
+				<!-- ─── Guard Log ─────────────────────────────────── -->
+				<div class="border-t border-gray-100"></div>
+				<div>
+					<div class="flex items-center justify-between mb-2">
+						<div class="flex items-center gap-1.5">
+							<h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Guard Log</h4>
+							{#if guardEvents.value.length > 0}
+								<span class={cn(
+									'rounded-full px-1.5 py-0.5 text-[9px] font-bold',
+									guardCount > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+								)}>
+									{guardEvents.value.length}
+								</span>
+							{/if}
+						</div>
+						<div class="flex items-center gap-1">
+							{#if guardEvents.value.length > 0}
+								<button
+									onclick={() => clearGuardEvents()}
+									class="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-red-500 transition-colors"
+									style="min-height: unset"
+									title="Clear all guard events"
+								>
+									<Trash2 class="h-3 w-3" />
+								</button>
+							{/if}
+							<button
+								onclick={() => showGuardLog = !showGuardLog}
+								class="flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-accent transition-colors"
+								style="min-height: unset"
+							>
+								<ShieldAlert class="h-3 w-3" />
+								{showGuardLog ? 'Hide' : 'Show'}
+							</button>
+						</div>
+					</div>
+
+					{#if !hasGuardEvents}
+						<p class="text-[10px] text-gray-400 italic">No guard events this session</p>
+					{:else if showGuardLog}
+						<div class="max-h-52 overflow-y-auto rounded-lg border border-gray-100">
+							{#each guardEvents.value as event (event.id)}
+								{@const layerColor = event.layer === 'replication' ? 'bg-purple-100 text-purple-700'
+									: event.layer === 'write-api' ? 'bg-blue-100 text-blue-700'
+									: 'bg-amber-100 text-amber-700'}
+								{@const typeIcon = event.type === 'duplicate-order' ? '🔁'
+									: event.type === 'duplicate-occupancy' ? '🪑'
+									: event.type === 'orphan-auto-healed' ? '🧹'
+									: event.type === 'stock-negative' ? '📉'
+									: event.type === 'table-close-with-open-order' ? '🔒'
+									: '🚫'}
+								<div class={cn(
+									'border-b border-gray-50 last:border-0 px-2.5 py-2',
+									!event.seen && 'bg-red-50/50'
+								)}>
+									<div class="flex items-start gap-2">
+										<span class="text-xs mt-0.5 shrink-0">{typeIcon}</span>
+										<div class="min-w-0 flex-1">
+											<div class="flex items-center gap-1.5 flex-wrap">
+												<span class={cn('rounded px-1 py-0.5 text-[8px] font-bold uppercase', layerColor)}>
+													{event.layer}
+												</span>
+												<span class="text-[10px] font-bold text-gray-800">{event.tableLabel}</span>
+												{#if !event.seen}
+													<span class="inline-block h-1.5 w-1.5 rounded-full bg-status-red"></span>
+												{/if}
+											</div>
+											<p class="text-[10px] text-gray-600 mt-0.5 leading-relaxed">{event.reason}</p>
+											<div class="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+												<span>{new Date(event.timestamp).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+												<span>·</span>
+												<span>{event.user}</span>
+												{#if event.existingOrderId}
+													<span>·</span>
+													<span class="font-mono">existing:{event.existingOrderId.slice(0, 8)}</span>
+												{/if}
+											</div>
+										</div>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<!-- Collapsed summary -->
+						<button
+							onclick={() => showGuardLog = true}
+							class="w-full flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-[11px] text-gray-500 hover:bg-gray-50 transition-colors"
+							style="min-height: unset"
+						>
+							<span class="flex items-center gap-1.5">
+								<ShieldAlert class="h-3.5 w-3.5 text-gray-400" />
+								{guardEvents.value.length} guard event{guardEvents.value.length !== 1 ? 's' : ''} this session
+							</span>
+							<ChevronDown class="h-3.5 w-3.5" />
+						</button>
 					{/if}
 				</div>
 

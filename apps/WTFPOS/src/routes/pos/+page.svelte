@@ -3,6 +3,7 @@
     import { getPendingRejectionsForTable, acknowledgeAlert, getUnacknowledgedAlerts, type KitchenAlert } from '$lib/stores/alert.svelte';
     import type { Table, MenuItem, Order } from '$lib/types';
     import AlertBanner from '$lib/components/AlertBanner.svelte';
+    import ChargeAnimation from '$lib/components/pos/ChargeAnimation.svelte';
     import TransferTableModal from '$lib/components/pos/TransferTableModal.svelte';
     import PackageChangeModal from '$lib/components/pos/PackageChangeModal.svelte';
     import SplitBillModal from '$lib/components/pos/SplitBillModal.svelte';
@@ -33,6 +34,80 @@
     import { browser } from '$app/environment';
 
     let showLegend = $state(false);
+
+    // ─── Auto-select latest opened table on desktop/iPad ──────────────────────
+    // On lg+ screens the sidebar is always visible, so passively show the latest bill.
+    let isDesktopView = $state(browser ? window.matchMedia('(min-width: 1024px)').matches : false);
+
+    onMount(() => {
+        const mq = window.matchMedia('(min-width: 1024px)');
+        const handler = (e: MediaQueryListEvent) => { isDesktopView = e.matches; };
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    });
+
+    $effect(() => {
+        if (!isDesktopView) return;
+        if (selectedTableId || selectedTakeoutId) return;
+        if (session.locationId === 'all' || isWarehouseSession()) return;
+
+        // Find the most recently opened occupied table
+        const occupiedTables = tables.filter(t => t.status !== 'available' && t.status !== 'maintenance' && t.currentOrderId);
+        if (occupiedTables.length === 0) return;
+
+        let latestTable: Table | null = null;
+        let latestTime = '';
+        for (const t of occupiedTables) {
+            const order = orders.find(o => o.id === t.currentOrderId);
+            if (order && order.createdAt > latestTime) {
+                latestTime = order.createdAt;
+                latestTable = t;
+            }
+        }
+
+        if (latestTable) {
+            selectedTableId = latestTable.id;
+        }
+    });
+
+    // ─── Subtle audio + vibrate when an open table's order is updated externally ──
+    // (e.g. dispatch bumps, weigh station weighs, stove marks done)
+    let _tableUpdateCtx: AudioContext | null = null;
+    let _prevOrderSnapshots = new Map<string, string>(); // orderId → updatedAt
+
+    function tableUpdatePing() {
+        try {
+            if (!_tableUpdateCtx) _tableUpdateCtx = new AudioContext();
+            const osc = _tableUpdateCtx.createOscillator();
+            const gain = _tableUpdateCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 660;
+            gain.gain.setValueAtTime(0.06, _tableUpdateCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, _tableUpdateCtx.currentTime + 0.12);
+            osc.connect(gain).connect(_tableUpdateCtx.destination);
+            osc.start();
+            osc.stop(_tableUpdateCtx.currentTime + 0.12);
+        } catch { /* audio not available */ }
+        if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    // Watch open orders for external updates (updatedAt changes we didn't cause)
+    $effect(() => {
+        const openOrders = orders.filter(o => o.status === 'open');
+        const prev = _prevOrderSnapshots;
+        let pinged = false;
+        for (const o of openOrders) {
+            const last = prev.get(o.id);
+            if (last && last !== o.updatedAt && !pinged) {
+                tableUpdatePing();
+                pinged = true;
+            }
+        }
+        // Rebuild snapshot map
+        const next = new Map<string, string>();
+        for (const o of openOrders) next.set(o.id, o.updatedAt);
+        _prevOrderSnapshots = next;
+    });
 
     // P0-5: Redirect kitchen role away from POS to their intended page
     onMount(() => {
@@ -177,14 +252,109 @@
     let receiptChange = $state(0);
     let receiptMethod = $state('');
 
-    // ─── Kitchen Charge Toast ────────────────────────────────────────────────
+    // ─── Kitchen Charge — sound + cascading badges on floor plan ────────────
     let kitchenToastCount = $state(0);
     let kitchenToastTimer: ReturnType<typeof setTimeout> | null = null;
 
+    interface ChargeBadge { id: number; name: string; visible: boolean }
+    let chargeBadges = $state<ChargeBadge[]>([]);
+    let badgeIdCounter = 0;
+
+    // Audio context for pop sound (lives in parent so it survives modal close)
+    let _chargeAudioCtx: AudioContext | null = null;
+    function popFeedback() {
+        try {
+            if (!_chargeAudioCtx) _chargeAudioCtx = new AudioContext();
+            const osc = _chargeAudioCtx.createOscillator();
+            const gain = _chargeAudioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.15, _chargeAudioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, _chargeAudioCtx.currentTime + 0.08);
+            osc.connect(gain).connect(_chargeAudioCtx.destination);
+            osc.start();
+            osc.stop(_chargeAudioCtx.currentTime + 0.08);
+        } catch { /* audio not available */ }
+        if (navigator.vibrate) navigator.vibrate(30);
+    }
+
+    const POP_INTERVAL_MS = 60;
+
+    // Track newly charged item IDs for sidebar highlight animation (desktop)
+    let chargeNewItemIds = $state<Set<string>>(new Set());
+    let _chargeNewItemTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Called by AddItemModal — modal is already closed at this point
+    async function handleCharge(orderId: string, items: import('$lib/components/pos/AddItemModal.svelte').ChargeItem[]) {
+        const count = items.length;
+        kitchenToastCount = count;
+        if (kitchenToastTimer) clearTimeout(kitchenToastTimer);
+        if (_chargeNewItemTimer) clearTimeout(_chargeNewItemTimer);
+        chargeBadges = [];
+        chargeNewItemIds = new Set();
+
+        // On mobile, dismiss running bill overlay so floor is visible
+        if (!isDesktopView) closeBill();
+
+        // Snapshot existing item IDs so we can detect which are new
+        const existingIds = new Set(
+            (allOrders.value.find(o => o.id === orderId)?.items ?? []).map(i => i.id)
+        );
+
+        // Sequential: write to DB + sound + badge, one at a time with 60ms min gap
+        let lastPopTime = 0;
+        for (let i = 0; i < items.length; i++) {
+            const ci = items[i];
+            await addItemToOrder(orderId, ci.item, ci.qty, ci.weight, ci.forceFree, ci.notes);
+
+            // Ensure minimum gap between pops
+            const now = Date.now();
+            const elapsed = now - lastPopTime;
+            if (elapsed < POP_INTERVAL_MS) {
+                await new Promise(r => setTimeout(r, POP_INTERVAL_MS - elapsed));
+            }
+
+            // Sound
+            popFeedback();
+
+            // Find the newly added item ID (the one not in existingIds)
+            const currentOrder = allOrders.value.find(o => o.id === orderId);
+            if (currentOrder) {
+                for (const item of currentOrder.items) {
+                    if (!existingIds.has(item.id)) {
+                        chargeNewItemIds = new Set([...chargeNewItemIds, item.id]);
+                        existingIds.add(item.id);
+                    }
+                }
+            }
+
+            // Mobile badge (only on non-desktop)
+            if (!isDesktopView) {
+                const id = ++badgeIdCounter;
+                const name = ci.qty > 1 ? `${ci.qty}× ${ci.item.name}` : ci.item.name;
+                chargeBadges = [...chargeBadges, { id, name, visible: true }];
+            }
+
+            lastPopTime = Date.now();
+        }
+
+        // Clear animations after linger
+        kitchenToastTimer = setTimeout(() => {
+            chargeBadges = [];
+            kitchenToastCount = 0;
+        }, 2500);
+
+        _chargeNewItemTimer = setTimeout(() => {
+            chargeNewItemIds = new Set();
+        }, 3000);
+    }
+
+    // Legacy callback (kept for compat)
     function handleCharged(count: number) {
         kitchenToastCount = count;
         if (kitchenToastTimer) clearTimeout(kitchenToastTimer);
         kitchenToastTimer = setTimeout(() => { kitchenToastCount = 0; }, 2500);
+        closeBill();
     }
 
     // ─── Checkout Success Toast ────────────────────────────────────────────
@@ -538,6 +708,7 @@
                 <OrderSidebar
                     order={currentActiveOrder}
                     table={selectedTable}
+                    newItemIds={chargeNewItemIds}
                     onclose={closeBill}
                     onadditem={() => showAddItem = true}
                     onrefill={() => showRefill = true}
@@ -610,14 +781,17 @@
 </div>
 
 {#if showAddItem && currentActiveOrder}
-    <AddItemModal 
-        order={currentActiveOrder} 
+    <AddItemModal
+        order={currentActiveOrder}
         onclose={() => showAddItem = false}
-        oncharged={handleCharged}
+        oncharge={handleCharge}
     />
 {/if}
 
 <!-- P1-1: Sent to Kitchen toast -->
+<!-- Cascading item badges + summary toast -->
+<ChargeAnimation badges={chargeBadges} totalCount={kitchenToastCount} />
+
 {#if kitchenToastCount > 0}
     <div class="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 pointer-events-none">
         <div class="flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200">

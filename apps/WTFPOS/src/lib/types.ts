@@ -141,8 +141,10 @@ export interface OrderItem {
 
 export interface DiscountEntry {
 	pax: number;
-	ids: string[];
-	idPhotos: string[][];
+	names: string[];       // Full name of each SC/PWD (BIR RR 7-2010 / RR 5-2017)
+	ids: string[];         // OSCA ID / PWD ID number
+	tins: string[];        // TIN (Tax ID) — required if available per RR 5-2017
+	idPhotos: string[][];  // Photo of ID card per person
 	discountPax?: number;
 	discountIds?: string[];
 	discountIdPhotos?: string[];
