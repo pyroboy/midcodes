@@ -270,7 +270,7 @@
             {@const isSelected = selectedTableId === table.id}
             {@const isOccupied = table.status !== 'available' && table.status !== 'maintenance'}
             {@const activeItems = order?.items.filter(i => i.status !== 'cancelled' && i.tag !== 'PKG') ?? []}
-            {@const unservedCount = activeItems.filter(i => i.status !== 'served').length}
+            {@const unservedCount = activeItems.filter(i => i.status !== 'served' && !(i.status === 'cooking' && i.weight && i.weight > 0)).length}
             {@const isFullyServed = isOccupied && !!order && activeItems.length > 0 && unservedCount === 0}
             {@const hasActiveKds = !!order && activeKdsOrderIds.has(order.id)}
             {@const serveState = isFullyServed ? (hasActiveKds ? 'ready' : 'served') : null}
@@ -590,17 +590,15 @@
         50% { opacity: 0.5; }
     }
 
-    /* Big number popup — scales up then fades out */
+    /* Big number popup — font-size animation (no transform-origin issues) */
     .floor-count-popup {
-        transform-box: fill-box;
-        transform-origin: center;
         animation: floorCountPopup 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
     @keyframes floorCountPopup {
-        0% { transform: scale(0); opacity: 0; }
-        20% { transform: scale(1.4); opacity: 1; }
-        45% { transform: scale(1.1); opacity: 1; }
-        100% { transform: scale(0.6); opacity: 0; }
+        0% { font-size: 0px; opacity: 0; }
+        20% { font-size: 52px; opacity: 1; }
+        45% { font-size: 42px; opacity: 1; }
+        100% { font-size: 24px; opacity: 0; }
     }
 
     /* Badge fades in after the big popup settles */
@@ -634,18 +632,16 @@
         100% { transform: scale(0); opacity: 0; }
     }
 
-    /* Celebration: big checkmark */
+    /* Celebration: big checkmark — font-size animation */
     .floor-checkmark {
-        transform-box: fill-box;
-        transform-origin: center;
         animation: floorCheckmark 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
     @keyframes floorCheckmark {
-        0% { transform: scale(0); opacity: 0; }
+        0% { font-size: 0px; opacity: 0; }
         15% { opacity: 1; }
-        25% { transform: scale(1.3); opacity: 1; }
-        55% { transform: scale(1); opacity: 1; }
-        100% { transform: scale(0); opacity: 0; }
+        25% { font-size: 48px; opacity: 1; }
+        55% { font-size: 36px; opacity: 1; }
+        100% { font-size: 0px; opacity: 0; }
     }
 
     /* Celebration: sparkle particles bursting outward */

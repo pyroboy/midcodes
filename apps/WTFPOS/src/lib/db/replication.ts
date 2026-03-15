@@ -67,6 +67,23 @@ interface Checkpoint { id: string; updatedAt: string }
 // Store state on `window` so it survives Vite HMR module replacement.
 // Without this, HMR resets the module vars while old replication instances
 // keep running → duplicate pushes, push loops, zombie SSE connections.
+// ─── Multi-tab reset coordination ─────────────────────────────────────────
+// If user triggers "Reset All" in one tab, other tabs won't get SSE RESET_ALL
+// because only the main replication tab listens. BroadcastChannel ensures ALL
+// tabs on this device clear state and reload.
+if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+	try {
+		const resetChannel = new BroadcastChannel('wtfpos-reset');
+		resetChannel.onmessage = (event) => {
+			if (event.data === 'RESET_ALL') {
+				console.log('[Replication] RESET_ALL received via BroadcastChannel — clearing and reloading');
+				try { sessionStorage.clear(); } catch { /* noop */ }
+				window.location.reload();
+			}
+		};
+	} catch { /* BroadcastChannel unavailable — single-tab only */ }
+}
+
 const _global = (typeof window !== 'undefined' ? window : globalThis) as any;
 if (!_global.__wtfposRepl) {
 	_global.__wtfposRepl = {
@@ -1048,6 +1065,15 @@ export async function performFullReset() {
 
 	const isServer = isServerBrowser();
 
+	// Broadcast to other tabs on this device so they also clear and reload
+	try {
+		if (typeof BroadcastChannel !== 'undefined') {
+			const ch = new BroadcastChannel('wtfpos-reset');
+			ch.postMessage('RESET_ALL');
+			ch.close();
+		}
+	} catch { /* noop */ }
+
 	if (isServer) {
 		// ── SERVER: prepare immediately ──────────────────────────────────
 		showResetOverlay('server');
@@ -1056,6 +1082,7 @@ export async function performFullReset() {
 		await stopReplication();
 		clearSyncKeys();
 		await deleteLocalDb();
+		try { sessionStorage.clear(); } catch { /* noop */ }
 		console.log('[Replication] Server reloading for fresh seed...');
 		window.location.reload();
 	} else {
@@ -1071,6 +1098,7 @@ export async function performFullReset() {
 		updateOverlayStatus('Server ready — resyncing...');
 		clearSyncKeys();
 		await deleteLocalDb();
+		try { sessionStorage.clear(); } catch { /* noop */ }
 		console.log('[Replication] Client reloading to sync from populated server...');
 		window.location.reload();
 	}
@@ -1144,6 +1172,9 @@ function clearSyncKeys() {
 		'wtfpos-sync-epoch',
 		LAST_EPOCH_KEY,
 		'wtfpos_server_epoch',
+		'wtfpos_expense_templates',   // seed gate — must clear so seeder re-runs
+		'wtfpos_yield_overrides',     // stock yield config — may reference deleted items
+		'wtfpos_server_preparing',    // reset overlay flag — can get stuck
 	];
 	for (const key of SYNC_KEYS) {
 		try { localStorage.removeItem(key); } catch { /* noop */ }
@@ -1153,18 +1184,29 @@ function clearSyncKeys() {
 
 async function deleteLocalDb() {
 	try {
-		const { getDb } = await import('$lib/db');
+		const { getDb, clearDbPromise } = await import('$lib/db');
 		const db = await getDb();
+		// Close first to release IDB connections — prevents onblocked during remove
+		try { await db.close(); } catch { /* noop */ }
 		await db.remove();
-		console.log('[Replication] RxDB database removed via db.remove()');
+		clearDbPromise();
+		console.log('[Replication] RxDB database removed via db.close() + db.remove()');
 	} catch {
 		console.log('[Replication] Falling back to indexedDB.deleteDatabase()');
+		// Still null out the promise so getDb() doesn't return a dead instance
+		try {
+			const { clearDbPromise } = await import('$lib/db');
+			clearDbPromise();
+		} catch { /* noop */ }
 		await new Promise<void>((resolve) => {
 			const req = window.indexedDB.deleteDatabase('wtfpos_db');
 			req.onsuccess = () => resolve();
 			req.onerror = () => resolve();
-			req.onblocked = () => resolve();
-			setTimeout(resolve, 3000);
+			req.onblocked = () => {
+				console.warn('[Replication] IndexedDB delete blocked — open connections preventing delete');
+				resolve();
+			};
+			setTimeout(resolve, 5000);
 		});
 	}
 }

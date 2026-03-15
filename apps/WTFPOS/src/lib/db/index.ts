@@ -49,6 +49,12 @@ const globalForRxDB = globalThis as unknown as {
 
 let dbPromise: Promise<any> | null = globalForRxDB.__wtfposDbPromise || null;
 
+/** Null out the cached DB promise so getDb() creates a fresh instance on next call. */
+export function clearDbPromise() {
+	globalForRxDB.__wtfposDbPromise = null;
+	dbPromise = null;
+}
+
 // ─── Migration helpers ──────────────────────────────────────────────────────
 
 /** Backfills updatedAt from the best available timestamp on the document */
