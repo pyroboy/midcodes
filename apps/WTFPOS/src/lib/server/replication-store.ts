@@ -15,7 +15,17 @@
  */
 
 import { log } from './logger';
+import { clearTrackedClients } from './client-tracker';
 
+// ─── Reset write-lock ────────────────────────────────────────────────────────
+// During a RESET_ALL→SERVER_READY window, all incoming pushes are silently
+// dropped so stale client data can't re-populate the freshly cleared stores.
+let _isResetting = false;
+
+/** True while a database reset is in progress — pushes should be silently dropped */
+export function isResetting(): boolean {
+	return _isResetting;
+}
 
 // Primary key field per collection (most use 'id')
 const PK_FIELD: Record<string, string> = {};
@@ -287,6 +297,27 @@ class CollectionStore {
 		return hash;
 	}
 
+	/**
+	 * Patch specific fields on an existing document in-place.
+	 * Used for lightweight server-side updates (e.g. screen-state beacon).
+	 * Returns true if the doc was found and patched.
+	 */
+	patchDoc(docId: string, fields: Record<string, any>): boolean {
+		if (_isResetting) return false;
+		const current = this.docs.get(docId);
+		if (!current) return false;
+
+		const patched = { ...current, ...fields };
+		this.docs.set(docId, patched);
+		this.indexDirty = true;
+
+		this.emit({
+			documents: [patched],
+			checkpoint: { id: docId, updatedAt: patched.updatedAt }
+		});
+		return true;
+	}
+
 	clear() {
 		this.docs.clear();
 		this.sortedIndex = [];
@@ -354,6 +385,9 @@ export function recordPush(collection: string, docCount: number) {
 	_lastPushAt = new Date().toISOString();
 	_totalDocs += docCount;
 
+	// Suppress milestones during reset — the DATABASE RESET COMPLETE banner shows final totals
+	if (_isResetting) return;
+
 	// Log a summary at milestones: first push, every 500 docs, or first time a collection gets data
 	if (_lastSummaryTotal === 0 || _totalDocs - _lastSummaryTotal >= 500) {
 		_lastSummaryTotal = _totalDocs;
@@ -376,9 +410,11 @@ export function subscribeBroadcast(fn: BroadcastListener): () => void {
 
 export function emitBroadcast(signal: string) {
 	if (signal === 'RESET_ALL') {
+		_isResetting = true; // Block all writes immediately
 		for (const store of stores.values()) {
 			store.clear();
 		}
+		clearTrackedClients(); // Wipe ghost client entries
 		_totalDocs = 0;
 		_lastSummaryTotal = 0;
 		_lastPushAt = null;
@@ -387,27 +423,47 @@ export function emitBroadcast(signal: string) {
 
 		log.banner(
 			'',
-			'  🔥  DATABASE RESET  🔥',
+			'  🔥  SERVER STORES CLEARED  🔥',
 			'',
-			`  All ${VALID_COLLECTIONS.size} collections cleared`,
-			`  Epoch bumped — clients will resync`,
+			`  All ${VALID_COLLECTIONS.size} in-memory collections wiped`,
+			`  Epoch bumped — writes blocked until SERVER_READY`,
+			`  Waiting for server browser to reseed + repush...`,
 			`  ${new Date().toLocaleString('en-PH')}`,
 			''
 		);
 	}
 	if (signal === 'SERVER_READY') {
+		const wasResetting = _isResetting;
+		_isResetting = false; // Re-allow writes — server is ready
 		const { total, collections } = getServerStoreSummary();
 		const colSummary = Object.entries(collections).map(([k, v]) => `${k}:${v}`).join(' ');
-		log.banner(
-			'',
-			'  ✅  SERVER READY  ✅',
-			'',
-			`  ${total} docs across ${Object.keys(collections).length} collections`,
-			`  ${colSummary}`,
-			`  Clients may now sync`,
-			`  ${new Date().toLocaleString('en-PH')}`,
-			''
-		);
+
+		if (wasResetting) {
+			// Post-reset: fire was extinguished, database reseeded
+			log.banner(
+				'',
+				'  🔥🔥🔥  DATABASE RESET COMPLETE  🧯✅',
+				'',
+				`  ${total} docs reseeded across ${Object.keys(collections).length} collections`,
+				`  ${colSummary}`,
+				`  All fires extinguished — writes unblocked`,
+				`  Clients may now sync fresh data`,
+				`  ${new Date().toLocaleString('en-PH')}`,
+				''
+			);
+		} else {
+			// Normal startup: server populated for the first time
+			log.banner(
+				'',
+				'  ✅  SERVER READY  ✅',
+				'',
+				`  ${total} docs across ${Object.keys(collections).length} collections`,
+				`  ${colSummary}`,
+				`  Clients may now sync`,
+				`  ${new Date().toLocaleString('en-PH')}`,
+				''
+			);
+		}
 	}
 	for (const fn of broadcastListeners) {
 		try { fn(signal); } catch { /* noop */ }

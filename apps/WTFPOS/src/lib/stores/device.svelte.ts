@@ -78,6 +78,7 @@ export interface DeviceRecord {
 	buildDate: string;
 	lastSeenAt: string;
 	isOnline: boolean;
+	isScreenActive: boolean;
 	syncStatus: 'local-only' | 'syncing' | 'synced' | 'error';
 	deviceType: string;
 	screenWidth: number;
@@ -225,6 +226,7 @@ async function quickRegisterDevice() {
 		await col.incrementalPatch(deviceId, {
 			lastSeenAt: now,
 			isOnline: connectionState.isOnline,
+			isScreenActive: true,
 			locationId: session.locationId || '',
 			role: session.role || '',
 			userName: session.userName || '',
@@ -242,6 +244,7 @@ async function quickRegisterDevice() {
 			buildDate: BUILD_DATE,
 			lastSeenAt: now,
 			isOnline: connectionState.isOnline,
+			isScreenActive: true,
 			syncStatus: 'local-only',
 			deviceType: detectDeviceType(),
 			screenWidth: window.innerWidth,
@@ -277,6 +280,7 @@ async function upsertDevice() {
 		const patch: Record<string, any> = {
 			lastSeenAt: now,
 			isOnline: connectionState.isOnline,
+			isScreenActive: true,
 			locationId: session.locationId || '',
 			role: session.role || '',
 			userName: session.userName || '',
@@ -311,6 +315,7 @@ async function upsertDevice() {
 			buildDate: BUILD_DATE,
 			lastSeenAt: now,
 			isOnline: connectionState.isOnline,
+			isScreenActive: true,
 			syncStatus: 'local-only',
 			deviceType: detectDeviceType(),
 			screenWidth: window.innerWidth,
@@ -419,17 +424,17 @@ export async function initDeviceHeartbeat() {
 	enrichPromise.catch(() => {});
 
 	// ── Phase 3: Fast initial heartbeat cadence ──
-	// 5s intervals for first 30s (6 beats), then slow to 30s
+	// 3s intervals for first 30s (10 beats), then slow to 15s
 	let fastBeatCount = 0;
 	const fastHeartbeat = setInterval(async () => {
 		fastBeatCount++;
 		await upsertDevice();
 		triggerDevicesReSync();
-		if (fastBeatCount >= 6) {
+		if (fastBeatCount >= 10) {
 			clearInterval(fastHeartbeat);
-			console.log('[Device] Fast heartbeat phase complete, switching to 30s cadence');
+			console.log('[Device] Fast heartbeat phase complete, switching to 15s cadence');
 		}
-	}, 5_000);
+	}, 3_000);
 
 	// Start periodic heartbeat (leader-gated to avoid duplicate writes across tabs)
 	// Leader election requires RxDB — in non-RxDB modes, start heartbeat directly
@@ -458,11 +463,64 @@ function triggerDevicesReSync() {
 	}).catch(() => { /* replication might not be started yet */ });
 }
 
+/**
+ * Mark screen as inactive (going dark). Called on visibilitychange → hidden.
+ * Uses dual-path: fast RxDB patch + sendBeacon backup for Safari suspension.
+ */
+async function markScreenInactive() {
+	if (!browser) return;
+	const deviceId = getDeviceId();
+	const now = new Date().toISOString();
+
+	// Fast RxDB patch (2 fields only — must complete before Safari suspends)
+	try {
+		const col = getWritableCollection('devices');
+		await col.incrementalPatch(deviceId, { isScreenActive: false, updatedAt: now });
+		triggerDevicesReSync();
+	} catch { /* may not complete before suspension */ }
+
+	// Backup: sendBeacon (guaranteed delivery even during page suspension)
+	try {
+		navigator.sendBeacon('/api/device/screen-state',
+			JSON.stringify({ deviceId, isScreenActive: false }));
+	} catch { /* best effort */ }
+}
+
+/**
+ * Mark screen as active (waking up). Called on visibilitychange → visible.
+ * Fast path: minimal RxDB patch + direct server notify, then full upsert in background.
+ * This makes the admin topology update within ~200ms instead of waiting for full fingerprint.
+ */
+async function markScreenActive() {
+	if (!browser) return;
+	const deviceId = getDeviceId();
+	const now = new Date().toISOString();
+
+	// Fast RxDB patch (3 fields only — no fingerprint scan)
+	try {
+		const col = getWritableCollection('devices');
+		await col.incrementalPatch(deviceId, {
+			isScreenActive: true,
+			lastSeenAt: now,
+			updatedAt: now
+		});
+		triggerDevicesReSync();
+	} catch { /* non-fatal */ }
+
+	// Fast server notify (parallel — don't await)
+	fetch('/api/device/screen-state', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ deviceId, isScreenActive: true }),
+		keepalive: true,
+	}).catch(() => {});
+}
+
 function startPeriodicHeartbeat() {
-	// Heartbeat every 30 seconds
+	// Heartbeat every 15 seconds (doubled resolution for faster stale detection)
 	heartbeatInterval = setInterval(() => {
 		upsertDevice();
-	}, 30_000);
+	}, 15_000);
 
 	// Re-fetch identity every 5 minutes (handles DHCP IP changes)
 	identityInterval = setInterval(() => {
@@ -477,14 +535,18 @@ function startPeriodicHeartbeat() {
 	// Also prune on startup (once, after a short delay to let stores initialize)
 	setTimeout(() => pruneStaleDevices(), 10_000);
 
-	// Catch up after tab sleep/background: when the page becomes visible again,
-	// immediately fire a heartbeat so the device doesn't appear stale/offline.
+	// Screen state tracking: signal "going dark" on hide, catch up on visibility restore
 	if (typeof document !== 'undefined') {
 		document.addEventListener('visibilitychange', () => {
 			if (document.visibilityState === 'visible') {
-				console.log('[Device] Tab became visible — sending catch-up heartbeat');
-				upsertDevice();
-				triggerDevicesReSync();
+				console.log('[Device] Tab became visible — fast screen-on + background heartbeat');
+				// Fast path: flip isScreenActive immediately (~50ms)
+				markScreenActive();
+				// Background: full heartbeat with fingerprint (slow but complete)
+				upsertDevice().catch(() => {});
+			} else {
+				console.log('[Device] Tab going hidden — marking screen inactive');
+				markScreenInactive();
 			}
 		});
 	}

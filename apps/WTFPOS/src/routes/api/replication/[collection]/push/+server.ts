@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getCollectionStore, recordPush } from '$lib/server/replication-store';
+import { getCollectionStore, recordPush, isResetting } from '$lib/server/replication-store';
 import { trackClient, isLoopbackIP, recordClientSync } from '$lib/server/client-tracker';
 import { log } from '$lib/server/logger';
 import { nanoid } from 'nanoid';
@@ -508,12 +508,27 @@ function autoBumpKdsOnOrderClose(changeRows: any[], collection: string): void {
 }
 
 export const POST: RequestHandler = async ({ params, request, getClientAddress }) => {
+	const ip = getClientAddress();
+	const isServer = isLoopbackIP(ip);
+
+	// During a reset, silently drop pushes from LAN clients — they'll resync after SERVER_READY.
+	// BUT: allow pushes from the server (loopback) — after a reset+reload, the server needs to
+	// re-push its freshly seeded data to repopulate the in-memory store before broadcasting
+	// SERVER_READY. Blocking the server's own pushes creates a deadlock where the store stays
+	// empty and the "out of sync" state never resolves.
+	if (isResetting() && !isServer) {
+		log.debug('Reset', `🚫 Dropped ${params.collection} push from client ${ip} — reset in progress`);
+		return json([]);
+	}
+	// Server pushes during reset are allowed (repopulating store) — logged at trace to avoid 15× spam
+	if (isResetting() && isServer) {
+		log.trace('Reset', `📤 Server repopulating ${params.collection}`);
+	}
+
 	const store = getCollectionStore(params.collection);
 	if (!store) throw error(404, `Unknown collection: ${params.collection}`);
 
-	const ip = getClientAddress();
 	const client = trackClient(ip, request.headers.get('user-agent') || '', `push/${params.collection}`);
-	const isServer = isLoopbackIP(ip);
 	const label = isServer ? '💻 Server' : `📱 ${client.deviceHint}`;
 
 	const changeRows = await request.json();

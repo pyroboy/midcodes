@@ -7,12 +7,12 @@
 	import { formatDistanceToNow, differenceInSeconds, parseISO } from 'date-fns';
 	import { APP_VERSION, BUILD_DATE } from '$lib/version';
 	import { onMount } from 'svelte';
-	import { Monitor, Smartphone, Tablet, LayoutGrid, Network, AlertTriangle, Users, Trash2 } from 'lucide-svelte';
+	import { Monitor, Smartphone, Tablet, LayoutGrid, Network, AlertTriangle, Users, Trash2, Moon } from 'lucide-svelte';
 
-	// Auto-refresh every 10s for topology responsiveness
+	// Auto-refresh every 3s for live-feeling timestamps
 	let now = $state(new Date());
 	onMount(() => {
-		const interval = setInterval(() => { now = new Date(); }, 10_000);
+		const interval = setInterval(() => { now = new Date(); }, 3_000);
 		return () => clearInterval(interval);
 	});
 
@@ -33,6 +33,7 @@
 		currentRoute: string;
 		lastSeenAt: string;
 		isActive: boolean;
+		isScreenActive: boolean;
 		hitCount: number;
 		connectionTypes: string[];
 		lastSyncAt: string | null;
@@ -58,8 +59,8 @@
 
 	onMount(() => {
 		fetchServerClients();
-		// Fallback poll every 30s — SSE is the primary update mechanism now
-		const poll = setInterval(fetchServerClients, 30_000);
+		// Fallback poll every 10s — SSE is the primary update mechanism now
+		const poll = setInterval(fetchServerClients, 10_000);
 
 		// SSE: listen for real-time client-tracker changes
 		const es = new EventSource('/api/replication/stream');
@@ -135,33 +136,49 @@
 
 	// Status helpers — parameterized on `now` for reactivity
 	// Uses server-side client tracker as primary source of truth, falls back to RxDB heartbeat
-	function getStatusInfo(lastSeenAt: string | undefined, opts?: { deviceId?: string; ip?: string }) {
+	// Thresholds: Online <45s, Stale 45-120s, Offline >120s
+	function getStatusInfo(lastSeenAt: string | undefined, opts?: { deviceId?: string; ip?: string; isScreenActive?: boolean }) {
 		now; // reactive dependency
 		// If this is the current device, it's always online (we're literally viewing the page)
 		if (opts?.deviceId && opts.deviceId === currentDeviceId) {
 			return { status: 'online' as const, color: 'bg-status-green', label: 'Online', hex: '#10B981', seconds: 0 };
 		}
 
+		let baseStatus: { status: 'online' | 'stale' | 'offline'; color: string; label: string; hex: string; seconds: number };
+
 		// Check server-side client tracker (most accurate — updated on every HTTP request)
 		if (opts?.ip) {
 			const serverClient = serverClientsByIp.get(opts.ip);
 			if (serverClient) {
 				const serverDiff = differenceInSeconds(new Date(), parseISO(serverClient.lastSeenAt));
-				if (serverClient.isActive || serverDiff < 60) {
-					return { status: 'online' as const, color: 'bg-status-green', label: 'Online', hex: '#10B981', seconds: serverDiff };
+				if (serverClient.isActive || serverDiff < 45) {
+					baseStatus = { status: 'online', color: 'bg-status-green', label: 'Online', hex: '#10B981', seconds: serverDiff };
+				} else if (serverDiff < 120) {
+					baseStatus = { status: 'stale', color: 'bg-amber-400', label: 'Stale', hex: '#F59E0B', seconds: serverDiff };
+				} else {
+					baseStatus = { status: 'offline', color: 'bg-status-red', label: 'Offline', hex: '#EF4444', seconds: serverDiff };
 				}
-				if (serverDiff < 300) {
-					return { status: 'stale' as const, color: 'bg-amber-400', label: 'Stale', hex: '#F59E0B', seconds: serverDiff };
+
+				// Sleeping overlay: online but screen inactive
+				if (baseStatus.status === 'online' && serverClient.isScreenActive === false) {
+					return { status: 'sleeping' as const, color: 'bg-slate-400', label: 'Asleep', hex: '#94A3B8', seconds: baseStatus.seconds };
 				}
+				return baseStatus;
 			}
 		}
 
 		// Fallback: RxDB heartbeat timestamp
 		if (!lastSeenAt) return { status: 'offline' as const, color: 'bg-gray-400', label: 'Unknown', hex: '#9CA3AF', seconds: Infinity };
 		const diff = differenceInSeconds(new Date(), parseISO(lastSeenAt));
-		if (diff < 60) return { status: 'online' as const, color: 'bg-status-green', label: 'Online', hex: '#10B981', seconds: diff };
-		if (diff < 300) return { status: 'stale' as const, color: 'bg-amber-400', label: 'Stale', hex: '#F59E0B', seconds: diff };
-		return { status: 'offline' as const, color: 'bg-status-red', label: 'Offline', hex: '#EF4444', seconds: diff };
+		if (diff < 45) baseStatus = { status: 'online', color: 'bg-status-green', label: 'Online', hex: '#10B981', seconds: diff };
+		else if (diff < 120) baseStatus = { status: 'stale', color: 'bg-amber-400', label: 'Stale', hex: '#F59E0B', seconds: diff };
+		else baseStatus = { status: 'offline', color: 'bg-status-red', label: 'Offline', hex: '#EF4444', seconds: diff };
+
+		// Sleeping overlay from RxDB device record
+		if (baseStatus.status === 'online' && opts?.isScreenActive === false) {
+			return { status: 'sleeping' as const, color: 'bg-slate-400', label: 'Asleep', hex: '#94A3B8', seconds: diff };
+		}
+		return baseStatus;
 	}
 
 	/** Data freshness: how old is the device record's actual data vs just the heartbeat ping */
@@ -251,15 +268,18 @@
 		isResetting = true;
 		try {
 			// 1. Tell server to clear its stores + broadcast RESET_ALL to other clients
+			// Write-lock is set immediately — stale pushes are silently dropped
 			console.log('[Reset] Sending RESET_ALL to server...');
 			await fetch('/api/replication/reset', { method: 'POST' });
-			// Small delay to let SSE broadcast reach other clients before we reload
-			await new Promise(r => setTimeout(r, 500));
 		} catch (err) {
 			console.error('[Reset] Server reset failed:', err);
 		}
-		// 2. Reset this device: stop replication, clear sync state, delete DB, reload
-		console.log('[Reset] Performing local full reset...');
+		// 2. The SSE broadcast listener in replication.ts will call performFullReset()
+		//    automatically when it receives the RESET_ALL signal. Give it 1s to arrive.
+		//    If the SSE listener already fired (mutex acquired), this is a no-op.
+		//    If SSE is disconnected, this is the fallback.
+		await new Promise(r => setTimeout(r, 1000));
+		console.log('[Reset] Calling performFullReset() as fallback (SSE may have already triggered it)...');
 		await performFullReset();
 	}
 
@@ -371,18 +391,22 @@
 	}
 
 	/** Build status opts for a network node (IP + current device check) */
-	function nodeStatusOpts(node: NetworkNode): { deviceId?: string; ip?: string } {
+	function nodeStatusOpts(node: NetworkNode): { deviceId?: string; ip?: string; isScreenActive?: boolean } {
+		// Use the primary session's isScreenActive flag
+		const primary = node.sessions[0];
 		return {
 			deviceId: isCurrentDeviceNode(node) ? currentDeviceId : undefined,
 			ip: node.ipAddress,
+			isScreenActive: (primary as any)?.isScreenActive,
 		};
 	}
 
 	/** Build status opts for an individual session/device record */
-	function devStatusOpts(dev: { id: string; ipAddress?: string }): { deviceId?: string; ip?: string } {
+	function devStatusOpts(dev: { id: string; ipAddress?: string; isScreenActive?: boolean }): { deviceId?: string; ip?: string; isScreenActive?: boolean } {
 		return {
 			deviceId: dev.id,
 			ip: dev.ipAddress || undefined,
+			isScreenActive: dev.isScreenActive,
 		};
 	}
 
@@ -433,6 +457,7 @@
 			<!-- Legend -->
 			<div class="flex items-center gap-4 rounded-lg border border-border bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 shadow-sm">
 				<div class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-status-green"></span>Online</div>
+				<div class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>Asleep</div>
 				<div class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>Stale</div>
 				<div class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-status-red"></span>Offline</div>
 			</div>
@@ -504,11 +529,11 @@
 						<line
 							x1="400" y1="100"
 							x2={cx} y2={cy}
-							stroke={status.status === 'online' ? '#10B981' : '#F59E0B'}
+							stroke={status.status === 'online' ? '#10B981' : status.status === 'sleeping' ? '#94A3B8' : '#F59E0B'}
 							stroke-width={status.status === 'online' ? 2 : 1}
 							stroke-dasharray={status.status === 'online' ? '6 4' : '3 6'}
-							opacity={status.status === 'online' ? 0.6 : 0.35}
-							class={status.status === 'online' ? 'line-online' : 'line-stale'}
+							opacity={status.status === 'online' ? 0.6 : status.status === 'sleeping' ? 0.25 : 0.35}
+							class={status.status === 'online' ? 'line-online' : status.status === 'sleeping' ? '' : 'line-stale'}
 						/>
 					{/each}
 
@@ -582,6 +607,8 @@
 						{@const status = getStatusInfo(node.lastSeenAt, nodeStatusOpts(node))}
 						{@const locColor = LOCATION_COLORS[node.locationId] || '#9CA3AF'}
 						{@const isSelected = selectedNodeIp === node.ipAddress}
+						{@const isSleeping = status.status === 'sleeping'}
+						{@const screenFill = isSleeping ? '#1E293B' : '#F3F4F6'}
 
 						<g
 							onclick={() => selectedNodeIp = isSelected ? null : node.ipAddress}
@@ -599,19 +626,24 @@
 							<!-- Device shape based on type -->
 							{#if node.deviceType === 'phone'}
 								<rect x={cx - 12} y={cy - 20} width="24" height="40" rx="5" fill="white" stroke={status.hex} stroke-width="2" />
-								<rect x={cx - 9} y={cy - 15} width="18" height="26" rx="1" fill="#F3F4F6" />
+								<rect x={cx - 9} y={cy - 15} width="18" height="26" rx="1" fill={screenFill} />
 								<circle cx={cx} cy={cy + 16} r="2.5" fill={status.hex} />
 								<circle cx={cx} cy={cy - 17} r="1.5" fill="#D1D5DB" />
 							{:else if node.deviceType === 'tablet'}
 								<rect x={cx - 24} y={cy - 16} width="48" height="32" rx="5" fill="white" stroke={status.hex} stroke-width="2" />
-								<rect x={cx - 20} y={cy - 12} width="40" height="24" rx="1" fill="#F3F4F6" />
+								<rect x={cx - 20} y={cy - 12} width="40" height="24" rx="1" fill={screenFill} />
 								<circle cx={cx + 20} cy={cy} r="2" fill={status.hex} />
 								<circle cx={cx - 22} cy={cy} r="1.5" fill="#D1D5DB" />
 							{:else}
 								<rect x={cx - 22} y={cy - 16} width="44" height="28" rx="3" fill="white" stroke={status.hex} stroke-width="2" />
-								<rect x={cx - 18} y={cy - 12} width="36" height="20" rx="1" fill="#F3F4F6" />
+								<rect x={cx - 18} y={cy - 12} width="36" height="20" rx="1" fill={screenFill} />
 								<path d="M {cx - 26} {cy + 14} L {cx - 22} {cy + 12} L {cx + 22} {cy + 12} L {cx + 26} {cy + 14} Z" fill="white" stroke={status.hex} stroke-width="1.5" />
 								<circle cx={cx} cy={cy - 14} r="1.5" fill="#D1D5DB" />
+							{/if}
+
+							<!-- Moon/Z overlay for sleeping devices -->
+							{#if isSleeping}
+								<text x={cx} y={cy + 2} text-anchor="middle" dominant-baseline="middle" class="text-[10px] font-bold" fill="#CBD5E1" style="font-family: Inter, sans-serif;">z</text>
 							{/if}
 
 							<!-- Status dot (top-right) -->
@@ -774,6 +806,15 @@
 									{freshness?.label || '—'}
 								</span>
 							</div>
+							{#if status.status === 'sleeping'}
+								<div class="flex justify-between items-center">
+									<span class="font-semibold text-gray-400 uppercase tracking-wide text-[10px]">Screen</span>
+									<span class="flex items-center gap-1 font-medium text-slate-500">
+										<Moon class="h-3 w-3" />
+										Off
+									</span>
+								</div>
+							{/if}
 						</div>
 
 						<!-- Sessions list -->
@@ -888,6 +929,9 @@
 											{/if}
 											<span class="relative inline-flex h-3 w-3 rounded-full {status.color}"></span>
 										</span>
+										{#if status.status === "sleeping"}
+											<Moon class="h-3 w-3 shrink-0 text-slate-400" />
+										{/if}
 
 										{#if editingId === dev.id}
 											<input

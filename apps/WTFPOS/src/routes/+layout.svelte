@@ -79,11 +79,21 @@
 	// Blocks the UI with a loading overlay until priority collections sync,
 	// preventing stale local data from being shown to the user.
 	// Server device skips this — its local data IS the source of truth.
-	const SYNC_GATE_TIMEOUT_MS = 8_000; // max wait before showing local data anyway
+	const SYNC_GATE_TIMEOUT_MS = 30_000; // max wait before showing Skip button
 	let syncGateOpen = $state(false); // true = gate lifted, show app
 	let syncGateStatus = $state('Connecting to server...');
 	let unsubSyncGate: (() => void) | null = null;
 	let syncGateTimer: ReturnType<typeof setTimeout> | null = null;
+
+	// Post-reset detection: if set, gate waits for full sync (no timeout)
+	let clientResync = $state(browser && !!localStorage.getItem('wtfpos_client_resync'));
+
+	// Client gate progress tracking (mirrors server prep vars)
+	let gateProgress = $state(0);
+	let gatePhase = $state('Connecting to server...');
+	let gateCompleted = $state<string[]>([]);
+	let gateTotal = $state(0);
+	let gateShowSkip = $state(false);
 
 	// Login page and server device bypass the gate immediately
 	const needsSyncGate = $derived(!isLoginPage && !isThisDeviceServer() && !!session.userName);
@@ -130,17 +140,11 @@
 		if (serverPreparing) {
 			prepLogs = [...prepLogs, 'Waiting for RxDB initialization...'];
 
-			// Fallback: show skip button after 30s, auto-dismiss after 90s
+			// Fallback: show skip button after 30s (no auto-dismiss — wait for initialSyncDone)
 			const skipTimer = setTimeout(() => {
 				prepShowSkip = true;
 				prepLogs = [...prepLogs, '⚠ Taking longer than expected — you can skip below'];
 			}, 30_000);
-			const autoSkipTimer = setTimeout(() => {
-				if (serverPreparing) {
-					console.warn('[ServerPrep] Auto-dismissing after 90s timeout');
-					dismissServerPrep();
-				}
-			}, 90_000);
 
 			import('$lib/db/replication').then(({ subscribeSyncActivity }) => {
 				prepLogs = [...prepLogs, 'Replication module loaded'];
@@ -167,7 +171,6 @@
 					if (activity.initialSyncDone) {
 						prepLogs = [...prepLogs, '✅ All collections synced — server ready!'];
 						clearTimeout(skipTimer);
-						clearTimeout(autoSkipTimer);
 						setTimeout(() => {
 							serverPreparing = false;
 							unsub();
@@ -176,7 +179,6 @@
 				});
 			}).catch(() => {
 				clearTimeout(skipTimer);
-				clearTimeout(autoSkipTimer);
 				serverPreparing = false;
 			});
 		}
@@ -188,22 +190,58 @@
 			resolveDataMode();
 		}
 
-		// ─── Sync gate: wait for priority sync on client devices ─────────
+		// ─── Sync gate: wait for full sync on client devices ─────────
 		if (needsSyncGate && needsRxDb()) {
-			// Safety timeout — never block forever
-			syncGateTimer = setTimeout(() => {
-				console.warn(`[SyncGate] Timeout (${SYNC_GATE_TIMEOUT_MS}ms) — showing local data`);
-				liftSyncGate();
-			}, SYNC_GATE_TIMEOUT_MS);
+			if (!clientResync) {
+				// Normal startup: show Skip button after timeout (not auto-dismiss)
+				syncGateTimer = setTimeout(() => {
+					console.warn(`[SyncGate] Timeout (${SYNC_GATE_TIMEOUT_MS}ms) — showing Skip button`);
+					gateShowSkip = true;
+				}, SYNC_GATE_TIMEOUT_MS);
+			}
+			// Post-reset: no timeout — wait indefinitely for initialSyncDone
 
-			// Subscribe to replication activity
 			import('$lib/db/replication').then(({ subscribeSyncActivity }) => {
+				let isFirstEmission = true;
+				let sawActiveFalse = false;
 				unsubSyncGate = subscribeSyncActivity((activity) => {
-					if (activity.prioritySyncDone) {
-						console.log('[SyncGate] Priority sync done — lifting gate');
-						liftSyncGate();
-					} else if (activity.active) {
+					gatePhase = activity.phase;
+					gateCompleted = activity.completedCollections;
+					gateTotal = activity.totalCollections;
+					gateProgress = gateTotal > 0
+						? Math.round((activity.completedCollections.length / gateTotal) * 100)
+						: 0;
+
+					if (activity.active) {
 						syncGateStatus = 'Syncing data with server...';
+					}
+
+					// After a reset-reload, subscribeSyncActivity fires the current state
+					// immediately. If replication already completed before we subscribed,
+					// that first emission has initialSyncDone: true — which would lift the
+					// gate before any actual sync happened. Guard against this:
+					// - Post-reset (clientResync): skip the first emission entirely, then
+					//   only lift once we've seen initialSyncDone go false→true.
+					// - Normal startup: trust initialSyncDone on any emission.
+					if (clientResync) {
+						if (isFirstEmission) {
+							isFirstEmission = false;
+							return; // skip immediate emission — stale state
+						}
+						if (!activity.initialSyncDone) {
+							sawActiveFalse = true;
+						}
+						if (activity.initialSyncDone && sawActiveFalse) {
+							clientResync = false;
+							try { localStorage.removeItem('wtfpos_client_resync'); } catch { /* noop */ }
+							console.log('[SyncGate] Resync complete — lifting gate');
+							setTimeout(() => liftSyncGate(), 400);
+						}
+					} else {
+						if (activity.initialSyncDone) {
+							console.log('[SyncGate] Initial sync done — lifting gate');
+							setTimeout(() => liftSyncGate(), 400);
+						}
 					}
 				});
 			}).catch(() => {
@@ -304,18 +342,49 @@
 
 <!-- ═══ Sync Gate: blocks client devices until server data arrives ═══ -->
 {#if needsSyncGate && !syncGateOpen}
-	<div class="fixed inset-0 z-[9998] flex flex-col items-center justify-center bg-white">
-		<div class="flex flex-col items-center gap-4">
-			<!-- Animated logo/spinner -->
-			<div class="relative flex h-16 w-16 items-center justify-center">
-				<div class="absolute inset-0 rounded-full border-4 border-gray-100"></div>
-				<div class="absolute inset-0 rounded-full border-4 border-t-accent animate-spin"></div>
-				<span class="text-xl font-black text-accent">W</span>
+	<div class="fixed inset-0 z-[9998] flex flex-col items-center justify-center bg-gray-900 text-white p-6">
+		<div class="flex flex-col items-center w-full max-w-md gap-6">
+			<div class="text-center">
+				<div class="text-5xl sm:text-6xl mb-3">
+					{clientResync ? '🔄' : '📡'}
+				</div>
+				<div class="text-2xl sm:text-3xl font-black tracking-wider">
+					{clientResync ? 'RESYNCING DATA' : 'SYNCING WITH SERVER'}
+				</div>
 			</div>
-			<div class="flex flex-col items-center gap-1">
-				<p class="text-sm font-bold text-gray-900">{syncGateStatus}</p>
-				<p class="text-xs text-gray-400">Fetching latest data from server</p>
+
+			<!-- Progress bar (same as server prep) -->
+			<div class="w-full">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs font-mono text-gray-400">{gatePhase}</span>
+					<span class="text-xs font-mono font-bold text-accent">{gateProgress}%</span>
+				</div>
+				<div class="h-3 w-full rounded-full bg-gray-800 overflow-hidden">
+					<div
+						class="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+						style="width: {gateProgress}%"
+					></div>
+				</div>
+				{#if gateTotal > 0}
+					<div class="mt-1.5 text-[10px] font-mono text-gray-500 text-right">
+						{gateCompleted.length} / {gateTotal} collections
+					</div>
+				{/if}
 			</div>
+
+			{#if gateProgress < 100}
+				<div class="h-8 w-8 rounded-full border-3 border-gray-700 border-t-accent animate-spin"></div>
+			{/if}
+
+			{#if gateShowSkip}
+				<button
+					onclick={liftSyncGate}
+					class="mt-2 rounded-lg bg-gray-700 px-6 py-3 text-sm font-semibold text-white hover:bg-gray-600 transition-colors"
+					style="min-height: unset"
+				>
+					Skip — Use Local Data
+				</button>
+			{/if}
 		</div>
 	</div>
 {/if}

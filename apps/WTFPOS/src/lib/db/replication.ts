@@ -799,6 +799,7 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 	});
 
 	// Mark initial sync done when all collections finish their first pull
+	const isPostReset = typeof window !== 'undefined' && !!localStorage.getItem('wtfpos_server_preparing');
 	Promise.allSettled(initialSyncPromises).then(() => {
 		emitActivity({
 			...currentActivity,
@@ -807,13 +808,16 @@ export async function startReplication(db: RxDatabase, options?: { generation?: 
 			completedCollections: [...completedSyncCollections],
 			phase: 'All collections synced — server ready!',
 		});
-		console.log('[Replication] Initial sync complete for all collections');
+		console.log(`[Replication] Initial sync complete for all ${completedSyncCollections.size} collections${isPostReset ? ' (post-reset reseed)' : ''}`);
 
 		// Server: broadcast SERVER_READY so clients waiting after a reset can proceed
 		if (isServerDevice) {
+			console.log('[Replication] Server broadcasting SERVER_READY to unblock clients...');
 			fetch(`${serverUrl}/api/replication/server-ready`, { method: 'POST' })
-				.then(() => console.log('[Replication] SERVER_READY broadcast sent'))
-				.catch(() => console.warn('[Replication] Failed to broadcast SERVER_READY'));
+				.then((res) => res.json().then((data) => {
+					console.log(`[Replication] ✅ SERVER_READY broadcast sent — ${data.total ?? '?'} docs in store`);
+				}).catch(() => console.log('[Replication] ✅ SERVER_READY broadcast sent')))
+				.catch((err) => console.warn('[Replication] ❌ Failed to broadcast SERVER_READY:', err));
 
 			// Clear the "preparing" flag and overlay if this was a post-reset reload
 			try {
@@ -1061,9 +1065,19 @@ async function reportLocalCounts(db: any) {
  *   broadcast, THEN deletes local DB and reloads to sync from populated server.
  */
 export async function performFullReset() {
-	console.log('[Replication] performFullReset() — stopping replication');
+	// HMR-safe mutex on window — survives Vite module re-evaluation.
+	// Without this, HMR resets the module-level flag and a second call slips through.
+	if (typeof window !== 'undefined' && (window as any).__wtfposResetInProgress) {
+		console.warn('[Reset] ⚠️ performFullReset() already in progress — blocking duplicate call');
+		remoteLog('warn', '[Reset] ⚠️ DUPLICATE performFullReset() BLOCKED — already in progress');
+		return;
+	}
+	if (typeof window !== 'undefined') (window as any).__wtfposResetInProgress = true;
 
 	const isServer = isServerBrowser();
+	const tag = isServer ? '[Reset/Server]' : '[Reset/Client]';
+	console.log(`${tag} performFullReset() starting — device=${isServer ? 'server' : 'client'}`);
+	remoteLog('info', `🔥 ${tag} performFullReset() STARTING (mutex acquired)`);
 
 	// Broadcast to other tabs on this device so they also clear and reload
 	try {
@@ -1071,35 +1085,34 @@ export async function performFullReset() {
 			const ch = new BroadcastChannel('wtfpos-reset');
 			ch.postMessage('RESET_ALL');
 			ch.close();
+			console.log(`${tag} BroadcastChannel RESET_ALL sent to other tabs`);
+			remoteLog('info', `${tag} BroadcastChannel RESET_ALL sent to other tabs`);
 		}
 	} catch { /* noop */ }
 
 	if (isServer) {
-		// ── SERVER: prepare immediately ──────────────────────────────────
+		// ── SERVER: stop → clear → delete → reload → seed → push → SERVER_READY
 		showResetOverlay('server');
-		// Flag survives reload — tells the server to show overlay until store is populated
-		try { localStorage.setItem('wtfpos_server_preparing', '1'); } catch { /* noop */ }
 		await stopReplication();
 		clearSyncKeys();
+		// Set AFTER clearSyncKeys — it's in the SYNC_KEYS list so clearing first would remove it
+		try { localStorage.setItem('wtfpos_server_preparing', '1'); } catch { /* noop */ }
 		await deleteLocalDb();
 		try { sessionStorage.clear(); } catch { /* noop */ }
-		console.log('[Replication] Server reloading for fresh seed...');
+		remoteLog('info', `${tag} ✅ Replication stopped, keys cleared, DB deleted — reloading for fresh seed`);
 		window.location.reload();
 	} else {
-		// ── CLIENT: wait for server to finish preparing ──────────────────
+		// ── CLIENT: stop → wait for server → clear → delete → reload → sync
 		showResetOverlay('client');
 		await stopReplication();
-
-		// Listen for SERVER_READY via SSE before proceeding
-		console.log('[Replication] Client waiting for SERVER_READY broadcast...');
+		remoteLog('info', `${tag} ⏳ Replication stopped — waiting for SERVER_READY...`);
 		await waitForServerReady();
-
-		// Server is populated — safe to delete local DB and resync
 		updateOverlayStatus('Server ready — resyncing...');
 		clearSyncKeys();
 		await deleteLocalDb();
 		try { sessionStorage.clear(); } catch { /* noop */ }
-		console.log('[Replication] Client reloading to sync from populated server...');
+		try { localStorage.setItem('wtfpos_client_resync', '1'); } catch { /* noop */ }
+		remoteLog('info', `${tag} ✅ SERVER_READY received, DB deleted — reloading to sync`);
 		window.location.reload();
 	}
 }
@@ -1175,6 +1188,7 @@ function clearSyncKeys() {
 		'wtfpos_expense_templates',   // seed gate — must clear so seeder re-runs
 		'wtfpos_yield_overrides',     // stock yield config — may reference deleted items
 		'wtfpos_server_preparing',    // reset overlay flag — can get stuck
+		'wtfpos_client_resync',       // client resync gate flag — can get stuck
 	];
 	for (const key of SYNC_KEYS) {
 		try { localStorage.removeItem(key); } catch { /* noop */ }
@@ -1183,32 +1197,51 @@ function clearSyncKeys() {
 }
 
 async function deleteLocalDb() {
+	const { clearDbPromise } = await import('$lib/db');
+	let docCount = 0;
+	let rxdbOk = false;
+
+	// Step 1: Try RxDB's remove() — handles close + delete internally.
+	// Do NOT call db.close() separately: remove() calls destroy() internally,
+	// and calling close() first leaves the DB in a "closed" state where
+	// destroy() throws, causing remove() to fail and old data to survive.
 	try {
-		const { getDb, clearDbPromise } = await import('$lib/db');
+		const { getDb } = await import('$lib/db');
 		const db = await getDb();
-		// Close first to release IDB connections — prevents onblocked during remove
-		try { await db.close(); } catch { /* noop */ }
+		for (const col of Object.values(db.collections) as any[]) {
+			try { docCount += await col.count().exec(); } catch { /* noop */ }
+		}
 		await db.remove();
-		clearDbPromise();
-		console.log('[Replication] RxDB database removed via db.close() + db.remove()');
-	} catch {
-		console.log('[Replication] Falling back to indexedDB.deleteDatabase()');
-		// Still null out the promise so getDb() doesn't return a dead instance
+		rxdbOk = true;
+	} catch (err) {
+		console.warn('[DeleteDB] db.remove() failed:', err);
+		remoteLog('error', `[DeleteDB] ❌ db.remove() FAILED: ${err instanceof Error ? err.message : String(err)}`);
+	}
+
+	// Always null out the cached promise so getDb() creates a fresh instance
+	clearDbPromise();
+
+	// Belt-and-suspenders: raw IndexedDB delete (Safari can leave data behind)
+	let idbResult = 'skipped';
+	await new Promise<void>((resolve) => {
 		try {
-			const { clearDbPromise } = await import('$lib/db');
-			clearDbPromise();
-		} catch { /* noop */ }
-		await new Promise<void>((resolve) => {
 			const req = window.indexedDB.deleteDatabase('wtfpos_db');
-			req.onsuccess = () => resolve();
-			req.onerror = () => resolve();
+			req.onsuccess = () => { idbResult = 'ok'; resolve(); };
+			req.onerror = () => { idbResult = 'error'; resolve(); };
 			req.onblocked = () => {
-				console.warn('[Replication] IndexedDB delete blocked — open connections preventing delete');
-				resolve();
+				idbResult = 'blocked';
+				const t = setTimeout(resolve, 3000);
+				req.onsuccess = () => { clearTimeout(t); idbResult = 'ok (unblocked)'; resolve(); };
 			};
 			setTimeout(resolve, 5000);
-		});
-	}
+		} catch { resolve(); }
+	});
+
+	// One consolidated log line
+	const status = rxdbOk ? '✅' : '⚠️';
+	const msg = `${status} deleteLocalDb: ${docCount} docs wiped (rxdb=${rxdbOk ? 'ok' : 'FAILED'}, idb=${idbResult})`;
+	console.log(`[DeleteDB] ${msg}`);
+	remoteLog(rxdbOk ? 'info' : 'warn', `[DeleteDB] ${msg}`);
 }
 
 /** Get the active replication state for a specific collection (for targeted reSync). */

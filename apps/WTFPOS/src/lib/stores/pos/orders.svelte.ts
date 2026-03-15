@@ -282,23 +282,24 @@ export async function markItemServed(orderId: string, itemId: string) {
 	let order = orders.value.find(o => o.id === orderId) as Order | null | undefined;
 	if (!order) {
 		order = await col.findOne(orderId).exec() as Order | null;
-		if (!order) {
-			console.warn(`[markItemServed] Order ${orderId} not found locally or on server — skipping`);
-			return;
-		}
 	}
 
+	// Update the order if it still exists (may have been paid/cancelled/cleaned up)
 	let servedItemName = 'Item';
-	await col.incrementalModify(orderId, (doc: Order) => {
-		doc.items = doc.items.map(i => {
-			if (i.id === itemId) { servedItemName = i.menuItemName; return { ...i, status: 'served' as const }; }
-			return i;
+	if (order) {
+		await col.incrementalModify(orderId, (doc: Order) => {
+			doc.items = doc.items.map(i => {
+				if (i.id === itemId) { servedItemName = i.menuItemName; return { ...i, status: 'served' as const }; }
+				return i;
+			});
+			doc.updatedAt = new Date().toISOString();
+			return doc;
 		});
-		doc.updatedAt = new Date().toISOString();
-		return doc;
-	});
+	} else {
+		console.warn(`[markItemServed] Order ${orderId} not found — updating KDS ticket only`);
+	}
 
-	// Find the ticket that actually contains this item (orders can have multiple tickets from refills)
+	// Always update the KDS ticket (dispatch board needs it cleared even if order is gone)
 	const kdsCol = getWritableCollection('kds_tickets');
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId && t.items.some(i => i.id === itemId));
 	if (ticket) {
@@ -320,13 +321,13 @@ export async function markItemServed(orderId: string, itemId: string) {
 				updatedAt: new Date().toISOString()
 			});
 
-			if (order.orderType === 'takeout' && order.status === 'open') {
+			if (order?.orderType === 'takeout' && order.status === 'open') {
 				await col.incrementalPatch(orderId, { takeoutStatus: 'ready', updatedAt: new Date().toISOString() });
 				log.takeoutAdvanced(order.customerName ?? 'Walk-in', 'ready');
 			}
 		}
 	}
-	log.itemServed(servedItemName, order.tableNumber);
+	log.itemServed(servedItemName, order?.tableNumber ?? null);
 }
 
 export async function rejectOrderItem(orderId: string, itemId: string, reason: string = 'Kitchen Reject') {

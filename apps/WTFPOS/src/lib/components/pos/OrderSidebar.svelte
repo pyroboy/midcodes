@@ -4,7 +4,7 @@
 	import type { Table, Order } from '$lib/types';
 	import { formatPeso, formatTimeAgo, cn } from '$lib/utils';
 	import { menuItems, printBill, confirmHeldPayment, cancelHeldPayment, advanceTakeoutStatus, getRefillCount } from '$lib/stores/pos.svelte';
-	import { isWithinGracePeriod, removeOrderItem } from '$lib/stores/pos/orders.svelte';
+	import { isWithinGracePeriod, removeOrderItem, voidOrder } from '$lib/stores/pos/orders.svelte';
 	import ManagerPinModal from './ManagerPinModal.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
@@ -98,6 +98,10 @@
 	let voidItemReason = $state<'Mistake' | 'Kitchen Error' | 'Guest Changed Mind' | 'Other' | ''>('');
 	const VOID_REASONS = ['Mistake', 'Kitchen Error', 'Guest Changed Mind', 'Other'] as const;
 
+	// PKG void: removing a PKG item should void the entire order
+	let showPkgVoidConfirm = $state(false);
+	let removePinIsPkg = $state(false);
+
 	// Ticker: increments every second so grace period state re-evaluates reactively
 	let _tick = $state(0);
 	$effect(() => {
@@ -122,6 +126,20 @@
 	function handleRemoveItem(item: Order['items'][number]) {
 		if (!order) return;
 		if (item.status !== 'pending') return;
+
+		if (item.tag === 'PKG') {
+			removePinItemId = item.id;
+			if (isWithinGracePeriod(item.addedAt)) {
+				// Grace period: confirm before voiding entire order
+				showPkgVoidConfirm = true;
+			} else {
+				// After grace: require manager PIN, then void entire order
+				removePinIsPkg = true;
+				showRemovePin = true;
+			}
+			return;
+		}
+
 		if (isWithinGracePeriod(item.addedAt)) {
 			removeOrderItem(order.id, item.id);
 		} else {
@@ -752,11 +770,11 @@
 
 <ManagerPinModal
 	isOpen={showRemovePin}
-	title="Void Item"
-	description="Grace period has expired. Enter Manager PIN to void this item."
+	title={removePinIsPkg ? 'Void Order' : 'Void Item'}
+	description={removePinIsPkg ? 'Removing the package will cancel the entire order. Enter Manager PIN to proceed.' : 'Grace period has expired. Enter Manager PIN to void this item.'}
 	confirmLabel="Void"
 	confirmClass="btn-danger"
-	onClose={() => { showRemovePin = false; removePinItemId = null; }}
+	onClose={() => { showRemovePin = false; removePinItemId = null; removePinIsPkg = false; }}
 	onConfirm={() => {
 		showRemovePin = false;
 		voidItemReason = '';
@@ -765,11 +783,11 @@
 />
 
 <!-- Void Item Reason Selector (shown after PIN confirmed) -->
-<ModalWrapper open={showVoidReasonSelector} onclose={() => { showVoidReasonSelector = false; removePinItemId = null; voidItemReason = ''; }} ariaLabel="Void item reason" zIndex={70}>
+<ModalWrapper open={showVoidReasonSelector} onclose={() => { showVoidReasonSelector = false; removePinItemId = null; removePinIsPkg = false; voidItemReason = ''; }} ariaLabel="Void item reason" zIndex={70}>
 	<div class="pos-card w-full max-w-[380px] flex flex-col gap-4">
 		<div class="flex flex-col gap-1">
-			<h3 class="text-lg font-bold text-gray-900">Void Reason</h3>
-			<p class="text-sm text-gray-500">Select the reason for voiding this item.</p>
+			<h3 class="text-lg font-bold text-gray-900">{removePinIsPkg ? 'Void Order Reason' : 'Void Reason'}</h3>
+			<p class="text-sm text-gray-500">{removePinIsPkg ? 'This will cancel the entire order. Select a reason.' : 'Select the reason for voiding this item.'}</p>
 		</div>
 		<div class="flex flex-col gap-2">
 			{#each VOID_REASONS as reason}
@@ -788,7 +806,7 @@
 			<button
 				class="btn-ghost flex-1"
 				style="min-height: 44px"
-				onclick={() => { showVoidReasonSelector = false; removePinItemId = null; voidItemReason = ''; }}
+				onclick={() => { showVoidReasonSelector = false; removePinItemId = null; removePinIsPkg = false; voidItemReason = ''; }}
 			>Cancel</button>
 			<button
 				class="btn-danger flex-1 disabled:opacity-40"
@@ -796,12 +814,48 @@
 				disabled={!voidItemReason}
 				onclick={() => {
 					playSound('warning');
-					if (order && removePinItemId) removeOrderItem(order.id, removePinItemId, voidItemReason || undefined);
+					if (order && removePinIsPkg) {
+						const reasonMap: Record<string, 'mistake' | 'walkout' | 'write_off'> = {
+							'Mistake': 'mistake', 'Kitchen Error': 'mistake',
+							'Guest Changed Mind': 'walkout', 'Other': 'write_off'
+						};
+						voidOrder(order.id, reasonMap[voidItemReason] ?? 'mistake');
+					} else if (order && removePinItemId) {
+						removeOrderItem(order.id, removePinItemId, voidItemReason || undefined);
+					}
 					showVoidReasonSelector = false;
 					removePinItemId = null;
+					removePinIsPkg = false;
 					voidItemReason = '';
 				}}
-			>Void Item</button>
+			>{removePinIsPkg ? 'Void Order' : 'Void Item'}</button>
+		</div>
+	</div>
+</ModalWrapper>
+
+<!-- PKG Grace Void Confirmation (within 30s) -->
+<ModalWrapper open={showPkgVoidConfirm} onclose={() => { showPkgVoidConfirm = false; removePinItemId = null; }} ariaLabel="Void package" zIndex={70}>
+	<div class="pos-card w-full max-w-[380px] flex flex-col gap-4">
+		<div class="flex flex-col gap-1">
+			<h3 class="text-lg font-bold text-status-red">Void Entire Order?</h3>
+			<p class="text-sm text-gray-500">Removing the package item will cancel the entire order — all meats, sides, and FREE items will be voided and the table will be closed.</p>
+		</div>
+		<div class="flex gap-2">
+			<button
+				class="btn-ghost flex-1"
+				style="min-height: 44px"
+				onclick={() => { showPkgVoidConfirm = false; removePinItemId = null; }}
+			>Keep</button>
+			<button
+				class="btn-danger flex-1"
+				style="min-height: 44px"
+				onclick={() => {
+					playSound('warning');
+					if (order) voidOrder(order.id, 'mistake');
+					showPkgVoidConfirm = false;
+					removePinItemId = null;
+				}}
+			>Void Order</button>
 		</div>
 	</div>
 </ModalWrapper>

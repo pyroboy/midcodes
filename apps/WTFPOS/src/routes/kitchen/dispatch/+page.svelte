@@ -9,6 +9,9 @@
 	import { getPkgColors } from '$lib/stores/pos/utils';
 	import { untrack } from 'svelte';
 	import { playSound } from '$lib/utils/audio';
+	import { fade, fly, scale } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+	import KdsVoidAlert from '$lib/components/kitchen/KdsVoidAlert.svelte';
 
 	// ── Live timer ──
 	let now = $state(Date.now());
@@ -93,6 +96,10 @@
 			});
 	});
 
+	let justBecameReady = $state(new Set<string>());
+	let clearingOrders = $state(new Set<string>());
+	let flashingStations = $state(new Set<string>());
+
 	// ── Actions ──
 	async function serveWeighedMeats(orderId: string, items: KdsTicketItem[]) {
 		try {
@@ -157,6 +164,10 @@
 	// ── ALL DONE: Complete entire order from dispatch ──
 	async function completeAllForOrder(card: DispatchTableCard) {
 		try {
+			clearingOrders.add(card.orderId);
+			clearingOrders = new Set(clearingOrders);
+			await new Promise((r) => setTimeout(r, 400));
+
 			// Get ALL KDS tickets for this order (may be multiple due to refills)
 			const tickets = kdsTickets.value.filter(t => t.orderId === card.orderId);
 			for (const ticket of tickets) {
@@ -168,6 +179,8 @@
 			}
 			log.dispatchOrderCleared(card.tableNumber);
 			playSound('success');
+			clearingOrders.delete(card.orderId);
+			clearingOrders = new Set(clearingOrders);
 
 			const label = card.tableNumber !== null ? `T${card.tableNumber}` : (card.customerName ?? 'Takeout');
 			showToast(`✓ ${label} — Order cleared`, () => {
@@ -175,6 +188,8 @@
 			});
 		} catch (err) {
 			console.error('[Dispatch] completeAllForOrder failed:', err);
+			clearingOrders.delete(card.orderId);
+			clearingOrders = new Set(clearingOrders);
 			showToast(`Failed to clear order — ${err instanceof Error ? err.message : 'try again'}`);
 		}
 	}
@@ -307,12 +322,48 @@
 			if (curr.dishDone > prev.dishDone && !playedDish) { playDishesSound(); playedDish = true; }
 			if (curr.sideDone > prev.sideDone && !playedSides) { playSidesSound(); playedSides = true; }
 			if (curr.serviceCount > prev.serviceCount && !playedRequest) { playRequestSound(); playedRequest = true; }
-			if (curr.readyToRun && !prev.readyToRun && !playedReady) { playReadyChime(); playedReady = true; }
+			if (curr.readyToRun && !prev.readyToRun && !playedReady) {
+				playReadyChime(); playedReady = true;
+				justBecameReady.add(orderId);
+				justBecameReady = new Set(justBecameReady);
+				setTimeout(() => { justBecameReady.delete(orderId); justBecameReady = new Set(justBecameReady); }, 600);
+			}
+		}
+
+		// Detect station completions for flash
+		for (const card of dispatchCards) {
+			const prev = untrack(() => prevSnapshots).get(card.orderId);
+			if (!prev) continue;
+			const curr = currentSnapshots.get(card.orderId);
+			if (!curr) continue;
+			// Check meat station
+			if (card.meats.allDone && card.meats.total > 0 && prev.meatDone < card.meats.total) {
+				const key = `${card.orderId}_meats`;
+				flashingStations.add(key);
+				flashingStations = new Set(flashingStations);
+				setTimeout(() => { flashingStations.delete(key); flashingStations = new Set(flashingStations); }, 500);
+			}
+			// Check dish station
+			if (card.dishes.allDone && card.dishes.total > 0 && prev.dishDone < card.dishes.total) {
+				const key = `${card.orderId}_dishes`;
+				flashingStations.add(key);
+				flashingStations = new Set(flashingStations);
+				setTimeout(() => { flashingStations.delete(key); flashingStations = new Set(flashingStations); }, 500);
+			}
+			// Check sides station
+			if (card.sides.allDone && card.sides.total > 0 && prev.sideDone < card.sides.total) {
+				const key = `${card.orderId}_sides`;
+				flashingStations.add(key);
+				flashingStations = new Set(flashingStations);
+				setTimeout(() => { flashingStations.delete(key); flashingStations = new Set(flashingStations); }, 500);
+			}
 		}
 
 		prevSnapshots = currentSnapshots;
 	});
 </script>
+
+<KdsVoidAlert />
 
 <div class="flex flex-col gap-3 sm:gap-4 pb-6">
 
@@ -320,7 +371,7 @@
 	<div class="flex flex-col gap-3">
 		{#if dispatchCards.length === 0}
 			<div class="rounded-xl border border-border bg-surface px-6 py-10 text-center text-gray-400">
-				<p class="text-3xl mb-2">&#9989;</p>
+				<p class="text-3xl mb-2 animate-gentle-bob">&#9989;</p>
 				<p class="font-semibold">No active orders</p>
 				<p class="text-sm mt-1">Orders will appear as tables open and items are sent</p>
 			</div>
@@ -331,7 +382,11 @@
 					{@const elapsedMin = Math.floor((now - new Date(card.createdAt).getTime()) / 60_000)}
 					{@const cardPkg = getPkgColors(card.packageId)}
 
-					<div class={cn(
+					<div
+						in:fly={{ y: 24, duration: 300 }}
+						out:scale={{ duration: 300, start: 0.95 }}
+						animate:flip={{ duration: 300 }}
+						class={cn(
 						'flex flex-col rounded-xl border-2 overflow-hidden shadow-sm',
 						card.readyToRun
 							? 'border-status-green bg-emerald-50'
@@ -340,7 +395,8 @@
 								: urgency === 'warning'
 									? 'border-status-yellow bg-surface'
 									: 'border-border bg-surface',
-						cardPkg?.accent ?? ''
+						cardPkg?.accent ?? '',
+						(justBecameReady.has(card.orderId) || clearingOrders.has(card.orderId)) && 'animate-card-glow'
 					)}>
 						<!-- Card Header -->
 						<div class="flex items-center justify-between px-4 py-3">
@@ -378,7 +434,7 @@
 						<!-- Station Progress Rows -->
 						<div class="flex flex-col divide-y divide-border/40 border-t border-border/40 px-4">
 							<!-- Meat row — deep link to Weigh Station when pending ([09]+[SP-01]) -->
-							<div class="py-2.5">
+							<div class={cn('py-2.5 rounded-md', flashingStations.has(`${card.orderId}_meats`) && 'animate-station-flash')}>
 								<div class={cn('flex items-center gap-3', stationStatusCls(card.meats.allDone, card.meats.total))}>
 									<span class="text-lg w-7 text-center" aria-hidden="true">&#129385;</span>
 									<span class="flex-1 text-sm font-semibold">Meat</span>
@@ -408,7 +464,7 @@
 							</div>
 
 							<!-- Dishes row — deep link to Stove when pending ([09]+[SP-01]) -->
-							<div class={cn('flex items-center gap-3 py-2.5', stationStatusCls(card.dishes.allDone, card.dishes.total))}>
+							<div class={cn('flex items-center gap-3 py-2.5 rounded-md', stationStatusCls(card.dishes.allDone, card.dishes.total), flashingStations.has(`${card.orderId}_dishes`) && 'animate-station-flash')}>
 								<span class="text-lg w-7 text-center" aria-hidden="true">&#127859;</span>
 								<span class="flex-1 text-sm font-semibold">Dishes</span>
 								{#if card.dishes.total === 0}
@@ -423,7 +479,7 @@
 							</div>
 
 							<!-- Sides row (actionable) -->
-							<div class="py-2.5">
+							<div class={cn('py-2.5 rounded-md', flashingStations.has(`${card.orderId}_sides`) && 'animate-station-flash')}>
 								<div class={cn('flex items-center gap-3', stationStatusCls(card.sides.allDone, card.sides.total))}>
 									<span class="text-lg w-7 text-center" aria-hidden="true">&#129388;</span>
 									<span class="flex-1 text-sm font-semibold">Sides</span>
@@ -518,7 +574,10 @@
 
 <!-- Undo Toast -->
 {#if toast.visible}
-	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 text-white px-4 sm:px-5 py-3 shadow-lg max-w-[calc(100vw-2rem)] fixed-safe-bottom">
+	<div
+		in:fly={{ y: 20, duration: 200 }}
+		out:fade={{ duration: 150 }}
+		class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 text-white px-4 sm:px-5 py-3 shadow-lg max-w-[calc(100vw-2rem)] fixed-safe-bottom">
 		<span class="text-sm font-semibold">{toast.message}</span>
 		{#if toast.undoFn}
 			<button

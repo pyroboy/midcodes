@@ -63,8 +63,43 @@ export default {
 				'border-pulse-yellow': 'borderPulseYellow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 				'border-pulse-bluetooth': 'borderPulseBluetooth 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
 				'border-pulse-accent': 'borderPulseAccent 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'success-flash': 'successFlash 500ms ease-out forwards',
+				'gentle-bob': 'gentleBob 2.5s ease-in-out infinite',
+				'check-burst': 'checkBurst 300ms ease-out forwards',
+				'card-glow': 'cardGlow 600ms ease-out forwards',
+				'weight-pop': 'weightPop 250ms ease-out',
+				'station-flash': 'stationFlash 500ms ease-out forwards',
 			},
 			keyframes: {
+				successFlash: {
+					'0%': { backgroundColor: 'rgba(16, 185, 129, 0)' },
+					'30%': { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
+					'100%': { backgroundColor: 'rgba(16, 185, 129, 0)' },
+				},
+				gentleBob: {
+					'0%, 100%': { transform: 'translateY(0)' },
+					'50%': { transform: 'translateY(-6px)' },
+				},
+				checkBurst: {
+					'0%': { transform: 'scale(0.5)', opacity: '0' },
+					'70%': { transform: 'scale(1.15)', opacity: '1' },
+					'100%': { transform: 'scale(1)', opacity: '1' },
+				},
+				cardGlow: {
+					'0%': { boxShadow: '0 0 0 rgba(16, 185, 129, 0)' },
+					'40%': { boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)' },
+					'100%': { boxShadow: '0 0 0 rgba(16, 185, 129, 0)' },
+				},
+				weightPop: {
+					'0%': { transform: 'scale(1)' },
+					'50%': { transform: 'scale(1.08)' },
+					'100%': { transform: 'scale(1)' },
+				},
+				stationFlash: {
+					'0%': { backgroundColor: 'rgba(16, 185, 129, 0)' },
+					'30%': { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
+					'100%': { backgroundColor: 'rgba(16, 185, 129, 0)' },
+				},
 				borderPulseRed: {
 					'0%, 100%': { borderColor: 'rgba(239, 68, 68, 1)' }, // red-500
 					'50%': { borderColor: 'rgba(239, 68, 68, 0.3)' },

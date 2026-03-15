@@ -24,6 +24,7 @@ export interface ClientInfo {
 	locationId: string;
 	dataMode: string;
 	isOnline: boolean;
+	isScreenActive: boolean;
 	currentRoute: string;
 	lastSyncAt: Date | null;
 	firstSeenAt: Date;
@@ -189,6 +190,7 @@ export function trackClient(rawIp: string, userAgent: string, context: string, r
 		locationId: devInfo?.locationId || '',
 		dataMode: devInfo?.dataMode || 'full',
 		isOnline: devInfo?.isOnline ?? true,
+		isScreenActive: true,
 		currentRoute: route || '/',
 		lastSyncAt: null,
 		firstSeenAt: now,
@@ -258,11 +260,27 @@ export function trackClient(rawIp: string, userAgent: string, context: string, r
 	return info;
 }
 
+/** Update screen-active state for a client (from sendBeacon). */
+export function setClientScreenState(rawIp: string, isActive: boolean): void {
+	const dip = displayIP(rawIp);
+	const client = knownClients.get(dip);
+	if (client) {
+		client.isScreenActive = isActive;
+		emitClientChange();
+	}
+}
+
 /** Record that a client just did a push or pull (sync activity) */
 export function recordClientSync(rawIp: string): void {
 	const dip = displayIP(rawIp);
 	const client = knownClients.get(dip);
 	if (client) client.lastSyncAt = new Date();
+}
+
+/** Clear all tracked clients (used during database reset) */
+export function clearTrackedClients(): void {
+	knownClients.clear();
+	emitClientChange();
 }
 
 /** Get all currently tracked clients */

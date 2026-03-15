@@ -283,7 +283,8 @@ export async function getDb() {
 						2: (d: any) => ({ ...d, dbLastUpdated: '', dbDocCount: 0 }),
 						3: (d: any) => ({ ...d, isServer: false }),
 						4: (d: any) => ({ ...d, ipAddress: '' }),
-						5: (d: any) => ({ ...d, dataMode: 'full-rxdb' })
+						5: (d: any) => ({ ...d, dataMode: 'full-rxdb' }),
+						6: (d: any) => ({ ...d, isScreenActive: true })
 					}
 				},
 				floor_elements: {

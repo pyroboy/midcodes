@@ -11,6 +11,9 @@
 	import { Bluetooth, Printer } from 'lucide-svelte';
 	import { browser } from '$app/environment';
 	import { playSound } from '$lib/utils/audio';
+	import { fade, fly, scale } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+	import KdsVoidAlert from '$lib/components/kitchen/KdsVoidAlert.svelte';
 
 	const SUGGESTED_GRAMS_PER_PAX = 150;
 
@@ -127,6 +130,7 @@
 	let inputMode = $state<'manual' | 'scale'>('manual');
 	let manualDispatchCount = $state(0); // track how many manual dispatches done this session
 	let dispatchedCollapsed = $state(true);
+	let dispatchSuccess = $state(false);
 
 	const DISPATCH_LOG_MAX = 50;
 
@@ -208,6 +212,8 @@
 
 		await recordMeatWeight(selectedItem.orderId, selectedItem.itemId, grams);
 		playSound('success');
+		dispatchSuccess = true;
+		setTimeout(() => (dispatchSuccess = false), 500);
 
 		// Track manual dispatches for [08] dismiss hint
 		if (!btConnected) manualDispatchCount += 1;
@@ -265,6 +271,8 @@
 	const numpadKeys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C', '0', 'DEL'];
 </script>
 
+<KdsVoidAlert />
+
 <div class="-m-3 sm:-m-4 md:-m-6 flex flex-col md:flex-row h-[calc(100%+24px)] sm:h-[calc(100%+32px)] md:h-[calc(100%+48px)] bg-surface-secondary">
 	<!-- LEFT: Pending meat orders grouped by table -->
 	<div class={cn(
@@ -280,7 +288,7 @@
 			{#if proteinSections.length === 0}
 				<div class="flex flex-1 items-center justify-center text-gray-400">
 					<div class="text-center">
-						<div class="text-4xl mb-2">✅</div>
+						<div class="text-4xl mb-2 animate-gentle-bob">✅</div>
 						<p class="text-sm font-medium">All clear</p>
 					</div>
 				</div>
@@ -305,6 +313,9 @@
 							{#each section.items as item (item.itemId + item.orderId)}
 								{@const isSelected = selectedItem?.itemId === item.itemId && selectedItem?.orderId === item.orderId}
 								<button
+									in:fly={{ y: 12, duration: 200 }}
+									out:scale={{ duration: 150, start: 0.85 }}
+									animate:flip={{ duration: 200 }}
 									onclick={() => selectItem(item)}
 									class={cn(
 										'rounded-xl border-2 p-2.5 text-left transition-all active:scale-95',
@@ -366,9 +377,14 @@
 		{/if}
 		<!-- Scrollable content area -->
 		<div
-			class="flex-1 overflow-y-auto flex flex-col items-center p-3 sm:p-6 md:p-8 transition-colors duration-300"
+			class={cn('flex-1 overflow-y-auto flex flex-col items-center p-3 sm:p-6 md:p-8 transition-colors duration-300 relative', dispatchSuccess && 'animate-success-flash')}
 			style={selectedPkgColors ? `background-color: ${selectedPkgColors.fill}` : ''}
 		>
+		{#if dispatchSuccess}
+			<div class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none" transition:fade={{ duration: 200 }}>
+				<span class="text-6xl animate-check-burst">✅</span>
+			</div>
+		{/if}
 		{#if selectedItem}
 			{@const group = tableGroups.find((g) => g.orderId === selectedItem?.orderId)}
 
@@ -493,7 +509,7 @@
 							class={cn(
 								'text-5xl sm:text-6xl font-extrabold font-mono tracking-tight min-h-[60px] flex items-center justify-center',
 								btScale.stability === 'stable'
-									? 'text-status-green'
+									? 'text-status-green animate-weight-pop'
 									: btScale.stability === 'unstable'
 										? 'text-status-yellow'
 										: 'text-gray-400'
@@ -638,8 +654,9 @@
 						<p class="text-sm">No items dispatched yet</p>
 					</div>
 				{:else}
-					{#each dispatched as d, i}
+					{#each dispatched as d, i (d.time + d.name + i)}
 						<div
+							in:fly={{ x: 20, duration: 200 }}
 							class={cn(
 								'flex items-center justify-between rounded-lg border px-4 py-3',
 								d.printFailed

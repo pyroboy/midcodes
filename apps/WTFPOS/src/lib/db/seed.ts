@@ -1,14 +1,26 @@
 import type { RxDatabase } from 'rxdb';
 import { INITIAL_TABLES as sourceTables, INITIAL_MENU_ITEMS as sourceMenu, INITIAL_FLOOR_ELEMENTS as sourceFloorElements } from '$lib/stores/pos.svelte';
-import { 
-    INITIAL_STOCK_ITEMS, 
-    INITIAL_DELIVERIES, 
+import {
+    INITIAL_STOCK_ITEMS,
+    INITIAL_DELIVERIES,
     INITIAL_STOCK_EVENTS,
     INITIAL_ADJUSTMENT_EVENTS,
     INITIAL_STOCK_COUNTS
 } from '$lib/stores/stock.svelte';
 import { expenseCategories } from '$lib/stores/expenses.svelte';
 import { nanoid } from 'nanoid';
+
+// Remote logger — posts to server console so seed progress is visible in terminal
+function _seedRemoteLog(level: 'info' | 'warn' | 'error', message: string, data?: any) {
+    try {
+        fetch('/api/replication/client-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ level, message, data }),
+            keepalive: true,
+        }).catch(() => {});
+    } catch { /* noop */ }
+}
 
 /**
  * Automatically seeds the database with mock data if it determines
@@ -20,13 +32,18 @@ import { nanoid } from 'nanoid';
  * the server, overwriting the main tablet's real orders/tables.
  */
 export async function seedDatabaseIfNeeded(db: RxDatabase) {
+    const isPostReset = typeof window !== 'undefined' && !!localStorage.getItem('wtfpos_server_preparing');
+    const seedTag = isPostReset ? '[Seed/Reset]' : '[Seed]';
+
     // Thin clients use memory storage — all data comes from replication, seeding is pointless
     if (typeof window !== 'undefined'
         && window.location.hostname !== 'localhost'
         && window.location.hostname !== '127.0.0.1') {
-        console.log('[RxDB] Thin client detected — skipping seed (replication will provide data)');
+        console.log(`${seedTag} Thin client — skipping seed`);
         return;
     }
+
+    console.log(`${seedTag} Checking if seed is needed... (post-reset: ${isPostReset})`);
 
     // Check if the server already has data — if so, replication will provide it
     if (typeof window !== 'undefined') {
@@ -35,13 +52,37 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
             if (res.ok) {
                 const data = await res.json();
                 if ((data.total ?? 0) >= 5) {
-                    console.log(`[RxDB] Server has ${data.total} docs — skipping seed, replication will sync`);
+                    console.log(`${seedTag} Server has ${data.total} docs — skipping seed`);
+                    _seedRemoteLog('warn', `${seedTag} ⚠️ SKIPPED — server has ${data.total} docs`);
                     return;
                 }
             }
         } catch {
-            // Server unreachable — fall through to local seed check
-            console.log('[RxDB] Server unreachable during seed check — checking local data');
+            console.log(`${seedTag} Server unreachable — checking local data`);
+        }
+    }
+
+    // ── Post-reset: force-clear stale local data that survived a failed db.remove() ──
+    if (isPostReset) {
+        const colNames = Object.keys(db.collections);
+        let staleTotal = 0;
+        for (const name of colNames) {
+            try { staleTotal += await db.collections[name].count().exec(); } catch { /* noop */ }
+        }
+
+        if (staleTotal > 0) {
+            console.warn(`${seedTag} 🧹 ${staleTotal} stale docs survived db.remove() — force-clearing`);
+            _seedRemoteLog('warn', `${seedTag} 🧹 STALE DATA: ${staleTotal} docs survived — force-clearing`);
+            for (const name of colNames) {
+                try {
+                    const docs = await db.collections[name].find().exec();
+                    if (docs.length > 0) {
+                        await db.collections[name].bulkRemove(docs.map((d: any) => d.id));
+                    }
+                } catch (err) {
+                    _seedRemoteLog('error', `${seedTag} Failed to clear ${name}: ${err instanceof Error ? err.message : String(err)}`);
+                }
+            }
         }
     }
 
@@ -49,8 +90,9 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
     const existingMenu = await db.menu_items.find().exec();
     const existingTables = await db.tables.find().exec();
 
-    if (existingMenu.length === 0 || existingTables.length === 0) {
-        console.log('[RxDB] Database is empty AND server has no data. Seeding initial mock data...');
+    if (isPostReset || existingMenu.length === 0 || existingTables.length === 0) {
+        console.log(`${seedTag} ✅ Seeding needed: menu_items=${existingMenu.length}, tables=${existingTables.length}${isPostReset ? ' (post-reset forced)' : ''}`);
+        _seedRemoteLog('info', `${seedTag} 🌱 SEEDING NOW — menu_items=${existingMenu.length}, tables=${existingTables.length}${isPostReset ? ' (FORCED — post-reset)' : ''}`);
         
         // 1. Seed Menu Items if empty
         if (existingMenu.length === 0) {
@@ -199,8 +241,26 @@ export async function seedDatabaseIfNeeded(db: RxDatabase) {
             ]);
         }
 
-        console.log('[RxDB] Seeding complete! Database is ready.');
+        // Count total seeded docs across all collections
+        const counts = await Promise.all([
+            db.menu_items.count().exec(),
+            db.tables.count().exec(),
+            db.orders.count().exec(),
+            db.stock_items.count().exec(),
+            db.stock_counts.count().exec(),
+            db.deliveries.count().exec(),
+            db.stock_events.count().exec(),
+            db.expenses.count().exec(),
+            db.floor_elements.count().exec(),
+            db.audit_logs.count().exec(),
+        ]);
+        const totalSeeded = counts.reduce((a, b) => a + b, 0);
+        const countLabels = ['menu_items', 'tables', 'orders', 'stock_items', 'stock_counts', 'deliveries', 'stock_events', 'expenses', 'floor_elements', 'audit_logs'];
+        const countMap: Record<string, number> = {};
+        counts.forEach((c, i) => { if (c > 0) countMap[countLabels[i]] = c; });
+        console.log(`${seedTag} ✅ Seeding complete! ${totalSeeded} total docs across 10 collections. Replication will push to server store.`);
+        _seedRemoteLog('info', `${seedTag} 🌱✅ SEED COMPLETE — ${totalSeeded} docs seeded`, countMap);
     } else {
-        console.log(`[RxDB] Database has ${existingMenu.length} menu items and ${existingTables.length} tables. Seeding skipped.`);
+        console.log(`${seedTag} Already has data (menu=${existingMenu.length}, tables=${existingTables.length}) — skipped`);
     }
 }

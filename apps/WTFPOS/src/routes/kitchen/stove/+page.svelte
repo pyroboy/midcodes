@@ -7,6 +7,9 @@
 	import { Printer } from 'lucide-svelte';
 	import { untrack } from 'svelte';
 	import { playSound } from '$lib/utils/audio';
+	import { fade, fly, scale } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+	import KdsVoidAlert from '$lib/components/kitchen/KdsVoidAlert.svelte';
 
 	// ── Live timer ──
 	let now = $state(Date.now());
@@ -37,6 +40,8 @@
 		stoveTickets.reduce((sum, t) => sum + t.items.filter((i) => i.status !== 'served').length, 0)
 	);
 
+	let celebratingOrders = $state(new Set<string>());
+
 	// ── Actions ──
 	async function markDone(orderId: string, itemId: string) {
 		try {
@@ -49,14 +54,21 @@
 
 	async function completeAll(ticket: MergedTicket) {
 		try {
+			celebratingOrders.add(ticket.orderId);
+			celebratingOrders = new Set(celebratingOrders);
+			await new Promise((r) => setTimeout(r, 400));
 			await Promise.all(
 				ticket.items
 					.filter((i) => i.status !== 'served')
 					.map((i) => markItemServed(ticket.orderId, i.id))
 			);
 			playSound('success');
+			celebratingOrders.delete(ticket.orderId);
+			celebratingOrders = new Set(celebratingOrders);
 		} catch (err) {
 			console.error('[Stove] completeAll failed:', err);
+			celebratingOrders.delete(ticket.orderId);
+			celebratingOrders = new Set(celebratingOrders);
 		}
 	}
 
@@ -126,6 +138,8 @@
 	});
 </script>
 
+<KdsVoidAlert />
+
 <!-- Header -->
 <div class="mb-3 sm:mb-4 flex items-center justify-between">
 	<div>
@@ -145,7 +159,7 @@
 {#if stoveTickets.length === 0}
 	<div class="flex flex-1 flex-col items-center justify-center gap-4" style="min-height: 400px">
 		<div class="text-center text-gray-400">
-			<div class="mb-4 text-6xl">&#9989;</div>
+			<div class="mb-4 text-6xl animate-gentle-bob">&#9989;</div>
 			<p class="text-xl font-bold">No pending dishes</p>
 			<p class="text-sm mt-2">New dish/drink orders will appear here automatically</p>
 		</div>
@@ -158,9 +172,14 @@
 				{@const urgency = urgencyLevel(ticket.createdAt, now)}
 				{@const progress = ticketProgress(ticket.items)}
 
-				<div class={cn(
+				<div
+					in:fly={{ y: 20, duration: 300 }}
+					out:scale={{ duration: 250, start: 0.95 }}
+					animate:flip={{ duration: 250 }}
+					class={cn(
 					'flex flex-col rounded-xl border-2 overflow-hidden bg-surface shadow-sm',
-					ticketBorderClass(urgency)
+					ticketBorderClass(urgency),
+					celebratingOrders.has(ticket.orderId) && 'animate-card-glow'
 				)}>
 					<!-- Header -->
 					<div class="flex items-center justify-between px-4 py-3 bg-white/60">
@@ -182,7 +201,7 @@
 					<div class="flex flex-col divide-y divide-border/30">
 						{#each ticket.items as item (item.id)}
 							{@const isServed = item.status === 'served'}
-							<div class={cn('flex items-center gap-3 px-4 py-2', isServed && 'opacity-50')}>
+							<div class={cn('flex items-center gap-3 px-4 py-2 transition-all duration-200', isServed && 'opacity-50')}>
 								<div class="flex-1 flex items-center gap-2 min-w-0">
 									<span class={cn('text-lg font-medium truncate', isServed && 'line-through text-gray-400')}>
 										{item.menuItemName}
@@ -197,7 +216,7 @@
 									{/if}
 								</div>
 								{#if isServed}
-									<span class="shrink-0 flex items-center justify-center rounded-lg bg-status-green/10 text-status-green text-lg min-h-[56px] w-14 h-14">
+									<span in:scale={{ duration: 200, start: 0.5 }} class="shrink-0 flex items-center justify-center rounded-lg bg-status-green/10 text-status-green text-lg min-h-[56px] w-14 h-14">
 										&#10003;
 									</span>
 								{:else}
@@ -242,9 +261,14 @@
 				{@const urgency = urgencyLevel(ticket.createdAt, now)}
 				{@const progress = ticketProgress(ticket.items)}
 
-				<div class={cn(
+				<div
+					in:fly={{ y: 20, duration: 300 }}
+					out:scale={{ duration: 250, start: 0.95 }}
+					animate:flip={{ duration: 250 }}
+					class={cn(
 					'flex flex-col rounded-xl border-2 overflow-hidden bg-surface shadow-sm',
-					ticketBorderClass(urgency)
+					ticketBorderClass(urgency),
+					celebratingOrders.has(ticket.orderId) && 'animate-card-glow'
 				)}>
 					<!-- Header -->
 					<div class="flex items-center justify-between px-4 py-3 bg-white/60">
@@ -267,7 +291,7 @@
 					<div class="flex flex-col divide-y divide-border/30">
 						{#each ticket.items as item (item.id)}
 							{@const isServed = item.status === 'served'}
-							<div class={cn('flex items-center gap-3 px-4 py-2', isServed && 'opacity-50')}>
+							<div class={cn('flex items-center gap-3 px-4 py-2 transition-all duration-200', isServed && 'opacity-50')}>
 								<div class="flex-1 flex items-center gap-2 min-w-0">
 									<span class={cn('text-lg font-medium truncate', isServed && 'line-through text-gray-400')}>
 										{item.menuItemName}
@@ -282,7 +306,7 @@
 									{/if}
 								</div>
 								{#if isServed}
-									<span class="shrink-0 flex items-center justify-center rounded-lg bg-status-green/10 text-status-green text-lg min-h-[56px] w-14 h-14">
+									<span in:scale={{ duration: 200, start: 0.5 }} class="shrink-0 flex items-center justify-center rounded-lg bg-status-green/10 text-status-green text-lg min-h-[56px] w-14 h-14">
 										&#10003;
 									</span>
 								{:else}

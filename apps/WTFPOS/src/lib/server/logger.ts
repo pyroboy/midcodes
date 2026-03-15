@@ -177,12 +177,37 @@ export const log = {
 	trace(tag: string, msg: string, ...args: any[]) {
 		if (shouldLog('trace')) console.log(fmt(tag, msg), ...args);
 	},
-	/** Boxed banner — auto-sizes to content, handles emoji widths */
+	/** Boxed banner — auto-sizes to content, handles emoji widths, wraps long lines */
 	banner(...lines: string[]) {
 		if (!shouldLog('info')) return;
 
-		// Pre-compute visual widths to avoid double iteration
-		const widths = lines.map(visualWidth);
+		const MAX_VW = 72; // max inner content width (keeps box ~76 cols)
+
+		// Word-wrap lines that exceed MAX_VW
+		const wrapped: string[] = [];
+		for (const line of lines) {
+			if (visualWidth(line) <= MAX_VW) {
+				wrapped.push(line);
+				continue;
+			}
+			// Find leading indent to preserve on continuation lines
+			const indentMatch = line.match(/^(\s*)/);
+			const indent = indentMatch ? indentMatch[1] : '';
+			const words = line.split(' ');
+			let current = '';
+			for (const word of words) {
+				const test = current ? current + ' ' + word : word;
+				if (visualWidth(test) > MAX_VW && current) {
+					wrapped.push(current);
+					current = indent + word; // continuation gets same indent
+				} else {
+					current = test;
+				}
+			}
+			if (current) wrapped.push(current);
+		}
+
+		const widths = wrapped.map(visualWidth);
 		let maxVw = 58;
 		for (const w of widths) {
 			if (w > maxVw) maxVw = w;
@@ -191,9 +216,9 @@ export const log = {
 
 		console.log('');
 		console.log('╔' + '═'.repeat(innerWidth) + '╗');
-		for (let i = 0; i < lines.length; i++) {
+		for (let i = 0; i < wrapped.length; i++) {
 			const padding = Math.max(0, maxVw - widths[i]);
-			console.log(`║  ${lines[i]}${' '.repeat(padding)}║`);
+			console.log(`║  ${wrapped[i]}${' '.repeat(padding)}║`);
 		}
 		console.log('╚' + '═'.repeat(innerWidth) + '╝');
 		console.log('');

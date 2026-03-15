@@ -18,6 +18,13 @@ const INFO_PATTERNS = [
 	'LOCAL DB EMPTY',
 	'Priority collections synced',
 	'Initial sync complete',
+	// Reset flow — every step must be visible in server console
+	'[Reset/',
+	'[DeleteDB]',
+	'[Seed',
+	'performFullReset',
+	'RESET_ALL',
+	'BroadcastChannel',
 ];
 
 /** Throttle "Replication started" per device — only log once per 15s */
