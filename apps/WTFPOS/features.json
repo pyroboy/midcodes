@@ -1,0 +1,1068 @@
+{
+  "project": "WTFPOS",
+  "generatedAt": "2026-03-14",
+  "totalFeatures": 262,
+
+  "authentication": [
+    "Username/password login",
+    "Role-based authentication (staff, manager, kitchen, owner, admin)",
+    "Manager PIN gate (configurable via VITE_MANAGER_PIN)",
+    "Duplicate session detection (120-second window, shows device name)",
+    "Session persistence via sessionStorage (tab-isolated)",
+    "Role-based location locking (staff/kitchen locked to assigned branch)",
+    "Elevated role location switching (owner/admin/manager)",
+    "Kitchen focus sub-roles (butcher, sides, dispatch, stove)",
+    "Session derivation from role (deriveSessionState)",
+    "Warehouse session detection and POS/kitchen redirect",
+    "Test account quick-login cards grouped by branch and role",
+    "Password visibility toggle"
+  ],
+
+  "pwa": [
+    "Android/Chrome install prompt via beforeinstallprompt",
+    "iOS/Safari custom install instructions modal",
+    "Standalone mode detection (hides install button when already PWA)",
+    "Service worker with cache-first for static assets",
+    "Service worker with network-first for API calls",
+    "Offline navigation fallback to home page",
+    "Auto-cache cleanup on service worker update",
+    "Theme color meta tag (#EA580C orange)",
+    "Web app manifest",
+    "Maskable icons for adaptive Android launcher (192x192, 512x512)",
+    "Apple touch icon for iOS home screen",
+    "Zoom prevention (maximum-scale=1, user-scalable=no, viewport-fit=cover)",
+    "navigator.storage.persist() to prevent IndexedDB eviction",
+    "Skip-waiting service worker (immediate activation on update)"
+  ],
+
+  "pos_floor": [
+    "Interactive SVG floor plan with clickable tables",
+    "Table color coding by order state (available, occupied, billing, maintenance, warning, critical)",
+    "Package-colored table backgrounds (rose/pork, blue/beef, orange/combo, amber/ala-carte, violet/empty-order)",
+    "Elapsed session timer per table (MM:SS display)",
+    "Timer color coding by urgency (green normal, yellow warning, red critical)",
+    "Kitchen rejection badge counter with animated pulse on tables",
+    "Unserved item count badge on tables",
+    "Ready-to-serve indicator on tables",
+    "Bill total overlay on occupied tables",
+    "Pax count and capacity indicator per table",
+    "Refill counter badge (bottom-right for AYCE)",
+    "Package badge (top-left showing protein type)",
+    "Selection ring highlight (orange) on click",
+    "Maintenance badge with wrench emoji and dimmed appearance",
+    "Chair rendering with multiple styles (bench/lounge, individual, l-shape, diner)",
+    "Corner-fill connectors where adjacent bench sides meet",
+    "Floor element rendering (walls, dividers, entrances, exits, bars, kitchens, stairs, furniture, custom labels with emojis)",
+    "Table rotation and custom border colors",
+    "Zone grouping (main, vip, bar)",
+    "Auto-select latest occupied table on desktop/iPad",
+    "Ghost-occupied table recovery prompt (race condition scenario)",
+    "Table update ping (660Hz beep + 20ms vibration on external updates)",
+    "Occupied/free/maintenance table count stats in top bar"
+  ],
+
+  "pos_orders": [
+    "Dine-in order creation linked to table",
+    "Takeout order creation with customer name",
+    "Takeout sequential numbering (#TO01, #TO02)",
+    "Takeout status progression (new → preparing → ready → picked_up)",
+    "Takeout queue horizontal scroll strip (mobile) / card grid (desktop)",
+    "Takeout status color coding (blue/new, yellow/preparing, green/ready, gray/picked_up)",
+    "Order item addition with quantity and weight",
+    "Pending items staging before charging",
+    "30-second grace period for item removal without PIN",
+    "Grace period countdown timer display",
+    "Manager PIN-gated item void after grace period",
+    "Void reason tracking (mistake, walkout, write_off)",
+    "Order void with stock auto-restoration",
+    "Item notes/special requests per order item",
+    "FREE item tagging (included sides)",
+    "REFILL note tagging with round tracking",
+    "Refill count per meat type tracking",
+    "Service request items (extra tong, scissors, plates, tissue, cups)",
+    "Service requests sent to KDS only (no billing)",
+    "Custom service request text input",
+    "Repeat-last-round refill suggestion",
+    "Ala-carte search for dishes",
+    "Close-guard confirmation before discarding pending items",
+    "Charge animation with sound feedback",
+    "Item status badges (pending, cooking, served, cancelled)",
+    "Meat stats bar showing total grams dispatched"
+  ],
+
+  "pos_tables": [
+    "Table open with pax count and package selection",
+    "Table close with reset to available",
+    "Table state machine (available → occupied → warning → critical → billing → available)",
+    "Table session timer updates every 30 seconds (reduced writes)",
+    "Table status auto-transition at 105min (warning) and 120min (critical)",
+    "Table maintenance mode toggle",
+    "Table transfer (atomic server operation with offline fallback)",
+    "Table merge (combine two orders, close secondary table)",
+    "Package conflict warning on table merge",
+    "Table capacity tracking and over-capacity warning",
+    "Dynamic table position/size/rotation editing",
+    "Table label customization",
+    "Table chair configuration (per side: top, bottom, left, right)",
+    "Table style editing (color, opacity, border radius)",
+    "Dynamic table addition/deletion",
+    "Print bill flag and billing status transition",
+    "12-table default grid generation per location"
+  ],
+
+  "pos_pax": [
+    "Adult pax count input",
+    "Child pax count (ages 6-9, reduced rate)",
+    "Free pax / infant count (under 5, no charge)",
+    "Senior Citizen discount pool (20%, adults only, exclusive with PWD on same pax)",
+    "PWD discount pool (20%, any guest, exclusive with SC on same pax)",
+    "Discount pool auto-clamping when headcount shrinks",
+    "Over-capacity warning banner",
+    "Pax change with manager PIN requirement",
+    "Package price preview on pax change (newPax × unitPrice vs old)"
+  ],
+
+  "pos_packages": [
+    "Package selection (Pork Unli, Beef Unli, Combo Unli)",
+    "Package upgrade detection (green badge, no PIN)",
+    "Package downgrade detection (red badge, manager PIN required)",
+    "Price delta display per pax on package change",
+    "Auto-sides included with packages (scaled per pax)",
+    "Package breakdown display (collapsed/expandable)",
+    "Package perks/benefits description",
+    "Child pricing per package"
+  ],
+
+  "pos_checkout": [
+    "Cash payment with numpad entry",
+    "Cash preset amounts (₱500, ₱1000, ₱2000)",
+    "Exact change button",
+    "Change calculation display",
+    "GCash payment method",
+    "Maya payment method",
+    "Card payment (Visa/Mastercard)",
+    "Payment hold state for e-wallet confirmation (pending_payment)",
+    "Hold → confirm → paid flow",
+    "Hold cancellation (return to open)",
+    "Multi-method payment support",
+    "Payment progress bar",
+    "Payment method correction on closed orders (manager PIN-gated)",
+    "Equal split bill (divide total evenly, remainder to first guests)",
+    "Item-based split bill (assign items to guest sub-bills)",
+    "Pro-rata discount/VAT allocation across split guests",
+    "Per-guest sub-bill payment with method selection",
+    "Per-guest sub-receipt after payment",
+    "Split cancellation (if no payments yet)",
+    "Manager PIN 30-minute grace period"
+  ],
+
+  "pos_discounts": [
+    "Senior Citizen 20% discount on VAT-exempt base (÷1.12)",
+    "PWD 20% discount on VAT-exempt base",
+    "Pro-rata SC/PWD for partial pax (e.g., 1 SC out of 4)",
+    "Multi-entry discount tracking (discountEntries array)",
+    "Anti-double-counting (SC and PWD can't apply to same pax)",
+    "Promo discount (100% off, no VAT)",
+    "Comp discount (100% off, business override)",
+    "Service recovery discount",
+    "Discount entry form with SC/PWD counts",
+    "BIR-compliant centavo precision rounding",
+    "VAT-exempt sale vs taxable sale breakdown"
+  ],
+
+  "pos_leftover_penalty": [
+    "Leftover penalty at ₱50 per 100g (configurable rate)",
+    "Weight input via numpad (0-99999 grams)",
+    "Bluetooth scale integration for penalty weighing",
+    "Penalty bracket calculation (ceil to 100g)",
+    "Manager PIN to waive/skip penalty",
+    "Penalty policy information toggle"
+  ],
+
+  "pos_receipt": [
+    "BIR-compliant receipt layout",
+    "Branch name and address display",
+    "Order ID and timestamp",
+    "Item breakdown (excluding FREE items)",
+    "Package pricing with adult × unitPrice + child × childPrice",
+    "Refill count aggregation",
+    "SC/PWD pax counts and discount amounts",
+    "Child/free pax display",
+    "VAT amount and breakdown",
+    "Subtotal, discounts, total",
+    "Payment method label",
+    "Cash tendered and change amount",
+    "Receipt print button"
+  ],
+
+  "pos_order_history": [
+    "View paid and cancelled orders",
+    "Filter by date or status",
+    "Reprint receipt from history"
+  ],
+
+  "pos_shifts": [
+    "Shift start with opening float input",
+    "Quick preset float amounts (₱1000, ₱2000, ₱3000, ₱5000)",
+    "Shift close with closing cash count",
+    "Active shift tracking per location per cashier",
+    "Shift state persistence across page reload (localStorage)",
+    "Auto-shift-start blocking modal on POS mount"
+  ],
+
+  "pos_menu": [
+    "Menu item CRUD (create, update, delete)",
+    "Menu item categories (packages, meats, sides, dishes, drinks)",
+    "Menu item availability toggle (86 / un-86)",
+    "Weight-based pricing (price per gram)",
+    "Free item flag",
+    "Retail item flag",
+    "Inventory tracking toggle per item",
+    "Menu item image and description",
+    "Auto-sides association with packages",
+    "15 pre-configured menu items + sides"
+  ],
+
+  "pos_barcode": [
+    "Barcode scanner keystroke accumulation",
+    "Menu item lookup by barcode ID",
+    "Retail item prefix matching (ret-{id})",
+    "300ms timeout buffer reset for slow typing"
+  ],
+
+  "kitchen_orders": [
+    "Active ticket queue merged by orderId",
+    "Live 1-second timer with urgency levels (normal < 5min, warning 5-10min, critical > 10min)",
+    "Color-coded ticket borders with pulsing red animation for critical",
+    "Progress bar showing served/total items",
+    "Grouped item display (Meats → Dishes & Drinks → Service Requests)",
+    "Collapsible Dishes & Drinks section",
+    "Refill tracking with round badges (Rnd 2 · REFILL)",
+    "86 item toggle from KDS with un-86 confirmation",
+    "Item return button (opens refuse reason modal)",
+    "Mark item served button",
+    "Ticket bumping when all items served",
+    "Ticket recall (undo last bump)",
+    "Recall specific bumped ticket",
+    "Void overlay (red banner with VOIDED: {itemName} + Got it button)",
+    "Void overlay auto-dismiss after 30 seconds",
+    "New table count badge (tables opened < 10min with no items sent)",
+    "Print status indicator with retry button",
+    "Auto-print incoming tickets",
+    "Staleness indicator (no updates > 60s)",
+    "Toast notifications with undo button (5s timeout)",
+    "Header stats (active orders, total items, new tables)"
+  ],
+
+  "kitchen_audio": [
+    "New order chime (440Hz sine wave, 300ms via WAV file)",
+    "Void beep (880Hz distinct tone, 200ms via Web Audio API)",
+    "Volume control slider (0-1.0)",
+    "Dispatch: new order tone (G5→C5 descending double-ding)",
+    "Dispatch: meat update tone (G4→B4→D5 punchy triple-tone)",
+    "Dispatch: dishes update tone (E4→G4→B4 warm three-tone)",
+    "Dispatch: sides done tone (A5→A5 punchy double beep)",
+    "Dispatch: request incoming tone (F5→F5→A5 urgent triple-tap)",
+    "Dispatch: ready-to-run tone (C5→E5→G5→C6 triumphant ascending chime)",
+    "Stove: dish arrival tone (440Hz, distinct from sides 660Hz)",
+    "Audio fires only on new item addition (skips first mount)",
+    "Reusable AudioContext to avoid browser throttling"
+  ],
+
+  "kitchen_dispatch": [
+    "Per-table dispatch cards with station progress",
+    "Station status indicators (empty=N/A, hourglass=pending, checkmark=done)",
+    "Meats progress (X/Y done with weight indicators)",
+    "Dishes progress (X/Y done)",
+    "Sides progress with individual DONE buttons",
+    "ALL SIDES DONE bulk button",
+    "Service request chips with DONE buttons",
+    "Ready-to-Run state (green border, floats to top)",
+    "ALL DONE — CLEAR ORDER button",
+    "Dine-in/takeout indicator with pax count",
+    "SC/PWD badge showing count",
+    "Package row with color coding",
+    "Deep links to Weigh Station and Stove for pending work",
+    "Undo toast on order clear with recall button"
+  ],
+
+  "kitchen_stove": [
+    "Dishes & drinks only view (no meats, no sides)",
+    "Dine-in and takeout sections separated",
+    "Per-item serve button",
+    "ALL DONE bulk completion button",
+    "Bump All button",
+    "Print chit button for takeout with success/error feedback",
+    "Empty state showing completed orders today + avg service time + last completed"
+  ],
+
+  "kitchen_sides_prep": [
+    "New tables alert (opened < 15min with no items sent, with acknowledgment)",
+    "Sides queue merged by order (oldest-first)",
+    "Service request alerts with urgency levels (purple background)",
+    "Per-item serve button",
+    "ALL SIDES DONE bulk button",
+    "Stats (pending sides count, active tables count)"
+  ],
+
+  "kitchen_weigh_station": [
+    "Pending meat items grouped by table/order with pax count",
+    "Suggested grams per pax (150g baseline)",
+    "Protein-grouped sections (beef first, pork second, others)",
+    "2-column chip layout per protein",
+    "Bluetooth scale live weight display",
+    "Meat weight dispatch (deducts stock, marks served, bumps KDS ticket)",
+    "Refill round number display",
+    "Current stock display per meat type",
+    "Meat label printing with order ID, table, meat name, weight, timestamp",
+    "Dispatch log cached in localStorage (restores on page reload)"
+  ],
+
+  "kitchen_yield_calculator": [
+    "Meat cut picker with searchable dropdown (stock-backed)",
+    "Raw weight input via numpad",
+    "Trimmed weight input via numpad",
+    "Yield percentage calculation (trimmed/raw × 100)",
+    "Manager PIN required for non-kitchen roles",
+    "Audit log entry on save",
+    "Editable yield overrides persisted to localStorage"
+  ],
+
+  "kitchen_refuse": [
+    "Preset refuse reasons (Out of Stock, Equipment Issue, Quality Issue, Wrong Order)",
+    "Custom reason input via textarea",
+    "Stock auto-restoration on refuse",
+    "Alert sent to POS floor (rejection badge on table)"
+  ],
+
+  "kitchen_all_orders": [
+    "Aggregate mode via SSE for cross-branch visibility",
+    "Branch connection status indicators (connecting/connected/error)",
+    "Status filter tabs (All, Open, Pending, Paid, Cancelled with counts)",
+    "Time filter (Today, Last Hour, Last 3 Hours, All Time)",
+    "Order cards with status badges, timing, pax, package, progress bar",
+    "Dine-in/takeout color-coded left border",
+    "Wait time urgency coloring",
+    "Order detail modal with full item list and timing",
+    "Editable order notes (local mode only)",
+    "Add Ala-Carte Item from KDS (local mode only, hidden in aggregate)",
+    "Item picker modal with category tabs",
+    "Read-only mode in aggregate (no edits across branches)",
+    "60-second auto-refresh timer"
+  ],
+
+  "kitchen_kds_history": [
+    "Bumped/completed tickets grouped by date (Today/Yesterday/MMM d)",
+    "Per-ticket: table/customer, bump time, item chips (color-coded by category)",
+    "Bumped-by user display",
+    "Recall button per ticket",
+    "Count badge"
+  ],
+
+  "kitchen_sse_realtime": [
+    "Smart debounce push (critical changes immediate, edits 3s debounce)",
+    "Fingerprint-based change detection (order count + status signature)",
+    "Ring buffer (50-event capacity) for resumable SSE",
+    "Last-Event-ID header support for reconnect replay",
+    "30-second heartbeat keepalive",
+    "Multi-branch SSE aggregator (server-side proxy)",
+    "Per-branch error isolation in aggregate mode"
+  ],
+
+  "stock_inventory": [
+    "Master inventory view with search and status filters (ok/low/critical)",
+    "Grid view (mobile) and list view (desktop) toggle",
+    "Sort by name or current stock level",
+    "Protein-grouped display (pork, beef, chicken, other) with collapsible sections",
+    "Auto-expand groups with critical/low items",
+    "Needs Attention section (critical, low, expiring soon, approaching low items)",
+    "Per-item health strip (status dot, current vs min, visual bar)",
+    "Per-item quick actions (Add/Deduct/Set stock)",
+    "86 toggle from inventory (role-gated)",
+    "Edit item metadata (name, description, min level, image)",
+    "All Locations cross-branch comparison view",
+    "Imbalance detection (>30% difference between branches)",
+    "Protein donut chart per group",
+    "Expand All / Collapse All buttons",
+    "Stock placeholder image generation"
+  ],
+
+  "stock_deliveries": [
+    "Receive delivery with item selector (branch-scoped)",
+    "Quantity input with Bluetooth scale weight support",
+    "Supplier input with recent supplier autocomplete",
+    "Batch number tracking",
+    "Expiry date picker",
+    "Unit cost entry for procurement CTA",
+    "Photo capture (up to 3 images with compression)",
+    "FIFO batch management (usedQty tracking per batch)",
+    "FIFO progress ring visualization per batch",
+    "Spoilage/expiry alerts (red expired, yellow expiring < 3 days)",
+    "Search by item name, supplier, or batch number",
+    "Date range filter (all/today/yesterday/earlier)",
+    "Show/hide depleted batches toggle",
+    "Auto-open receive form via ?action=open URL param"
+  ],
+
+  "stock_waste": [
+    "6 waste reason types with icons (Dropped/Spilled, Expired, Unusable/Damaged, Overcooked, Trimming/bone/fat, Other)",
+    "Overcooked hidden for warehouse users",
+    "Item selector grouped by category (Meats first)",
+    "Quantity and unit auto-fill",
+    "Today's waste summary (total waste, top reason, most wasted item)",
+    "Today's entries list (mobile cards + desktop table)",
+    "Auto-open via ?action=open URL param"
+  ],
+
+  "stock_counts": [
+    "Three daily count periods (10 AM, 4 PM, 10 PM)",
+    "Count deadline display with urgency coloring (normal/warning/overdue)",
+    "Period selector buttons (am10, pm4, pm10)",
+    "Per-category collapsible sections",
+    "Per-item count input (QuickNumberInput)",
+    "Expected vs counted variance display",
+    "Variance color coding (>10% red, >2% yellow, !=0 yellow)",
+    "Variance chart for completed periods",
+    "Category subtotals (same-unit items only)",
+    "Summary stats (total variance, items with drift)",
+    "Sticky top Submit Count bar",
+    "Auto-open via ?action=open URL param"
+  ],
+
+  "stock_transfers": [
+    "3-step transfer wizard (select item → choose destination → confirm)",
+    "Source location auto-detection (warehouse or current branch)",
+    "Destination validation (only locations tracking same menuItemId)",
+    "Real-time remaining stock calculation",
+    "Transfer notes field",
+    "Auto-create delivery at destination (supplier=Transfer from [location])",
+    "Auto-open via ?action=open URL param"
+  ],
+
+  "stock_adjustments": [
+    "Manual stock add (no reason required)",
+    "Manual stock deduct (reason required)",
+    "Manual stock set/override (reason required)",
+    "All adjustments audit logged"
+  ],
+
+  "stock_pos_integration": [
+    "Automatic stock deduction when tracked item ordered",
+    "Automatic stock restoration on void/cancel/reject",
+    "Negative stock prevention guard (server-side)",
+    "Stock level lookup from POS via menuItemId → stockItemId mapping"
+  ],
+
+  "stock_meat_ontology": [
+    "30 meat cut nodes across beef, pork, chicken",
+    "40 conversion edges with default yields (50-90%)",
+    "Editable yield overrides (localStorage-persisted)",
+    "Meat ontology graph visualization",
+    "Conversion examples: bone-in → bone-out (75%), bone-out → sliced (90%)",
+    "getProteinType inference from item name"
+  ],
+
+  "reports_operations": [
+    "X-Reading generation with manager PIN gate (BIR immutable record)",
+    "X-Read history with timestamp, branch, gross sales, discrepancy",
+    "X-Read comparison chart (current period vs last X-Read)",
+    "End of Day / Z-Reading summary",
+    "Open tables guard (warns if tables still occupied)",
+    "Stale shift detection (checks if yesterday had Z-Read)",
+    "Cash reconciliation (opening float + cash collected − cash expenses = expected)",
+    "Cash variance calculation (actual vs expected closing)",
+    "Payment breakdown (Cash, GCash, Maya, Card)",
+    "Table sales per-table breakdown (sessions, pax, sales)",
+    "Meat consumption report with protein grouping",
+    "Meat report tabs (Consumption, Transfers, Conversion)",
+    "Meat grand totals (opening, deliveries, consumed, waste, closing)",
+    "Stock variance analysis by period (today/week/month)",
+    "Variance rows (delivered, sold, waste, expected, counted, drift, driftPct)",
+    "Window.print() for X-Read and EOD reports"
+  ],
+
+  "reports_revenue": [
+    "Sales summary KPI cards (Gross Sales, Net Sales, VAT, Avg Ticket, Total Pax)",
+    "YoY comparison on KPI cards",
+    "Time-series bar chart (14 days or 8 weeks, toggleable granularity)",
+    "Period filter (Today, Week, Month, All)",
+    "Best sellers by meat weight",
+    "Best sellers by addon quantity",
+    "Peak hours hourly traffic heatmap",
+    "Transaction log with status/search filters",
+    "Voids & discounts audit trail"
+  ],
+
+  "reports_profitability": [
+    "Gross profit calculation (revenue − COGS)",
+    "Net profit calculation (gross profit − expenses − overheads)",
+    "Branch comparison (Alta Citta vs Alona Beach side-by-side)"
+  ],
+
+  "expenses": [
+    "16 expense categories in 4 groups (Staff & Labor, Procurement, Utilities, Operations)",
+    "Amount input with meter fields for utilities (electricity, water, gas)",
+    "Meter calculation (current − previous × rate)",
+    "Gas/LPG: kg × rate",
+    "Paid-by dropdown (Cash from Register, GCash, Maya, Credit/Debit, Check, Bank Transfer, Petty Cash, Other)",
+    "Receipt photo capture via camera",
+    "Expense date picker (default today)",
+    "Template system (save, edit, delete recurring templates)",
+    "Template recurrence (One-time, Daily, Weekly, Monthly)",
+    "Quick-add from saved template",
+    "Filter by period (Today, Week, Month, All)",
+    "Sort by amount (Asc/Desc/None)",
+    "Category subtotals and running total",
+    "Undo delete with 5-second timeout",
+    "Group border colors (Staff=green, Procurement=blue, Utilities=purple, Operations=amber)"
+  ],
+
+  "expenses_utilities": [
+    "Utility meter readings (water, gas, electricity)",
+    "Consumption calculation (current − previous reading)",
+    "Rate-based cost calculation",
+    "Auto-create expense from utility reading",
+    "Last reading pre-fill (previous reading lookup)",
+    "Editable utility rates with defaults"
+  ],
+
+  "admin_users": [
+    "User table (name, username, role, branch, visible tabs, status, last login)",
+    "Role badges color-coded (Owner, Admin, Manager, Kitchen, Staff)",
+    "User status toggle (Active/Inactive)",
+    "Add User modal (display name, username, password, role, branch)",
+    "Edit user button",
+    "Deactivate user with audit log entry"
+  ],
+
+  "admin_menu_editor": [
+    "Category filter tabs (All, Packages, Meats, Sides, Dishes, Drinks)",
+    "Add/Edit item modal with all menu item fields",
+    "Weight-based pricing toggle with price-per-gram input",
+    "Free item toggle",
+    "Track inventory toggle",
+    "Auto-sides selection for packages",
+    "Image upload with preview",
+    "Delete item with confirmation modal"
+  ],
+
+  "admin_activity_logs": [
+    "Action type filter (All, Order, Payment, Stock, Expense, Auth, Admin)",
+    "Branch filter (All, Alta Citta, Alona Beach)",
+    "Live indicator with pulsing green dot",
+    "Log entry count display",
+    "Log table (Timestamp, Type, Description, User/role, Branch)",
+    "Color-coded type badges with emoji icons",
+    "Immutable append-only log"
+  ],
+
+  "admin_floor_editor": [
+    "Location selector (Alta Citta, Alona Beach)",
+    "SVG canvas with drag-to-move tables and elements",
+    "Resize handles (NW, NE, SW, SE corners)",
+    "Rotation handle (center top)",
+    "Snap-to-grid (configurable grid size)",
+    "Grid visualization overlay",
+    "Table shape (circle or square) with custom label",
+    "Floor elements (doors, pillars, decorations, restrooms, bar, kitchen counter)",
+    "Right-click context menu (properties, delete, duplicate)",
+    "Chair side popover editor (per side: top, bottom, left, right)",
+    "Canvas config inputs (width, height, grid size)",
+    "Keyboard shortcuts (Delete/Backspace=remove, Escape=deselect)",
+    "Pan mode (spacebar + drag)",
+    "Zoom controls (0.25x to 3x)",
+    "Save to RxDB and API",
+    "Export floor layout to seed JSON file (dev only)",
+    "Pointer capture for drag outside SVG bounds"
+  ],
+
+  "admin_devices": [
+    "Two view modes (Topology network diagram, Cards)",
+    "Device grouping by IP address",
+    "Device type indicator (Monitor, Smartphone, Tablet)",
+    "Current route/page display per device",
+    "Current user + role per device",
+    "Connection status (online green, stale amber <5min, offline red)",
+    "Last seen timestamp with auto-refresh",
+    "Server device special badge (blue highlight, primary node in topology)",
+    "Real-time updates via SSE + 30-second fallback poll",
+    "Device rename (inline edit + save)",
+    "Device removal from tracking",
+    "Prune stale devices (>24 hours idle)",
+    "Sync badge (Local Only, Syncing, Synced, Sync Error)",
+    "Data mode badge (Full DB, Selective DB, SSE Stream, API Fetch)",
+    "DB conformity comparison (device vs server timestamp/count)",
+    "Duplicate server warning (multiple servers at same location)",
+    "No server warning (critical alert)",
+    "Full Database Reset with 2x confirmation (admin only)",
+    "Database Export as JSON backup",
+    "10-second auto-refresh ticker"
+  ],
+
+  "system_database": [
+    "RxDB v16 with IndexedDB (Dexie) storage on server",
+    "In-memory storage on thin client devices",
+    "18 collections with schema versioning and migrations",
+    "Priority collections for thin clients (6: tables, orders, menu_items, kds_tickets, devices, floor_elements)",
+    "Secondary collections for server/admin only (8: stock_items, deliveries, stock_events, etc.)",
+    "AJV validator for IEEE 754 precision on timestamps",
+    "Leader election plugin (avoid duplicate writes across tabs)",
+    "Dev-mode schema validation with HMR support",
+    "Auto-seed on first run (menu, expenses, tables, floor layout)",
+    "URL escape hatch ?reset-db=1 to force-clear IndexedDB",
+    "Fallback djb2 hash function for non-HTTPS contexts",
+    "Migration strategies for all schemas with updatedAt backfill"
+  ],
+
+  "system_replication": [
+    "Push/pull replication per collection via HTTP",
+    "Priority sync tiers (critical collections first)",
+    "Sync activity tracking with phase reporting (initializing, syncing, complete)",
+    "Sync gate overlay on client devices (8-second timeout)",
+    "Multiplexed SSE stream for all 15 collections + broadcasts + client changes",
+    "Server-side in-memory document store with sorted index (O(log n) lookups)",
+    "Field-level CRDT merge for concurrent edits (orders, tables, kds_tickets, stock_items, deliveries)",
+    "Monotonic CRDT fields (e.g., deliveries.usedQty uses max() to prevent lost increments)",
+    "Checkpoint pagination for pull (batch size capped at 1000)",
+    "Full reset capability (RESET_ALL broadcast to all clients)",
+    "Server epoch tracking for restart detection",
+    "Sync generation counter in localStorage",
+    "Client-to-server log forwarding (/api/replication/client-log)",
+    "Log throttling and noise filtering (demotes noisy patterns, throttles startup spam)"
+  ],
+
+  "system_write_guards": [
+    "Guard: duplicate dine-in orders (auto-heals orphans)",
+    "Guard: duplicate table occupancy",
+    "Guard: table state transition validation",
+    "Guard: order state transition validation",
+    "Guard: orphan order auto-healing",
+    "Guard: duplicate active KDS tickets (merges instead)",
+    "Guard: duplicate active shifts per location",
+    "Guard: duplicate Z-Reads per business date",
+    "Guard: table close with open order prevention",
+    "Guard: stock negative prevention (audit-only, non-blocking)",
+    "Guard event recording (in-memory, max 50 FIFO)",
+    "Guard auto-dismiss after 60 seconds",
+    "Guard audit log integration",
+    "Guard layers: replication (server), write-api (HTTP), client (pre-check)"
+  ],
+
+  "system_admin_guards": [
+    "Critical action registry (8 actions with risk levels)",
+    "Actions: floor-publish, table-delete, menu-item-delete, menu-item-disable, package-edit, pricing-change, vat-change, location-settings",
+    "Active service detection (counts open/pending orders before allowing risky changes)",
+    "Manager PIN verification for critical admin actions"
+  ],
+
+  "system_connectivity": [
+    "Three-tier connectivity detection (full, LAN-only, offline)",
+    "Circuit breaker pattern (3-failure threshold, 30s/60s reset)",
+    "LAN probe with token echo verification",
+    "Internet probe (Google CDN, no-cors mode)",
+    "Browser online/offline event listeners",
+    "Last online timestamp tracking",
+    "KDS reachability flag with critical alert modal",
+    "KDS offline warning banner (persistent after dismiss)",
+    "Connection status floating pill (top-right, animated)",
+    "Connection status expandable panel with full diagnostics",
+    "Simulation helpers for offline/LAN-only/KDS-down (dev/admin only)",
+    "60-second automatic probing interval"
+  ],
+
+  "system_device_tracking": [
+    "Device ID generation (nanoid-based, 96-bit entropy)",
+    "Device ID persistence (localStorage primary, cookie backup 1-year expiry)",
+    "Device re-identification via hardware fingerprint (userAgent, deviceType, ±50px screenWidth, 7-day window)",
+    "Device type auto-detection (phone <768px, tablet, desktop)",
+    "Device name customization",
+    "Heartbeat system (5s fast cadence for 30s, then 30s periodic)",
+    "Visibility-triggered catch-up heartbeat on tab focus",
+    "DB fingerprinting (doc count + latest timestamp)",
+    "Device route reporting on every SvelteKit navigation",
+    "Device route map logging (throttled, shows all devices' locations)",
+    "Stale device pruning (>24 hours offline)"
+  ],
+
+  "system_data_mode": [
+    "Data mode: full-rxdb (server device, all collections)",
+    "Data mode: selective-rxdb (client with role-specific collections)",
+    "Data mode: sse-only (thin client, streaming only)",
+    "Data mode: api-fetch (fallback, no local persistence)",
+    "Role-based collection scope (staff/kitchen get 6 priority, owner/admin get all 18)",
+    "Mode cached in sessionStorage for instant recovery",
+    "Dynamic replication restart on scope change"
+  ],
+
+  "system_audit_log": [
+    "55+ specific action log wrappers",
+    "Action types: order, payment, stock, expense, auth, admin, kitchen, hardware",
+    "Convenience loggers: tableOpened, itemCharged, discountApplied, tableClosed, orderVoided, itemVoided, etc.",
+    "Human-readable + ISO timestamps",
+    "Fire-and-forget writes via write proxy",
+    "RxDB-backed persistent storage",
+    "Location-scoped log entries"
+  ],
+
+  "system_db_health": [
+    "Data integrity checks (stale location IDs, schema validation)",
+    "Database reset function",
+    "Error reporting with codes",
+    "Health status tracking (ok, checking, error)",
+    "DbHealthBanner emergency reset button in root layout"
+  ],
+
+  "system_server_recovery": [
+    "Server Preparing overlay (blocks UI after server reset)",
+    "Live progress bar with log streaming during recovery",
+    "wtfpos_server_preparing localStorage flag",
+    "SERVER_READY broadcast signal to all clients",
+    "Auto-reload on server epoch change"
+  ],
+
+  "hardware_bluetooth_scale": [
+    "Web Bluetooth GATT pairing for meat scales",
+    "Device scanning with signal strength display",
+    "Connection states (disconnected, scanning, pairing, connected)",
+    "Weight stability detection (idle, unstable, stable)",
+    "Battery level tracking (85-99%)",
+    "RSSI signal strength display",
+    "Two simulated devices (Scale A kitchen, Scale B floor)",
+    "Hold-to-weigh interaction (ramp up on hold, stabilize on release)",
+    "Weight placement simulation (8-tick stabilization)",
+    "Weight removal simulation (drain to 0)",
+    "Bluetooth Scale Simulator component (dev mode, when no real hardware)"
+  ],
+
+  "hardware_printer": [
+    "Receipt printer status tracking (online, offline, paper_out, jammed)",
+    "Kitchen printer status tracking",
+    "Print receipt with simulated 1.2s latency",
+    "Print kitchen order with simulated 800ms latency",
+    "Print meat label with simulated 600ms latency",
+    "Cash drawer open with simulated 300ms latency",
+    "Hardware error simulation for UI testing",
+    "Hardware error resolution"
+  ],
+
+  "hardware_photo_capture": [
+    "Camera capture via file input",
+    "Image compression (1024px max, 0.8 quality JPEG)",
+    "Thumbnail gallery (max 3 images)",
+    "Individual photo removal",
+    "Lightbox preview on click"
+  ],
+
+  "ui_audio_system": [
+    "5 synthesized sound presets (click, error, success, warning, sale)",
+    "Click: 800Hz sine wave",
+    "Error: 200→150Hz square buzz",
+    "Success: 660→880Hz sine chime",
+    "Warning: 440→330Hz triangle wave",
+    "Sale: C6→E6→G6 arpeggio + G7 shimmer + C5 sub-bass",
+    "AudioContext.resume() for browser autoplay handling",
+    "playSound('preset') API"
+  ],
+
+  "ui_haptics": [
+    "navigator.vibrate(20) on add-to-order",
+    "navigator.vibrate(30) on quantity change",
+    "Phone/tablet only (no effect on desktop)"
+  ],
+
+  "ui_responsive": [
+    "Mobile bottom sheet modals",
+    "Desktop centered overlays",
+    "Collapsible sidebar (desktop rail, mobile sheet drawer)",
+    "Touch device detection (ontouchstart, maxTouchPoints)",
+    "Viewport-based layout (phone 4-col, tablet 2-col)",
+    "Landscape phone detection (height ≤500px)",
+    "Min 44px touch targets on interactive elements"
+  ],
+
+  "ui_navigation": [
+    "AppSidebar with role-based nav items",
+    "Quick Action grid (8 manager shortcuts with ?action=open URLs)",
+    "LocationBanner always visible on authenticated pages",
+    "SubNav tabs per section",
+    "MobileTopBar with hamburger menu (md:hidden)",
+    "Live clock in sidebar header (HH:MM:SS)",
+    "Sidebar keyboard shortcut (Cmd/Ctrl + B toggle)"
+  ],
+
+  "ui_formatting": [
+    "formatPeso() — ₱ PHP currency with en-PH locale",
+    "formatCountdown() — MM:SS timer display",
+    "formatTimeAgo() — relative timestamps (2m ago, 1h ago)",
+    "formatDisplayId() — #T{table}-{ID} or #TO-{ID}",
+    "formatKg() — grams → kg promotion at 1000g",
+    "formatWeight() — { display, unit } with auto-promotion",
+    "formatTime() — HH:MM AM/PM",
+    "formatDate() — context-aware (Today 6:00 AM, Yesterday, Mar 9)",
+    "cn() — Tailwind class merging (clsx + tailwind-merge)"
+  ],
+
+  "api_endpoints": [
+    "POST /api/collections/[collection]/write — guarded document writes",
+    "GET /api/collections/[collection]/read — document reads with location filter",
+    "POST /api/replication/[collection]/push — replication push with 6 guard filters",
+    "GET /api/replication/[collection]/pull — replication pull with checkpoint pagination",
+    "POST /api/replication/ping — connectivity + write capability test",
+    "GET /api/replication/status — document counts + checksums per collection",
+    "POST /api/replication/server-ready — server readiness broadcast (loopback only)",
+    "POST /api/replication/reset — full database reset broadcast (loopback only)",
+    "GET /api/replication/stream — multiplexed SSE for all collections + broadcasts",
+    "POST /api/replication/sync-check — client sync health report submission",
+    "GET /api/replication/sync-check — read all client sync reports",
+    "PUT /api/replication/sync-check — trigger all clients to run sync check",
+    "POST /api/replication/ping-chat — network diagnostic message send",
+    "GET /api/replication/ping-chat — SSE stream for diagnostic messages",
+    "POST /api/replication/client-log — client-to-server log forwarding",
+    "GET /api/device/identify — server IP/hostname/epoch for device identity",
+    "POST /api/device/identify — device re-identification via hardware fingerprint",
+    "GET /api/device/clients — all tracked client connections",
+    "POST /api/device/route — lightweight route reporter (sendBeacon)",
+    "GET /api/sse/kitchen-orders — branch kitchen order SSE stream",
+    "GET /api/sse/aggregate — multi-branch kitchen SSE aggregator",
+    "POST /api/events/kitchen-push — kitchen snapshot broadcast",
+    "POST /api/pos/transfer — atomic table-to-table order transfer",
+    "POST /api/reports/x-read — BIR X-Read generation from server snapshot",
+    "POST /api/admin/save-floor-seed — export floor layout to seed file (dev only)"
+  ],
+
+  "server_modules": [
+    "hooks.server.ts — page navigation logging with device hints",
+    "logger.ts — structured logging with pull batch grouping and emoji-aware width",
+    "client-tracker.ts — client connection tracking with fingerprint re-identification",
+    "kitchen-sse.ts — kitchen orders broadcasting with ring buffer",
+    "replication-store.ts — in-memory document store with sorted index and CRDT merge",
+    "ping-chat.ts — ephemeral message bus for network testing",
+    "sync-check-store.ts — per-client replication health reports",
+    "epoch.ts — server restart epoch constants"
+  ],
+
+  "dev_tools": [
+    "/test-db debug page (dev mode only)",
+    "Ping test with round-trip latency",
+    "Push/pull replication tests",
+    "Replication round-trip timing",
+    "Device identity check",
+    "Write proxy test (insert/read/delete latency)",
+    "Route health check (all major routes, collection sync status)",
+    "Server status endpoint (total docs, epoch, per-collection counts)",
+    "Ping-Chat live messaging (send/receive with timestamps)",
+    "Client log submission to server console",
+    "Collection sync details (expandable per-collection)",
+    "Dev error badge (bottom-right, shows error count + stack traces, dev mode only)",
+    "Database reset button on login page (dev mode only)",
+    "Bluetooth scale simulator (when no real hardware)",
+    "Connection simulation helpers (simulateOffline, simulateLanOnly, simulateKdsDown)",
+    "LOG_LEVEL env var for server logging verbosity"
+  ],
+
+  "network_resilience": [
+    "Exponential backoff with jitter (AWS full-jitter algorithm) for reconnection delays",
+    "Circuit breaker state machine (closed/open/half-open, configurable failure threshold)",
+    "Client-side data integrity checksums (djb2 hash verification against server)",
+    "AbortSignal.timeout() on all fetch calls (5-10 second timeouts)",
+    "AbortController cleanup on SSE disconnect",
+    "navigator.sendBeacon for fire-and-forget route tracking",
+    "Tab visibility detection (resume sync on visibilitychange)",
+    "Fetch retry with circuit breaker protection"
+  ],
+
+  "build_and_config": [
+    "App version tracking (APP_VERSION, BUILD_DATE, BUILD_MODE globals)",
+    "Vite connectionLogger plugin (detects new LAN clients at TCP socket level)",
+    "Basic SSL plugin for HTTPS local development",
+    "Safari 15 build target (es2020 + safari15 for iOS compatibility)",
+    "SvelteKit hover prefetch (data-sveltekit-preload-data=hover)",
+    "Node.js adapter for monorepo deployment",
+    "LAN exposure (host: 0.0.0.0, allowedHosts: true)",
+    "Environment-controlled cross-branch SSE URLs (TAG_SSE_URL, PGL_SSE_URL)",
+    "color-scheme: light only forced in HTML",
+    "Process shims for browser compatibility"
+  ],
+
+  "design_system": [
+    "20+ custom Tailwind color tokens (accent, surface, status-green/yellow/red/purple/cyan/bluetooth)",
+    "Inter font for body/headings, JetBrains Mono for prices/timers",
+    "Custom border radii (sm=6, md=8, lg=12, xl=16)",
+    "pulse-slow animation (3s, lower frequency than default)",
+    "border-pulse-red animation (1.5s, for critical alerts)",
+    "border-pulse-yellow animation (2s, for warnings)",
+    "border-pulse-bluetooth animation (1.5s, for connecting devices)",
+    "border-pulse-accent animation (1.8s orange with shadow, for active state)",
+    "POS component classes (pos-card, btn-primary/secondary/danger/success/ghost, badge-*, pos-input)",
+    "48px min-height buttons with active:scale-95 press feedback",
+    "Scrollbar hiding utility class (.scrollbar-hide)",
+    "CSS variables for shadcn-svelte sidebar system",
+    "no-select utility class for POS touch prevention"
+  ],
+
+  "mobile_landscape": [
+    "Landscape phone compact layout (@media orientation: landscape, max-height: 500px)",
+    "Mobile topbar hidden in landscape (replaced by sidebar panel)",
+    "Compact floor plan padding and gaps in landscape",
+    "Compact header font sizes in landscape",
+    "Compact takeout queue in landscape",
+    "Compact LocationBanner vertical padding in landscape",
+    "Compact OrderSidebar font and padding in landscape"
+  ],
+
+  "svelte_transitions": [
+    "transition:fade on modal overlays and toasts",
+    "transition:slide on collapsible sections",
+    "transition:fly on modal entrance animations"
+  ],
+
+  "static_assets": [
+    "55 menu item photos (JPG) for POS item cards",
+    "36 stock/inventory item photos (JPG) for inventory views",
+    "new-order.wav sound file for kitchen notifications",
+    "SVG vector logo icon"
+  ],
+
+  "error_handling": [
+    "Global window error capture (unhandled errors + promise rejections, dev mode overlay)",
+    "Performance.now() timing for network latency diagnostics",
+    "SHA-256 hashing with djb2 fallback for non-HTTPS LAN contexts",
+    "Legacy expense category migration mapping (v5→v6)",
+    "Cookie-based device ID backup (1-year expiry, survives localStorage clear)"
+  ],
+
+  "data_export": [
+    "Database export as JSON file (Blob + URL.createObjectURL download)",
+    "Floor layout export to seed JSON via API",
+    "URL.revokeObjectURL cleanup after download"
+  ],
+
+  "empty_states": [
+    "No X-Reads generated yet this shift (X-Read history)",
+    "No expenses for this period (Expenses page)",
+    "No prior month data (Monthly expense comparison)",
+    "No revenue data for this period (Meat report)",
+    "No transfers recorded for this period (Meat report transfers tab)",
+    "No orders found for this period with dynamic guidance (Branch comparison)",
+    "No menu items in this category (Menu editor)",
+    "No tables yet — click + Table to add one (Floor editor)",
+    "No devices registered yet (Devices page)",
+    "No server detected with troubleshooting hint (Devices topology)",
+    "No other devices connected (Devices topology)",
+    "Empty state for KDS stove: completed orders today + avg service time + last completed"
+  ],
+
+  "loading_states": [
+    "Initializing database... spinner on root layout mount",
+    "Preparing Server overlay with progress bar and live log streaming",
+    "Connecting to server... (sync gate phase 1)",
+    "Syncing data with server... (sync gate phase 2)",
+    "Core data loaded, syncing history... (sync gate phase 3)",
+    "Syncing badge on individual device rows (admin devices)",
+    "Connecting to branches... (KDS aggregate mode)",
+    "Merging... button text during takeout merge",
+    "checkoutLoading flag disables checkout button during API call",
+    "ShiftStartModal spinner during shift start submission",
+    "Opening Shift... status message with disabled button",
+    "clientsLoading state in ConnectionStatus panel"
+  ],
+
+  "confirmation_dialogs": [
+    "X-Read generation with PIN + Confirm & Generate modal",
+    "Un-86 inline confirmation bar (Cancel/Restore buttons in KDS)",
+    "Refuse reason modal with confirm/cancel for kitchen item return",
+    "EOD recurring costs checkbox confirmation",
+    "Large expense amount threshold warning dialog",
+    "Expense delete confirmation with manager PIN",
+    "Menu item delete Are you sure? confirmation",
+    "Database wipe double-confirm() dialog (admin devices)",
+    "Stock transfer 3-step wizard with final confirmation",
+    "Add item to order inline Confirm button (KDS all-orders)"
+  ],
+
+  "toast_notifications": [
+    "Order complete: T{n} — All items served + Undo button (5s)",
+    "Return flagged — Alert sent to T{n}",
+    "Item marked sold out + Undo button",
+    "N item(s) sent to kitchen (charge cascade)",
+    "Order paid: {label} paid {amount} via {method}",
+    "Dispatch cleared: {label} — Order cleared + Undo",
+    "Failed to update — {error message} (error toast)",
+    "Delivery received success toast (3.5s)",
+    "Expense saved success (3s visibility)",
+    "Expense undo delete (5s window before permanent deletion)",
+    "86 toggle: {itemName} marked available/sold out (inventory)"
+  ],
+
+  "form_validation": [
+    "Pick a category (expense form)",
+    "Enter a valid amount (expense form)",
+    "Add a description (expense form)",
+    "Enter previous reading (utilities form)",
+    "Enter current reading (utilities form)",
+    "Current must be ≥ previous (utilities logic validation)",
+    "Enter a valid rate (utilities form)",
+    "Select billing period (utilities form)",
+    "N table(s) still open... (EOD pre-flight guard)",
+    "Username not found (login error)",
+    "Failed to save fallback (API error)"
+  ],
+
+  "accessibility": [
+    "60+ aria-label attributes on buttons, controls, and status indicators",
+    "role=button, dialog, presentation, status, progressbar, img, graphics-symbol",
+    "sr-only screen reader labels on sidebar triggers and sheet overlays",
+    "30+ tabindex attributes for keyboard navigation",
+    "aria-hidden=true on decorative icons",
+    "aria-pressed on category filter buttons",
+    "aria-expanded on collapsible accordion sections",
+    "aria-valuenow/min/max on progress bars (kitchen, stock, sides-prep)",
+    "aria-modal=true on dialog overlays"
+  ],
+
+  "timezone_and_locale": [
+    "Server-side Manila timezone (Asia/Manila) for X-Read business day boundaries",
+    "Client-side en-PH locale for date formatting",
+    "BIR centavo rounding (round2: Math.round(n * 100) / 100)",
+    "VAT extraction from inclusive price (sub - sub / 1.12)",
+    "Pro-rata SC/PWD discount per qualifying pax share",
+    "Intl.NumberFormat for PHP currency (en-PH, 2 decimal places)",
+    "date-fns format/formatDistanceToNow/isToday/isYesterday for contextual time labels"
+  ],
+
+  "caching_and_performance": [
+    "Map-based O(1) lookup indexes for stock items, menu items, orders",
+    "Write queue serialization (per-document-ID sequential writes prevent interleaving)",
+    "50ms per-collection write debounce (coalesces rapid DB writes before replication pull)",
+    "Order snapshot change detection (prevOrderSnapshots Map for diffing updates)",
+    "Stock calculation cache (Map<stockItemId, currentStock> for derived values)",
+    "Replication state tracking (activeReplications, retryAttempts Maps)",
+    "Server-side pull batch collector (800ms aggregation window for logging)",
+    "Server-side SSE event batcher (500ms aggregation for connect/disconnect logs)",
+    "Throttled circuit-breaker-open log suppression (only first + summary every 30s)"
+  ],
+
+  "shadcn_ui_primitives": [
+    "Button component (primary, secondary, ghost, danger, success, outline variants)",
+    "Input component with focus states and error styling",
+    "Sheet (mobile drawer: overlay, content, header, footer, title, description)",
+    "Sidebar system (provider, trigger, inset, content, menu, menu-item, menu-button, group, group-label, group-content)",
+    "Separator (horizontal/vertical dividers)",
+    "Skeleton (pulse animation loading placeholder)",
+    "Tooltip (hover content display via sidebar-menu-button)"
+  ],
+
+  "admin_change_guard": [
+    "AdminChangeGuardModal for critical admin actions",
+    "8 registered critical actions (floor-publish, table-delete, menu-item-delete, menu-item-disable, package-edit, pricing-change, vat-change, location-settings)",
+    "Risk level classification (high vs critical)",
+    "Active service detection before allowing risky changes (counts open/pending orders)",
+    "Guard descriptions shown in modal for user awareness"
+  ],
+
+  "no_sale_modal": [
+    "NoSaleModal for X-Reading display (no-sale transaction recording)",
+    "BIR compliance information display",
+    "Z-Reading reference information"
+  ]
+}

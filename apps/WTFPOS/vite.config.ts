@@ -33,6 +33,10 @@ export default defineConfig({
 		'process.env': {},
 		'process': { env: {} }
 	},
+	// Downlevel TLA and modern syntax for Safari in BOTH dev and prod
+	esbuild: {
+		target: 'safari15'
+	},
 	build: {
 		target: ['es2020', 'safari15']
 	},

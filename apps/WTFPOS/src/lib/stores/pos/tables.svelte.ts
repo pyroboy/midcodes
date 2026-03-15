@@ -11,13 +11,12 @@ import { getWritableCollection } from '$lib/db/write-proxy';
 import { recordGuardEvent } from '$lib/stores/guard.svelte';
 import { browser } from '$app/environment';
 
-// Try to load designed floor layout from seed file (exported via floor editor)
-let _floorSeed: { tables: any[]; floorElements: any[] } | null = null;
-try {
-	// Dynamic import — file may not exist yet (first run before floor editor export)
-	const mod = await import(/* @vite-ignore */ '../../db/floor-seed.json');
-	_floorSeed = mod.default ?? mod;
-} catch { /* no seed file yet — use generated defaults */ }
+// Floor layout seed (exported via floor editor).
+// NOTE: Must NOT use top-level await — Safari's module loader (WebKit #242740)
+// breaks when multiple modules simultaneously import an async module.
+// Static import is safe: Vite resolves JSON imports at build time.
+import floorSeedData from '../../db/floor-seed.json';
+const _floorSeed: { tables: any[]; floorElements: any[] } | null = floorSeedData ?? null;
 
 const FLOOR_POSITIONS = [
 	{ x: 40,  y: 50  }, { x: 200, y: 35  }, { x: 360, y: 52  }, { x: 520, y: 38  },

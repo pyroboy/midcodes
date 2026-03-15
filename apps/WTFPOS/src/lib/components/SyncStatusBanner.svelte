@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '$lib/stores/session.svelte';
 	import { getDb } from '$lib/db';
 	import { invalidateFingerprintCache } from '$lib/stores/device.svelte';
 	import { resetDatabase } from '$lib/db';

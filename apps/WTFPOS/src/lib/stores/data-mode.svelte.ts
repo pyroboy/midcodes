@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { session, type Role } from './session.svelte';
+import type { Role } from './session.svelte';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +86,10 @@ export async function resolveDataMode(): Promise<DataMode> {
 	}
 
 	const identity = await fetchDeviceIdentity();
+
+	// Lazy-import session to break the circular dep with session.svelte.ts
+	// (session.svelte.ts dynamically imports data-mode.svelte.ts in setSession)
+	const { session } = await import('./session.svelte');
 
 	let resolved: DataMode;
 	if (identity.isServer) {

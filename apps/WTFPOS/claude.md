@@ -109,6 +109,16 @@ Root layout (+layout.svelte):
 - `store.value` when using `createRxStore()` bridge
 - `onclick` not `on:click` (Svelte 5 event syntax)
 
+### Safari Import Order (Non-Negotiable)
+Safari throws `"Cannot access 'component' before initialization"` when ES modules evaluate in the wrong order. `data-mode.svelte.ts` imports `session.svelte.ts` at module level, creating a circular chain through `create-store`.
+
+**Rule:** In every `.svelte` or `.svelte.ts` file that imports from `$lib/stores/`, the **first** store import must be `session.svelte`:
+```ts
+import { session } from '$lib/stores/session.svelte'; // or bare: import '$lib/stores/session.svelte';
+import { kdsTickets } from '$lib/stores/pos/kds.svelte'; // safe — session already loaded
+```
+This applies to routes, components, AND store files. Violating this order will work in Chrome but crash iPad/Safari.
+
 ### TypeScript
 - `<script lang="ts">` on all components
 - Explicit types — no `any`. Union types must be annotated before assignment

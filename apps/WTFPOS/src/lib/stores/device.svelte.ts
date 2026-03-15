@@ -1,9 +1,9 @@
 import { browser } from '$app/environment';
+import { session } from './session.svelte';
 import { getDb } from '$lib/db';
 import { createStore } from './create-store.svelte';
 import { getWritableCollection } from '$lib/db/write-proxy';
 import { needsRxDb, getDataMode } from '$lib/stores/data-mode.svelte';
-import { session } from './session.svelte';
 import { connectionState } from './connection.svelte';
 import { APP_VERSION, BUILD_DATE } from '$lib/version';
 import { nanoid } from 'nanoid';

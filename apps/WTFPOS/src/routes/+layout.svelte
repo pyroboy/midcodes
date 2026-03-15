@@ -7,6 +7,7 @@
 	import MobileTopBar from '$lib/components/MobileTopBar.svelte';
 	import LocationBanner from '$lib/components/stock/LocationBanner.svelte';
 	import { SidebarProvider, SidebarInset } from '$lib/components/ui/sidebar/index.js';
+	import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 	import { initConnectionMonitor } from '$lib/stores/connection.svelte';
 	import { initDeviceHeartbeat, stopDeviceHeartbeat, isThisDeviceServer } from '$lib/stores/device.svelte';
 	import { initDbHealthCheck } from '$lib/stores/db-health.svelte';
@@ -16,7 +17,6 @@
 	import { page } from '$app/state';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 
 	let { children }: { children: import('svelte').Snippet } = $props();
 

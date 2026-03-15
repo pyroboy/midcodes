@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { connectionState, dismissKdsAlert, simulateOffline, simulateOnline, simulateLanOnly, simulateKdsDown, simulateKdsUp } from '$lib/stores/connection.svelte';
 	import { session } from '$lib/stores/session.svelte';
+	import { connectionState, dismissKdsAlert, simulateOffline, simulateOnline, simulateLanOnly, simulateKdsDown, simulateKdsUp } from '$lib/stores/connection.svelte';
 	import { getCurrentDeviceId } from '$lib/stores/device.svelte';
 	import { isSseMode, isApiFetchMode, needsRxDb } from '$lib/stores/data-mode.svelte';
 	import { getSseConnectionState } from '$lib/stores/server-store.svelte';

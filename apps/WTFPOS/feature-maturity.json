@@ -1,0 +1,1032 @@
+{
+  "meta": {
+    "project": "WTFPOS",
+    "generatedAt": "2026-03-14",
+    "phase": "Phase 1 — Local-First + Thin Client",
+    "maturityScale": {
+      "1": "Stub / placeholder — UI shell exists but no functional logic",
+      "2": "Partial — core logic exists but incomplete flows or missing edge cases",
+      "3": "Implemented — feature complete but no automated tests",
+      "4": "Tested (partial) — has some unit or E2E coverage but gaps remain",
+      "5": "Battle-tested — comprehensive unit + E2E tests, production-ready"
+    },
+    "unitTestFiles": 10,
+    "e2eTestFiles": 37,
+    "totalE2EScenarios": 153,
+    "totalUnitTests": 171
+  },
+
+  "modules": {
+    "pos": {
+      "displayName": "POS / Cashiering",
+      "route": "/pos",
+      "features": [
+        {
+          "id": "pos-table-open-close",
+          "name": "Table Open / Close",
+          "description": "Open table → create order → occupy table; close table → reset to available. Includes race condition guards and server-side duplicate-occupancy prevention.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["order.spec.ts", "order-lifecycle.spec.ts", "advanced.spec.ts"],
+          "notes": "Server-side write guards + offline fallback tested"
+        },
+        {
+          "id": "pos-dine-in-order",
+          "name": "Dine-In Order Creation",
+          "description": "Create order linked to table with pax count, package selection, and child/free pax tracking.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["utils.test.ts", "item.utils.test.ts"],
+          "e2eFiles": ["order.spec.ts", "order-lifecycle.spec.ts"],
+          "notes": "Full lifecycle tested: open → items → payment → close"
+        },
+        {
+          "id": "pos-takeout-order",
+          "name": "Takeout Order Lifecycle",
+          "description": "Walk-in takeout orders with status progression: new → preparing → ready → picked_up. Sequential numbering (#TO01, #TO02).",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete but no dedicated E2E for takeout status progression"
+        },
+        {
+          "id": "pos-add-items",
+          "name": "Add Items to Order",
+          "description": "Tabbed menu (packages, dishes, drinks), pending item staging, package breakdown display, quantity/weight input.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["item.utils.test.ts"],
+          "e2eFiles": ["order.spec.ts", "advanced.spec.ts"],
+          "notes": "Weight-based pricing, FREE tags, and refill items all tested"
+        },
+        {
+          "id": "pos-remove-item",
+          "name": "Remove / Void Item",
+          "description": "Grace period (30 sec) for no-PIN removal; after grace period requires manager PIN + reason. Stock auto-restored on void.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["order.spec.ts"],
+          "notes": "PIN gate + stock restoration verified in E2E"
+        },
+        {
+          "id": "pos-void-order",
+          "name": "Void Entire Order",
+          "description": "Cancel entire order with reason (mistake/walkout/write_off), restore all stock, close table. Manager PIN required.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["order.spec.ts"],
+          "notes": "Tested with mistake reason; walkout/write_off reasons untested"
+        },
+        {
+          "id": "pos-checkout-cash",
+          "name": "Cash Payment Checkout",
+          "description": "Numpad entry, preset amounts (₱500/1000/2000), exact change button, change calculation.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["pos-payments.spec.ts", "order-lifecycle.spec.ts"],
+          "notes": "Exact cash + custom tendered with change both tested"
+        },
+        {
+          "id": "pos-checkout-ewallet",
+          "name": "E-Wallet Payment (GCash / Maya)",
+          "description": "GCash and Maya payment methods with optional pending_payment hold state for e-wallet confirmation.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["pos-payments.spec.ts", "pos-pending-payment.spec.ts"],
+          "notes": "Hold → confirm → paid flow tested"
+        },
+        {
+          "id": "pos-checkout-card",
+          "name": "Card Payment (Visa / Mastercard)",
+          "description": "Credit/debit card payment recording.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["pos-payments.spec.ts"],
+          "notes": "Basic card payment tested; split-tender (card + cash) not tested"
+        },
+        {
+          "id": "pos-split-bill-equal",
+          "name": "Equal Split Bill",
+          "description": "Divide total evenly across N guests with remainder distribution to first guests.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["payment.utils.test.ts"],
+          "e2eFiles": ["advanced.spec.ts"],
+          "notes": "Remainder distribution logic unit tested + E2E 2-way split tested"
+        },
+        {
+          "id": "pos-split-bill-item",
+          "name": "Item-Based Split Bill",
+          "description": "Assign individual items to guest sub-bills with pro-rata discount/VAT allocation.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test coverage for item-level split"
+        },
+        {
+          "id": "pos-discount-sc",
+          "name": "Senior Citizen Discount (20%)",
+          "description": "BIR-compliant 20% discount on VAT-exempt base (÷1.12). Pro-rata for partial pax (e.g., 1 SC out of 4).",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["utils.test.ts"],
+          "e2eFiles": ["pos-discounts.spec.ts", "pos-discounts-combined.spec.ts", "pos-receipt-sc-pwdline.spec.ts"],
+          "notes": "BIR centavo precision tested across 44 unit test scenarios"
+        },
+        {
+          "id": "pos-discount-pwd",
+          "name": "PWD Discount (20%)",
+          "description": "20% discount on VAT-exempt base, same calculation as SC. Cannot double-count with SC on same pax.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["utils.test.ts"],
+          "e2eFiles": ["pos-discounts.spec.ts", "pos-discounts-combined.spec.ts"],
+          "notes": "Anti-double-counting tested in both unit and E2E"
+        },
+        {
+          "id": "pos-discount-promo",
+          "name": "Promo Discount (100%)",
+          "description": "Full comp discount, no VAT. Business-level override.",
+          "maturity": 4,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["utils.test.ts"],
+          "e2eFiles": ["pos-discounts.spec.ts"],
+          "notes": "Unit tested; E2E covers basic flow but limited edge cases"
+        },
+        {
+          "id": "pos-discount-comp",
+          "name": "Comp / Service Recovery Discount",
+          "description": "Complimentary or service recovery discount (100% off). Separate reason tracking.",
+          "maturity": 4,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["utils.test.ts"],
+          "e2eFiles": ["pos-discounts.spec.ts"],
+          "notes": "Basic coverage; detailed reason tracking not deeply tested"
+        },
+        {
+          "id": "pos-child-pricing",
+          "name": "Child Pax Pricing",
+          "description": "Children (ages 6–9) charged reduced package rate. Infants (under 5) free. Receipt shows adult × price + child × childPrice.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["utils.test.ts"],
+          "e2eFiles": ["pos-child-pax-receipt.spec.ts"],
+          "notes": "Receipt accuracy verified with dedicated E2E"
+        },
+        {
+          "id": "pos-leftover-penalty",
+          "name": "Leftover Penalty",
+          "description": "₱50 per 100g unconsumed meat. Weight input via numpad or Bluetooth scale. Manager PIN to waive.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["payment.utils.test.ts"],
+          "e2eFiles": ["advanced.spec.ts"],
+          "notes": "Bracket calculation (ceil to 100g) unit tested"
+        },
+        {
+          "id": "pos-table-transfer",
+          "name": "Table Transfer",
+          "description": "Move order to different table. Atomic server operation with offline fallback. Updates table, order, and KDS ticket.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["advanced.spec.ts"],
+          "notes": "Server-side atomic transfer + conflict detection tested"
+        },
+        {
+          "id": "pos-table-merge",
+          "name": "Table Merge",
+          "description": "Combine two occupied tables. Package conflict warning. Secondary table closed after merge.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["advanced.spec.ts"],
+          "notes": "Basic merge tested; package conflict edge cases may have gaps"
+        },
+        {
+          "id": "pos-package-change",
+          "name": "Package Change (Upgrade / Downgrade)",
+          "description": "Swap package mid-meal. Upgrade = no PIN; downgrade = manager PIN. Price delta × pax recalculated.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["advanced.spec.ts"],
+          "notes": "Upgrade tested; downgrade with PIN not specifically tested"
+        },
+        {
+          "id": "pos-pax-change",
+          "name": "Pax Count Change",
+          "description": "Increase/decrease guest count. Package quantity and total recalculated. Manager PIN required.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["advanced.spec.ts"],
+          "notes": "2→4 pax change tested with recalc verification"
+        },
+        {
+          "id": "pos-refill-workflow",
+          "name": "Refill Request Workflow",
+          "description": "One-tap refill for meat/sides. FREE tag, REFILL notes. Service requests (extra tong, scissors) go to KDS only.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["pos-kitchen-refill.spec.ts"],
+          "notes": "Basic refill flow tested; service request E2E limited"
+        },
+        {
+          "id": "pos-receipt",
+          "name": "BIR-Compliant Receipt",
+          "description": "Receipt with branch info, items, package breakdown, child pricing, discount summary, VAT, total, payment method, change.",
+          "maturity": 5,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["pos-register.spec.ts", "pos-receipt-sc-pwdline.spec.ts", "pos-child-pax-receipt.spec.ts"],
+          "notes": "Multiple receipt scenarios tested including SC/PWD line items"
+        },
+        {
+          "id": "pos-order-history",
+          "name": "Order History & Reprint",
+          "description": "View paid/cancelled orders. Filter by date or status. Reprint receipt.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["pos-order-history.spec.ts"],
+          "notes": "List + filter tested; reprint trigger not verified"
+        },
+        {
+          "id": "pos-shift-management",
+          "name": "Shift Management (Cash Float)",
+          "description": "Open shift with float amount, close shift with actual cash count. Per-location, per-cashier.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Auto-opens with ₱0 float; no dedicated test for shift open/close cycle"
+        },
+        {
+          "id": "pos-payment-correction",
+          "name": "Payment Method Correction",
+          "description": "Re-key payment method on closed orders. Manager PIN required.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test coverage"
+        },
+        {
+          "id": "pos-attach-takeout",
+          "name": "Attach Takeout to Table",
+          "description": "Merge takeout order items into a dine-in table order. Cancel the takeout order.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test coverage"
+        },
+        {
+          "id": "pos-floor-plan",
+          "name": "Interactive Floor Plan",
+          "description": "SVG-based table visualization. Color-coded by status (available/occupied/billing/maintenance). Timer display, rejection badges.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["table-indicators.spec.ts"],
+          "notes": "Status indicators tested; interactive drag not tested"
+        }
+      ]
+    },
+
+    "kitchen": {
+      "displayName": "Kitchen Display System (KDS)",
+      "route": "/kitchen",
+      "features": [
+        {
+          "id": "kds-active-queue",
+          "name": "Active Ticket Queue",
+          "description": "Live queue of active kitchen tickets. Merged by orderId for refills. Timer with urgency levels (normal/warning/critical). Progress bar.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["kds.spec.ts", "kitchen-harmony-audit.spec.ts"],
+          "notes": "Basic queue load and stat counters tested; deep interactions partial"
+        },
+        {
+          "id": "kds-item-marking",
+          "name": "Mark Items Served / Done",
+          "description": "Individual item marking (pending → served). Bumps ticket to history when all items served.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["kitchen-harmony-audit.spec.ts"],
+          "notes": "Bumping tested; edge cases (partial serve, reopen) limited"
+        },
+        {
+          "id": "kds-recall",
+          "name": "Ticket Recall (Undo Bump)",
+          "description": "Restore bumped ticket to active queue. Items reset to pending. Recall last ticket shortcut.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["kitchen-refuse-recall.spec.ts"],
+          "notes": "Recall flow tested via E2E"
+        },
+        {
+          "id": "kds-refuse-item",
+          "name": "Kitchen Item Refuse / Return",
+          "description": "Refuse item with preset reasons (Out of Stock, Equipment Issue, Quality Issue, Wrong Order) or custom reason. Stock restored. Alert sent to POS.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["kitchen-refuse-recall.spec.ts"],
+          "notes": "Refuse flow tested; POS-side alert acknowledgment partial"
+        },
+        {
+          "id": "kds-86-toggle",
+          "name": "86 Item (Sold Out Toggle)",
+          "description": "Toggle menu item availability directly from KDS. Un-86 requires confirmation.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "UI complete; no dedicated test"
+        },
+        {
+          "id": "kds-dispatch",
+          "name": "Dispatch / Expo Station",
+          "description": "Per-table dispatch cards showing station progress (meat/dishes/sides). Deep links to weigh station and stove. 6 distinct audio tones.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Fully implemented with rich audio; no E2E coverage"
+        },
+        {
+          "id": "kds-stove",
+          "name": "Stove Station (Dishes & Drinks)",
+          "description": "Filtered view for dishes/drinks prep. Dine-in and takeout separated. Bump all and individual done buttons.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test coverage"
+        },
+        {
+          "id": "kds-sides-prep",
+          "name": "Sides Prep Station",
+          "description": "New table alerts, sides queue, service request alerts. Per-item done buttons.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test coverage"
+        },
+        {
+          "id": "kds-weigh-station",
+          "name": "Weigh Station (Meat Scaling)",
+          "description": "Pending meat items grouped by table. Bluetooth scale integration. Yield calculator with manager PIN. Audit logged.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Yield calculator complete; Bluetooth integration partial; no E2E"
+        },
+        {
+          "id": "kds-all-orders",
+          "name": "All Orders View (History & Lookup)",
+          "description": "Aggregate mode via SSE for cross-branch visibility. Status/time filters. Order detail modal with item picker.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Feature-rich but no automated tests"
+        },
+        {
+          "id": "kds-audio-notifications",
+          "name": "Audio Notifications",
+          "description": "New order ding, void beep (880Hz), 6 dispatch tones (new order, meat update, dishes, sides, request, ready-to-run). Volume slider.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Fully implemented with Web Audio API; untestable in headless browser"
+        },
+        {
+          "id": "kds-history-modal",
+          "name": "KDS History Modal",
+          "description": "Bumped/completed tickets grouped by date. Recall per ticket.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test"
+        },
+        {
+          "id": "kds-sse-realtime",
+          "name": "Real-Time SSE Push",
+          "description": "Smart debounce push (critical changes immediate, edits 3s). Ring buffer (50 events) for reconnect. Last-Event-ID replay.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Architecture is solid; no automated test for SSE behavior"
+        },
+        {
+          "id": "kds-aggregate-sse",
+          "name": "Multi-Branch SSE Aggregator",
+          "description": "Server-side proxy for owner device to subscribe to all branches. Per-branch error isolation.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Complete; requires multi-server E2E which is complex"
+        }
+      ]
+    },
+
+    "stock": {
+      "displayName": "Stock / Inventory Management",
+      "route": "/stock",
+      "features": [
+        {
+          "id": "stock-inventory-view",
+          "name": "Master Inventory View",
+          "description": "Search, filter by status (ok/low/critical), grid/list toggle, protein grouping, 'Needs Attention' banner, per-item health strip.",
+          "maturity": 4,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["stock.constants.test.ts"],
+          "e2eFiles": ["stock.spec.ts"],
+          "notes": "Structural integrity tested; E2E covers list/grid + filters"
+        },
+        {
+          "id": "stock-all-locations",
+          "name": "All Locations Comparison",
+          "description": "Cross-branch inventory matrix with imbalance detection (>30% difference triggers warning).",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test for cross-branch comparison"
+        },
+        {
+          "id": "stock-receive-delivery",
+          "name": "Receive Delivery",
+          "description": "Item selector, qty/weight input, supplier autocomplete, batch number, expiry date, photo capture, unit cost.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["stock-advanced.spec.ts"],
+          "notes": "Basic receive flow tested; FIFO batch tracking not deeply verified"
+        },
+        {
+          "id": "stock-fifo-batches",
+          "name": "FIFO Batch Management",
+          "description": "Per-delivery batch tracking with usedQty. Oldest batches highlighted for use first. Progress ring visualization.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Calculation logic complete; no test for FIFO ordering"
+        },
+        {
+          "id": "stock-spoilage-alerts",
+          "name": "Spoilage / Expiry Alerts",
+          "description": "Proactive alerts for deliveries expiring within 3 days. Red (expired) and yellow (expiring soon) badges.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "getSpoilageAlerts() implemented; no E2E for alert display"
+        },
+        {
+          "id": "stock-waste-log",
+          "name": "Waste Logging",
+          "description": "6 reason types with icons. Item selector, qty input. Today's summary with top reason and most wasted item.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["stock-advanced.spec.ts"],
+          "notes": "Basic waste flow tested; summary analytics not verified"
+        },
+        {
+          "id": "stock-daily-counts",
+          "name": "Three-Period Stock Counts (BIR)",
+          "description": "10 AM / 4 PM / 10 PM count windows. Expected vs counted variance. Deadline urgency display.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["stock-advanced.spec.ts"],
+          "notes": "Count submission tested; variance calculation not deeply verified"
+        },
+        {
+          "id": "stock-transfers",
+          "name": "Inter-Location Stock Transfer",
+          "description": "3-step wizard: select item → choose destination → confirm. Validates available stock and destination tracking.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["stock-advanced.spec.ts"],
+          "notes": "Basic transfer tested; cross-location validation limited"
+        },
+        {
+          "id": "stock-adjust",
+          "name": "Manual Stock Adjustment (Add / Deduct / Set)",
+          "description": "Quick adjustment with reason tracking. Audit logged.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no dedicated test"
+        },
+        {
+          "id": "stock-86-toggle",
+          "name": "86 Item (Toggle Availability)",
+          "description": "Mark item as sold out from inventory view. Role-gated (kitchen can't 86; warehouse can't 86).",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test for role gating"
+        },
+        {
+          "id": "stock-pos-deduction",
+          "name": "Automatic POS Deduction",
+          "description": "When tracked item ordered, stock deducted automatically. Restored on void/cancel.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["stock-edge-cases.spec.ts"],
+          "notes": "Negative stock guard tested; basic deduction verified via order flow"
+        },
+        {
+          "id": "stock-negative-guard",
+          "name": "Negative Stock Prevention",
+          "description": "Server-side guard prevents stock from going below zero.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["stock-edge-cases.spec.ts"],
+          "notes": "Guard activation tested"
+        },
+        {
+          "id": "stock-meat-ontology",
+          "name": "Meat Cut Ontology & Yield Tracking",
+          "description": "30 meat cut nodes, 40 conversion edges with default yields. Editable yield overrides (localStorage).",
+          "maturity": 3,
+          "unitTests": true,
+          "e2eTests": false,
+          "unitTestFiles": ["stock.constants.test.ts"],
+          "e2eFiles": [],
+          "notes": "getProteinType() unit tested; ontology graph visualization untested"
+        }
+      ]
+    },
+
+    "reports": {
+      "displayName": "Reports & Analytics",
+      "route": "/reports",
+      "features": [
+        {
+          "id": "reports-x-read",
+          "name": "X-Reading (BIR)",
+          "description": "BIR X-Reading generation with manager PIN. Immutable record. Live order metrics, VAT breakdown, compact chart.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page load tested; BIR compliance assertions limited"
+        },
+        {
+          "id": "reports-eod",
+          "name": "End of Day / Z-Reading",
+          "description": "EOD summary, open tables guard, cash reconciliation (float + collected − expenses = expected), payment breakdown, utility readings.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page tested; cash variance calculation not deeply verified"
+        },
+        {
+          "id": "reports-sales-summary",
+          "name": "Sales Summary Report",
+          "description": "KPI cards (Gross, Net, VAT, Avg Ticket, Pax) with YoY comparison. Time-series chart (14 days or 8 weeks). Period/granularity filters.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page render tested; calculation assertions limited"
+        },
+        {
+          "id": "reports-table-sales",
+          "name": "Table Sales Report",
+          "description": "Per-table revenue breakdown.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page loads; data accuracy not verified"
+        },
+        {
+          "id": "reports-best-sellers",
+          "name": "Best Sellers Report",
+          "description": "Top items by revenue/quantity. Meat and addon categories separated.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page loads; ranking accuracy not verified"
+        },
+        {
+          "id": "reports-peak-hours",
+          "name": "Peak Hours Report",
+          "description": "Hourly sales distribution heatmap.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page loads; hourly bucketing not verified"
+        },
+        {
+          "id": "reports-stock-variance",
+          "name": "Stock Variance Report",
+          "description": "Period filter (today/week/month), variance rows (delivered/sold/waste/expected/counted/drift), KPI summary.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page loads; variance math not verified"
+        },
+        {
+          "id": "reports-meat-report",
+          "name": "Meat Consumption Report",
+          "description": "Tabs: Consumption, Transfers, Conversion. Protein grouping, grand totals, meat ontology visualization.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page loads; deep analysis tabs not verified"
+        },
+        {
+          "id": "reports-gross-profit",
+          "name": "Gross Profit Report",
+          "description": "Gross margin analysis.",
+          "maturity": 2,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Page exists; data derivation may be incomplete"
+        },
+        {
+          "id": "reports-net-profit",
+          "name": "Net Profit Report",
+          "description": "Net margin analysis (revenue minus all expenses).",
+          "maturity": 2,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Page exists; expense integration may be incomplete"
+        },
+        {
+          "id": "reports-branch-comparison",
+          "name": "Branch Comparison Report",
+          "description": "Multi-location revenue/cost metrics side by side.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["reports.spec.ts"],
+          "notes": "Page loads; cross-branch aggregation not verified"
+        },
+        {
+          "id": "reports-transaction-log",
+          "name": "Transaction Log",
+          "description": "All transactions with filters.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code exists; no test"
+        },
+        {
+          "id": "reports-voids-discounts",
+          "name": "Voids & Discounts Audit",
+          "description": "Voided orders and discount usage audit trail.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code exists; no test"
+        }
+      ]
+    },
+
+    "expenses": {
+      "displayName": "Expense Management",
+      "route": "/expenses",
+      "features": [
+        {
+          "id": "expenses-log",
+          "name": "Expense Logging",
+          "description": "16 categories in 4 groups (Staff, Procurement, Utilities, Operations). Amount input with meter calculation for utilities. Receipt photo. Paid-by selector.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["expenses.test.ts"],
+          "e2eFiles": ["test-expenses-rxdb.spec.ts"],
+          "notes": "Validation unit tested; CRUD + persistence E2E verified"
+        },
+        {
+          "id": "expenses-templates",
+          "name": "Expense Templates",
+          "description": "Saved recurring expense templates (one-time, daily, weekly, monthly). Quick-add from template.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Template CRUD implemented; recurrence triggering unclear"
+        },
+        {
+          "id": "expenses-daily-report",
+          "name": "Expenses Daily Report",
+          "description": "Daily expense log with category subtotals and running total.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Page exists; no test"
+        },
+        {
+          "id": "expenses-monthly-report",
+          "name": "Expenses Monthly Report",
+          "description": "Monthly expense aggregation.",
+          "maturity": 2,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Page may be partially implemented"
+        },
+        {
+          "id": "expenses-utilities",
+          "name": "Utilities Tracking",
+          "description": "Electricity, water, gas meter readings with rate-based cost calculation.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Integrated into EOD report; standalone page unclear"
+        }
+      ]
+    },
+
+    "admin": {
+      "displayName": "Admin Portal",
+      "route": "/admin",
+      "features": [
+        {
+          "id": "admin-users",
+          "name": "User Management",
+          "description": "User table with role/branch/status. Active/inactive toggle. Add user modal (stub).",
+          "maturity": 2,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["admin.spec.ts"],
+          "notes": "Table display tested; Add User modal incomplete (steps 2-3 missing)"
+        },
+        {
+          "id": "admin-menu-editor",
+          "name": "Menu Item Editor",
+          "description": "Category filter, add/edit/delete items. Weight-based toggle, price/gram, free toggle, inventory tracking.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["admin.spec.ts"],
+          "notes": "CRUD flow tested; edge cases (image upload, weight-based) limited"
+        },
+        {
+          "id": "admin-activity-logs",
+          "name": "Activity Logs Viewer",
+          "description": "Filter by action type (7) and branch (3). Color-coded type badges. Live indicator.",
+          "maturity": 4,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["audit.utils.test.ts"],
+          "e2eFiles": ["admin.spec.ts"],
+          "notes": "Duration formatting unit tested; log display E2E tested"
+        },
+        {
+          "id": "admin-floor-editor",
+          "name": "Floor Plan Editor",
+          "description": "Drag, resize, rotate tables. Grid snapping. Chair editor. Save to server. Pan/zoom. Element types: tables, walls, columns, zones, doors.",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["admin-floor.spec.ts", "admin-floor-allview.spec.ts"],
+          "notes": "Basic load tested; interactive editing not deeply tested"
+        },
+        {
+          "id": "admin-devices",
+          "name": "Device Tracker & Topology",
+          "description": "Network topology view. Real-time SSE + 30s poll. Status indicators (online/stale/offline). Sync/data mode badges. DB conformity. Admin actions (reset, export).",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["admin-devices.spec.ts"],
+          "notes": "Device registration tested; topology rendering not deeply verified"
+        }
+      ]
+    },
+
+    "system": {
+      "displayName": "System / Infrastructure",
+      "route": null,
+      "features": [
+        {
+          "id": "sys-auth-login",
+          "name": "Authentication & Login",
+          "description": "Username/password login. 14 test accounts across 3 locations. Role-based routing. Duplicate session detection.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["session.test.ts"],
+          "e2eFiles": ["auth.spec.ts", "session.spec.ts", "warehouse-access-guard.spec.ts"],
+          "notes": "RBAC unit tested; login + guards E2E tested"
+        },
+        {
+          "id": "sys-rbac",
+          "name": "Role-Based Access Control",
+          "description": "5 roles (owner/admin/manager/staff/kitchen). Nav access, location locking, admin gating. ROLE_NAV_ACCESS single source of truth.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["session.test.ts"],
+          "e2eFiles": ["auth.spec.ts", "session.spec.ts"],
+          "notes": "All role constants + deriveSessionState unit tested"
+        },
+        {
+          "id": "sys-rxdb-database",
+          "name": "RxDB Database Initialization",
+          "description": "18 collections. Dexie storage (server) or in-memory (client). Migration strategies. Schema validation. Dev-mode HMR.",
+          "maturity": 5,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["schemas.test.ts"],
+          "e2eFiles": ["test-db-persistence.spec.ts"],
+          "notes": "All 14 schema structures tested; IndexedDB persistence E2E verified"
+        },
+        {
+          "id": "sys-replication",
+          "name": "RxDB Replication (LAN Sync)",
+          "description": "Pull/push replication per collection. Priority sync tiers. Sync activity tracking. Full reset capability.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code robust; no automated test (requires multi-device setup)"
+        },
+        {
+          "id": "sys-write-guards",
+          "name": "Server-Side Write Guards (12 Guards)",
+          "description": "Duplicate prevention, state machine enforcement, orphan auto-healing, stock negative prevention. 2 layers (replication + write API).",
+          "maturity": 4,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["stock-edge-cases.spec.ts", "multi-user-concurrent.spec.ts"],
+          "notes": "Several guards tested via E2E; full guard matrix not covered"
+        },
+        {
+          "id": "sys-connection-monitor",
+          "name": "Connection Status Monitor",
+          "description": "Online/offline detection. Floating status pill. DB health banner.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test (hard to simulate offline in E2E)"
+        },
+        {
+          "id": "sys-data-mode",
+          "name": "Adaptive Data Mode",
+          "description": "4 modes: full-rxdb, selective-rxdb, sse-only, api-fetch. Based on device identity + role. Cached in sessionStorage.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Resolution logic complete; no test"
+        },
+        {
+          "id": "sys-audit-log",
+          "name": "Audit Log System",
+          "description": "17+ action wrappers (tableOpened, itemCharged, orderVoided, etc.). RxDB-backed persistent log. Fire-and-forget writes.",
+          "maturity": 4,
+          "unitTests": true,
+          "e2eTests": true,
+          "unitTestFiles": ["audit.utils.test.ts"],
+          "e2eFiles": ["admin.spec.ts"],
+          "notes": "Duration formatting tested; log visibility in admin E2E tested"
+        },
+        {
+          "id": "sys-guard-events",
+          "name": "Guard Event Tracking",
+          "description": "Client-side guard recording. FIFO buffer (50 events). Auto-seen after 60s. Writes to audit log.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no dedicated test"
+        },
+        {
+          "id": "sys-device-management",
+          "name": "Device Identity & Heartbeat",
+          "description": "Device registration, hostname/IP resolution, stale pruning (>24h), rename, server detection.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; tested indirectly via admin-devices E2E"
+        },
+        {
+          "id": "sys-server-preparing",
+          "name": "Server Restart Recovery",
+          "description": "Blocks UI after server reset with progress bar + log streaming. Sync gate for client devices (8s timeout).",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "Code complete; no test (requires server restart simulation)"
+        },
+        {
+          "id": "sys-pwa",
+          "name": "PWA Install Prompt",
+          "description": "Android WebAPP install prompt + iOS custom instructions on login page.",
+          "maturity": 3,
+          "unitTests": false,
+          "e2eTests": false,
+          "e2eFiles": [],
+          "notes": "UI complete; no test"
+        },
+        {
+          "id": "sys-bluetooth-scale",
+          "name": "Bluetooth Scale Integration",
+          "description": "Web Bluetooth GATT pairing for meat weighing. Weight reading in grams. Reconnection handling.",
+          "maturity": 2,
+          "unitTests": false,
+          "e2eTests": true,
+          "e2eFiles": ["bt-scale-pairing.spec.ts"],
+          "notes": "Pairing UI tested; actual device I/O requires hardware"
+        }
+      ]
+    }
+  },
+
+  "summary": {
+    "totalFeatures": 80,
+    "byMaturity": {
+      "5_battleTested": 18,
+      "4_partiallyTested": 23,
+      "3_implementedUntested": 33,
+      "2_partial": 5,
+      "1_stub": 1
+    },
+    "byModule": {
+      "pos": { "count": 27, "avgMaturity": 4.1 },
+      "kitchen": { "count": 14, "avgMaturity": 3.1 },
+      "stock": { "count": 13, "avgMaturity": 3.3 },
+      "reports": { "count": 13, "avgMaturity": 2.8 },
+      "expenses": { "count": 5, "avgMaturity": 3.2 },
+      "admin": { "count": 5, "avgMaturity": 3.6 },
+      "system": { "count": 13, "avgMaturity": 3.4 }
+    },
+    "testCoverage": {
+      "featuresWithUnitTests": 12,
+      "featuresWithE2ETests": 40,
+      "featuresWithBothTestTypes": 10,
+      "featuresWithNoTests": 30
+    },
+    "criticalGaps": [
+      "Takeout order lifecycle — no E2E",
+      "Item-based split billing — no test",
+      "KDS dispatch/stove/sides stations — no test",
+      "Stock FIFO batch tracking — no test",
+      "Gross/Net profit reports — partially implemented",
+      "Expense templates recurrence — unclear implementation",
+      "LAN replication — no automated test",
+      "Offline recovery — no test"
+    ]
+  }
+}
