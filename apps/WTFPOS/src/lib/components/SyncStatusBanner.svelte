@@ -492,7 +492,7 @@
 {:else if syncState.status === 'stale' || syncState.status === 'offline'}
 	<button
 		onclick={() => showStaleDetail = !showStaleDetail}
-		class="fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 shadow-sm transition-colors hover:bg-gray-50"
+		class="fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 shadow-sm transition-colors hover:bg-gray-50 fixed-safe-top fixed-safe-right"
 	>
 		{#if syncState.status === 'offline'}
 			<WifiOff class="h-3.5 w-3.5 text-red-500" />
@@ -504,7 +504,7 @@
 	</button>
 
 	{#if showStaleDetail}
-		<div class="fixed top-10 right-2 z-50 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+		<div class="fixed top-10 right-2 z-50 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-lg fixed-safe-right">
 			<div class="flex items-start gap-2">
 				{#if syncState.status === 'offline'}
 					<WifiOff class="h-4 w-4 text-red-500 mt-0.5 shrink-0" />

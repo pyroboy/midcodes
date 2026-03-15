@@ -331,7 +331,7 @@
 <!-- Large amount confirmation -->
 {#if showLargeAmountConfirm}
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div class="pos-card w-[360px] flex flex-col gap-4">
+        <div class="pos-card w-full max-w-[360px] mx-4 flex flex-col gap-4">
             <h3 class="text-lg font-bold text-gray-900">Large Amount</h3>
             <p class="text-sm text-gray-700">
                 <span class="font-bold text-status-red font-mono">{formatPeso(parseFloat(amount))}</span> — are you sure?
@@ -346,7 +346,7 @@
 
 <!-- Undo delete toast -->
 {#if pendingUndoItem}
-    <div class="fixed bottom-6 right-6 z-[80] flex items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-white shadow-xl">
+    <div class="fixed bottom-6 right-6 z-[80] flex items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-white shadow-xl fixed-safe-bottom fixed-safe-right">
         <span class="text-sm font-medium">Expense deleted</span>
         <button type="button" onclick={undoDelete} class="rounded bg-white/20 px-3 py-1 text-xs font-bold hover:bg-white/30 transition-colors min-h-[36px]">Undo</button>
     </div>

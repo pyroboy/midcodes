@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { kdsTickets, recallTicket } from '$lib/stores/pos/kds.svelte';
 	import { orders, markItemServed } from '$lib/stores/pos.svelte';
+	import type { Order } from '$lib/types';
 	import { log } from '$lib/stores/audit.svelte';
 	import type { KdsTicketItem } from '$lib/types';
 	import { cn } from '$lib/utils';
@@ -27,7 +28,7 @@
 		packageId?: string | null;
 		packageName?: string | null;
 		createdAt: string;
-		meats: { total: number; done: number; allDone: boolean };
+		meats: { total: number; done: number; weighed: number; weighedItems: KdsTicketItem[]; allDone: boolean };
 		dishes: { total: number; done: number; allDone: boolean };
 		sides: { items: KdsTicketItem[]; total: number; done: number; allDone: boolean };
 		service: { items: KdsTicketItem[] };
@@ -49,11 +50,13 @@
 				const sideItems = active.filter((i) => i.category === 'sides');
 				const serviceItems = active.filter((i) => i.category === 'service' && i.status !== 'served');
 
-				const meatDone = meatItems.filter((i) => i.weight && i.weight > 0 || i.status === 'served').length;
+				const meatDone = meatItems.filter((i) => i.status === 'served').length;
+				const meatWeighedItems = meatItems.filter((i) => i.weight && i.weight > 0 && i.status !== 'served');
+				const meatWeighed = meatWeighedItems.length;
 				const dishDone = dishItems.filter((i) => i.status === 'served').length;
 				const sideDone = sideItems.filter((i) => i.status === 'served').length;
 
-				const meats = { total: meatItems.length, done: meatDone, allDone: meatItems.length === 0 || meatDone >= meatItems.length };
+				const meats = { total: meatItems.length, done: meatDone, weighed: meatWeighed, weighedItems: meatWeighedItems, allDone: meatItems.length === 0 || meatDone >= meatItems.length };
 				const dishes = { total: dishItems.length, done: dishDone, allDone: dishItems.length === 0 || dishDone >= dishItems.length };
 				const sides = { items: sideItems, total: sideItems.length, done: sideDone, allDone: sideItems.length === 0 || sideDone >= sideItems.length };
 
@@ -91,6 +94,18 @@
 	});
 
 	// ── Actions ──
+	async function serveWeighedMeats(orderId: string, items: KdsTicketItem[]) {
+		try {
+			for (const item of items) {
+				await markItemServed(orderId, item.id);
+			}
+			playSound('success');
+		} catch (err) {
+			console.error('[Dispatch] serveWeighedMeats failed:', err);
+			showToast(`Failed to serve meats — ${err instanceof Error ? err.message : 'try again'}`);
+		}
+	}
+
 	async function markSideDone(orderId: string, itemId: string) {
 		try {
 			await markItemServed(orderId, itemId);
@@ -363,17 +378,32 @@
 						<!-- Station Progress Rows -->
 						<div class="flex flex-col divide-y divide-border/40 border-t border-border/40 px-4">
 							<!-- Meat row — deep link to Weigh Station when pending ([09]+[SP-01]) -->
-							<div class={cn('flex items-center gap-3 py-2.5', stationStatusCls(card.meats.allDone, card.meats.total))}>
-								<span class="text-lg w-7 text-center" aria-hidden="true">&#129385;</span>
-								<span class="flex-1 text-sm font-semibold">Meat</span>
-								{#if card.meats.total === 0}
-									<span class="text-xs text-gray-300">N/A</span>
-								{:else}
-									{#if !card.meats.allDone}
-										<a href="/kitchen/weigh-station" class="text-xs text-accent underline font-semibold hover:text-accent-dark transition-colors px-1">&#8594; Weigh Station</a>
+							<div class="py-2.5">
+								<div class={cn('flex items-center gap-3', stationStatusCls(card.meats.allDone, card.meats.total))}>
+									<span class="text-lg w-7 text-center" aria-hidden="true">&#129385;</span>
+									<span class="flex-1 text-sm font-semibold">Meat</span>
+									{#if card.meats.total === 0}
+										<span class="text-xs text-gray-300">N/A</span>
+									{:else}
+										{#if !card.meats.allDone && card.meats.weighed === 0}
+											<a href="/kitchen/weigh-station" class="text-xs text-accent underline font-semibold hover:text-accent-dark transition-colors px-1">&#8594; Weigh Station</a>
+										{/if}
+										{#if card.meats.weighed > 0}
+											<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800">{card.meats.weighed} weighed</span>
+										{/if}
+										<span class="font-mono text-sm font-bold">{card.meats.done}/{card.meats.total}</span>
+										<span class="text-base">{@html stationStatusIcon(card.meats.allDone, card.meats.total)}</span>
 									{/if}
-									<span class="font-mono text-sm font-bold">{card.meats.done}/{card.meats.total}</span>
-									<span class="text-base">{@html stationStatusIcon(card.meats.allDone, card.meats.total)}</span>
+								</div>
+								{#if card.meats.weighed > 0}
+									<div class="mt-2 ml-10">
+										<button
+											onclick={() => serveWeighedMeats(card.orderId, card.meats.weighedItems)}
+											class="w-full rounded-lg bg-status-green text-white font-bold text-sm active:scale-95 transition-all no-select min-h-[44px] px-3"
+										>
+											SERVE {card.meats.weighed} MEAT{card.meats.weighed > 1 ? 'S' : ''}
+										</button>
+									</div>
 								{/if}
 							</div>
 
@@ -488,7 +518,7 @@
 
 <!-- Undo Toast -->
 {#if toast.visible}
-	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 text-white px-4 sm:px-5 py-3 shadow-lg max-w-[calc(100vw-2rem)]">
+	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 text-white px-4 sm:px-5 py-3 shadow-lg max-w-[calc(100vw-2rem)] fixed-safe-bottom">
 		<span class="text-sm font-semibold">{toast.message}</span>
 		{#if toast.undoFn}
 			<button

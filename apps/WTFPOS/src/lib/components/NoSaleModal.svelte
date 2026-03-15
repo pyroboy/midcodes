@@ -2,6 +2,8 @@
 	import { X, HardDrive } from 'lucide-svelte';
 	import { openCashDrawer } from '$lib/stores/hardware.svelte';
 	import { session, MANAGER_PIN } from '$lib/stores/session.svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
+	import { pinpadKeyboard } from '$lib/actions/pinpad-keyboard';
 
 	export let isOpen = false;
 	export let onClose: () => void;
@@ -48,9 +50,9 @@
 	}
 </script>
 
-{#if isOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-		<div class="bg-surface w-full max-w-sm rounded-[1.5rem] p-6 shadow-xl border border-border animate-in zoom-in-95 duration-200 relative">
+<ModalWrapper open={isOpen} onclose={onClose} zIndex={50} ariaLabel="Open cash drawer" class="p-4">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="bg-surface w-full max-w-[380px] rounded-[1.5rem] p-6 shadow-xl border border-border relative" use:pinpadKeyboard={{ onDigit: (d) => handleNumber(Number(d)), onBackspace: handleBackspace, onClear: () => { pin = ''; }, onSubmit: handleSubmit, canSubmit: () => pin.length === 4 }}>
 			<button class="absolute right-5 top-5 text-gray-400 hover:text-gray-900 transition-colors" onclick={onClose}>
 				<X class="w-6 h-6" />
 			</button>
@@ -133,5 +135,4 @@
 				</div>
 			{/if}
 		</div>
-	</div>
-{/if}
+</ModalWrapper>

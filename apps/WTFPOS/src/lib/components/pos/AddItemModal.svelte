@@ -6,6 +6,7 @@
     import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
     import { btScale } from '$lib/stores/bluetooth-scale.svelte';
     import { playSound } from '$lib/utils/audio';
+    import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
     export interface ChargeItem {
         item: MenuItem;
@@ -184,10 +185,8 @@
     function undoPending() { pendingItems = []; }
 </script>
 
-<svelte:window onkeydown={(e) => { if (e.key === 'Escape') tryClose(); }} />
-
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm sm:p-4 lg:p-6">
-    <div class="flex h-full w-full sm:max-h-[95vh] lg:max-w-[1100px] overflow-hidden sm:rounded-xl border border-border bg-surface shadow-2xl flex-col lg:flex-row">
+<ModalWrapper open={true} onclose={tryClose} zIndex={50} ariaLabel="Add items to order" class="sm:p-4 lg:p-6" backdropClose={false}>
+    <div class="flex h-full w-full sm:h-[80vh] lg:max-w-[1100px] overflow-hidden sm:rounded-xl border border-border bg-surface shadow-2xl flex-col lg:flex-row">
         <div class="flex flex-1 flex-col overflow-hidden min-h-0">
             <div class="flex items-start justify-between border-b border-border px-4 sm:px-6 py-3 sm:py-4">
                 <div class="flex flex-col gap-1.5">
@@ -272,13 +271,13 @@
                             />
                         </div>
                     {/if}
-                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-1.5 sm:gap-3 lg:gap-4">
                         {#each filteredItems as item (item.id)}
                             <button
                                 onclick={() => item.available && tapItem(item)}
                                 disabled={!item.available}
                                 class={cn(
-                                    'relative flex flex-col rounded-lg sm:rounded-xl border text-left transition-all overflow-hidden',
+                                    'relative flex flex-col justify-between rounded-lg sm:rounded-xl border text-left transition-all overflow-hidden h-[88px] sm:h-[104px]',
                                     !item.available
                                         ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
                                         : pendingItems.some(p => p.item.id === item.id)
@@ -289,57 +288,56 @@
                                     item.protein === 'chicken' ? '!border-l-yellow-500 !border-l-4' : ''
                                 )}
                             >
+                                {#if item.image}
+                                    <img src={item.image} alt="" class="absolute inset-0 w-full h-full object-cover opacity-10" />
+                                {/if}
                                 {#if !item.available}
                                     <div class="absolute inset-0 z-10 flex items-center justify-center">
                                         <span class="rounded-lg bg-gray-900/70 px-2.5 py-1 text-[10px] sm:text-xs font-bold text-white uppercase tracking-wider">Sold Out</span>
                                     </div>
                                 {/if}
-                                {#if item.image}
-                                    <div class="w-full h-20 sm:h-28 bg-gray-100">
-                                        <img src={item.image} alt={item.name} class="w-full h-full object-cover" />
+                                <div class="relative z-[1] flex flex-col justify-between h-full px-2.5 py-2 sm:px-3 sm:py-2.5">
+                                    <div class="flex items-start justify-between gap-1">
+                                        <span class="text-xs sm:text-sm font-bold text-gray-900 leading-tight line-clamp-2">{item.name}</span>
+                                        {#if item.protein}
+                                            <span class={cn(
+                                                "flex items-center gap-0.5 rounded-full px-1 py-0.5 text-[8px] sm:text-[10px] font-bold uppercase tracking-wide shrink-0",
+                                                item.protein === 'beef' ? 'bg-red-100 text-red-700' : '',
+                                                item.protein === 'pork' ? 'bg-orange-100 text-orange-700' : '',
+                                                item.protein === 'chicken' ? 'bg-yellow-100 text-yellow-700' : ''
+                                            )}>
+                                                {item.protein === 'beef' ? '🥩' : item.protein === 'pork' ? '🐷' : '🍗'}
+                                            </span>
+                                        {/if}
+                                        {#if item.category === 'packages' && pendingItems.some(p => p.item.id === item.id)}
+                                            <span class="rounded bg-accent px-1 py-0.5 text-[8px] sm:text-[10px] font-bold text-white shrink-0">ACTIVE</span>
+                                        {/if}
                                     </div>
-                                {/if}
-                                <div class={cn('flex flex-col gap-1 sm:gap-2 px-3 pb-3 sm:px-4 sm:pb-4', item.image ? 'pt-2 sm:pt-3' : 'pt-3 sm:pt-4')}>
-                                    {#if item.protein}
-                                        <span class={cn(
-                                            "absolute top-2 right-2 sm:top-3 sm:right-3 flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide",
-                                            item.protein === 'beef' ? 'bg-red-100 text-red-700' : '',
-                                            item.protein === 'pork' ? 'bg-orange-100 text-orange-700' : '',
-                                            item.protein === 'chicken' ? 'bg-yellow-100 text-yellow-700' : ''
-                                        )}>
-                                            {item.protein === 'beef' ? '🥩' : item.protein === 'pork' ? '🐷' : '🍗'} {item.protein}
-                                        </span>
+                                    {#if item.category === 'packages' && item.desc}
+                                        <p class="text-[9px] sm:text-[11px] text-gray-500 leading-snug line-clamp-1 mt-0.5">{item.desc}</p>
                                     {/if}
-                                    {#if item.category === 'packages'}
-                                        <div class="flex items-center justify-between gap-1">
-                                            <span class="text-sm sm:text-base font-bold text-gray-900 leading-tight">{item.name}</span>
-                                            {#if pendingItems.some(p => p.item.id === item.id)}
-                                                <span class="rounded bg-accent px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-white shrink-0">ACTIVE</span>
+                                    <div class="flex items-end justify-between gap-1 mt-auto">
+                                        {#if item.category === 'packages'}
+                                            {#if activeChildPax > 0 || activeFreePax > 0}
+                                                <div class="font-mono text-[9px] sm:text-[11px] text-gray-700 leading-snug">
+                                                    {#if activeAdultPax > 0}<span>₱{item.price}×{activeAdultPax}</span>{/if}
+                                                    {#if activeChildPax > 0}<span class="ml-1">kid ₱{item.childPrice ?? item.price}×{activeChildPax}</span>{/if}
+                                                </div>
+                                            {:else}
+                                                <span class="font-mono text-[10px] sm:text-sm font-bold text-gray-900">₱{item.price}/pax</span>
                                             {/if}
-                                        </div>
-                                        {#if item.desc}<p class="text-[10px] sm:text-xs text-gray-500 leading-snug">{item.desc}</p>{/if}
-                                        {#if activeChildPax > 0 || activeFreePax > 0}
-                                            <div class="font-mono text-[10px] sm:text-xs text-gray-700 leading-relaxed">
-                                                {#if activeAdultPax > 0}<div>₱{item.price} × {activeAdultPax} adult{activeAdultPax !== 1 ? 's' : ''}</div>{/if}
-                                                {#if activeChildPax > 0}<div>₱{item.childPrice ?? item.price} × {activeChildPax} kid{activeChildPax !== 1 ? 's' : ''}</div>{/if}
-                                                {#if activeFreePax > 0}<div class="text-gray-400">Free × {activeFreePax}</div>{/if}
-                                            </div>
+                                            {#if item.perks}<span class="text-[8px] sm:text-[10px] text-status-green line-clamp-1 shrink-0">✓ {item.perks}</span>{/if}
+                                        {:else if item.isWeightBased}
+                                            <span class="font-mono text-[10px] sm:text-xs font-bold text-gray-700">₱{((item.pricePerGram ?? 0) * 100).toFixed(0)}/100g</span>
+                                            <span class="text-[9px] sm:text-[10px] text-gray-400">tap to weigh</span>
                                         {:else}
-                                            <p class="font-mono text-xs sm:text-sm font-bold text-gray-900">₱{item.price}/pax</p>
+                                            {#if item.isFree}
+                                                <span class="text-[10px] sm:text-xs font-semibold text-status-green">FREE</span>
+                                            {:else}
+                                                <span class="font-mono text-[10px] sm:text-sm font-bold text-gray-900">{formatPeso(item.price)}</span>
+                                            {/if}
                                         {/if}
-                                        {#if item.perks}<p class="text-[10px] sm:text-xs text-status-green leading-snug">✓ {item.perks}</p>{/if}
-                                    {:else if item.isWeightBased}
-                                        <span class="text-xs sm:text-sm font-semibold text-gray-900">{item.name}</span>
-                                        <span class="text-[10px] sm:text-xs text-gray-400">tap to weigh</span>
-                                        <span class="font-mono text-[10px] sm:text-xs font-bold text-gray-700">₱{((item.pricePerGram ?? 0) * 100).toFixed(0)}/100g</span>
-                                    {:else}
-                                        <span class="text-xs sm:text-sm font-semibold text-gray-900">{item.name}</span>
-                                        {#if item.isFree}
-                                            <span class="text-[10px] sm:text-xs font-semibold text-status-green">FREE</span>
-                                        {:else}
-                                            <span class="font-mono text-xs sm:text-sm font-bold text-gray-900">{formatPeso(item.price)}</span>
-                                        {/if}
-                                    {/if}
+                                    </div>
                                 </div>
                             </button>
                         {/each}
@@ -515,7 +513,7 @@
             </div>
         </div>
     </div>
-</div>
+</ModalWrapper>
 
 <!-- Mobile pending items sheet (< lg) -->
 {#if showMobilePending}
@@ -576,10 +574,8 @@
     </div>
 {/if}
 
-{#if confirmingClose}
-    <!-- P0-2: Confirm discard of uncommitted pending items -->
-    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
-        <div class="pos-card flex flex-col gap-4 p-6 w-full max-w-[340px]">
+<ModalWrapper open={confirmingClose} onclose={() => { confirmingClose = false; }} zIndex={60} ariaLabel="Confirm discard pending items" class="px-4">
+        <div class="pos-card flex flex-col gap-4 p-6 w-full max-w-[380px]">
             <div class="flex flex-col gap-1">
                 <p class="text-base font-bold text-gray-900">Discard {pendingItems.length} pending item{pendingItems.length !== 1 ? 's' : ''}?</p>
                 <p class="text-sm text-gray-500">These items have not been charged yet and will not be sent to the kitchen.</p>
@@ -589,5 +585,4 @@
                 <button onclick={discardAndClose} class="btn-danger flex-1 text-sm" style="min-height: 44px">Discard</button>
             </div>
         </div>
-    </div>
-{/if}
+</ModalWrapper>

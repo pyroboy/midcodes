@@ -104,7 +104,7 @@
 	</div>
 
 	<div class="flex-1 overflow-auto">
-		<div class="p-3 sm:p-6">
+		<div class="p-4 sm:p-6">
 			{@render children()}
 		</div>
 	</div>

@@ -450,6 +450,63 @@ function filterDuplicateZReads(
 	return { allowed, dropped };
 }
 
+// ─── Side-Effect Guard: Auto-bump KDS tickets when order closes ─────────────
+// When an order transitions to 'paid' or 'cancelled' via replication push,
+// find any active KDS tickets for that order and bump them. This is a side-effect
+// (doesn't filter rows), so it runs after all filter guards.
+function autoBumpKdsOnOrderClose(changeRows: any[], collection: string): void {
+	if (collection !== 'orders') return;
+
+	const kdsStore = getCollectionStore('kds_tickets');
+	if (!kdsStore) return;
+
+	const closedStatuses = new Set(['paid', 'cancelled']);
+
+	for (const row of changeRows) {
+		const doc = row.newDocumentState;
+		const assumed = row.assumedMasterState;
+
+		// Only handle transitions INTO a closed state
+		if (
+			doc && assumed &&
+			doc.status && assumed.status &&
+			closedStatuses.has(doc.status) &&
+			!closedStatuses.has(assumed.status)
+		) {
+			const orderId = doc.id;
+			const allTickets = kdsStore.pull(null, Infinity).documents;
+			const activeTickets = allTickets.filter(
+				(t: any) => t.orderId === orderId && !t.bumpedAt && !t._deleted
+			);
+
+			const now = new Date().toISOString();
+			for (const ticket of activeTickets) {
+				const servedItems = (ticket.items || []).map((i: any) =>
+					i.status === 'pending' || i.status === 'cooking'
+						? { ...i, status: 'served' }
+						: i
+				);
+				kdsStore.push([{
+					newDocumentState: {
+						...ticket,
+						items: servedItems,
+						bumpedAt: now,
+						bumpedBy: 'System (auto-bump)',
+						updatedAt: now
+					},
+					assumedMasterState: ticket
+				}]);
+			}
+
+			if (activeTickets.length > 0) {
+				log.debug('Sync',
+					`[Guard] Auto-bumped ${activeTickets.length} KDS ticket(s) for order ${orderId} → ${doc.status}`
+				);
+			}
+		}
+	}
+}
+
 export const POST: RequestHandler = async ({ params, request, getClientAddress }) => {
 	const store = getCollectionStore(params.collection);
 	if (!store) throw error(404, `Unknown collection: ${params.collection}`);
@@ -469,6 +526,9 @@ export const POST: RequestHandler = async ({ params, request, getClientAddress }
 	const orderStateGuard = filterInvalidOrderTransitions(kdsGuard.allowed, params.collection);
 	const shiftGuard = filterDuplicateActiveShifts(orderStateGuard.allowed, params.collection);
 	const zReadGuard = filterDuplicateZReads(shiftGuard.allowed, params.collection);
+
+	// Side-effect: auto-bump KDS tickets when an order closes (doesn't filter)
+	autoBumpKdsOnOrderClose(zReadGuard.allowed, params.collection);
 
 	const allowed = zReadGuard.allowed;
 	const dropped = orderGuard.dropped + tableGuard.dropped + kdsGuard.dropped + orderStateGuard.dropped + shiftGuard.dropped + zReadGuard.dropped;

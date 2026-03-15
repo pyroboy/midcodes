@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, recallTicket, REFILL_NOTE, orders } from '$lib/stores/pos.svelte';
+	import { kdsTickets, kdsTicketHistory, markItemServed, toggleMenuItemAvailability, menuItems, recallLastTicket, recallTicket, bumpTicketsForOrder, REFILL_NOTE, orders } from '$lib/stores/pos.svelte';
 	import type { KdsTicket, KdsTicketItem } from '$lib/types';
 	import { refuseItem } from '$lib/stores/alert.svelte';
 	import { formatTimeAgo, formatDisplayId, cn } from '$lib/utils';
@@ -247,6 +247,27 @@
 			isStale = Date.now() - untrack(() => lastUpdated) > 60_000;
 		}, 10_000);
 		return () => clearInterval(id);
+	});
+
+	// ── One-time orphan sweep: bump tickets whose orders are already closed ──
+	let orphanSweepDone = false;
+	$effect(() => {
+		if (orphanSweepDone) return;
+		if (!kdsTickets.initialized || !orders.initialized) return;
+		orphanSweepDone = true;
+
+		const active = kdsTickets.value;
+		if (active.length === 0) return;
+
+		const closedStatuses = new Set(['paid', 'cancelled']);
+		const orderMap = new Map(orders.value.map(o => [o.id, o]));
+
+		for (const ticket of active) {
+			const order = orderMap.get(ticket.orderId);
+			if (order && closedStatuses.has(order.status)) {
+				bumpTicketsForOrder(ticket.orderId, 'System (orphan sweep)').catch(() => {});
+			}
+		}
 	});
 
 	// ── Auto-print incoming tickets ──
@@ -762,7 +783,7 @@
 
 <!-- Toast -->
 {#if toast.visible}
-	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 px-5 py-3 shadow-lg text-white text-sm font-medium">
+	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-gray-900 px-5 py-3 shadow-lg text-white text-sm font-medium fixed-safe-bottom">
 		<span>{toast.message}</span>
 		{#if toast.undoFn}
 			<button

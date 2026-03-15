@@ -7,6 +7,7 @@
 		type CriticalActionId
 	} from '$lib/stores/admin-guard.svelte';
 	import { ShieldAlert, TriangleAlert } from 'lucide-svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		action: CriticalActionId;
@@ -38,19 +39,11 @@
 		pin = (e.target as HTMLInputElement).value;
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') handleConfirm();
-		if (e.key === 'Escape') onCancel();
-	}
+
 </script>
 
-<!-- Backdrop -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-	onkeydown={handleKeydown}
->
-	<div class="w-[460px] rounded-2xl border border-border bg-white shadow-2xl">
+<ModalWrapper open={true} onclose={onCancel} zIndex={50} ariaLabel={meta.label} backdropClose={false}>
+	<div class="w-full max-w-[480px] rounded-2xl border border-border bg-white shadow-2xl">
 		<!-- Header -->
 		<div
 			class={cn(
@@ -129,9 +122,7 @@
 					)}
 					autofocus
 				/>
-				{#if pinError}
-					<p class="text-xs text-status-red">Incorrect PIN. Try again.</p>
-				{/if}
+				<p class={cn('text-xs text-status-red', !pinError && 'invisible')}>Incorrect PIN. Try again.</p>
 			</div>
 
 			<!-- Actions -->
@@ -146,4 +137,4 @@
 			</div>
 		</div>
 	</div>
-</div>
+</ModalWrapper>

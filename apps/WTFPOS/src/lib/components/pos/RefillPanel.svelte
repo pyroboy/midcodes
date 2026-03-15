@@ -4,6 +4,7 @@
 	import { cn } from '$lib/utils';
 	import { X, RotateCcw, UtensilsCrossed, Beef, LeafyGreen, Wrench, Plus } from 'lucide-svelte';
 	import { playSound } from '$lib/utils/audio';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -122,13 +123,10 @@
 	}
 </script>
 
-{#if isOpen && order}
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onclick={onclose}>
+<ModalWrapper open={isOpen && !!order} onclose={onclose} zIndex={60} ariaLabel="Refill panel" class="items-end sm:items-center">
+  {#if order}
 	<div
-		class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden max-h-[92vh] sm:max-h-[85vh]"
-		onclick={(e) => e.stopPropagation()}
+		class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden max-h-[92vh] sm:max-h-[85vh] safe-bottom sm:pb-0"
 	>
 		<!-- ─── Header ─────────────────────────────────────────────── -->
 		<div class="shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -337,5 +335,5 @@
 			</button>
 		</div>
 	</div>
-</div>
-{/if}
+  {/if}
+</ModalWrapper>

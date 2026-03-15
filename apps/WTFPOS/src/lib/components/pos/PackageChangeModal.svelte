@@ -3,6 +3,7 @@
 	import { formatPeso, cn } from '$lib/utils';
 	import { MANAGER_PIN } from '$lib/stores/session.svelte';
 	import type { Order } from '$lib/types';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	let {
 		order,
@@ -61,8 +62,8 @@
 	}
 </script>
 
-<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-	<div class="pos-card w-full max-w-[440px] flex flex-col gap-4">
+<ModalWrapper open={true} onclose={onclose} zIndex={60} ariaLabel="Change package" class="px-4">
+	<div class="pos-card w-full max-w-[480px] min-h-[28rem] flex flex-col gap-4">
 		{#if step === 'select'}
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">🔄 Change Package</h3>
@@ -125,9 +126,7 @@
 						)}></div>
 					{/each}
 				</div>
-				{#if pinError}
-					<p class="text-center text-xs font-semibold text-status-red">Incorrect PIN. Try again.</p>
-				{/if}
+				<p class={cn('text-center text-xs font-semibold text-status-red', !pinError && 'invisible')}>Incorrect PIN. Try again.</p>
 			</div>
 
 			<div class="grid grid-cols-3 gap-2">
@@ -154,4 +153,4 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</ModalWrapper>

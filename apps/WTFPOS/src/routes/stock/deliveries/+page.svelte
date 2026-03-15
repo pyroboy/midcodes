@@ -312,7 +312,7 @@
 
 <!-- Issue 09: Success toast -->
 {#if successMsg}
-	<div class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl bg-status-green px-5 py-3.5 text-white shadow-xl" transition:fade={{ duration: 200 }}>
+	<div class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl bg-status-green px-5 py-3.5 text-white shadow-xl fixed-safe-bottom fixed-safe-right" transition:fade={{ duration: 200 }}>
 		<svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 		</svg>
@@ -327,7 +327,7 @@
 		amount: String(lastSavedDelivery.totalCost),
 		description: `${lastSavedDelivery.itemName} ${lastSavedDelivery.qty}${lastSavedDelivery.unit}`
 	})}
-	<div class="fixed bottom-3 left-3 right-3 sm:left-6 sm:right-auto sm:bottom-6 z-[60] flex items-center gap-3 rounded-xl border border-accent/30 bg-white px-4 py-3 shadow-xl" transition:fade={{ duration: 200 }}>
+	<div class="fixed bottom-3 left-3 right-3 sm:left-6 sm:right-auto sm:bottom-6 z-[60] flex items-center gap-3 rounded-xl border border-accent/30 bg-white px-4 py-3 shadow-xl fixed-safe-bottom" transition:fade={{ duration: 200 }}>
 		<div class="flex flex-col gap-0.5">
 			<span class="text-xs font-semibold text-gray-600">Procurement cost: <span class="font-mono text-accent">{formatPeso(lastSavedDelivery.totalCost)}</span></span>
 			<span class="text-xs text-gray-400">Add as expense?</span>
@@ -346,7 +346,7 @@
 <!-- Receive Delivery Modal -->
 {#if showModal}
 	<div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="w-full sm:w-[500px] sm:max-w-[500px] rounded-t-2xl sm:rounded-xl shadow-xl relative">
+		<div class="w-full sm:w-[500px] sm:max-w-[500px] rounded-t-2xl sm:rounded-xl shadow-xl relative safe-bottom sm:pb-0">
 			<button
 				onclick={() => (showModal = false)}
 				class="absolute top-4 right-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"

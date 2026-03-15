@@ -55,7 +55,7 @@ pnpm format       # Auto-format
 2. Every new record **must** include `locationId: session.locationId`
 3. `locationId === 'all'` → show aggregate/cross-branch view, never silently filter to one branch
 4. `isWarehouseSession()` gates POS/floor access — warehouse is inventory-only
-5. `LocationBanner` lives in **root layout only** — never add it to section layouts
+5. `StatusBar` (location + live indicator) lives in **root layout only** — never add it to section layouts
 
 ---
 
@@ -80,14 +80,14 @@ pnpm format       # Auto-format
 
 ```
 Root layout (+layout.svelte):
-  <ConnectionStatus />       ← floating pill (fixed), always rendered
+  <ConnectionStatus />       ← banners only (offline/KDS alerts), always rendered
   <DbHealthBanner />         ← floating warning (fixed), emergency DB reset
   {#if showSidebar}           ← false only for login page (/)
     <SidebarProvider>
       <AppSidebar />          ← collapsible left rail (desktop) / Sheet (mobile)
       <SidebarInset>
         <MobileTopBar />      ← md:hidden hamburger
-        <LocationBanner />    ← ALWAYS VISIBLE on authenticated pages
+        <StatusBar />         ← Location + Live status bar (sticky, authenticated pages)
         {children}
       </SidebarInset>
     </SidebarProvider>
@@ -96,7 +96,7 @@ Root layout (+layout.svelte):
 
 **Rules:**
 - **Never** add `TopBar` to new pages — deprecated
-- **Never** add `LocationBanner`, `ConnectionStatus`, or `DbHealthBanner` to page components — root layout only
+- **Never** add `StatusBar`, `ConnectionStatus`, or `DbHealthBanner` to page components — root layout only
 - Section layouts use `h-full` not `h-screen` — height managed by `SidebarInset`
 
 ---

@@ -42,6 +42,7 @@
 	import { ELEVATED_ROLES } from '$lib/stores/session.svelte';
 	import { orders } from '$lib/stores/pos.svelte';
 	import LocationSelectorModal from '$lib/components/stock/LocationSelectorModal.svelte';
+	import * as Popover from '$lib/components/ui/popover/index.js';
 
 	const allNavItems = [
 		{ href: '/pos',     label: 'POS',     Icon: ShoppingCart },
@@ -130,13 +131,13 @@
 <Sidebar collapsible="icon">
 	<!-- Brand header -->
 	<SidebarHeader>
-		<div class="flex items-center gap-2 px-1 py-1">
+		<div class="flex items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
 			<button
 				onclick={() => sidebar.toggle()}
-				class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent hover:bg-accent-dark transition-colors cursor-pointer focus:outline-none"
+				class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent hover:bg-accent-dark transition-colors cursor-pointer focus:outline-none"
 				aria-label="Toggle sidebar"
 			>
-				<span class="text-xs font-extrabold text-white">W!</span>
+				<span class="text-sm font-extrabold text-white">W!</span>
 			</button>
 			<div class="flex flex-col group-data-[collapsible=icon]:hidden">
 				<span class="text-sm font-extrabold tracking-tight text-gray-900 leading-tight">WTF! SAMGYUP</span>
@@ -193,23 +194,23 @@
 					{/if}
 				</div>
 				<!-- Phone: 4-col icon grid | Tablet+: 2-col with labels -->
-				<div class={cn('grid grid-cols-4 md:grid-cols-2 gap-1', isAllLocation && 'opacity-50 pointer-events-none')} title={isAllLocation ? 'Select a specific branch to use quick actions' : undefined}>
+				<div class={cn('sidebar-quick-actions grid grid-cols-4 md:grid-cols-2 gap-1.5', isAllLocation && 'opacity-50 pointer-events-none')} title={isAllLocation ? 'Select a specific branch to use quick actions' : undefined}>
 					{#each quickActions as qa}
 						<a
 							href="{qa.href}?action=open"
 							title={qa.label}
 							class={cn(
 								'flex rounded-md font-medium transition-colors',
-								'flex-col items-center gap-0.5 px-1 py-1.5 md:flex-row md:gap-2 md:px-2 md:py-1.5 text-xs md:text-sm',
+								'flex-col items-center gap-0.5 px-1.5 py-2.5 md:flex-row md:gap-2 md:px-2 md:py-2.5 text-xs md:text-sm',
 								isActive(qa.href)
 									? 'bg-accent text-white'
 									: 'border border-dashed border-gray-200 bg-white text-gray-600 hover:border-accent/40 hover:bg-accent-light hover:text-accent',
 								''
 							)}
 						>
-							<qa.Icon class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
+							<qa.Icon class="h-4 w-4 md:h-4 md:w-4 shrink-0" />
 							<!-- Phone: short label below icon | Tablet+: full label | Collapsed: sr-only -->
-							<span class="text-[9px] leading-tight text-center md:hidden group-data-[collapsible=icon]:sr-only">{qa.shortLabel}</span>
+							<span class="text-[10px] leading-tight text-center md:hidden group-data-[collapsible=icon]:sr-only">{qa.shortLabel}</span>
 							<span class="hidden md:inline group-data-[collapsible=icon]:sr-only">{qa.label}</span>
 						</a>
 					{/each}
@@ -248,71 +249,83 @@
 	<SidebarFooter>
 		<SidebarSeparator />
 
-		<!-- User info -->
-		<div class="flex items-center gap-2 px-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-			<div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-light text-sm font-semibold text-accent">
-				{(session.userName || 'U').charAt(0).toUpperCase()}
-			</div>
-			<div class="flex flex-1 flex-col group-data-[collapsible=icon]:hidden overflow-hidden">
-				<span class="truncate text-sm font-medium text-gray-900 leading-tight">{session.userName || 'User'}</span>
-				<span class={cn('mt-0.5 inline-flex w-fit items-center rounded-full border px-1.5 py-0 text-[10px] font-bold uppercase', roleClass)}>
-					{session.role}
-				</span>
-			</div>
-		</div>
-
-		<!-- P1-15: Change Location button with confirmation (elevated roles only) -->
-		{#if ELEVATED_ROLES.includes(session.role)}
-			<div class="px-1 group-data-[collapsible=icon]:hidden">
-				{#if showLocationConfirm}
-					<!-- Inline confirmation panel -->
-					<div class="rounded-lg border border-amber-200 bg-amber-50 p-2 md:p-3 flex flex-col gap-1.5 md:gap-2">
-						<p class="text-xs font-semibold text-amber-800 leading-snug">
-							Switch location? This will change all data views to the new branch.
-						</p>
-						{#if openOrderCount > 0}
-							<p class="text-xs text-amber-700">
-								You have <strong>{openOrderCount}</strong> open {openOrderCount === 1 ? 'table' : 'tables'} at this branch.
-							</p>
-						{/if}
-						<div class="flex gap-2 mt-0.5 md:mt-1">
-							<button
-								onclick={confirmLocationSwitch}
-								class="flex-1 rounded-md bg-amber-600 px-2 py-1 md:py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors"
-							>
-								Switch Anyway
-							</button>
-							<button
-								onclick={cancelLocationChange}
-								class="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 md:py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-							>
-								Cancel
-							</button>
-						</div>
+		<!-- User avatar + popover (logout, change location) -->
+		<div class="px-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+			<Popover.Root>
+				<Popover.Trigger
+					class="flex w-full items-center gap-2 rounded-md px-1 py-1.5 hover:bg-gray-100 transition-colors cursor-pointer group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1"
+				>
+					<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-light text-sm font-semibold text-accent">
+						{(session.userName || 'U').charAt(0).toUpperCase()}
 					</div>
-				{:else}
-					<button
-						onclick={requestLocationChange}
-						class="flex w-full items-center gap-2 rounded-md px-2 py-1 md:py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors border border-dashed border-gray-200"
-					>
-						<ArrowLeftRight class="h-3.5 w-3.5 shrink-0" />
-						<span>Change Location</span>
-					</button>
-				{/if}
-			</div>
-		{/if}
+					<div class="flex flex-1 flex-col group-data-[collapsible=icon]:hidden overflow-hidden text-left">
+						<span class="truncate text-sm font-medium text-gray-900 leading-tight">{session.userName || 'User'}</span>
+						<span class={cn('mt-0.5 inline-flex w-fit items-center rounded-full border px-1.5 py-0 text-[10px] font-bold uppercase', roleClass)}>
+							{session.role}
+						</span>
+					</div>
+				</Popover.Trigger>
+				<Popover.Content side="top" align="start" sideOffset={8} class="w-56 p-0">
+					<!-- User details header -->
+					<div class="border-b border-gray-100 px-3 py-3">
+						<p class="text-sm font-semibold text-gray-900">{session.userName || 'User'}</p>
+						<p class={cn('mt-1 inline-flex w-fit items-center rounded-full border px-1.5 py-0.5 text-[10px] font-bold uppercase', roleClass)}>
+							{session.role}
+						</p>
+						<p class="mt-1 text-xs text-gray-500">{currentLoc?.name ?? 'Unknown'}</p>
+					</div>
 
-		<!-- Logout -->
-		<div class="px-1 group-data-[collapsible=icon]:px-0">
-			<a
-				href="/"
-				onclick={() => clearSession()}
-				class="flex w-full items-center gap-2 rounded-md px-2 py-1 md:py-1.5 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:p-0"
-				title="Logout"
-			>
-				<LogOut class="h-4 w-4 shrink-0" />
-				<span class="group-data-[collapsible=icon]:hidden">Logout</span>
-			</a>
+					<div class="flex flex-col gap-0.5 p-1.5">
+						<!-- Change Location (elevated roles only) -->
+						{#if ELEVATED_ROLES.includes(session.role)}
+							{#if showLocationConfirm}
+								<div class="rounded-md border border-amber-200 bg-amber-50 p-2.5 flex flex-col gap-1.5">
+									<p class="text-xs font-semibold text-amber-800 leading-snug">
+										Switch location?
+									</p>
+									{#if openOrderCount > 0}
+										<p class="text-xs text-amber-700">
+											<strong>{openOrderCount}</strong> open {openOrderCount === 1 ? 'table' : 'tables'} here.
+										</p>
+									{/if}
+									<div class="flex gap-2">
+										<button
+											onclick={confirmLocationSwitch}
+											class="flex-1 rounded-md bg-amber-600 px-2 py-2 text-xs font-bold text-white hover:bg-amber-700 transition-colors"
+										>
+											Switch
+										</button>
+										<button
+											onclick={cancelLocationChange}
+											class="flex-1 rounded-md border border-gray-300 bg-white px-2 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+										>
+											Cancel
+										</button>
+									</div>
+								</div>
+							{:else}
+								<button
+									onclick={requestLocationChange}
+									class="flex w-full items-center gap-2 rounded-md px-2.5 py-2.5 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+								>
+									<ArrowLeftRight class="h-4 w-4 shrink-0" />
+									<span>Change Location</span>
+								</button>
+							{/if}
+						{/if}
+
+						<!-- Logout -->
+						<a
+							href="/"
+							onclick={() => clearSession()}
+							class="flex w-full items-center gap-2 rounded-md px-2.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+						>
+							<LogOut class="h-4 w-4 shrink-0" />
+							<span>Logout</span>
+						</a>
+					</div>
+				</Popover.Content>
+			</Popover.Root>
 		</div>
 	</SidebarFooter>
 

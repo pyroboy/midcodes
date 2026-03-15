@@ -5,6 +5,7 @@
     import { applyLeftoverPenalty, waiveLeftoverPenalty } from '$lib/stores/pos.svelte';
     import BluetoothWeightInput from '$lib/components/BluetoothWeightInput.svelte';
     import { btScale } from '$lib/stores/bluetooth-scale.svelte';
+    import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
     interface Props {
         isOpen: boolean;
@@ -60,12 +61,12 @@
     }
 </script>
 
-{#if isOpen && order}
-<div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+<ModalWrapper open={isOpen && !!order} onclose={onClose} zIndex={60} ariaLabel="Leftover penalty" class="items-end sm:items-center">
+  {#if order}
     {#if !showPin}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl bg-surface shadow-2xl pos-card flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden" onclick={(e) => e.stopPropagation()}>
+        <div class="w-full sm:max-w-[480px] rounded-t-2xl sm:rounded-2xl bg-surface shadow-2xl pos-card flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden safe-bottom sm:pb-0" onclick={(e) => e.stopPropagation()}>
             <!-- Header — compact, fixed -->
             <div class="flex items-center justify-between px-4 pt-3 pb-2 sm:px-5 sm:pt-4 border-b border-gray-100">
                 <div class="flex items-center gap-2 min-w-0">
@@ -97,11 +98,9 @@
                     >ℹ</button>
                 </div>
 
-                {#if showPolicyTip}
-                    <p class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800 leading-relaxed">
-                        AYCE leftover policy: uneaten meat is charged per gram. Enter the total weight of leftover meat.
+                                    <p class={cn("rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800 leading-relaxed", !showPolicyTip && "hidden")}>
+                    	AYCE leftover policy: uneaten meat is charged per gram. Enter the total weight of leftover meat.
                     </p>
-                {/if}
 
                 <p class="text-xs sm:text-sm text-gray-500 leading-relaxed">Weigh uneaten meat. Charged at <span class="font-semibold text-accent">₱{rate}/100g</span>. Enter 0 if clean.</p>
 
@@ -162,5 +161,5 @@
             confirmLabel="Waive"
         />
     {/if}
-</div>
-{/if}
+  {/if}
+</ModalWrapper>

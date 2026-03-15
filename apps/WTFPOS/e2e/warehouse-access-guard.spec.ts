@@ -68,10 +68,10 @@ test.describe('Warehouse Access Guard', () => {
     expect(isRedirected || hasKdsUI === 0).toBeTruthy();
   });
 
-  test('LocationBanner shows warehouse location name', async ({ page }) => {
+  test('StatusBar shows warehouse location name', async ({ page }) => {
     await loginAsWarehouseStaff(page);
 
-    // LocationBanner renders the uppercased location name — warehouse is "Tagbilaran Central Warehouse"
+    // StatusBar renders the uppercased location name — warehouse is "Tagbilaran Central Warehouse"
     // The banner text is set to currentLocation?.name?.toUpperCase()
     const banner = page.locator('h2', { hasText: /WAREHOUSE|TAGBILARAN CENTRAL/i }).first();
     await expect(banner).toBeVisible({ timeout: 10000 });
@@ -80,7 +80,7 @@ test.describe('Warehouse Access Guard', () => {
   test('Warehouse staff location switcher is not present (locked role)', async ({ page }) => {
     await loginAsWarehouseStaff(page);
 
-    // For locked roles (isLocked=true), LocationBanner hides the "Change Location" button.
+    // For locked roles (isLocked=true), StatusBar hides the "Change Location" button.
     // canChangeLocation = !session.isLocked && ELEVATED_ROLES.includes(session.role)
     // staff is NOT in ELEVATED_ROLES, so the button must be absent.
     const changeBtn = page.locator('button', { hasText: 'Change Location' });

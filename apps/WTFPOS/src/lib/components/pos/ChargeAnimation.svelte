@@ -11,7 +11,7 @@
 
 {#if badges.length > 0}
     <!-- z-[95] = above everything, badges float at the top of the screen -->
-    <div class="fixed inset-x-0 top-0 z-[95] pointer-events-none flex justify-center pt-16">
+    <div class="fixed inset-x-0 top-0 z-[95] pointer-events-none flex justify-center pt-[calc(4rem+var(--safe-top))]">
         <div class="flex flex-col items-center gap-1">
             {#each badges as badge (badge.id)}
                 <div class="charge-badge">

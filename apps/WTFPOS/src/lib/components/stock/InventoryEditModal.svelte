@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { cn } from '$lib/utils';
 	import { X } from 'lucide-svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 	import type { StockItem, StockStatus } from '$lib/stores/stock.svelte';
 
 	interface InventoryItem extends StockItem {
@@ -46,8 +48,8 @@
 	}
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
-	<div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl flex flex-col">
+<ModalWrapper open={true} onclose={onClose} zIndex={50} ariaLabel="Edit inventory item" class="p-4">
+	<div class="w-full max-w-[480px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl flex flex-col">
 		<div class="flex items-center justify-between border-b border-border px-5 py-4">
 			<h3 class="font-bold text-gray-900 leading-tight">Edit Item Info</h3>
 			<button onclick={onClose} class="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
@@ -109,9 +111,7 @@
 		</div>
 
 		<div class="flex flex-col gap-2 rounded-b-2xl border-t border-border bg-gray-50 p-4">
-			{#if formError}
-				<p class="text-xs text-status-red font-semibold">{formError}</p>
-			{/if}
+			<p class={cn('text-xs text-status-red font-semibold', !formError && 'invisible')}>{formError || '\u00A0'}</p>
 			<div class="flex items-center justify-end gap-3">
 			<button onclick={onClose} class="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">
 				Cancel
@@ -126,4 +126,4 @@
 			</div>
 		</div>
 	</div>
-</div>
+</ModalWrapper>

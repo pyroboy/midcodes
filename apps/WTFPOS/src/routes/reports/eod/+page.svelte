@@ -243,7 +243,7 @@
 <!-- ─── EOD Modal ───────────────────────────────────────────────────────────── -->
 {#if showModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="pos-card w-full max-w-[460px] mx-3 max-h-[90vh] overflow-y-auto flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[460px] mx-4 max-h-[90vh] overflow-y-auto flex flex-col gap-5">
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">End of Day</h3>
 				<button onclick={() => (showModal = false)} class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">

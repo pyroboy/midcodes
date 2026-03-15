@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { cn } from '$lib/utils';
 	import { playSound } from '$lib/utils/audio';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -56,9 +57,8 @@
 	});
 </script>
 
-{#if isOpen}
-	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-		<div class="pos-card w-[420px] max-w-[95vw] flex flex-col overflow-hidden p-0">
+<ModalWrapper open={isOpen} onclose={handleCancel} zIndex={60} ariaLabel="Return item reason" class="p-4">
+		<div class="pos-card w-full max-w-[480px] min-h-[26rem] flex flex-col overflow-hidden p-0">
 			<!-- Header -->
 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
 				<div class="flex items-center gap-3">
@@ -130,5 +130,4 @@
 				</button>
 			</div>
 		</div>
-	</div>
-{/if}
+</ModalWrapper>

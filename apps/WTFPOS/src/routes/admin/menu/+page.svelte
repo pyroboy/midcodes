@@ -275,7 +275,7 @@
 <!-- ─── Add/Edit Modal ──────────────────────────────────────────────────────── -->
 {#if showModal}
 	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[520px] max-h-[85vh] overflow-y-auto flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[520px] mx-4 max-h-[85vh] overflow-y-auto flex flex-col gap-5">
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">{editingId ? 'Edit' : 'Add'} Menu Item</h3>
 				<button onclick={() => showModal = false} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>
@@ -438,7 +438,7 @@
 <!-- ─── Delete Confirmation ────────────────────────────────────────────────── -->
 {#if deleteTarget}
 	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[360px] flex flex-col gap-4">
+		<div class="pos-card w-full max-w-[360px] mx-4 flex flex-col gap-4">
 			<h3 class="text-lg font-bold text-status-red">Delete Menu Item</h3>
 			<p class="text-sm text-gray-600">
 				Are you sure you want to delete <strong>{deleteTarget.name}</strong>? This action cannot be undone.

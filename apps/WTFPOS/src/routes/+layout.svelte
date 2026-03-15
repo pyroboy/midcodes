@@ -5,13 +5,14 @@
 	import SyncStatusBanner from '$lib/components/SyncStatusBanner.svelte';
 	import AppSidebar from '$lib/components/AppSidebar.svelte';
 	import MobileTopBar from '$lib/components/MobileTopBar.svelte';
-	import LocationBanner from '$lib/components/stock/LocationBanner.svelte';
+	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { SidebarProvider, SidebarInset } from '$lib/components/ui/sidebar/index.js';
 	import { session, isWarehouseSession } from '$lib/stores/session.svelte';
 	import { initConnectionMonitor } from '$lib/stores/connection.svelte';
 	import { initDeviceHeartbeat, stopDeviceHeartbeat, isThisDeviceServer } from '$lib/stores/device.svelte';
 	import { initDbHealthCheck } from '$lib/stores/db-health.svelte';
 	import { pruneOldData } from '$lib/db/cleanup';
+	import { reconcileDataConsistency } from '$lib/db/reconcile';
 	import { needsRxDb, isFullRxDbMode, resolveDataMode } from '$lib/stores/data-mode.svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/state';
@@ -110,6 +111,20 @@
 		initDeviceHeartbeat();
 		initDbHealthCheck();
 		pruneOldData(); // background cleanup — non-blocking
+
+		// Proactive data reconciliation — server device only, every 5 minutes
+		const isRemoteClient = window.location.hostname !== 'localhost'
+			&& window.location.hostname !== '127.0.0.1';
+		if (!isRemoteClient) {
+			const RECONCILE_INTERVAL_MS = 5 * 60 * 1000;
+			const reconcileTimer = setTimeout(() => {
+				reconcileDataConsistency().catch(() => {});
+				setInterval(() => {
+					reconcileDataConsistency().catch(() => {});
+				}, RECONCILE_INTERVAL_MS);
+			}, 30_000); // initial delay: 30s to let stores initialize
+			// Note: no cleanup needed — reconcile is best-effort background work
+		}
 
 		// Server reset recovery: listen for replication to finish so we can dismiss overlay
 		if (serverPreparing) {
@@ -316,7 +331,7 @@
 		<AppSidebar />
 		<SidebarInset class="h-svh overflow-hidden">
 			<MobileTopBar />
-			<LocationBanner />
+			<StatusBar />
 			{@render children()}
 		</SidebarInset>
 	</SidebarProvider>
@@ -328,7 +343,7 @@
 	<!-- Dev error badge -->
 	<button
 		onclick={() => (showErrors = !showErrors)}
-		class="fixed bottom-4 right-4 z-[9999] flex items-center gap-2 rounded-full bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-lg"
+		class="fixed bottom-4 right-4 z-[9999] flex items-center gap-2 rounded-full bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-lg fixed-safe-bottom fixed-safe-right"
 		style="min-height: unset"
 	>
 		⚠ {devErrors.length} error{devErrors.length !== 1 ? 's' : ''}
@@ -336,7 +351,7 @@
 
 	{#if showErrors}
 		<div class="fixed inset-0 z-[10000] flex items-end justify-end p-4 pointer-events-none">
-			<div class="pointer-events-auto flex max-h-[70vh] w-[520px] flex-col overflow-hidden rounded-xl bg-gray-950 text-white shadow-2xl">
+			<div class="pointer-events-auto flex max-h-[70vh] w-full max-w-[520px] flex-col overflow-hidden rounded-xl bg-gray-950 text-white shadow-2xl">
 				<div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
 					<span class="font-mono text-sm font-bold text-red-400">⚠ Dev Errors ({devErrors.length})</span>
 					<div class="flex gap-2">

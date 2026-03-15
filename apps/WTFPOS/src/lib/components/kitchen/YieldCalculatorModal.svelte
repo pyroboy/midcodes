@@ -5,6 +5,7 @@
     import { session } from '$lib/stores/session.svelte';
     import { log } from '$lib/stores/audit.svelte';
     import ManagerPinModal from '$lib/components/pos/ManagerPinModal.svelte';
+    import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
     interface Props {
         isOpen: boolean;
@@ -86,8 +87,7 @@
     }
 </script>
 
-{#if isOpen}
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+<ModalWrapper open={isOpen} onclose={onClose} zIndex={50} ariaLabel="Yield calculator" class="p-4">
     {#if !showPin}
         <div class="w-full max-w-2xl rounded-2xl bg-gray-900 border border-gray-700 shadow-2xl text-white overflow-hidden">
             <!-- Header -->
@@ -228,5 +228,4 @@
             confirmLabel="Record"
         />
     {/if}
-</div>
-{/if}
+</ModalWrapper>

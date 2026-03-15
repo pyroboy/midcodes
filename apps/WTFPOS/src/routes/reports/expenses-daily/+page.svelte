@@ -184,7 +184,7 @@
 <!-- ── Expense entry modal ─────────────────────────────────────────────────── -->
 {#if formOpen}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" transition:fade={{ duration: 150 }}>
-		<div class="pos-card w-full max-w-[560px] mx-3 max-h-[90vh] overflow-y-auto flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[560px] mx-4 max-h-[90vh] overflow-y-auto flex flex-col gap-5">
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">Log New Expense</h3>
 				<button onclick={() => { formOpen = false; resetForm(); }} class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">

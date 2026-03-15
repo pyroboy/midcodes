@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { fade, fly } from 'svelte/transition';
 	import { session, LOCATIONS, type LocationId, ADMIN_ROLES, ELEVATED_ROLES, setLocation } from '$lib/stores/session.svelte';
 	import { MapPin, CheckCircle, Package, AlertCircle, Lock, Globe } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	let { onClose }: { onClose: () => void } = $props();
 
@@ -26,23 +26,12 @@
 		onClose();
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onClose();
-	}
+
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" transition:fade={{ duration: 150 }}>
-	<button
-		class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
-		onclick={onClose}
-		aria-label="Close modal"
-	></button>
-
+<ModalWrapper open={true} onclose={onClose} zIndex={50} ariaLabel="Select work location" class="p-4 sm:p-6">
 	<div
 		class="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
-		transition:fly={{ y: 20, duration: 250 }}
 	>
 		<!-- Header -->
 		<div class="border-b px-6 py-5 bg-gray-50 flex items-center justify-between">
@@ -209,4 +198,4 @@
 			{/if}
 		</div>
 	</div>
-</div>
+</ModalWrapper>

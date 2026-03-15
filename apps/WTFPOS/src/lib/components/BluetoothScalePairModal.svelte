@@ -7,6 +7,7 @@
 		startScan,
 		type SimulatedDevice,
 	} from '$lib/stores/bluetooth-scale.svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -51,9 +52,8 @@
 	}
 </script>
 
-{#if isOpen}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[380px] flex flex-col gap-5">
+<ModalWrapper open={isOpen} onclose={onClose} zIndex={70} ariaLabel="Bluetooth scale pairing">
+		<div class="pos-card w-full max-w-[480px] min-h-[20rem] flex flex-col gap-5">
 			<!-- Header -->
 			<div class="flex items-center justify-between">
 				<h3 class="text-lg font-bold text-gray-900">Bluetooth Scale</h3>
@@ -137,5 +137,4 @@
 				<button onclick={onClose} class="btn-ghost w-full" style="min-height: 40px">Cancel</button>
 			{/if}
 		</div>
-	</div>
-{/if}
+</ModalWrapper>

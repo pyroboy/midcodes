@@ -767,11 +767,12 @@ export async function addServiceRequest(orderId: string, requestText: string): P
 }
 
 /**
- * Called from the weigh station when meat is weighed and dispatched.
- * Writes actual weight to the order item, deducts stock, and immediately
- * advances the item to 'served' + bumps the KDS ticket (fixes [05]+[CR-01]).
+ * Records the weight of a meat item at the weigh station WITHOUT marking it served.
+ * Sets status to 'cooking' (or keeps it if already cooking), records weight, deducts stock,
+ * updates KDS ticket with weight. The item stays visible on the dispatch page as "weighed".
+ * Serving happens separately via markItemServed() from the dispatch page.
  */
-export async function dispatchMeatWeight(orderId: string, itemId: string, weightGrams: number): Promise<void> {
+export async function recordMeatWeight(orderId: string, itemId: string, weightGrams: number): Promise<void> {
 	if (!browser) return;
 	const col = getWritableCollection('orders');
 	const order = orders.value.find(o => o.id === orderId);
@@ -779,10 +780,10 @@ export async function dispatchMeatWeight(orderId: string, itemId: string, weight
 	const item = order.items.find(i => i.id === itemId);
 	if (!item) return;
 
-	// Write weight AND advance directly to 'served' — meat is served the moment it is dispatched.
+	// Write weight and advance to 'cooking' (weighed but not served)
 	await col.incrementalModify(orderId, (doc: Order) => {
 		doc.items = doc.items.map(i =>
-			i.id === itemId ? { ...i, weight: weightGrams, status: 'served' as const } : i
+			i.id === itemId ? { ...i, weight: weightGrams, status: 'cooking' as const } : i
 		);
 		doc.updatedAt = new Date().toISOString();
 		return doc;
@@ -793,41 +794,30 @@ export async function dispatchMeatWeight(orderId: string, itemId: string, weight
 		await deductFromStock(item.menuItemId, weightGrams, order.tableId ?? 'takeout', orderId, mi?.trackInventory ?? true);
 	}
 
-	// Update KDS ticket item to 'served' with weight, bump ticket to history if all items done.
-	// Find the ticket that actually contains this item (orders can have multiple tickets from refills)
+	// Update KDS ticket item with weight and 'cooking' status — do NOT bump ticket
 	const kdsCol = getWritableCollection('kds_tickets');
 	const ticket = kdsTickets.value.find(t => t.orderId === orderId && t.items.some(i => i.id === itemId));
 	if (ticket) {
-		let allServed = false;
-		let snapshotItems: KdsTicket['items'] = [];
 		await kdsCol.incrementalModify(ticket.id, (doc: any) => {
 			doc.items = doc.items.map((i: any) =>
-				i.id === itemId ? { ...i, weight: weightGrams, status: 'served' } : i
+				i.id === itemId ? { ...i, weight: weightGrams, status: 'cooking' } : i
 			);
-			allServed = doc.items.every((i: any) => i.status === 'served' || i.status === 'cancelled');
-			snapshotItems = doc.items;
 			doc.updatedAt = new Date().toISOString();
 			return doc;
 		});
-
-		// Bump the ticket to history if all items are now served
-		if (allServed) {
-			await kdsCol.incrementalPatch(ticket.id, {
-				items: snapshotItems,
-				bumpedAt: new Date().toISOString(),
-				bumpedBy: session.userName || 'Weigh Station',
-				updatedAt: new Date().toISOString()
-			});
-
-			if (order.orderType === 'takeout' && order.status === 'open') {
-				await col.incrementalPatch(orderId, { takeoutStatus: 'ready', updatedAt: new Date().toISOString() });
-				log.takeoutAdvanced(order.customerName ?? 'Walk-in', 'ready');
-			}
-		}
 	}
 
 	const tableLabel = getOrderLabel(order);
 	log.itemCharged(item.menuItemName, tableLabel, weightGrams, 1);
+}
+
+/**
+ * @deprecated Use recordMeatWeight() + markItemServed() instead.
+ * Kept for backward compatibility — records weight and immediately serves.
+ */
+export async function dispatchMeatWeight(orderId: string, itemId: string, weightGrams: number): Promise<void> {
+	await recordMeatWeight(orderId, itemId, weightGrams);
+	await markItemServed(orderId, itemId);
 }
 
 export async function changePackage(orderId: string, newPackageId: string) {

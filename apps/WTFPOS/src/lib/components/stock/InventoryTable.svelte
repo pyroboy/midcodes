@@ -515,7 +515,7 @@
 <!-- ─── 86 Toast ─────────────────────────────────────────────────────────────── -->
 {#if toast86Msg}
 	<div
-		class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl bg-gray-900 px-5 py-3.5 text-white shadow-xl"
+		class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-xl bg-gray-900 px-5 py-3.5 text-white shadow-xl fixed-safe-bottom fixed-safe-right"
 		transition:fade={{ duration: 200 }}
 	>
 		<svg class="w-5 h-5 shrink-0 text-status-yellow" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

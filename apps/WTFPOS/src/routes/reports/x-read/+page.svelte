@@ -115,7 +115,7 @@
 <!-- P1-9: Centered modal overlay for X-Read confirmation -->
 {#if showConfirm}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-full max-w-[400px] mx-3 flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[400px] mx-4 flex flex-col gap-5">
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-gray-900">Generate X-Read?</h3>
 				<p class="text-sm text-gray-500">

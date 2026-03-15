@@ -3,6 +3,7 @@
 	import { formatPeso, cn } from '$lib/utils';
 	import { mergeTakeoutToTable } from '$lib/stores/pos/orders.svelte';
 	import ManagerPinModal from './ManagerPinModal.svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		tableOrder: Order;
@@ -64,8 +65,8 @@
 	}
 </script>
 
-<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-	<div class="pos-card w-full max-w-[380px] max-h-[85vh] flex flex-col">
+<ModalWrapper open={true} onclose={onclose} zIndex={70} ariaLabel="Attach takeout order" class="px-4">
+	<div class="pos-card w-full max-w-[480px] min-h-[20rem] max-h-[85vh] flex flex-col">
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b border-border px-5 py-4">
 			<div>
@@ -148,7 +149,7 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</ModalWrapper>
 
 {#if step === 'pin'}
 	<ManagerPinModal

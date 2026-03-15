@@ -10,6 +10,7 @@
 	import type { KitchenAlert } from '$lib/stores/alert.svelte';
 	import { TriangleAlert } from 'lucide-svelte';
 	import { playSound } from '$lib/utils/audio';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		order: Order | undefined;
@@ -58,6 +59,25 @@
 	let showMoreActions = $state(false);
 	let sidesExpanded = $state(false);
 	let confirmCancel = $state(false);
+
+	// P1-2: Scroll overflow indicators
+	let itemsListEl = $state<HTMLDivElement | null>(null);
+	let canScrollUp = $state(false);
+	let canScrollDown = $state(false);
+
+	function updateScrollIndicators() {
+		if (!itemsListEl) return;
+		canScrollUp = itemsListEl.scrollTop > 8;
+		canScrollDown = itemsListEl.scrollTop + itemsListEl.clientHeight < itemsListEl.scrollHeight - 8;
+	}
+
+	$effect(() => {
+		if (!itemsListEl) return;
+		updateScrollIndicators();
+		const observer = new ResizeObserver(updateScrollIndicators);
+		observer.observe(itemsListEl);
+		return () => observer.disconnect();
+	});
 
 	// Auto-expand sides during charge animation, collapse after delay
 	let _sidesCollapseTimer: ReturnType<typeof setTimeout> | null = null;
@@ -122,14 +142,35 @@
 	const menuItemsById = $derived(new Map(menuItems.value.map(m => [m.id, m])));
 
 	// Returns weight/status badge type for an order item
-	function itemBadge(item: Order['items'][number]): 'pending' | 'weighing' | 'cooking' | 'served' | null {
+	function itemBadge(item: Order['items'][number]): 'sent' | 'weighing' | 'weighed' | 'cooking' | 'prepping' | 'served' | null {
 		if (item.status === 'cancelled') return null;
 		const mi = menuItemsById.get(item.menuItemId);
-		// Meats: pending+no weight = awaiting scale; cooking = refill being prepped (still "weighing" phase visually)
-		if (mi?.category === 'meats' && (item.status === 'cooking' || (item.status === 'pending' && item.weight === null))) return 'weighing';
-		if (item.status === 'cooking') return 'cooking'; // dishes/drinks only
+		const isMeat = mi?.category === 'meats';
+		const isSide = item.tag === 'FREE' || mi?.category === 'sides';
+
+		if (isMeat) {
+			if (item.status === 'pending') {
+				void _tick; // re-evaluate each second
+				const elapsed = item.addedAt ? Date.now() - new Date(item.addedAt).getTime() : Infinity;
+				return elapsed < 2000 ? 'sent' : 'weighing';
+			}
+			if (item.status === 'cooking' && !item.weight) return 'weighing';
+			if (item.status === 'cooking' && item.weight && item.weight > 0) return 'weighed';
+			if (item.status === 'served') return 'served';
+			return null;
+		}
+
+		if (isSide) {
+			if (item.status === 'pending') return 'sent'; // statusBadge checks isRefill to show REQUESTED
+			if (item.status === 'cooking') return 'prepping';
+			if (item.status === 'served') return 'served';
+			return null;
+		}
+
+		// Dishes & drinks
+		if (item.status === 'pending') return 'sent';
+		if (item.status === 'cooking') return 'cooking';
 		if (item.status === 'served') return 'served';
-		if (item.status === 'pending') return 'pending';
 		return null;
 	}
 
@@ -137,11 +178,14 @@
 	function groupBadgeCounts(instances: Order['items']) {
 		const badges = instances.map(i => itemBadge(i)).filter(Boolean);
 		return {
+			sent: badges.filter(b => b === 'sent').length,
 			weighing: badges.filter(b => b === 'weighing').length,
+			weighed: badges.filter(b => b === 'weighed').length,
 			cooking: badges.filter(b => b === 'cooking').length,
 			served: badges.filter(b => b === 'served').length,
-			pending: badges.filter(b => b === 'pending').length,
-			totalWeight: instances.filter(i => i.weight != null).reduce((s, i) => s + (i.weight ?? 0), 0)
+			totalWeight: instances.filter(i => i.weight != null).reduce((s, i) => s + (i.weight ?? 0), 0),
+			weighedWeight: instances.filter(i => i.weight != null && i.status === 'cooking').reduce((s, i) => s + (i.weight ?? 0), 0),
+			servedWeight: instances.filter(i => i.weight != null && i.status === 'served').reduce((s, i) => s + (i.weight ?? 0), 0)
 		};
 	}
 
@@ -221,43 +265,60 @@
 </script>
 
 <!-- Status badge snippet — used in itemRow for flat list and AYCE side rows -->
-{#snippet statusBadge(badge: ReturnType<typeof itemBadge>, isRefill = false)}
-	{#if badge === 'pending'}
-		{#if isRefill}
-			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-violet-100 text-violet-800 animate-pulse">REQUESTING</span>
-		{:else}
-			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-800">SENT</span>
+{#snippet statusBadge(badge: ReturnType<typeof itemBadge>, isRefill = false, weight: number | null = null, addedAt: string | undefined = undefined)}
+	{@const elapsedMins = (badge === 'weighing' || badge === 'cooking' || badge === 'prepping') && addedAt
+		? (void _tick, Math.floor((Date.now() - new Date(addedAt).getTime()) / 60_000))
+		: 0}
+	{#key badge}
+		{#if badge === 'sent'}
+			{#if isRefill}
+				<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-violet-100 text-violet-800 badge-transition animate-pulse">REQUESTED</span>
+			{:else}
+				<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-blue-100 text-blue-800 badge-transition">SENT</span>
+			{/if}
+		{:else if badge === 'weighing'}
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 badge-transition badge-shimmer">WEIGHING{elapsedMins > 0 ? ` ${elapsedMins}m` : ''}</span>
+		{:else if badge === 'weighed'}
+			<span class="shrink-0 flex items-center gap-1 badge-served-enter">
+				<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">✓ WEIGHED</span>
+				{#if weight}<span class="text-xs font-mono font-semibold text-emerald-600">{weight}g</span>{/if}
+			</span>
+		{:else if badge === 'cooking'}
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800 badge-transition">COOKING{elapsedMins > 0 ? ` ${elapsedMins}m` : ''}</span>
+		{:else if badge === 'prepping'}
+			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800 badge-transition">PREPPING{elapsedMins > 0 ? ` ${elapsedMins}m` : ''}</span>
+		{:else if badge === 'served'}
+			<span class="shrink-0 flex items-center gap-1 badge-served-enter">
+				<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
+				{#if weight}<span class="text-xs font-mono font-semibold text-emerald-600">{weight}g</span>{/if}
+			</span>
 		{/if}
-	{:else if badge === 'weighing'}
-		{#if session.role === 'manager' || session.role === 'owner'}
-			<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">WEIGHING {order?.createdAt ? formatTimeAgo(order.createdAt) : ''}</span>
-		{/if}
-	{:else if badge === 'cooking'}
-		<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">COOKING</span>
-	{:else if badge === 'served'}
-		<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">✓ SERVED</span>
-	{/if}
+	{/key}
 {/snippet}
 
 <!-- P1-2: Aggregated badge counts for AYCE meat groups -->
 {#snippet badgesBlock(counts: ReturnType<typeof groupBadgeCounts>)}
 	<div class="flex items-center gap-1 flex-wrap justify-end">
-		{#if counts.totalWeight > 0}
-			<span class="text-[10px] text-gray-400">{counts.totalWeight}g</span>
-		{/if}
 		{#if counts.served > 0}
-			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">{counts.served > 1 ? `${counts.served}× ` : ''}✓ SERVED</span>
+			<span class="flex items-center gap-1 badge-served-enter">
+				<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">{counts.served > 1 ? `${counts.served}× ` : ''}✓ SERVED</span>
+				{#if counts.servedWeight > 0}<span class="text-xs font-mono font-semibold text-emerald-600">{counts.servedWeight}g</span>{/if}
+			</span>
+		{/if}
+		{#if counts.weighed > 0}
+			<span class="flex items-center gap-1 badge-served-enter">
+				<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-600">{counts.weighed > 1 ? `${counts.weighed}× ` : ''}✓ WEIGHED</span>
+				{#if counts.weighedWeight > 0}<span class="text-xs font-mono font-semibold text-emerald-600">{counts.weighedWeight}g</span>{/if}
+			</span>
+		{/if}
+		{#if counts.weighing > 0}
+			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 badge-shimmer">{counts.weighing > 1 ? `${counts.weighing}× ` : ''}WEIGHING</span>
 		{/if}
 		{#if counts.cooking > 0}
 			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-orange-100 text-orange-800">{counts.cooking > 1 ? `${counts.cooking}× ` : ''}COOKING</span>
 		{/if}
-		{#if counts.weighing > 0}
-			{#if session.role === 'manager' || session.role === 'owner'}
-				<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">{counts.weighing > 1 ? `${counts.weighing}× ` : ''}WEIGHING</span>
-			{/if}
-		{/if}
-		{#if counts.pending > 0}
-			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-violet-100 text-violet-800 animate-pulse">{counts.pending > 1 ? `${counts.pending}× ` : ''}REQUESTING</span>
+		{#if counts.sent > 0}
+			<span class="rounded px-1.5 py-0.5 text-xs font-bold bg-violet-100 text-violet-800 animate-pulse">{counts.sent > 1 ? `${counts.sent}× ` : ''}REQUESTED</span>
 		{/if}
 	</div>
 {/snippet}
@@ -275,10 +336,7 @@
 		<div class="flex flex-col gap-0.5 flex-1 min-w-0 pr-2">
 			<div class="flex items-center gap-1.5 flex-wrap">
 				<span class="text-sm font-medium text-gray-900 truncate">{item.menuItemName}</span>
-				{@render statusBadge(badge, item.tag === 'FREE')}
-				{#if item.weight != null && badge !== 'weighing'}
-					<span class="text-xs text-gray-400">{item.weight}g</span>
-				{/if}
+				{@render statusBadge(badge, item.tag === 'FREE' || isMeatItem(item), item.weight, item.addedAt)}
 			</div>
 			{#if item.notes && item.notes !== 'refill'}
 				<p class="text-xs text-gray-400 pl-1 italic">"{item.notes}"</p>
@@ -291,12 +349,12 @@
 			{#if item.tag === 'PKG'}
 				<div class="flex flex-col items-end">
 					<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
-					<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-accent-light text-accent">PKG</span>
+					<span class="rounded px-2 py-0.5 text-[11px] font-bold bg-accent-light text-accent">PKG</span>
 				</div>
 			{:else if item.tag === 'FREE'}
-				<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-green-light text-status-green">FREE</span>
+				<span class="rounded px-2 py-0.5 text-[11px] font-bold bg-status-green-light text-status-green">FREE</span>
 			{:else if item.status === 'cancelled'}
-				<span class="rounded px-2 py-0.5 text-[10px] font-bold bg-status-red-light text-status-red">VOID</span>
+				<span class="rounded px-2 py-0.5 text-[11px] font-bold bg-status-red-light text-status-red">VOID</span>
 			{:else}
 				<span class="font-mono text-sm font-semibold text-gray-900">{formatPeso(item.unitPrice * item.quantity)}</span>
 			{/if}
@@ -316,7 +374,7 @@
 					{#if grace}
 						<span class="flex flex-col items-center leading-none gap-0.5">
 							<span class="text-sm">✕</span>
-							<span class="text-[10px] font-mono text-gray-400">{Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, '0')}</span>
+							<span class="text-xs font-mono text-gray-400">{Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, '0')}</span>
 						</span>
 					{:else}
 						<span class="flex flex-col items-center leading-none gap-0.5">
@@ -329,7 +387,7 @@
 	</div>
 {/snippet}
 
-<div class="pos-order-sidebar flex w-full lg:w-[380px] shrink-0 flex-col lg:border-l border-border bg-surface overflow-hidden min-h-0">
+<div class="pos-order-sidebar flex w-full lg:w-[380px] shrink-0 flex-col lg:border-l border-border bg-surface overflow-hidden min-h-0" role="complementary" aria-label="Running bill">
 	{#if !order}
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center select-none">
 			<div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-secondary text-3xl">
@@ -352,7 +410,7 @@
 		</div>
 	{:else}
 		<!-- ── Header ── -->
-		<div class="flex flex-col gap-1.5 sm:gap-2 border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
+		<div class="flex flex-col gap-1 sm:gap-2 border-b border-border px-3 sm:px-4 py-2 sm:py-3">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
 					{#if order.orderType === 'takeout'}
@@ -362,8 +420,7 @@
 						<span class="text-base sm:text-lg font-extrabold text-gray-900">{table?.label}</span>
 						<button
 							onclick={onchangepax}
-							class="flex items-center gap-1 rounded-full bg-surface-secondary px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-accent transition-colors cursor-pointer"
-							style="min-height: unset"
+							class="flex items-center gap-1 rounded-full bg-surface-secondary px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium text-gray-600 hover:bg-orange-50 hover:text-accent transition-colors cursor-pointer min-h-[44px]"
 							title="Change guest count"
 						>
 							{order.pax}p ✎
@@ -375,7 +432,7 @@
 						{/if}
 					{/if}
 				</div>
-				<button onclick={onclose} class="flex min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] items-center justify-center rounded-full bg-gray-100 lg:bg-transparent text-gray-500 lg:text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors text-base sm:text-lg font-bold">✕</button>
+				<button onclick={onclose} class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-gray-100 lg:bg-transparent text-gray-500 lg:text-gray-400 hover:bg-red-100 hover:text-red-500 transition-colors text-base sm:text-lg font-bold">✕</button>
 			</div>
 
 			{#if order.orderType === 'takeout'}
@@ -397,8 +454,7 @@
 					{#if tStatus === 'ready' && session.role !== 'staff'}
 						<button
 							onclick={() => advanceTakeoutStatus(order.id)}
-							class="text-[10px] font-semibold text-accent hover:underline"
-							style="min-height: unset"
+							class="text-[10px] font-semibold text-accent hover:underline min-h-[44px] flex items-center"
 						>
 							Picked Up
 						</button>
@@ -421,20 +477,20 @@
 					<button
 						onclick={() => { playSound('click'); onrefill(); }}
 						class="flex-[2] rounded-lg sm:rounded-xl bg-accent text-sm sm:text-lg font-bold text-white hover:bg-accent-dark active:scale-95 transition-all"
-						style="min-height: 40px"
+						style="min-height: 44px"
 					>
 						Refill
 					</button>
 					<button
 						onclick={() => { playSound('click'); onadditem(); }}
 						class="flex-1 rounded-lg sm:rounded-xl border-2 border-accent bg-accent-light px-3 sm:px-4 text-sm sm:text-lg font-bold text-accent hover:bg-accent/10 active:scale-95 transition-all"
-						style="min-height: 40px"
+						style="min-height: 44px"
 					>
 						+ Add
 					</button>
 				</div>
 			{:else if order.status === 'open'}
-				<button onclick={() => { playSound('click'); onadditem(); }} class="btn-primary w-full text-sm sm:text-lg rounded-lg sm:rounded-xl" style="min-height: 40px">+ Add Item</button>
+				<button onclick={() => { playSound('click'); onadditem(); }} class="btn-primary w-full text-sm sm:text-lg rounded-lg sm:rounded-xl" style="min-height: 44px">+ Add Item</button>
 			{/if}
 		</div>
 
@@ -477,7 +533,17 @@
 		{/if}
 
 		<!-- ── Items List ── -->
-		<div class="flex-1 overflow-y-auto divide-y divide-border-light px-4 pt-1">
+		<div
+			bind:this={itemsListEl}
+			onscroll={updateScrollIndicators}
+			role="list"
+			aria-label="Order items"
+			class={cn(
+				'flex-1 overflow-y-auto divide-y divide-border-light px-4 pt-1 overscroll-contain',
+				canScrollUp && canScrollDown && 'items-list-fade-both',
+				canScrollUp && !canScrollDown && 'items-list-fade-top',
+				!canScrollUp && canScrollDown && 'items-list-fade-bottom'
+			)}>
 			{#if groupedItems}
 				<!-- AYCE grouped view -->
 
@@ -518,8 +584,9 @@
 							{@const sidesServed = groupedItems.liveSides.filter(i => i.status === 'served').length}
 							<button
 								onclick={() => { sidesExpanded = !sidesExpanded; }}
+								aria-expanded={sidesExpanded}
 								class="flex w-full items-center justify-between py-2 text-left"
-								style="min-height: 36px"
+								style="min-height: 44px"
 							>
 								<span class="flex items-center gap-2 text-xs">
 									{#if sidesRequesting > 0}
@@ -537,7 +604,10 @@
 							{#if sidesExpanded}
 								<div transition:slide={{ duration: 300, easing: cubicOut }}>
 									{#each groupedItems.liveSides as item (item.id)}
-										{@render itemRow(item, true)}
+										<div class="flex items-center justify-between py-2 gap-2 -mx-3 px-3">
+											<span class="text-sm font-medium text-gray-900 truncate opacity-60">{item.menuItemName}</span>
+											{@render statusBadge(itemBadge(item), item.tag === 'FREE')}
+										</div>
 									{/each}
 								</div>
 							{/if}
@@ -567,8 +637,10 @@
 			</div>
 		{/if}
 
-		<!-- ── Bill Total ── -->
-		<div class="border-t border-border px-4 py-3 flex items-center justify-between shrink-0">
+		<!-- ── Compact Footer (mobile) | Spacious Footer (desktop) ── -->
+
+		<!-- Desktop: full bill section (lg+) -->
+		<div class="hidden lg:flex border-t border-border px-4 py-3 items-center justify-between shrink-0">
 			<div class="flex flex-col gap-0.5">
 				<span class="text-base font-bold text-gray-900">BILL</span>
 				<span class="text-xs text-gray-400">{activeItemCount} items</span>
@@ -579,6 +651,26 @@
 				{/if}
 			</div>
 			<span class={cn('font-mono text-2xl font-extrabold transition-colors duration-300', billFlash ? 'text-accent' : 'text-gray-900')}>{formatPeso(order.total)}</span>
+		</div>
+
+		<!-- Mobile: compact bill info + Print/Void in one row -->
+		<div class="flex lg:hidden border-t border-border px-4 py-2 items-center justify-between gap-2 shrink-0">
+			<div class="flex items-center gap-2 min-w-0">
+				<div class="flex flex-col gap-0">
+					<span class="text-xs font-bold text-gray-900">BILL · {activeItemCount} items</span>
+					{#if order.discountType !== 'none' && order.discountAmount > 0}
+						<span class="text-[11px] font-semibold text-status-green">
+							{order.discountType === 'senior' ? 'SC' : order.discountType === 'pwd' ? 'PWD' : order.discountType.toUpperCase()} −{formatPeso(order.discountAmount)}
+						</span>
+					{/if}
+				</div>
+			</div>
+			{#if order.status !== 'pending_payment' && !(activeItemCount === 0 && oncanceltable)}
+				<div class="flex gap-1.5 shrink-0">
+					<button onclick={() => { playSound('click'); printBill(order.id); }} disabled={activeItemCount === 0} class={cn('btn-secondary px-3 text-xs bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Print</button>
+					<button onclick={() => { playSound('warning'); onvoid(); }} disabled={activeItemCount === 0} class={cn('btn-ghost px-3 text-xs border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
+				</div>
+			{/if}
 		</div>
 
 		<!-- ── Primary Actions ── -->
@@ -598,8 +690,8 @@
 					<div class="flex flex-col gap-2 rounded-lg border border-status-red bg-red-50 p-3">
 						<p class="text-xs font-semibold text-status-red">Cancel this table? Pax entry will be removed.</p>
 						<div class="flex gap-2">
-							<button onclick={() => confirmCancel = false} class="btn-ghost flex-1 text-xs border border-gray-300" style="min-height: 40px">Keep</button>
-							<button onclick={() => { playSound('warning'); confirmCancel = false; oncanceltable?.(); }} class="btn-danger flex-1 text-xs" style="min-height: 40px">Yes, Cancel</button>
+							<button onclick={() => confirmCancel = false} class="btn-ghost flex-1 text-xs border border-gray-300" style="min-height: 44px">Keep</button>
+							<button onclick={() => { playSound('warning'); confirmCancel = false; oncanceltable?.(); }} class="btn-danger flex-1 text-xs" style="min-height: 44px">Yes, Cancel</button>
 						</div>
 					</div>
 				{:else}
@@ -608,20 +700,24 @@
 					</button>
 				{/if}
 			{:else}
-				<!-- Secondary actions row: Print + Void (smaller, less prominent) -->
-				<div class="flex gap-2">
-					<button onclick={() => { playSound('click'); printBill(order.id); }} disabled={activeItemCount === 0} class={cn('btn-secondary flex-1 px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Print</button>
-					<button onclick={() => { playSound('warning'); onvoid(); }} disabled={activeItemCount === 0} class={cn('btn-ghost flex-1 px-3 text-sm border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 40px">Void</button>
+				<!-- Desktop: Print + Void row (hidden on mobile — merged into bill row above) -->
+				<div class="hidden lg:flex gap-2">
+					<button onclick={() => { playSound('click'); printBill(order.id); }} disabled={activeItemCount === 0} class={cn('btn-secondary flex-1 px-3 text-sm bg-orange-100 hover:bg-orange-200 border-orange-300 text-orange-800', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Print</button>
+					<button onclick={() => { playSound('warning'); onvoid(); }} disabled={activeItemCount === 0} class={cn('btn-ghost flex-1 px-3 text-sm border border-status-red text-status-red hover:bg-red-50', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 44px">Void</button>
 				</div>
-				<!-- Primary CTA: Checkout — full width, visually dominant -->
-				<button onclick={() => { playSound('click'); oncheckout(); }} disabled={activeItemCount === 0} class={cn('w-full rounded-xl text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 56px">✓ Checkout</button>
+				<!-- Primary CTA: Checkout — mobile shows total in button, desktop keeps it separate -->
+				<button onclick={() => { playSound('click'); oncheckout(); }} disabled={activeItemCount === 0} class={cn('w-full rounded-xl text-base font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-md', activeItemCount === 0 && 'opacity-40 pointer-events-none')} style="min-height: 56px">
+					<span class="lg:hidden"><span class={cn('font-mono transition-colors duration-300', billFlash && 'text-orange-200')}>{formatPeso(order.total)}</span> — Checkout</span>
+					<span class="hidden lg:inline">✓ Checkout</span>
+				</button>
 			{/if}
 			{/if}
 
 			<!-- Table Actions (overflow) -->
 			<button
 				onclick={() => { showMoreActions = !showMoreActions; }}
-				class="w-full rounded-lg border border-border bg-surface py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all flex flex-col items-center gap-0.5"
+				aria-expanded={showMoreActions}
+				class="more-actions-section w-full rounded-lg border border-border bg-surface py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-all flex flex-col items-center gap-0.5"
 				style="min-height: 44px"
 			>
 				<span>{showMoreActions ? '▲ Hide' : 'More ▼'}</span>
@@ -631,7 +727,7 @@
 			</button>
 
 			{#if showMoreActions}
-				<div class="flex gap-2 flex-wrap">
+				<div class="more-actions-section flex gap-2 flex-wrap">
 					{#if order.orderType === 'dine-in' && table}
 						<button onclick={ontransfer} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Transfer</button>
 						<button onclick={onchangepax} class="btn-secondary flex-1 text-xs" style="min-height: 44px">Pax</button>
@@ -669,48 +765,46 @@
 />
 
 <!-- Void Item Reason Selector (shown after PIN confirmed) -->
-{#if showVoidReasonSelector}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-		<div class="pos-card w-full max-w-[340px] flex flex-col gap-4">
-			<div class="flex flex-col gap-1">
-				<h3 class="text-lg font-bold text-gray-900">Void Reason</h3>
-				<p class="text-sm text-gray-500">Select the reason for voiding this item.</p>
-			</div>
-			<div class="flex flex-col gap-2">
-				{#each VOID_REASONS as reason}
-					<button
-						onclick={() => { voidItemReason = reason; }}
-						class={cn(
-							'rounded-xl border-2 px-4 py-3 text-sm font-semibold text-left transition-colors',
-							voidItemReason === reason
-								? 'border-status-red bg-red-50 text-status-red'
-								: 'border-border bg-surface text-gray-700 hover:border-red-300 hover:bg-red-50'
-						)}
-					>{reason}</button>
-				{/each}
-			</div>
-			<div class="flex gap-2 mt-1">
+<ModalWrapper open={showVoidReasonSelector} onclose={() => { showVoidReasonSelector = false; removePinItemId = null; voidItemReason = ''; }} ariaLabel="Void item reason" zIndex={70}>
+	<div class="pos-card w-full max-w-[380px] flex flex-col gap-4">
+		<div class="flex flex-col gap-1">
+			<h3 class="text-lg font-bold text-gray-900">Void Reason</h3>
+			<p class="text-sm text-gray-500">Select the reason for voiding this item.</p>
+		</div>
+		<div class="flex flex-col gap-2">
+			{#each VOID_REASONS as reason}
 				<button
-					class="btn-ghost flex-1"
-					style="min-height: 44px"
-					onclick={() => { showVoidReasonSelector = false; removePinItemId = null; voidItemReason = ''; }}
-				>Cancel</button>
-				<button
-					class="btn-danger flex-1 disabled:opacity-40"
-					style="min-height: 44px"
-					disabled={!voidItemReason}
-					onclick={() => {
-						playSound('warning');
-						if (order && removePinItemId) removeOrderItem(order.id, removePinItemId, voidItemReason || undefined);
-						showVoidReasonSelector = false;
-						removePinItemId = null;
-						voidItemReason = '';
-					}}
-				>Void Item</button>
-			</div>
+					onclick={() => { voidItemReason = reason; }}
+					class={cn(
+						'rounded-xl border-2 px-4 py-3 text-sm font-semibold text-left transition-colors',
+						voidItemReason === reason
+							? 'border-status-red bg-red-50 text-status-red'
+							: 'border-border bg-surface text-gray-700 hover:border-red-300 hover:bg-red-50'
+					)}
+				>{reason}</button>
+			{/each}
+		</div>
+		<div class="flex gap-2 mt-1">
+			<button
+				class="btn-ghost flex-1"
+				style="min-height: 44px"
+				onclick={() => { showVoidReasonSelector = false; removePinItemId = null; voidItemReason = ''; }}
+			>Cancel</button>
+			<button
+				class="btn-danger flex-1 disabled:opacity-40"
+				style="min-height: 44px"
+				disabled={!voidItemReason}
+				onclick={() => {
+					playSound('warning');
+					if (order && removePinItemId) removeOrderItem(order.id, removePinItemId, voidItemReason || undefined);
+					showVoidReasonSelector = false;
+					removePinItemId = null;
+					voidItemReason = '';
+				}}
+			>Void Item</button>
 		</div>
 	</div>
-{/if}
+</ModalWrapper>
 
 <style>
 	.charge-item-flash {
@@ -736,6 +830,61 @@
 		100% {
 			background-color: transparent;
 		}
+	}
+
+	/* Enhancement 1: Badge state transition pop */
+	.badge-transition {
+		animation: badgeTransition 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+	}
+
+	@keyframes badgeTransition {
+		0% { transform: scale(0.8); opacity: 0.6; }
+		50% { transform: scale(1.08); }
+		100% { transform: scale(1); opacity: 1; }
+	}
+
+	/* Enhancement 2: Shimmer sweep + glowing border on WEIGHING */
+	.badge-shimmer {
+		background-image: linear-gradient(90deg, transparent 10%, rgba(255, 215, 0, 0.45) 40%, rgba(255, 193, 7, 0.35) 60%, transparent 90%);
+		background-size: 300% 100%;
+		animation: badgeTransition 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+		           shimmerSweep 4s ease-in-out 0.3s infinite,
+		           shimmerGlow 3s ease-in-out infinite;
+	}
+
+	@keyframes shimmerSweep {
+		0% { background-position: 300% 0; }
+		100% { background-position: -300% 0; }
+	}
+
+	@keyframes shimmerGlow {
+		0%, 100% { box-shadow: 0 0 4px 0 rgba(217, 119, 6, 0.3); }
+		50% { box-shadow: 0 0 10px 2px rgba(217, 119, 6, 0.5); }
+	}
+
+	/* Enhancement 5: Checkmark burst on SERVED */
+	.badge-served-enter {
+		animation: servedBurst 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+	}
+
+	@keyframes servedBurst {
+		0% { transform: scale(0.7); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+		40% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15); }
+		100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+	}
+
+	/* P1-2: Scroll overflow gradient fade indicators */
+	:global(.items-list-fade-bottom) {
+		-webkit-mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent 100%);
+		mask-image: linear-gradient(to bottom, black calc(100% - 32px), transparent 100%);
+	}
+	:global(.items-list-fade-top) {
+		-webkit-mask-image: linear-gradient(to top, black calc(100% - 32px), transparent 100%);
+		mask-image: linear-gradient(to top, black calc(100% - 32px), transparent 100%);
+	}
+	:global(.items-list-fade-both) {
+		-webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 32px, black calc(100% - 32px), transparent 100%);
+		mask-image: linear-gradient(to bottom, transparent 0%, black 32px, black calc(100% - 32px), transparent 100%);
 	}
 </style>
 

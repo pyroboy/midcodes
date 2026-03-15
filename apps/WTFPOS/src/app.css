@@ -11,6 +11,11 @@
 	display: none;
 }
 
+/* Kill 300ms tap delay on iPad/iOS — disables double-tap-to-zoom */
+*, *::before, *::after {
+	touch-action: manipulation;
+}
+
 @layer base {
 	:root {
 		--sidebar: #ffffff;
@@ -21,6 +26,13 @@
 		--sidebar-accent-foreground: #EA580C;
 		--sidebar-border: #E5E7EB;
 		--sidebar-ring: #EA580C;
+
+		/* Safe-area insets — consumed by utility classes below.
+		   Fallback to 0px when env() is unsupported. */
+		--safe-top: env(safe-area-inset-top, 0px);
+		--safe-right: env(safe-area-inset-right, 0px);
+		--safe-bottom: env(safe-area-inset-bottom, 0px);
+		--safe-left: env(safe-area-inset-left, 0px);
 	}
 
 	body {
@@ -84,6 +96,25 @@
 	.pos-input::placeholder {
 		color: #6B7280;
 	}
+
+	/* ── Safe-area utilities ──────────────────────────────────────────────── */
+	/* Adds env(safe-area-inset-*) padding so content doesn't clip behind
+	   the iOS status bar, home indicator, or rounded screen corners.
+	   Applied to MobileTopBar (top), root content wrapper (left/right/bottom). */
+	.safe-top    { padding-top:    var(--safe-top); }
+	.safe-right  { padding-right:  var(--safe-right); }
+	.safe-bottom { padding-bottom: var(--safe-bottom); }
+	.safe-left   { padding-left:   var(--safe-left); }
+	.safe-x      { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+	.safe-y      { padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+	.safe-all    { padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left); }
+
+	/* Fixed-position offsets — use on absolutely/fixed-positioned floating elements
+	   so they clear the safe area (status bar, home indicator, rounded corners). */
+	.fixed-safe-top    { top:    calc(var(--safe-top) + 0.625rem); }
+	.fixed-safe-right  { right:  calc(var(--safe-right) + 0.75rem); }
+	.fixed-safe-bottom { bottom: calc(var(--safe-bottom) + 0.625rem); }
+	.fixed-safe-left   { left:   calc(var(--safe-left) + 0.75rem); }
 }
 
 /* ── Mobile Landscape POS Optimization ─────────────────────────────────────── */
@@ -101,8 +132,9 @@
 		min-width: 280px;
 	}
 
-	/* Hide the bottom-sheet overlay — side panel takes over */
-	.pos-sheet-mobile {
+	/* Hide the bottom-sheet + tablet panel overlays — desktop side panel takes over */
+	.pos-sheet-mobile,
+	.pos-tablet-panel {
 		display: none !important;
 	}
 
@@ -134,11 +166,21 @@
 		font-size: 0.625rem !important;
 	}
 
-	/* Compact LocationBanner */
-	.location-banner-compact {
-		padding-top: 0.125rem !important;
-		padding-bottom: 0.125rem !important;
-		min-height: unset !important;
+	/* Compact but tappable sidebar nav in phone landscape */
+	[data-sidebar="menu-button"] {
+		min-height: 36px !important;
+		height: auto !important;
+	}
+	[data-sidebar="header"],
+	[data-sidebar="footer"] {
+		padding: 6px 8px !important;
+		gap: 4px !important;
+	}
+	[data-sidebar="group"] {
+		padding: 4px 8px !important;
+	}
+	.sidebar-quick-actions {
+		grid-template-columns: repeat(2, 1fr) !important;
 	}
 
 	/* Compact OrderSidebar internals */
@@ -148,5 +190,30 @@
 	.pos-sidebar-desktop .pos-order-sidebar .px-4 {
 		padding-left: 0.5rem !important;
 		padding-right: 0.5rem !important;
+	}
+
+	/* P1-5: Hide More Actions in landscape — Transfer/Merge/Split accessible via floor plan */
+	.pos-order-sidebar .more-actions-section {
+		display: none !important;
+	}
+}
+
+/* ── Hide sidebar rail on touch devices ────────────────────────────────────── */
+/* Rail is a thin 16px drag edge designed for mouse — blank-click handles touch */
+@media (pointer: coarse) {
+	[data-sidebar="rail"] {
+		display: none !important;
+	}
+}
+
+/* ── Tablet Portrait Touch Optimization ───────────────────────────────────── */
+/* iPad portrait (768-834px width) — enlarge sidebar touch targets              */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+	[data-sidebar="menu-button"] {
+		min-height: 48px !important;
+	}
+	[data-sidebar="menu-button"] svg {
+		width: 1.25rem !important;
+		height: 1.25rem !important;
 	}
 }

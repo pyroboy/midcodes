@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { kdsTickets, orders, dispatchMeatWeight, getRefillCountForMeat } from '$lib/stores/pos.svelte';
+	import { kdsTickets, orders, recordMeatWeight, getRefillCountForMeat } from '$lib/stores/pos.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { formatDisplayId, cn } from '$lib/utils';
 	import { getPkgColors, getItemProteinColors } from '$lib/stores/pos/utils';
@@ -206,7 +206,7 @@
 		const grams = parseInt(weightInput);
 		if (isNaN(grams) || grams <= 0) return;
 
-		await dispatchMeatWeight(selectedItem.orderId, selectedItem.itemId, grams);
+		await recordMeatWeight(selectedItem.orderId, selectedItem.itemId, grams);
 		playSound('success');
 
 		// Track manual dispatches for [08] dismiss hint
@@ -585,7 +585,7 @@
 					       hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none shadow-md"
 					style="min-height: 56px"
 				>
-					DISPATCH
+					RECORD WEIGHT
 				</button>
 			</div>
 		{/if}

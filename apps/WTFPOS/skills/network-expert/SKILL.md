@@ -63,7 +63,10 @@ Read `BACKUP_REGIMEN.md` before implementing any backup, restore, or disaster re
 | What prevents duplicate orders from two tablets? | **Server-side write guards.** Both the write API and replication push check for existing open orders on the same table. If found, cross-checks the table document for orphan detection. See §Server-Side Write Guards. |
 | What if a guard blocks my write? | The server returns `{ guarded: true, document: existingDoc }`. The client uses the existing document instead of the new one. Guard events appear in the Live status panel's Guard Log. |
 | How do I debug guard events? | Click the "Live" pill (top-right) → Guard Log section. Each event shows layer (client/write-api/replication), type, table, order IDs, and timestamp. All guards also write to `audit_logs`. |
-| Can guards block the POS during service? | **Only table/order guards block.** Stock negativity detection is non-blocking (alert only). KDS dedup merges instead of blocking. The POS never freezes. |
+| Can guards block the POS during service? | **Only table/order guards block.** Stock negativity detection is non-blocking (alert only). KDS dedup merges instead of blocking. KDS auto-bump is a side-effect (never blocks). The POS never freezes. |
+| What happens to KDS tickets when an order is paid? | **Bumped automatically** via `bumpTicketsForOrder()` in all 3 payment flows + server-side replication guard + periodic reconciliation sweep. Split bills only bump after the last sub-bill. |
+| How does the app detect data inconsistencies? | **Three layers:** (1) Guards prevent bad writes reactively. (2) Reconciliation sweep auto-heals orphans every 5 min on server. (3) Checksum comparison (djb2 hash) every 60s on all devices surfaces divergence in the StatusBar. |
+| What if a table shows occupied but the order is closed? | **Auto-healed** by reconciliation Check 1 within 5 minutes. Also caught by the orphan detection in the duplicate-order guard if a new order is attempted. |
 | Do branches need to know about each other? | **No.** Each branch uploads to Neon independently. Owner queries Neon for cross-branch views. |
 | When do I add Ably? | **Only after Neon is working**, and only if the owner needs instant cross-branch alerts. It's a luxury, not a requirement. |
 
@@ -104,7 +107,8 @@ Layer 5: REAL-TIME ALERTS 100-300ms Ably one-way publish (Phase 2b, optional lux
 | **Kitchen real-time** | SSE with 3s debounce (same-branch only) |
 | **Cross-branch view** | SSE aggregate proxy (owner only, internet required) |
 | **Device monitoring** | RxDB `devices` collection + 30s heartbeat |
-| **Sync verification** | `SyncStatusBanner` polls `/api/replication/status` every 60s |
+| **Sync verification** | `SyncStatusBanner` polls `/api/replication/status` every 60s + checksum integrity comparison |
+| **Data reconciliation** | Server-only sweep every 5 min: 4 auto-heal + 3 detect-only checks across tables/orders/KDS/devices/shifts/stock |
 | **Data modes** | 4 tiers: `full-rxdb` (server), `selective-rxdb` (staff/kitchen), `api-fetch` (owner/admin), `sse-only` (displays) |
 | **Thin-client writes** | HTTP POST `/api/collections/[col]/write` with write-proxy routing |
 | **Conflict resolution** | Field-level merge (5 collections) + CRDT `max()` for monotonic fields + LWW fallback |
@@ -148,12 +152,15 @@ Layer 5: REAL-TIME ALERTS 100-300ms Ably one-way publish (Phase 2b, optional lux
 | `src/routes/api/replication/reset/+server.ts` | RESET_ALL broadcast + epoch bump |
 | `src/routes/api/replication/client-log/+server.ts` | Client error log relay |
 | `src/routes/api/replication/ping/+server.ts` | Diagnostic echo + store test |
+| `src/lib/db/reconcile.ts` | Proactive 7-check data consistency sweep (server-only, every 5 min) |
+| `src/lib/utils/sync-checksum.ts` | Client-side djb2 checksum for integrity verification |
+| `src/lib/stores/pos/kds.svelte.ts` | KDS store + `bumpTicketsForOrder()` shared helper |
 
 ---
 
 ## Server-Side Write Guards
 
-Multi-device race conditions are the biggest data integrity risk on LAN. The server enforces **12 guards** across 2 layers (write API + replication push) to prevent duplicates, invalid transitions, orphaned data, stock errors, and BIR compliance violations.
+Multi-device race conditions are the biggest data integrity risk on LAN. The server enforces **13 guards** across 2 layers (write API + replication push) to prevent duplicates, invalid transitions, orphaned data, stock errors, and BIR compliance violations — plus 1 side-effect guard that auto-bumps KDS tickets when orders close.
 
 ### Guard Architecture
 
@@ -176,6 +183,7 @@ Server (RxDB) ──replication push──► Push Endpoint (/api/replication/[c
                                        ├─ filterInvalidTableTransitions()
                                        ├─ filterDuplicateKdsTickets()      (merge, not drop)
                                        ├─ filterInvalidOrderTransitions()
+                                       ├─ autoBumpKdsOnOrderClose()        (side-effect, not filter)
                                        ├─ filterDuplicateZReads()
                                        └─ filterDuplicateActiveShifts()
 ```
@@ -194,6 +202,7 @@ Server (RxDB) ──replication push──► Push Endpoint (/api/replication/[c
 | **Stock negativity** | `stock-negative` | Write API + Client | Non-blocking alert when deduction pushes stock below zero |
 | **Duplicate Z-Read** | `duplicate-z-read` | Write API + Replication | Prevents two EOD closes per business date (BIR compliance) |
 | **Duplicate shift** | `duplicate-active-shift` | Write API + Replication | Prevents two open cash floats per location |
+| **KDS auto-bump** | `kds-auto-bump` | Replication (side-effect) | When order → `paid`/`cancelled`, bumps all active KDS tickets for that order. Not a filter — runs after all guards. |
 | **Client pre-check** | `table-unavailable` | Client only | Rejects table open if status ≠ `available` before server call |
 
 ### Valid State Machines
@@ -253,13 +262,84 @@ All guard events flow to 4 destinations:
 | File | What It Does |
 |------|-------------|
 | `src/routes/api/collections/[collection]/write/+server.ts` | 9 server guards + stock detection |
-| `src/routes/api/replication/[collection]/push/+server.ts` | 6 replication filters chained |
+| `src/routes/api/replication/[collection]/push/+server.ts` | 6 replication filters + 1 side-effect guard (KDS auto-bump) |
 | `src/lib/stores/guard.svelte.ts` | Client-side guard event store (in-memory, reactive) |
 | `src/lib/stores/pos/tables.svelte.ts` | Client guard handling for table operations |
 | `src/lib/stores/stock.svelte.ts` | Client-side stock negativity detection |
 | `src/lib/components/ConnectionStatus.svelte` | Guard log UI + red dot indicator |
 | `src/routes/api/pos/transfer/+server.ts` | Atomic table transfer endpoint |
 | `src/routes/api/reports/x-read/+server.ts` | Atomic X-Read snapshot endpoint |
+
+---
+
+## Proactive Data Health System
+
+Guards are **reactive** — they fire when a conflicting write is attempted. The proactive data health system adds two **continuous monitoring** layers that catch inconsistencies that slip through guards (e.g., network drops during a multi-step flow, stale data from before guards existed, or bugs in application logic).
+
+### Layer 1: Reconciliation Sweep (`src/lib/db/reconcile.ts`)
+
+A single `reconcileDataConsistency()` function runs on the **server device only** (same `isRemoteClient` guard as `pruneOldData()`). Wired into the root layout: first run 30s after mount, then every 5 minutes.
+
+#### Auto-Heal Checks (safe to fix automatically)
+
+| # | Check | What It Fixes | Healing Action |
+|---|-------|---------------|----------------|
+| 1 | **Table orphan** | Occupied table pointing to a paid/cancelled/missing order | Reset table to `available`, clear `currentOrderId` + session fields |
+| 2 | **Order orphan** | Open dine-in order whose table is `available` and points elsewhere | Cancel order with `cancelReason: 'orphan-reconciled'` |
+| 3 | **KDS orphan** | Active KDS ticket whose order is paid/cancelled | Bump ticket via `bumpTicketsForOrder()` |
+| 4 | **Stale device** | Device record showing `isOnline: true` but `lastSeenAt` > 2 hours | Patch `isOnline: false` |
+
+#### Detect & Report Checks (log warning, don't auto-fix)
+
+| # | Check | What It Detects | Why Not Auto-Fix |
+|---|-------|-----------------|------------------|
+| 5 | **Stale shift** | Shift open > 24 hours | Might lose cashier's unsaved data |
+| 6 | **Stock negativity** | Computed stock balance below zero | Might be a legitimate pending delivery |
+| 7 | **Orphan deductions** | Deduction for cancelled order with no stock restoration | Stock events should have been created at void time; needs manual check. **Known limitation:** `StockEvent` lacks `orderId`, so matching is by `stockItemId` only — a future schema migration will add `orderId` for precise matching. |
+
+All checks write to `audit_logs` when healing or detecting issues. Each check is wrapped in `try/catch` so one failure doesn't block others. Returns a summary object with counts.
+
+### Layer 2: KDS Payment Bump (`src/lib/stores/pos/kds.svelte.ts`)
+
+The shared `bumpTicketsForOrder(orderId)` helper bumps all active KDS tickets for an order. It is called from **4 locations** to ensure KDS tickets never linger after payment:
+
+| Caller | When | File |
+|--------|------|------|
+| `checkoutOrder()` | After cash/GCash/Maya direct checkout | `payments.svelte.ts` |
+| `confirmHeldPayment()` | After confirming a held GCash/Maya payment | `payments.svelte.ts` |
+| `paySubBill()` | After the LAST sub-bill is paid (`allPaid === true`) | `payments.svelte.ts` |
+| KDS page `$effect` | One-time orphan sweep on `/kitchen/orders` mount | `orders/+page.svelte` |
+| Replication guard | Server-side auto-bump when order → paid/cancelled via push | `push/+server.ts` |
+| Reconciliation Check 3 | Periodic background sweep | `reconcile.ts` |
+
+Why bump not delete: preserves KDS history, service time metrics (createdAt → bumpedAt), and undo/recall capability.
+
+### Layer 3: Checksum Integrity Monitoring (`StatusBar.svelte`)
+
+The existing `checkSync()` function (runs every 60s) now also compares **djb2 checksums** between local RxDB and the server's in-memory store. Uses the existing `computeLocalChecksum()` from `src/lib/utils/sync-checksum.ts` and the server's `?checksums=1` parameter on `/api/replication/status`.
+
+| Aspect | Server Device | Client Device |
+|--------|--------------|---------------|
+| Collections checked | `tables`, `orders`, `kds_tickets`, `shifts` | `tables`, `orders`, `kds_tickets` |
+| Frequency | Every 60s (with sync poll) | Every 60s (with sync poll) |
+| UI location | StatusBar panel → Data Sync section | Same |
+| Green state | Checkmark badge: "Integrity Verified — All critical collections match server" | Same |
+| Amber state | Warning badge: "N collections diverged" with list | Same |
+
+Checksum comparison is best-effort (`try/catch`). A mismatch does NOT trigger auto-healing — it surfaces the issue to the operator who can investigate via the collection detail table.
+
+### Data Health Key Files
+
+| File | What It Does |
+|------|-------------|
+| `src/lib/db/reconcile.ts` | 7-check reconciliation sweep (auto-heal + detect) |
+| `src/lib/stores/pos/kds.svelte.ts` | `bumpTicketsForOrder()` shared helper |
+| `src/lib/stores/pos/payments.svelte.ts` | 3 payment flows wired to bump KDS tickets |
+| `src/routes/kitchen/orders/+page.svelte` | One-time KDS orphan sweep on page mount |
+| `src/routes/api/replication/[collection]/push/+server.ts` | `autoBumpKdsOnOrderClose()` server-side side-effect |
+| `src/lib/utils/sync-checksum.ts` | Client-side djb2 hash matching server's algorithm |
+| `src/lib/components/StatusBar.svelte` | Checksum comparison + integrity badge UI |
+| `src/routes/+layout.svelte` | Reconciliation timer (30s initial, 5min interval) |
 
 ---
 

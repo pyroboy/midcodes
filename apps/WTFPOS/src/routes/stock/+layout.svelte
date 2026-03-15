@@ -29,7 +29,7 @@
 		</div>
 
 		<!-- Tab row — horizontally scrollable on mobile -->
-		<nav class="flex items-end gap-0 sm:gap-0.5 px-1 sm:px-3 md:px-4 overflow-x-auto scrollbar-hide">
+		<nav class="flex items-end gap-0 sm:gap-0.5 px-2 sm:px-3 md:px-4 overflow-x-auto scrollbar-hide">
 			{#each tabs as tab}
 				{@const isActive = currentRoute === tab.href}
 				<a
@@ -54,7 +54,7 @@
 		</nav>
 	</div>
 
-	<div class="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
+	<div class="flex-1 overflow-auto p-4 sm:p-5 md:p-6">
 		{@render children()}
 	</div>
 </div>

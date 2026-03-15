@@ -2,6 +2,8 @@
 	import { cn } from '$lib/utils';
 	import { MANAGER_PIN } from '$lib/stores/session.svelte';
 	import { playSound } from '$lib/utils/audio';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
+	import { pinpadKeyboard } from '$lib/actions/pinpad-keyboard';
 
 	interface Props {
 		isOpen: boolean;
@@ -54,9 +56,9 @@
 	});
 </script>
 
-{#if isOpen}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-		<div class="pos-card w-full max-w-[340px] flex flex-col gap-4">
+<ModalWrapper open={isOpen} onclose={onClose} zIndex={70} ariaLabel="Void order" class="px-4">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="pos-card w-full max-w-[380px] flex flex-col gap-4" use:pinpadKeyboard={{ onDigit: handleNumber, onBackspace: handleBackspace, onClear: handleClear, onSubmit: handleConfirm, canSubmit: () => voidPin.length === 4 }}>
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-status-red">Void Order</h3>
 				<p class="text-sm text-gray-500">This will cancel the entire order and free the table. Enter Manager PIN to confirm.</p>
@@ -99,9 +101,7 @@
 						)}></div>
 					{/each}
 				</div>
-				{#if voidPinError}
-					<p class="text-center text-xs font-semibold text-status-red">Incorrect PIN. Try again.</p>
-				{/if}
+				<p class={cn('text-center text-xs font-semibold text-status-red', !voidPinError && 'invisible')}>Incorrect PIN. Try again.</p>
 			</div>
 
 			<!-- Numpad -->
@@ -140,5 +140,4 @@
 				>Confirm Void</button>
 			</div>
 		</div>
-	</div>
-{/if}
+</ModalWrapper>

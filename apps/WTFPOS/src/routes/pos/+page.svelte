@@ -29,6 +29,7 @@
     import { formatPeso } from '$lib/utils';
     import { Info } from 'lucide-svelte';
     import { playSound } from '$lib/utils/audio';
+    import ModalWrapper from '$lib/components/ModalWrapper.svelte';
     import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
@@ -74,11 +75,26 @@
     // ─── Subtle audio + vibrate when an open table's order is updated externally ──
     // (e.g. dispatch bumps, weigh station weighs, stove marks done)
     let _tableUpdateCtx: AudioContext | null = null;
+    let _userHasInteracted = false;
     let _prevOrderSnapshots = new Map<string, string>(); // orderId → updatedAt
 
+    // Only create AudioContext after first user gesture to avoid browser warnings
+    function ensureUserInteracted() {
+        if (_userHasInteracted) return;
+        _userHasInteracted = true;
+        document.removeEventListener('pointerdown', ensureUserInteracted);
+        document.removeEventListener('keydown', ensureUserInteracted);
+    }
+    if (typeof document !== 'undefined') {
+        document.addEventListener('pointerdown', ensureUserInteracted, { once: false });
+        document.addEventListener('keydown', ensureUserInteracted, { once: false });
+    }
+
     function tableUpdatePing() {
+        if (!_userHasInteracted) return;
         try {
             if (!_tableUpdateCtx) _tableUpdateCtx = new AudioContext();
+            if (_tableUpdateCtx.state === 'suspended') _tableUpdateCtx.resume();
             const osc = _tableUpdateCtx.createOscillator();
             const gain = _tableUpdateCtx.createGain();
             osc.type = 'sine';
@@ -552,6 +568,13 @@
     function handleGlobalKeydown(e: KeyboardEvent) {
         // Only listen if no modals are open (inputs might be active)
         if (showCheckout || showVoidConfirm || showPackageChange || showSplitBill || showAddItem || showTransferModal) return;
+
+        // Escape dismisses running bill panels (mobile bottom sheet + tablet side panel)
+        if (e.key === 'Escape' && currentActiveOrder) {
+            closeBill();
+            return;
+        }
+
         if (!currentActiveOrder) return;
         
         // If typing in input, ignore
@@ -594,7 +617,7 @@
     {:else}
         <!-- Floor plan wrapper -->
         <div class="flex flex-1 overflow-hidden">
-            <div class="pos-floor-col flex flex-1 flex-col overflow-hidden min-h-0 p-3 sm:p-4 lg:p-6 gap-3 lg:gap-5">
+            <div class="pos-floor-col flex flex-1 flex-col overflow-hidden min-h-0 p-4 sm:p-5 lg:p-6 gap-3 lg:gap-5">
                 <!-- Header -->
                 <div class="pos-header-row flex items-center justify-between shrink-0 gap-1 sm:gap-2">
                     <div class="flex items-center gap-1 sm:gap-2 lg:gap-3">
@@ -743,17 +766,53 @@
             </div>
         </div>
 
-        <!-- Mobile order sidebar (bottom sheet, < lg — hidden in landscape mobile) -->
+        <!-- Mobile order sidebar (bottom sheet, < md — hidden in landscape mobile) -->
         {#if currentActiveOrder}
             <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-            <div class="pos-sheet-mobile fixed inset-0 z-50 flex flex-col lg:hidden" role="dialog" aria-label="Running bill">
+            <div class="pos-sheet-mobile fixed inset-0 z-50 flex flex-col md:hidden" role="dialog" aria-label="Running bill">
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div class="flex-1 bg-black/30" onclick={closeBill} role="presentation"></div>
-                <div class="flex flex-col bg-surface rounded-t-2xl shadow-2xl max-h-[85vh]">
+                <div class="flex flex-col bg-surface rounded-t-2xl shadow-2xl max-h-[92vh] max-h-[92dvh] safe-bottom">
                     <!-- Drag handle -->
                     <div class="flex justify-center py-2 shrink-0">
                         <div class="h-1 w-10 rounded-full bg-gray-300"></div>
                     </div>
+                    <OrderSidebar
+                        order={currentActiveOrder}
+                        table={selectedTable}
+                        onclose={closeBill}
+                        onadditem={() => showAddItem = true}
+                        onrefill={() => showRefill = true}
+                        oncheckout={() => {
+                            if (currentActiveOrder?.packageId) {
+                                showLeftoverPenalty = true;
+                            } else {
+                                checkoutOrder = currentActiveOrder ?? null;
+                                showCheckout = true;
+                            }
+                        }}
+                        onvoid={() => showVoidConfirm = true}
+                        ontransfer={() => showTransferModal = true}
+                        onchangepackage={() => showPackageChange = true}
+                        onsplit={() => { splitBillOrderId = currentActiveOrder?.id ?? null; showSplitBill = true; }}
+                        onattachtakeout={() => showAttachTakeout = true}
+                        hasTakeoutOrders={takeoutOrders.length > 0}
+                        onchangepax={() => showPaxChange = true}
+                        onmerge={() => showMergeModal = true}
+                        oncanceltable={handleCancelTable}
+                        {pendingRejections}
+                        onacknowledgeRejection={(alertId) => acknowledgeAlert(alertId)}
+                        takeoutSeq={currentTakeoutSeq}
+                    />
+                </div>
+            </div>
+
+            <!-- Tablet portrait right panel (md to lg) — full height side panel instead of bottom sheet -->
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <div class="pos-tablet-panel fixed inset-0 z-50 hidden md:flex lg:hidden" role="dialog" aria-label="Running bill">
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div class="flex-1 bg-black/30" onclick={closeBill} role="presentation"></div>
+                <div class="flex flex-col bg-surface w-[400px] shadow-2xl h-full border-l border-border">
                     <OrderSidebar
                         order={currentActiveOrder}
                         table={selectedTable}
@@ -800,7 +859,7 @@
 <ChargeAnimation badges={chargeBadges} totalCount={kitchenToastCount} />
 
 {#if kitchenToastCount > 0}
-    <div class="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 pointer-events-none">
+    <div class="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 pointer-events-none fixed-safe-bottom">
         <div class="flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
             <span class="text-status-green text-lg">✓</span>
             <span class="text-sm font-semibold">{kitchenToastCount} item{kitchenToastCount !== 1 ? 's' : ''} sent to kitchen</span>
@@ -810,7 +869,7 @@
 
 <!-- Checkout success toast (KP-05 fix) -->
 {#if checkoutToastMsg}
-    <div class="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 pointer-events-none">
+    <div class="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 pointer-events-none fixed-safe-bottom">
         <div class="flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-3 text-white shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
             <span class="text-status-green text-lg">✓</span>
             <span class="text-sm font-semibold">{checkoutToastMsg}</span>
@@ -832,7 +891,7 @@
     </div>
 
     {#if !showCheckout}
-        <div class="fixed bottom-6 left-1/2 z-[80] -translate-x-1/2">
+        <div class="fixed bottom-6 left-1/2 z-[80] -translate-x-1/2 fixed-safe-bottom">
             <button
                 onclick={() => showCheckout = true}
                 class="flex items-center gap-3 rounded-full bg-orange-600 px-6 py-3 text-white shadow-xl hover:bg-orange-700 transition-all font-bold group animate-in slide-in-from-bottom-5"
@@ -972,26 +1031,24 @@
 
 
 <!-- P1-20: Ghost-occupied table recovery prompt -->
-{#if ghostTable}
-    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-        <div class="pos-card w-full max-w-[340px] flex flex-col gap-4 p-6">
-            <div class="flex flex-col gap-1">
-                <h3 class="font-bold text-gray-900">Empty Order Detected</h3>
-                <p class="text-sm text-gray-500">
-                    <strong>{ghostTable.label}</strong> shows as occupied but has no items on its bill.
-                    Free this table to make it available for new guests.
-                </p>
-            </div>
-            <div class="flex gap-3">
-                <button
-                    class="btn-ghost flex-1 border border-border"
-                    onclick={() => ghostTableId = null}
-                >Keep Table Open</button>
-                <button
-                    class="btn-danger flex-1"
-                    onclick={handleFreeGhostTable}
-                >Close &amp; Free Table</button>
-            </div>
+<ModalWrapper open={!!ghostTable} onclose={() => ghostTableId = null} ariaLabel="Ghost table recovery" zIndex={70}>
+    <div class="pos-card w-full max-w-[380px] flex flex-col gap-4 p-6 mx-4">
+        <div class="flex flex-col gap-1">
+            <h3 class="font-bold text-gray-900">Empty Order Detected</h3>
+            <p class="text-sm text-gray-500">
+                <strong>{ghostTable?.label}</strong> shows as occupied but has no items on its bill.
+                Free this table to make it available for new guests.
+            </p>
+        </div>
+        <div class="flex gap-3">
+            <button
+                class="btn-ghost flex-1 border border-border"
+                onclick={() => ghostTableId = null}
+            >Keep Table Open</button>
+            <button
+                class="btn-danger flex-1"
+                onclick={handleFreeGhostTable}
+            >Close &amp; Free Table</button>
         </div>
     </div>
-{/if}
+</ModalWrapper>

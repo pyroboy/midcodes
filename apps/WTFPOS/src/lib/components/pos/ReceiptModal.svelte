@@ -4,6 +4,7 @@
 	import { printReceipt } from '$lib/stores/hardware.svelte';
 	import { LOCATIONS } from '$lib/stores/session.svelte';
 	import { playSound } from '$lib/utils/audio';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -119,14 +120,16 @@
 	});
 </script>
 
-{#if isOpen && order}
-	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-		<div class="pos-card w-full max-w-[380px] flex flex-col gap-0 overflow-hidden p-0">
+<ModalWrapper open={isOpen && !!order} onclose={onClose} zIndex={70} ariaLabel="Payment receipt" class="px-4">
+	{#if order}
+		<div class="pos-card w-full max-w-[480px] max-h-[90vh] flex flex-col gap-0 overflow-hidden p-0">
 			<!-- BIR disclaimer — top -->
-			<div class="bg-gray-900 text-white text-center py-1.5 px-4">
-				<span class="text-[10px] font-bold tracking-widest uppercase">This is not an official receipt</span>
+			<div class="bg-gray-100 text-center py-1 px-4 shrink-0">
+				<span class="text-[9px] text-gray-400 tracking-wide">This is not an official receipt</span>
 			</div>
 
+			<!-- Scrollable receipt content -->
+			<div class="flex-1 overflow-y-auto min-h-0">
 			<!-- Receipt Header -->
 			<div class="flex flex-col items-center gap-1 border-b border-dashed border-gray-300 px-6 py-5 bg-surface">
 				<!-- [04] Branch name -->
@@ -290,12 +293,14 @@
 				<span class="text-[9px] text-gray-400 mt-1">Please ask cashier for BIR official receipt.</span>
 			</div>
 
-			<!-- BIR disclaimer — bottom -->
-			<div class="bg-gray-900 text-white text-center py-1.5 px-4">
-				<span class="text-[10px] font-bold tracking-widest uppercase">This is not an official receipt</span>
+			</div><!-- end scrollable receipt content -->
+
+			<!-- BIR disclaimer — bottom (always visible) -->
+			<div class="bg-gray-100 text-center py-1 px-4 shrink-0">
+				<span class="text-[9px] text-gray-400 tracking-wide">This is not an official receipt</span>
 			</div>
 
-			<div class="flex gap-3 px-6 py-4">
+			<div class="flex gap-3 px-6 py-4 shrink-0">
 				<button
 					onclick={() => { playSound('click'); order && printReceipt(order.id); }}
 					class="btn-secondary flex-1"
@@ -312,5 +317,5 @@
 				</button>
 			</div>
 		</div>
-	</div>
-{/if}
+	{/if}
+</ModalWrapper>

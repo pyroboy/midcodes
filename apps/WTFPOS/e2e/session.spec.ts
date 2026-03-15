@@ -110,9 +110,9 @@ test.describe('Session — Branch Switching', () => {
     await expect(page.locator('text=ALL BRANCHES — LIVE')).toBeVisible();
   });
 
-  test('owner (chris) LocationBanner shows Change Location button', async ({ page }) => {
+  test('owner (chris) StatusBar shows Change Location button', async ({ page }) => {
     await loginAsOwner(page);
-    // Owner (elevated role) sees "Change Location" button in LocationBanner
+    // Owner (elevated role) sees "Change Location" button in StatusBar
     await expect(page.locator('[data-testid="location-change-btn"]')).toBeVisible({ timeout: 5000 });
   });
 

@@ -3,6 +3,7 @@
 	import { X, Plus, Minus, Pencil } from 'lucide-svelte';
 	import { adjustStock, setStock, type StockItem, type StockStatus } from '$lib/stores/stock.svelte';
 	import CategoryIcon from './CategoryIcon.svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface InventoryItem extends StockItem {
 		currentStock: number;
@@ -51,12 +52,8 @@
 	);
 </script>
 
-<div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"
-	role="dialog"
-	aria-modal="true"
->
-	<div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl flex flex-col">
+<ModalWrapper open={true} onclose={onClose} zIndex={50} ariaLabel="Inventory action" class="p-4">
+	<div class="w-full max-w-[480px] min-h-[28rem] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl flex flex-col">
 
 		<!-- Header -->
 		<div class="flex items-center justify-between border-b border-border px-5 py-4">
@@ -160,9 +157,7 @@
 						placeholder={modalAction === 'deduct' ? 'e.g. Spoilage, manual correction…' : modalAction === 'set' ? 'e.g. Physical count result…' : 'e.g. New delivery received…'}
 						class="pos-input"
 					/>
-					{#if reasonRequired && adjustReason.trim() === '' && adjustQty}
-						<p class="text-xs text-status-red">Reason is required for {modalAction === 'deduct' ? 'deductions' : 'stock level overrides'}.</p>
-					{/if}
+					<p class={cn('text-xs text-status-red', !(reasonRequired && adjustReason.trim() === '' && adjustQty) && 'invisible')}>Reason is required for {modalAction === 'deduct' ? 'deductions' : 'stock level overrides'}</p>
 				</div>
 			</div>
 		{:else}
@@ -193,4 +188,4 @@
 		</div>
 
 	</div>
-</div>
+</ModalWrapper>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Order, Table } from '$lib/types';
 	import { formatPeso, cn } from '$lib/utils';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -19,8 +20,7 @@
 	}
 </script>
 
-{#if isOpen}
-	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+<ModalWrapper open={isOpen} onclose={onClose} zIndex={60} ariaLabel="Order history" class="p-6">
 		<div class="flex h-[600px] w-full max-w-[700px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
 			<!-- Header -->
 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
@@ -101,5 +101,4 @@
 				</div>
 			{/if}
 		</div>
-	</div>
-{/if}
+</ModalWrapper>

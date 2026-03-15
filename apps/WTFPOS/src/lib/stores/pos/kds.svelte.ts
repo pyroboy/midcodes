@@ -84,6 +84,34 @@ export async function recallTicket(orderId: string) {
 	log.kdsTicketRecalled(entry.tableNumber);
 }
 
+/**
+ * Bump all active KDS tickets for a given order — marks them as served.
+ * Called after payment completes so tickets don't linger as ghosts.
+ * Idempotent: returns silently if no active tickets found.
+ */
+export async function bumpTicketsForOrder(orderId: string, bumpedBy?: string): Promise<number> {
+	const activeForOrder = _kdsActive.value.filter(t => t.orderId === orderId && !t.bumpedAt);
+	if (activeForOrder.length === 0) return 0;
+
+	const kdsCol = getWritableCollection('kds_tickets');
+	const now = new Date().toISOString();
+	const user = bumpedBy || session.userName || 'System';
+
+	for (const ticket of activeForOrder) {
+		const servedItems = ticket.items.map((i: KdsTicketItem) =>
+			i.status === 'pending' || i.status === 'cooking' ? { ...i, status: 'served' as const } : i
+		);
+		await kdsCol.incrementalPatch(ticket.id, {
+			items: servedItems,
+			bumpedAt: now,
+			bumpedBy: user,
+			updatedAt: now
+		});
+	}
+
+	return activeForOrder.length;
+}
+
 export async function recallLastTicket() {
 	const first = kdsTicketHistory.value[0];
 	if (!first) return;

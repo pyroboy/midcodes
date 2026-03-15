@@ -47,7 +47,7 @@
 
 {#if isOpen}
 	<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[360px] flex flex-col gap-4 select-none">
+		<div class="pos-card w-full max-w-[360px] mx-4 flex flex-col gap-4 select-none">
 			<div class="flex items-center justify-between">
 				<div>
 					<h3 class="text-lg font-bold text-gray-900">Scale Simulator</h3>

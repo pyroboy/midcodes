@@ -8,6 +8,8 @@
 	import { devices } from '$lib/stores/device.svelte';
 	import { differenceInSeconds, parseISO } from 'date-fns';
 	import { AlertTriangle, Trash2, Download, Share } from 'lucide-svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
+	import { pinpadKeyboard } from '$lib/actions/pinpad-keyboard';
 	import { browser } from '$app/environment';
 
 	// ─── Accounts ─────────────────────────────────────────────────────────────
@@ -293,7 +295,7 @@
 {/snippet}
 
 <!-- Full-page login -->
-<div class="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-50 via-white to-orange-50/40 p-4 sm:p-6">
+<div class="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-gray-50 via-white to-orange-50/40 p-4 sm:p-6 safe-all">
 
 	<!-- ─── Login Card ───────────────────────────────────────────────────── -->
 	<div class="pos-card w-full max-w-[420px] flex flex-col gap-6 p-8 sm:p-10 shadow-xl shadow-gray-200/60">
@@ -462,9 +464,9 @@
 </div>
 
 <!-- ─── PIN Modal ─────────────────────────────────────────────────────────── -->
-{#if showPin}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-		<div class="pos-card w-[380px] flex flex-col items-center gap-6 py-10 px-10">
+<ModalWrapper open={showPin} onclose={() => { showPin = false; pin = ''; pinError = false; }} zIndex={50} ariaLabel="Manager PIN verification" class="mx-4">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="pos-card w-full max-w-[380px] mx-4 flex flex-col items-center gap-6 py-10 px-10" use:pinpadKeyboard={{ onDigit: handlePinKey, onBackspace: () => { pin = pin.slice(0, -1); pinError = false; }, onClear: () => { pin = ''; pinError = false; }, onSubmit: verifyPin, canSubmit: () => pin.length >= 4 }}>
 			<div class="flex flex-col items-center gap-1">
 				<span class="text-3xl">👑</span>
 				<h2 class="text-xl font-bold text-gray-900">Manager PIN</h2>
@@ -522,13 +524,12 @@
 				<span class="text-xs text-gray-400">or Cancel</span>
 			</div>
 		</div>
-	</div>
-{/if}
+</ModalWrapper>
 
 <!-- ─── P1: Duplicate Session Warning Modal ────────────────────────────────── -->
-{#if showDuplicateWarning && pendingAccount}
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-		<div class="pos-card w-[420px] flex flex-col items-center gap-5 py-8 px-8">
+<ModalWrapper open={showDuplicateWarning && !!pendingAccount} onclose={() => { showDuplicateWarning = false; pendingAccount = null; error = ''; }} zIndex={50} ariaLabel="Duplicate session warning" class="mx-4">
+	{#if pendingAccount}
+		<div class="pos-card w-full max-w-[420px] mx-4 flex flex-col items-center gap-5 py-8 px-8">
 			<div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100">
 				<AlertTriangle class="h-7 w-7 text-amber-600" />
 			</div>
@@ -567,5 +568,5 @@
 				</button>
 			</div>
 		</div>
-	</div>
-{/if}
+	{/if}
+</ModalWrapper>

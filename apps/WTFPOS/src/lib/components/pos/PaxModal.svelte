@@ -3,6 +3,7 @@
     import { cn } from '$lib/utils';
     import { Users } from 'lucide-svelte';
     import { playSound } from '$lib/utils/audio';
+    import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
     interface Props {
         table: Table | null;
@@ -59,10 +60,10 @@
     }
 </script>
 
-{#if table}
-    <div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-0 sm:px-4">
+<ModalWrapper open={!!table} onclose={oncancel} zIndex={60} ariaLabel="Guest count for table" class="items-end sm:items-center px-3 sm:px-4">
+    {#if table}
         <div
-            class="pos-card w-full sm:max-w-[340px] flex flex-col gap-0 overflow-hidden rounded-t-2xl sm:rounded-xl max-h-[90vh] overflow-y-auto"
+            class="pos-card w-full sm:max-w-[380px] flex flex-col gap-0 overflow-hidden rounded-t-2xl sm:rounded-xl max-h-[90vh] overflow-y-auto safe-bottom sm:pb-0"
             style="padding: 0;"
         >
             <!-- Header -->
@@ -258,15 +259,13 @@
             </div>
 
             <!-- Over-capacity warning -->
-            {#if isOverCapacity}
-                <div class="mx-5 mt-3 rounded-lg bg-yellow-50 border border-yellow-200 px-3 py-2 flex items-center gap-2">
+            
+                <div class={cn("mx-5 mt-3 rounded-lg bg-yellow-50 border border-yellow-200 px-3 py-2 flex items-center gap-2", !isOverCapacity && "invisible")}>
                     <span class="text-status-yellow text-base leading-none">⚠</span>
                     <span class="text-xs font-semibold text-yellow-700">
                         Over capacity — table fits {table.capacity} guest{table.capacity !== 1 ? 's' : ''}.
                     </span>
                 </div>
-            {/if}
-
             <!-- Actions -->
             <div class="flex gap-2 px-5 pt-3 pb-5 mt-1">
                 <button class="btn-ghost flex-1" onclick={oncancel}>Cancel</button>
@@ -285,5 +284,5 @@
                 </button>
             </div>
         </div>
-    </div>
-{/if}
+    {/if}
+</ModalWrapper>

@@ -280,10 +280,15 @@
             {@const fill = tableFill(table, order)}
             {@const stroke = tableStroke(table, order)}
 
-            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
             <g
                 transform="rotate({rot} {cx} {cy})"
                 onclick={() => ontableclick(table)}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        ontableclick(table);
+                    }
+                }}
                 style="cursor: {table.status === 'maintenance' ? 'not-allowed' : 'pointer'};"
                 role="button"
                 tabindex="0"
@@ -348,6 +353,29 @@
                         fill="#6b7280" pointer-events="none"
                     >{table.label}</text>
                 {:else}
+                    <!-- Marching ants — items actively being processed -->
+                    {#if unservedCount > 0 && table.status !== 'billing'}
+                        <rect
+                            x={table.x - 3} y={table.y - 3}
+                            width={W + 6} height={H + 6}
+                            rx={rx + 3}
+                            fill="none" stroke="#f97316" stroke-width="1.5"
+                            stroke-dasharray="8 6" opacity="0.35"
+                            class="floor-marching-ants"
+                        />
+                    {/if}
+
+                    <!-- Ready state: golden breathing glow -->
+                    {#if serveState === 'ready'}
+                        <rect
+                            x={table.x - 3} y={table.y - 3}
+                            width={W + 6} height={H + 6}
+                            rx={rx + 3}
+                            fill="none" stroke="#f59e0b" stroke-width="2.5"
+                            class="floor-ready-glow"
+                        />
+                    {/if}
+
                     <!-- Package badge (top-left) -->
                     {#if pkg}
                         <rect x={table.x + 4} y={table.y + 4} width={pkg.length * 7 + 8} height="16" rx="8" fill={pkgColor(order?.packageId)} opacity="0.15" />
@@ -409,24 +437,34 @@
 
                     <!-- Status badge (left-aligned, above bill total) -->
                     {#if isOccupied && !!order && unservedCount > 0}
-                        {@const badgeLabel = `${unservedCount} item${unservedCount !== 1 ? 's' : ''}`}
-                        {@const badgeW = badgeLabel.length * 6.5 + 10}
-                        <title>{unservedCount} unserved item{unservedCount !== 1 ? 's' : ''}</title>
-                        <rect x={table.x + 4} y={table.y + H - 32} width={badgeW} height="14" rx="7" fill="#f97316" opacity="0.9">
-                            <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1.2s" repeatCount="indefinite" />
-                        </rect>
-                        <text
-                            x={table.x + 4 + badgeW / 2} y={table.y + H - 24}
-                            text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="9" font-weight="800"
-                            fill="#ffffff" pointer-events="none"
-                        >{badgeLabel}</text>
+                        {#key unservedCount}
+                            <!-- Big number popup — flashes large then fades -->
+                            <text
+                                x={cx} y={cy}
+                                text-anchor="middle" dominant-baseline="central"
+                                font-family="'JetBrains Mono', monospace" font-size="40" font-weight="900"
+                                fill="#f97316" pointer-events="none"
+                                class="floor-count-popup"
+                            >{unservedCount}</text>
+
+                            <!-- Small badge — fades in after popup -->
+                            {@const badgeLabel = `${unservedCount} item${unservedCount !== 1 ? 's' : ''}`}
+                            {@const badgeW = badgeLabel.length * 6.5 + 10}
+                            <g class="floor-badge-after-popup">
+                                <title>{unservedCount} unserved item{unservedCount !== 1 ? 's' : ''}</title>
+                                <rect x={table.x + 4} y={table.y + H - 32} width={badgeW} height="14" rx="7" fill="#f97316" class="floor-badge-pulse" />
+                                <text
+                                    x={table.x + 4 + badgeW / 2} y={table.y + H - 24}
+                                    text-anchor="middle" dominant-baseline="middle"
+                                    font-family="Inter, sans-serif" font-size="9" font-weight="800"
+                                    fill="#ffffff" pointer-events="none"
+                                >{badgeLabel}</text>
+                            </g>
+                        {/key}
                     {:else if serveState === 'ready'}
                         {@const readyLabel = '✓ READY'}
                         {@const readyW = readyLabel.length * 7 + 10}
-                        <rect x={table.x + 4} y={table.y + H - 32} width={readyW} height="14" rx="7" fill="#f59e0b" opacity="0.9">
-                            <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1.2s" repeatCount="indefinite" />
-                        </rect>
+                        <rect x={table.x + 4} y={table.y + H - 32} width={readyW} height="14" rx="7" fill="#f59e0b" class="floor-badge-pulse" />
                         <text
                             x={table.x + 4 + readyW / 2} y={table.y + H - 24}
                             text-anchor="middle" dominant-baseline="middle"
@@ -434,15 +472,50 @@
                             fill="#ffffff" pointer-events="none"
                         >{readyLabel}</text>
                     {:else if serveState === 'served'}
+                        <!-- Celebration: green circle flash -->
+                        <circle
+                            cx={cx} cy={cy}
+                            r={Math.min(W, H) * 0.35}
+                            fill="#10b981"
+                            class="floor-celebration-flash"
+                        />
+
+                        <!-- Celebration: big checkmark pop -->
+                        <text
+                            x={cx} y={cy}
+                            text-anchor="middle" dominant-baseline="central"
+                            font-size="36" font-weight="900"
+                            fill="#10b981" pointer-events="none"
+                            class="floor-checkmark"
+                        >✓</text>
+
+                        <!-- Celebration: sparkle burst (green + gold particles) -->
+                        {#each [0, 1, 2, 3, 4, 5, 6, 7] as i}
+                            {@const angle = (i / 8) * Math.PI * 2}
+                            {@const dist = Math.min(W, H) * 0.5 + 10}
+                            {@const tx = Math.cos(angle) * dist}
+                            {@const ty = Math.sin(angle) * dist}
+                            {@const delay = `${(0.08 + i * 0.035).toFixed(3)}s`}
+                            {@const color = i % 3 === 0 ? '#fbbf24' : i % 3 === 1 ? '#34d399' : '#10b981'}
+                            <circle
+                                cx={cx} cy={cy} r="3" fill={color}
+                                class="floor-sparkle"
+                                style="--tx: {tx}px; --ty: {ty}px; animation-delay: {delay};"
+                            />
+                        {/each}
+
+                        <!-- Served badge (appears after celebration settles) -->
                         {@const servedLabel = '✓ SERVED'}
                         {@const servedW = servedLabel.length * 7 + 10}
-                        <rect x={table.x + 4} y={table.y + H - 32} width={servedW} height="14" rx="7" fill="#10b981" opacity="0.9" />
-                        <text
-                            x={table.x + 4 + servedW / 2} y={table.y + H - 24}
-                            text-anchor="middle" dominant-baseline="middle"
-                            font-family="Inter, sans-serif" font-size="9" font-weight="800"
-                            fill="#ffffff" pointer-events="none"
-                        >{servedLabel}</text>
+                        <g class="floor-served-delay">
+                            <rect x={table.x + 4} y={table.y + H - 32} width={servedW} height="14" rx="7" fill="#10b981" opacity="0.9" />
+                            <text
+                                x={table.x + 4 + servedW / 2} y={table.y + H - 24}
+                                text-anchor="middle" dominant-baseline="middle"
+                                font-family="Inter, sans-serif" font-size="9" font-weight="800"
+                                fill="#ffffff" pointer-events="none"
+                            >{servedLabel}</text>
+                        </g>
                     {/if}
 
                     <!-- Bill total (bottom-left, below badge) -->
@@ -498,3 +571,102 @@
         {/each}
     </svg>
 </div>
+
+<style>
+    /* Marching ants — dashes flow around the table border */
+    .floor-marching-ants {
+        animation: floorMarch 2s linear infinite;
+    }
+    @keyframes floorMarch {
+        to { stroke-dashoffset: -28; }
+    }
+
+    /* Ready state — golden breathing glow */
+    .floor-ready-glow {
+        animation: floorReadyGlow 2s ease-in-out infinite;
+    }
+    @keyframes floorReadyGlow {
+        0%, 100% { opacity: 0; }
+        50% { opacity: 0.5; }
+    }
+
+    /* Big number popup — scales up then fades out */
+    .floor-count-popup {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: floorCountPopup 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes floorCountPopup {
+        0% { transform: scale(0); opacity: 0; }
+        20% { transform: scale(1.4); opacity: 1; }
+        45% { transform: scale(1.1); opacity: 1; }
+        100% { transform: scale(0.6); opacity: 0; }
+    }
+
+    /* Badge fades in after the big popup settles */
+    .floor-badge-after-popup {
+        opacity: 0;
+        animation: floorBadgeAfterPopup 0.3s ease-out 0.5s forwards;
+    }
+    @keyframes floorBadgeAfterPopup {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* Badge ongoing pulse */
+    .floor-badge-pulse {
+        animation: floorBadgePulse 1.2s ease-in-out infinite;
+    }
+    @keyframes floorBadgePulse {
+        0%, 100% { opacity: 0.9; }
+        50% { opacity: 0.6; }
+    }
+
+    /* Celebration: green circle flash */
+    .floor-celebration-flash {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: floorFlash 1s ease-out forwards;
+    }
+    @keyframes floorFlash {
+        0% { transform: scale(0); opacity: 0; }
+        35% { transform: scale(1); opacity: 0.2; }
+        100% { transform: scale(0); opacity: 0; }
+    }
+
+    /* Celebration: big checkmark */
+    .floor-checkmark {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: floorCheckmark 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes floorCheckmark {
+        0% { transform: scale(0); opacity: 0; }
+        15% { opacity: 1; }
+        25% { transform: scale(1.3); opacity: 1; }
+        55% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(0); opacity: 0; }
+    }
+
+    /* Celebration: sparkle particles bursting outward */
+    .floor-sparkle {
+        transform-box: fill-box;
+        transform-origin: center;
+        opacity: 0;
+        animation: floorSparkle 0.5s ease-out forwards;
+    }
+    @keyframes floorSparkle {
+        0% { transform: translate(0, 0) scale(0); opacity: 0; }
+        20% { opacity: 1; transform: translate(calc(var(--tx) * 0.3), calc(var(--ty) * 0.3)) scale(1); }
+        100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; }
+    }
+
+    /* Served badge — delayed fade-in after celebration */
+    .floor-served-delay {
+        opacity: 0;
+        animation: floorServedFade 0.3s ease-out 0.9s forwards;
+    }
+    @keyframes floorServedFade {
+        to { opacity: 1; }
+    }
+</style>

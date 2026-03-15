@@ -4,6 +4,7 @@
 	import { format, isToday, isYesterday } from 'date-fns';
 	import { playSound } from '$lib/utils/audio';
 	import type { KdsTicket } from '$lib/types';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -55,9 +56,8 @@
 	});
 </script>
 
-{#if isOpen}
-	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-		<div class="pos-card w-[500px] max-h-[80vh] flex flex-col gap-0 overflow-hidden p-0">
+<ModalWrapper open={isOpen} onclose={onClose} zIndex={60} ariaLabel="Bumped ticket history">
+		<div class="pos-card w-full max-w-[480px] max-h-[80vh] flex flex-col gap-0 overflow-hidden p-0">
 			<div class="flex items-center justify-between border-b border-border px-6 py-4">
 				<div class="flex items-center gap-2">
 					<h3 class="text-lg font-bold text-gray-900">Bumped Ticket History</h3>
@@ -120,5 +120,4 @@
 				<button onclick={onClose} class="btn-secondary w-full" style="min-height: 44px">Close</button>
 			</div>
 		</div>
-	</div>
-{/if}
+</ModalWrapper>

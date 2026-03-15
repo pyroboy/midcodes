@@ -21,6 +21,13 @@
 	} = $props();
 
 	const sidebar = useSidebar();
+
+	function handleBlankClick(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		// Only toggle when clicking empty sidebar background, not interactive elements
+		if (target.closest('button, a, input, select, textarea, [role="button"], [data-sidebar="menu-button"]')) return;
+		sidebar.toggle();
+	}
 </script>
 
 {#if collapsible === "none"}
@@ -85,9 +92,12 @@
 			)}
 			{...restProps}
 		>
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				data-sidebar="sidebar"
-				class="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow"
+				class="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow safe-top safe-left"
+				onclick={handleBlankClick}
 			>
 				{@render children?.()}
 			</div>

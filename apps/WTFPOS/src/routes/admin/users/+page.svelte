@@ -136,7 +136,7 @@
 <!-- Add User modal (stub) -->
 {#if showAdd}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-		<div class="pos-card w-[420px] p-8 flex flex-col gap-5">
+		<div class="pos-card w-full max-w-[420px] mx-4 p-8 flex flex-col gap-5">
 			<div class="flex items-center justify-between">
 				<h2 class="text-lg font-bold text-gray-900">Add New User</h2>
 				<button onclick={() => (showAdd = false)} class="text-gray-400 hover:text-gray-600" style="min-height: unset">✕</button>

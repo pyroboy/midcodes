@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { formatPeso } from '$lib/utils';
+	import { formatPeso, cn } from '$lib/utils';
 	import { openShift } from '$lib/stores/pos/shifts.svelte';
 	import { session } from '$lib/stores/session.svelte';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		onSkip?: () => void;
@@ -32,8 +33,8 @@
 </script>
 
 <!-- Blocking overlay — no dismiss, must enter a float to proceed -->
-<div class="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-	<div class="pos-card w-[400px] flex flex-col gap-5 p-8">
+<ModalWrapper open={true} onclose={() => { if (onSkip) onSkip(); }} ariaLabel="Start your shift" zIndex={80} backdropClose={false}>
+	<div class="pos-card w-full max-w-[480px] flex flex-col gap-5 p-8">
 		<!-- Header -->
 		<div class="flex flex-col items-center gap-2 text-center">
 			<span class="text-4xl">🏦</span>
@@ -72,14 +73,10 @@
 				class="pos-input text-center font-mono text-2xl font-bold"
 				placeholder="0"
 			/>
-			{#if openingFloat > 0}
-				<p class="text-center text-sm font-semibold text-status-green">{formatPeso(openingFloat)} declared</p>
-			{/if}
+			<p class={cn('text-center text-sm font-semibold text-status-green', openingFloat <= 0 && 'invisible')}>{formatPeso(openingFloat)} declared</p>
 		</div>
 
-		{#if error}
-			<p class="text-center text-sm font-medium text-status-red">{error}</p>
-		{/if}
+		<p class={cn('text-center text-sm font-medium text-status-red', !error && 'invisible')}>{error || '\u00A0'}</p>
 
 		<!-- Submit -->
 		<button
@@ -110,4 +107,4 @@
 		</button>
 	{/if}
 	</div>
-</div>
+</ModalWrapper>

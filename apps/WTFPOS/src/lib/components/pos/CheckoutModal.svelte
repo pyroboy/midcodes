@@ -11,6 +11,8 @@
     import PhotoCapture from '$lib/components/PhotoCapture.svelte';
     import { ChevronDown, ChevronUp, Minus, Plus, X, Check, Pause, Banknote, Smartphone, Camera } from 'lucide-svelte';
     import { playSound } from '$lib/utils/audio';
+    import ModalWrapper from '$lib/components/ModalWrapper.svelte';
+    import { pinpadKeyboard } from '$lib/actions/pinpad-keyboard';
 
     interface Props {
         order: Order;
@@ -375,8 +377,8 @@
 </script>
 
 <!-- ═══ CHECKOUT MODAL ═══════════════════════════════════════════════════════ -->
-<div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="w-full h-[95vh] sm:h-auto sm:max-w-[480px] sm:max-h-[92vh] flex flex-col overflow-hidden bg-white sm:rounded-2xl shadow-2xl">
+<ModalWrapper open={true} onclose={onclose} zIndex={60} ariaLabel="Checkout" class="items-end sm:items-center">
+    <div class="w-full h-[95vh] sm:h-auto sm:max-w-[480px] sm:max-h-[92vh] flex flex-col overflow-hidden bg-white sm:rounded-2xl shadow-2xl safe-bottom sm:pb-0">
 
         <!-- ─── HEADER ─────────────────────────────────────────────────────── -->
         <div class="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
@@ -858,7 +860,7 @@
             {/if}
         </div>
     </div>
-</div>
+</ModalWrapper>
 
 <!-- ═══ MANAGER PIN MODAL (DISCOUNT AUTH) ════════════════════════════════════ -->
 <ManagerPinModal
@@ -871,9 +873,9 @@
 />
 
 <!-- ═══ DISCOUNT CONFIRM + PIN MODAL ════════════════════════════════════════ -->
-{#if showDiscountConfirm}
-    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-        <div class="w-full max-w-[400px] flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl max-h-[95vh] overflow-y-auto">
+<ModalWrapper open={showDiscountConfirm} onclose={() => { showDiscountConfirm = false; }} zIndex={70} ariaLabel="Confirm discount" class="px-4">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="w-full max-w-[400px] flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl max-h-[95vh] overflow-y-auto" use:pinpadKeyboard={{ onDigit: (d) => { discountConfirmPinError = false; if (discountConfirmPin.length < 4) { discountConfirmPin += d; playSound('click'); } }, onBackspace: () => { discountConfirmPin = discountConfirmPin.slice(0, -1); discountConfirmPinError = false; }, onClear: () => { discountConfirmPin = ''; discountConfirmPinError = false; }, onSubmit: () => { if (discountConfirmPin !== MANAGER_PIN) { discountConfirmPinError = true; playSound('error'); return; } playSound('success'); pinGraceUntil = Date.now() + 60000; showDiscountConfirm = false; confirmCheckout(); }, canSubmit: () => discountConfirmPin.length === 4 }}>
             <div class="px-6 py-4 border-b border-gray-100">
                 <h3 class="text-lg font-bold text-gray-900">Confirm Discount</h3>
                 <p class="text-xs text-gray-400 mt-0.5">Manager PIN required to authorize</p>
@@ -965,5 +967,4 @@
                 </button>
             </div>
         </div>
-    </div>
-{/if}
+</ModalWrapper>

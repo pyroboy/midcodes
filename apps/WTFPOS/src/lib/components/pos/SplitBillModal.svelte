@@ -3,6 +3,7 @@
 	import { initEqualSplit, initItemSplit, assignItemToSubBill, paySubBill, cancelSplit } from '$lib/stores/pos.svelte';
 	import { formatPeso, cn } from '$lib/utils';
 	import type { Order, PaymentMethod, SubBill } from '$lib/types';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	let {
 		order,
@@ -132,7 +133,7 @@
 	});
 </script>
 
-<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+<ModalWrapper open={true} onclose={onclose} zIndex={60} ariaLabel="Split bill" class="p-6">
 	<div class="pos-card w-full max-w-[700px] max-h-[85vh] overflow-y-auto flex flex-col gap-0 p-0">
 
 		{#if step === 'choose'}
@@ -479,4 +480,4 @@
 			{/if}
 		{/if}
 	</div>
-</div>
+</ModalWrapper>

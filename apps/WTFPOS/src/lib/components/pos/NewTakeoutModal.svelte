@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { playSound } from '$lib/utils/audio';
+	import ModalWrapper from '$lib/components/ModalWrapper.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -26,9 +27,8 @@
 	});
 </script>
 
-{#if isOpen}
-	<div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-		<div class="pos-card w-full max-w-[340px] flex flex-col gap-5">
+<ModalWrapper open={isOpen} onclose={onClose} zIndex={60} ariaLabel="New takeout order" class="px-4">
+		<div class="pos-card w-full max-w-[380px] flex flex-col gap-5">
 			<div class="flex flex-col gap-1">
 				<h3 class="text-lg font-bold text-gray-900">📦 New Takeout Order</h3>
 				<p class="text-sm text-gray-500">Enter customer name or alias (optional)</p>
@@ -47,5 +47,4 @@
 				</button>
 			</div>
 		</div>
-	</div>
-{/if}
+</ModalWrapper>

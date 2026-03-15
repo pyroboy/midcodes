@@ -8,6 +8,7 @@ import { session } from '$lib/stores/session.svelte';
 import { getWritableCollection } from '$lib/db/write-proxy';
 import { closeTable, tables } from '$lib/stores/pos/tables.svelte';
 import { orders } from '$lib/stores/pos/orders.svelte';
+import { bumpTicketsForOrder } from '$lib/stores/pos/kds.svelte';
 import { getOrderLabel } from '$lib/stores/pos/label.utils';
 import { calculateEqualSplit, formatPaymentMethod } from '$lib/stores/pos/payment.utils';
 
@@ -38,6 +39,7 @@ export async function checkoutOrder(
 	});
 
 	if (tableId) await closeTable(tableId);
+	await bumpTicketsForOrder(orderId);
 
 	const order = orders.value.find(o => o.id === orderId);
 	const methodLabel = payments.length === 1
@@ -86,6 +88,7 @@ export async function confirmHeldPayment(orderId: string) {
 	});
 
 	if (order.tableId) await closeTable(order.tableId);
+	await bumpTicketsForOrder(orderId);
 
 	const methodLabel = formatPaymentMethod(method);
 	log.paymentConfirmed(label, order.total, methodLabel);
@@ -231,6 +234,7 @@ export async function paySubBill(orderId: string, subBillId: string, method: Pay
 	if (allPaid && tableId) {
 		const capturedElapsed = tables.value.find(t => t.id === tableId)?.elapsedSeconds ?? undefined;
 		await closeTable(tableId);
+		await bumpTicketsForOrder(orderId);
 		log.tableClosed(tableLabel, totalPaid, 'Split', capturedElapsed);
 	}
 }
