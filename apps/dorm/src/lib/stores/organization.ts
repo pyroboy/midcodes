@@ -1,7 +1,6 @@
 import { writable, type Writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { Organization } from '$lib/types/database';
-import { supabase } from '$lib/supabaseClient';
 
 interface OrganizationStore {
 	selectedId: string | null;
@@ -34,42 +33,17 @@ function createOrganizationStore() {
 				current: state.organizations.find((org) => org.id === orgId) || null
 			}));
 		},
-		loadOrganizations: async (profile: { role: string; org_id?: string | null }) => {
-			let organizations: Organization[] = [];
-
-			try {
-				if (profile.role === 'super_admin') {
-					const { data: orgs, error: orgsError } = await supabase
-						.from('organizations')
-						.select('*')
-						.order('name');
-
-					if (orgsError) throw orgsError;
-					organizations = orgs || [];
-				} else if (profile.role === 'org_admin' && profile.org_id) {
-					const { data: org, error: orgError } = await supabase
-						.from('organizations')
-						.select('*')
-						.eq('id', profile.org_id)
-						.single();
-
-					if (orgError) throw orgError;
-					organizations = org ? [org] : [];
-				}
-
-				update((state) => ({
-					...state,
-					organizations,
-					current:
-						organizations.find((org) => org.id === state.selectedId) || organizations[0] || null
-				}));
-
-				return organizations;
-			} catch (error) {
-				console.error('Error loading organizations:', error);
-				update((state) => ({ ...state, organizations: [], current: null }));
-				return [];
-			}
+		/**
+		 * Load organizations from page data instead of querying directly.
+		 * Organizations should be passed from the layout load function.
+		 */
+		setOrganizations: (organizations: Organization[]) => {
+			update((state) => ({
+				...state,
+				organizations,
+				current:
+					organizations.find((org) => org.id === state.selectedId) || organizations[0] || null
+			}));
 		},
 		reset: () => {
 			if (browser) {

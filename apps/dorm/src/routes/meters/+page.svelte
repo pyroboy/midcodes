@@ -12,7 +12,6 @@
 		meterFormSchema
 	} from './formSchema';
 	import { Loader2 } from 'lucide-svelte';
-	import type { Database } from '$lib/database.types';
 	import type { PageData } from './$types';
 	import MeterForm from './MeterForm.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
@@ -22,13 +21,40 @@
 	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
 	// Type definitions
-	type Property = Database['public']['Tables']['properties']['Row'];
-	type Floor = Database['public']['Tables']['floors']['Row'] & {
+	interface Property {
+		id: number;
+		name: string;
+		address: string;
+		type: string;
+		status: string;
+		created_at: string;
+		updated_at: string | null;
+	}
+	interface Floor {
+		id: number;
+		property_id: number;
+		floor_number: number;
+		wing: string | null;
+		status: string;
+		created_at: string;
+		updated_at: string | null;
 		property: Property | null;
-	};
-	type Rental_unit = Database['public']['Tables']['rental_unit']['Row'] & {
+	}
+	interface Rental_unit {
+		id: number;
+		name: string;
+		number: number;
+		capacity: number;
+		rental_unit_status: string;
+		base_rate: number;
+		created_at: string;
+		updated_at: string | null;
+		property_id: number;
+		floor_id: number;
+		type: string;
+		amenities: Record<string, any> | null;
 		floor: Floor | null;
-	};
+	}
 
 	interface LatestReading {
 		value: number;

@@ -3,21 +3,18 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { resetPasswordSchema } from '../schema';
 import type { Actions, PageServerLoad } from './$types';
+import { auth } from '$lib/server/auth';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession } }) => {
+export const load: PageServerLoad = async ({ locals }) => {
 	// Ensure user is authenticated (via the link they clicked)
-	const { session } = await safeGetSession();
-
-	// Note: Sometimes the session isn't immediately available depending on how the 
-	// link handler is set up (PKCE flow). If using implicit flow, the token is in hash 
-	// and needs client-side handling. Assuming standard PKCE flow handled by SvelteKit helpers:
+	const { session } = locals;
 
 	const form = await superValidate(zod(resetPasswordSchema));
 	return { form, hasSession: !!session };
 };
 
 export const actions: Actions = {
-	default: async ({ request, locals: { supabase } }) => {
+	default: async ({ request }) => {
 		const form = await superValidate(request, zod(resetPasswordSchema));
 
 		if (!form.valid) {
@@ -26,14 +23,20 @@ export const actions: Actions = {
 
 		const { password } = form.data;
 
-		const { error } = await supabase.auth.updateUser({
-			password
-		});
-
-		if (error) {
+		try {
+			// Use Better Auth changePassword API
+			// If the user arrived via a reset email link, they have a session
+			await auth.api.changePassword({
+				body: {
+					newPassword: password,
+					currentPassword: '' // Reset flow - user arrived via email link
+				},
+				headers: request.headers
+			});
+		} catch (error: any) {
 			return fail(500, {
 				form,
-				message: error.message
+				message: error.message || 'Failed to update password. Please try again.'
 			});
 		}
 

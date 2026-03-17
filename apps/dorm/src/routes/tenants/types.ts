@@ -1,7 +1,15 @@
 // types.ts
-import type { Database } from '$lib/database.types';
 
-export type ServerProfile = Database['public']['Tables']['profiles']['Row'];
+export type ServerProfile = {
+	id: string;
+	email: string | null;
+	role: string;
+	created_at: string;
+	updated_at: string;
+	org_id: string | null;
+	context: Record<string, any> | null;
+};
+
 export type TenantStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
 export type LeaseStatus = 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'TERMINATED';
 export type LeaseType = 'BEDSPACER' | 'PRIVATEROOM';
@@ -51,4 +59,17 @@ export interface ExtendedTenant {
 	outstanding_balance: number;
 }
 
-export type Rental_unit = Database['public']['Tables']['rental_unit']['Row'];
+export interface Rental_unit {
+	id: number;
+	name: string;
+	number: number;
+	capacity: number;
+	rental_unit_status: string;
+	base_rate: number;
+	created_at: string;
+	updated_at: string | null;
+	property_id: number;
+	floor_id: number;
+	type: string;
+	amenities: Record<string, any> | null;
+}

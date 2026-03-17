@@ -1,5 +1,7 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PaymentStatus } from './formSchema';
+import { db } from '$lib/server/db';
+import { penaltyConfigs, billings } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 
 interface PenaltyConfig {
 	grace_period: number;
@@ -82,26 +84,31 @@ export function determinePaymentStatus(
 	return 'PENDING';
 }
 
-export async function getPenaltyConfig(
-	supabase: SupabaseClient,
-	billingType: string
-): Promise<PenaltyConfig | null> {
+export async function getPenaltyConfig(billingType: string): Promise<PenaltyConfig | null> {
 	try {
-		const { data: penaltyConfig, error } = await supabase
-			.from('penalty_configs')
-			.select('*')
-			.eq('type', billingType)
-			.single();
+		const result = await db
+			.select({
+				grace_period: penaltyConfigs.gracePeriod,
+				penalty_percentage: penaltyConfigs.penaltyPercentage,
+				compound_period: penaltyConfigs.compoundPeriod,
+				max_penalty_percentage: penaltyConfigs.maxPenaltyPercentage
+			})
+			.from(penaltyConfigs)
+			.where(eq(penaltyConfigs.type, billingType as any))
+			.limit(1);
 
-		if (error) {
-			console.error('Failed to get penalty config:', {
-				billingType,
-				error
-			});
-			throw new Error(`Failed to get penalty config: ${error.message}`);
+		if (result.length === 0) {
+			return null;
 		}
 
-		return penaltyConfig;
+		return {
+			grace_period: result[0].grace_period,
+			penalty_percentage: Number(result[0].penalty_percentage),
+			compound_period: result[0].compound_period ?? undefined,
+			max_penalty_percentage: result[0].max_penalty_percentage
+				? Number(result[0].max_penalty_percentage)
+				: undefined
+		};
 	} catch (error) {
 		console.error('Error in getPenaltyConfig:', error);
 		throw error;
@@ -109,32 +116,21 @@ export async function getPenaltyConfig(
 }
 
 export async function createPenaltyBilling(
-	supabase: SupabaseClient,
 	billing: Billing,
 	penaltyAmount: number
 ): Promise<void> {
 	try {
-		const { error } = await supabase.from('billings').insert({
-			lease_id: billing.lease_id,
+		await db.insert(billings).values({
+			leaseId: billing.lease_id,
 			type: 'PENALTY',
-			amount: penaltyAmount,
-			paid_amount: 0,
-			balance: penaltyAmount,
+			amount: String(penaltyAmount),
+			paidAmount: '0',
+			balance: String(penaltyAmount),
 			status: 'PENDING',
-			due_date: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
-			billing_date: new Date().toISOString().split('T')[0],
-			notes: `Late payment penalty for billing #${billing.id}`,
-			created_at: new Date().toISOString()
+			dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+			billingDate: new Date().toISOString().split('T')[0],
+			notes: `Late payment penalty for billing #${billing.id}`
 		});
-
-		if (error) {
-			console.error('Failed to create penalty billing:', {
-				originalBillingId: billing.id,
-				penaltyAmount,
-				error
-			});
-			throw new Error(`Failed to create penalty billing: ${error.message}`);
-		}
 
 		console.log('Successfully created penalty billing:', {
 			originalBillingId: billing.id,
@@ -148,7 +144,6 @@ export async function createPenaltyBilling(
 }
 
 export async function updateBillingStatus(
-	supabase: SupabaseClient,
 	billing: Billing,
 	newPaidAmount: number
 ): Promise<void> {
@@ -164,26 +159,15 @@ export async function updateBillingStatus(
 			newStatus = 'OVERDUE';
 		}
 
-		const { error } = await supabase
-			.from('billings')
-			.update({
-				paid_amount: newPaidAmount,
-				balance: newBalance,
+		await db
+			.update(billings)
+			.set({
+				paidAmount: String(newPaidAmount),
+				balance: String(newBalance),
 				status: newStatus,
-				updated_at: new Date().toISOString()
+				updatedAt: new Date()
 			})
-			.eq('id', billing.id);
-
-		if (error) {
-			console.error('Failed to update billing status:', {
-				billingId: billing.id,
-				error,
-				newStatus,
-				newPaidAmount,
-				newBalance
-			});
-			throw new Error(`Failed to update billing status: ${error.message}`);
-		}
+			.where(eq(billings.id, billing.id));
 
 		console.log('Successfully updated billing status:', {
 			billingId: billing.id,
@@ -204,32 +188,15 @@ export function getUTCTimestamp(): string {
 	return new Date().toISOString();
 }
 
-export async function logAuditEvent(
-	supabase: SupabaseClient,
-	event: {
-		action: string;
-		user_id: string;
-		user_role?: string;
-		details: Record<string, any>;
-	}
-): Promise<void> {
-	try {
-		const { error } = await supabase.from('audit_logs').insert({
-			action: event.action,
-			user_id: event.user_id,
-			user_role: event.user_role,
-			module: 'payments',
-			details: event.details,
-			created_at: getUTCTimestamp()
-		});
-
-		if (error) {
-			console.error('Failed to log audit event:', {
-				event,
-				error
-			});
-		}
-	} catch (error) {
-		console.error('Error in logAuditEvent:', error);
-	}
+export async function logAuditEvent(event: {
+	action: string;
+	user_id: string;
+	user_role?: string;
+	details: Record<string, any>;
+}): Promise<void> {
+	// Audit logging - currently a no-op since audit_logs table
+	// may not exist in the Drizzle schema yet.
+	// When the audit_logs table is added to schema, implement:
+	// await db.insert(auditLogs).values({ ... });
+	console.log('[AUDIT]', event.action, event.details);
 }

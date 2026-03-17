@@ -1,8 +1,38 @@
 import { z } from 'zod';
-import type { Database } from '$lib/database.types';
-export type Property = Database['public']['Tables']['properties']['Row'];
-export type Floor = Database['public']['Tables']['floors']['Row'];
-export type RentalUnit = Database['public']['Tables']['rental_unit']['Row'] & {
+
+export interface Property {
+	id: number;
+	name: string;
+	address: string;
+	type: string;
+	status: string;
+	created_at: string;
+	updated_at: string | null;
+}
+
+export interface Floor {
+	id: number;
+	property_id: number;
+	floor_number: number;
+	wing: string | null;
+	status: string;
+	created_at: string;
+	updated_at: string | null;
+}
+
+export type RentalUnit = {
+	id: number;
+	name: string;
+	number: number;
+	capacity: number;
+	rental_unit_status: string;
+	base_rate: number;
+	created_at: string;
+	updated_at: string | null;
+	property_id: number;
+	floor_id: number;
+	type: string;
+	amenities: Record<string, any> | null;
 	property?: Property;
 	floor?: Floor;
 };

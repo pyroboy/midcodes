@@ -212,7 +212,7 @@ export const organizations = pgTable('organizations', {
 });
 
 export const profiles = pgTable('profiles', {
-	id: uuid('id').primaryKey(), // Linked to Supabase auth.users / Better Auth user.id
+	id: uuid('id').primaryKey(), // Linked to Better Auth user.id
 	email: text('email'),
 	role: userRoleEnum('role').default('user'),
 	orgId: uuid('org_id').references(() => organizations.id),
@@ -288,7 +288,8 @@ export const readings = pgTable('readings', {
 	meterName: text('meter_name'),
 	rateAtReading: decimal('rate_at_reading', { precision: 10, scale: 2 }),
 	previousReading: decimal('previous_reading', { precision: 10, scale: 2 }),
-	backdatingEnabled: boolean('backdating_enabled').default(false)
+	backdatingEnabled: boolean('backdating_enabled').default(false),
+	reviewStatus: text('review_status').notNull().default('APPROVED')
 });
 
 export const tenants = pgTable('tenants', {

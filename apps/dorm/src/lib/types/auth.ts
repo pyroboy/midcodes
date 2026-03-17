@@ -1,6 +1,5 @@
-import type { Session as SupabaseSession } from '@supabase/supabase-js';
-
 // src/lib/types/auth.ts
+
 export interface UserJWTPayload {
 	user_roles: string[];
 	// add other JWT payload fields as needed

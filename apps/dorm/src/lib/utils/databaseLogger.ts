@@ -98,9 +98,9 @@ const getErrorSuggestions = (code: string, constraint?: string): string[] => {
 const getErrorType = (code: string): string => ERROR_TYPES[code] || 'Unknown Error Type';
 
 /**
- * Enhanced Supabase response logger
+ * Enhanced database response logger
  * @param operation - The database operation being performed
- * @param response - The Supabase response object
+ * @param response - The database response object
  */
 export const logDatabaseResponse = (operation: string, response: DatabaseResponse): void => {
 	const { data, error, status } = response;

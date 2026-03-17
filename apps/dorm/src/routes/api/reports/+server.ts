@@ -1,17 +1,28 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import type { Database } from '$lib/database.types';
+import { db } from '$lib/server/db';
+import {
+	rentalUnit,
+	leases,
+	leaseTenants,
+	floors,
+	billings,
+	payments,
+	expenses
+} from '$lib/server/schema';
+import { eq, and, gte, lte, inArray, desc } from 'drizzle-orm';
 
-export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }, url }) => {
-	const session = await safeGetSession();
-	if (!session) {
+export const GET: RequestHandler = async ({ locals, url }) => {
+	const { session, user } = locals;
+	if (!session || !user) {
 		throw error(401, 'Unauthorized');
 	}
 
 	// Get query parameters
 	const propertyId = url.searchParams.get('propertyId');
 	const year = url.searchParams.get('year') || new Date().getFullYear().toString();
-	const month = url.searchParams.get('month') || 
+	const month =
+		url.searchParams.get('month') ||
 		new Date().toLocaleString('en-US', { month: 'long' }).toLowerCase();
 
 	if (!propertyId) {
@@ -22,8 +33,18 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 
 	// Convert month name to month number (1-12)
 	const months = [
-		'january', 'february', 'march', 'april', 'may', 'june',
-		'july', 'august', 'september', 'october', 'november', 'december'
+		'january',
+		'february',
+		'march',
+		'april',
+		'may',
+		'june',
+		'july',
+		'august',
+		'september',
+		'october',
+		'november',
+		'december'
 	];
 	const monthIndex = months.indexOf(month.toLowerCase()) + 1;
 
@@ -36,83 +57,76 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 	const endDateStr = endDate.toISOString().split('T')[0];
 
 	try {
+		const propId = Number(propertyId);
+
 		// Step 1: Get all rental units for the selected property
-		const { data: propertyUnits, error: propertyUnitsError } = await supabase
-			.from('rental_unit')
-			.select('id')
-			.eq('property_id', propertyId);
+		const propertyUnits = await db
+			.select({ id: rentalUnit.id })
+			.from(rentalUnit)
+			.where(eq(rentalUnit.propertyId, propId));
 
-		if (propertyUnitsError)
-			throw new Error(`Error fetching property units: ${propertyUnitsError.message}`);
-
-		// Extract the unit IDs
-		const unitIds = propertyUnits?.map((unit) => unit.id) || [];
+		const unitIds = propertyUnits.map((unit) => unit.id);
 
 		// Step 2: Get all leases for the units in this property
-		const { data: leases, error: leasesError } = await supabase
-			.from('leases')
-			.select('id, rental_unit_id')
-			.in('rental_unit_id', unitIds);
-
-		if (leasesError) throw new Error(`Error fetching leases: ${leasesError.message}`);
+		const leasesData =
+			unitIds.length > 0
+				? await db
+						.select({ id: leases.id, rentalUnitId: leases.rentalUnitId })
+						.from(leases)
+						.where(inArray(leases.rentalUnitId, unitIds))
+				: [];
 
 		// Create a map of lease_id to rental_unit_id
-		const leaseToUnitMap = new Map();
-		leases?.forEach((lease) => {
-			leaseToUnitMap.set(lease.id, lease.rental_unit_id);
+		const leaseToUnitMap = new Map<number, number>();
+		leasesData.forEach((lease) => {
+			leaseToUnitMap.set(lease.id, lease.rentalUnitId);
 		});
 
 		// Step 3: Get all rental units with their floor IDs
-		const { data: rentalUnits, error: unitsError } = await supabase
-			.from('rental_unit')
-			.select('id, floor_id')
-			.eq('property_id', propertyId);
-
-		if (unitsError) throw new Error(`Error fetching rental units: ${unitsError.message}`);
+		const rentalUnitsData = await db
+			.select({ id: rentalUnit.id, floorId: rentalUnit.floorId })
+			.from(rentalUnit)
+			.where(eq(rentalUnit.propertyId, propId));
 
 		// Create a map of rental_unit_id to floor_id
-		const unitToFloorMap = new Map();
-		rentalUnits?.forEach((unit) => {
-			unitToFloorMap.set(unit.id, unit.floor_id);
+		const unitToFloorMap = new Map<number, number>();
+		rentalUnitsData.forEach((unit) => {
+			unitToFloorMap.set(unit.id, unit.floorId);
 		});
 
 		// Step 4: Get all floors for the selected property
-		const { data: floors, error: floorsError } = await supabase
-			.from('floors')
-			.select('id, floor_number')
-			.eq('property_id', propertyId);
-
-		if (floorsError) throw new Error(`Error fetching floors: ${floorsError.message}`);
+		const floorsData = await db
+			.select({ id: floors.id, floorNumber: floors.floorNumber })
+			.from(floors)
+			.where(eq(floors.propertyId, propId));
 
 		// Create a map of floor_id to floor_number
-		const floorMap = new Map();
-		floors?.forEach((floor) => {
-			floorMap.set(floor.id, floor.floor_number);
+		const floorMap = new Map<number, number>();
+		floorsData.forEach((floor) => {
+			floorMap.set(floor.id, floor.floorNumber);
 		});
 
 		// Step 5: Get all lease IDs for this property
-		const leaseIds = leases?.map((lease) => lease.id) || [];
+		const leaseIds = leasesData.map((lease) => lease.id);
 
 		// Initialize tenant counts for each floor
-		const tenantCountByFloor = new Map<string, number>();
-
-		// Initialize tenant counts for each floor
-		floors?.forEach((floor) => {
+		const tenantCountByFloor = new Map<number, number>();
+		floorsData.forEach((floor) => {
 			tenantCountByFloor.set(floor.id, 0);
 		});
 
 		// Get all lease tenants for the active leases
-		const { data: leaseTenants, error: leaseTenantsError } = await supabase
-			.from('lease_tenants')
-			.select('lease_id, tenant_id')
-			.in('lease_id', leaseIds);
-
-		if (leaseTenantsError)
-			throw new Error(`Error fetching lease tenants: ${leaseTenantsError.message}`);
+		const leaseTenantsData =
+			leaseIds.length > 0
+				? await db
+						.select({ leaseId: leaseTenants.leaseId, tenantId: leaseTenants.tenantId })
+						.from(leaseTenants)
+						.where(inArray(leaseTenants.leaseId, leaseIds))
+				: [];
 
 		// Count tenants per floor
-		leaseTenants?.forEach((leaseTenant) => {
-			const rentalUnitId = leaseToUnitMap.get(leaseTenant.lease_id);
+		leaseTenantsData.forEach((leaseTenant) => {
+			const rentalUnitId = leaseToUnitMap.get(leaseTenant.leaseId);
 			if (rentalUnitId) {
 				const floorId = unitToFloorMap.get(rentalUnitId);
 				if (floorId) {
@@ -122,47 +136,73 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 			}
 		});
 
-		// Step 6: Get all billings for the period (including unpaid ones) to calculate collectibles
-		// Ensure we're only getting billings for the current month
-		const { data: allBillings, error: allBillingsError } = await supabase
-			.from('billings')
-			.select('id, amount, type, billing_date, lease_id, status, balance, paid_amount')
-			.gte('billing_date', startDateStr)
-			.lte('billing_date', endDateStr)
-			.in('lease_id', leaseIds);
+		// Step 6: Get all billings for the period
+		const allBillings =
+			leaseIds.length > 0
+				? await db
+						.select({
+							id: billings.id,
+							amount: billings.amount,
+							type: billings.type,
+							billingDate: billings.billingDate,
+							leaseId: billings.leaseId,
+							status: billings.status,
+							balance: billings.balance,
+							paidAmount: billings.paidAmount
+						})
+						.from(billings)
+						.where(
+							and(
+								gte(billings.billingDate, startDateStr),
+								lte(billings.billingDate, endDateStr),
+								inArray(billings.leaseId, leaseIds)
+							)
+						)
+				: [];
 
-		if (allBillingsError) throw new Error(`Error fetching billings: ${allBillingsError.message}`);
-
-		// Step 7: Get payment history to determine last collection date
-		// Make sure we only get payments for this month
-		const { data: payments, error: paymentsError } = await supabase
-			.from('payments')
-			.select('id, amount, paid_at, billing_ids, method')
-			.gte('paid_at', startDate.toISOString()) // Use startDate with time component
-			.lte('paid_at', new Date(endDate.getTime() + 86400000 - 1).toISOString()) // Include entire last day of month
-			.order('paid_at', { ascending: false });
-
-		if (paymentsError) throw new Error(`Error fetching payments: ${paymentsError.message}`);
+		// Step 7: Get payment history for the month
+		const paymentsData = await db
+			.select({
+				id: payments.id,
+				amount: payments.amount,
+				paidAt: payments.paidAt,
+				billingIds: payments.billingIds,
+				method: payments.method
+			})
+			.from(payments)
+			.where(
+				and(
+					gte(payments.paidAt, startDate),
+					lte(payments.paidAt, new Date(endDate.getTime() + 86400000 - 1))
+				)
+			)
+			.orderBy(desc(payments.paidAt));
 
 		// Step 8: Get all expenses for the period and property
-		const { data: expenses, error: expensesError } = await supabase
-			.from('expenses')
-			.select('id, amount, description, type, status, created_at')
-			.eq('property_id', propertyId)
-			.gte('created_at', startDate.toISOString())
-			.lte('created_at', endDate.toISOString())
-			.order('created_at', { ascending: false });
-
-		if (expensesError) throw new Error(`Error fetching expenses: ${expensesError.message}`);
+		const expensesData = await db
+			.select({
+				id: expenses.id,
+				amount: expenses.amount,
+				description: expenses.description,
+				type: expenses.type,
+				status: expenses.status,
+				createdAt: expenses.createdAt
+			})
+			.from(expenses)
+			.where(
+				and(
+					eq(expenses.propertyId, propId),
+					gte(expenses.createdAt, startDate),
+					lte(expenses.createdAt, endDate)
+				)
+			)
+			.orderBy(desc(expenses.createdAt));
 
 		// Initialize floorData structure for all floors
-		const floorDataMap: Record<string, any> = {};
+		const floorDataMap: Record<number, any> = {};
+		const floorBillingsMap: Record<number, any[]> = {};
 
-		// Initialize collections for each floor
-		const floorBillingsMap: Record<string, any[]> = {};
-
-		// Initialize all floor data structures
-		floors?.forEach((floor) => {
+		floorsData.forEach((floor) => {
 			const floorId = floor.id;
 			floorDataMap[floorId] = {
 				income: 0,
@@ -171,18 +211,17 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 				collectible: 0,
 				collected: 0,
 				lastCollectionDate: undefined,
-				floorNumber: floor.floor_number,
+				floorNumber: floor.floorNumber,
 				floorId: floorId
 			};
 			floorBillingsMap[floorId] = [];
 		});
 
 		// Group billings by floor - only for the current month
-		allBillings?.forEach((billing) => {
-			// Ensure the billing is for the current month
-			const billingDate = new Date(billing.billing_date);
+		allBillings.forEach((billing) => {
+			const billingDate = new Date(billing.billingDate);
 			if (billingDate >= startDate && billingDate <= endDate) {
-				const leaseId = billing.lease_id;
+				const leaseId = billing.leaseId;
 				const unitId = leaseToUnitMap.get(leaseId);
 
 				if (unitId) {
@@ -194,22 +233,20 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 			}
 		});
 
-		// Calculate collectibles and collected amounts per floor - strictly for the selected month
-		for (const [floorId, billings] of Object.entries(floorBillingsMap)) {
-			// Calculate Total Billable (Income) from the RENT billings for the month
-			// This is the sum of all billing amounts for the floor in the current month
-			const totalBillable = billings.reduce((sum, billing) => {
+		// Calculate collectibles and collected amounts per floor
+		for (const [floorIdStr, floorBillings] of Object.entries(floorBillingsMap)) {
+			const floorId = Number(floorIdStr);
+
+			const totalBillable = floorBillings.reduce((sum, billing) => {
 				if (billing.type === 'RENT') {
 					return sum + Number(billing.amount || 0);
 				}
 				return sum;
 			}, 0);
 
-			// Set the income to the total billable amount
 			floorDataMap[floorId].income = totalBillable;
 
-			// Calculate Collectible (Unpaid) - the sum of unpaid balances for the current month
-			floorDataMap[floorId].collectible = billings.reduce((sum, billing) => {
+			floorDataMap[floorId].collectible = floorBillings.reduce((sum, billing) => {
 				if (
 					billing.type === 'RENT' &&
 					(billing.status === 'PENDING' || billing.status === 'PARTIAL')
@@ -219,57 +256,51 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 				return sum;
 			}, 0);
 
-			// Calculate Collected - the sum of paid amounts for the current month
-			// This should be Total Billable minus Collectible
 			floorDataMap[floorId].collected = totalBillable - floorDataMap[floorId].collectible;
 		}
 
-		// Find last collection dates - only looking at the current month
-		for (const [floorId, billings] of Object.entries(floorBillingsMap)) {
-			if (payments && payments.length > 0) {
-				for (const payment of payments) {
-					// Ensure payment is in the current month
-					const paymentDate = new Date(payment.paid_at);
+		// Find last collection dates
+		for (const [floorIdStr, floorBillings] of Object.entries(floorBillingsMap)) {
+			const floorId = Number(floorIdStr);
+			if (paymentsData.length > 0) {
+				for (const payment of paymentsData) {
+					const paymentDate = new Date(payment.paidAt);
 					if (
 						paymentDate >= startDate &&
 						paymentDate <= new Date(endDate.getTime() + 86400000 - 1)
 					) {
-						const billingIds = payment.billing_ids || [];
-
-						// Check if any billing ID in this payment belongs to this floor
-						const appliesToFloor = billings.some((billing) => billingIds.includes(billing.id));
+						const billingIds = payment.billingIds || [];
+						const appliesToFloor = floorBillings.some((billing) =>
+							billingIds.includes(billing.id)
+						);
 
 						if (appliesToFloor && !floorDataMap[floorId].lastCollectionDate) {
-							floorDataMap[floorId].lastCollectionDate = payment.paid_at;
-							break; // Found the first payment for this floor, no need to continue
+							floorDataMap[floorId].lastCollectionDate = payment.paidAt;
+							break;
 						}
 					}
 				}
 			}
 		}
 
-		// Calculate totals - all for the current month only
-		// Start with gross income (total billable amount across all floors)
+		// Calculate totals
 		const grossIncome = Object.values(floorDataMap).reduce(
 			(sum, floor: any) => sum + Number(floor.income),
 			0
 		);
 
-		// Calculate collectibles (all unpaid balances) for the current month only
 		const collectibles = Object.values(floorDataMap).reduce(
 			(sum, floor: any) => sum + Number(floor.collectible),
 			0
 		);
 
-		// Calculate collected amount for the current month only
-		// This should be grossIncome minus collectibles to ensure mathematical consistency
 		const collected = grossIncome - collectibles;
 
 		// Group expenses by type
-		const operationalExpenses = expenses?.filter((expense) => expense.type === 'OPERATIONAL') || [];
-		const capitalExpenses = expenses?.filter((expense) => expense.type === 'CAPITAL') || [];
+		const operationalExpenses =
+			expensesData.filter((expense) => expense.type === 'OPERATIONAL') || [];
+		const capitalExpenses = expensesData.filter((expense) => expense.type === 'CAPITAL') || [];
 
-		// Calculate total expenses by type
 		const totalOperationalExpenses = operationalExpenses.reduce(
 			(sum, expense) => sum + Number(expense.amount),
 			0
@@ -279,26 +310,17 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 			0
 		);
 
-		// Calculate total expenses
 		const totalExpenses = totalOperationalExpenses + totalCapitalExpenses;
-
-		// Calculate net income before capital expenses
 		const netBeforeCapital = grossIncome - totalOperationalExpenses;
-
-		// Calculate net income
 		const netIncome = netBeforeCapital - totalCapitalExpenses;
 
-		// Calculate profit sharing with new rules:
-		// - Both 40% and 60% share get reduced by operational expenses proportionally
-		// - Only 60% share gets reduced by capital expenses
 		const fortyShare = netBeforeCapital * 0.4;
 		const sixtyShareBeforeCapital = netBeforeCapital * 0.6;
 		const sixtyShare = sixtyShareBeforeCapital - totalCapitalExpenses;
 
-		// Construct the final data object
 		const reportData = {
 			floorData: floorDataMap,
-			expenses: expenses || [],
+			expenses: expensesData,
 			profitSharing: {
 				forty: fortyShare,
 				sixty: sixtyShare
@@ -309,7 +331,8 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 				netIncome,
 				collectibles,
 				collected,
-				lastCollectionDate: payments && payments.length > 0 ? payments[0].paid_at : undefined
+				lastCollectionDate:
+					paymentsData.length > 0 ? paymentsData[0].paidAt : undefined
 			}
 		};
 
@@ -317,7 +340,9 @@ export const GET: RequestHandler = async ({ locals: { supabase, safeGetSession }
 	} catch (err) {
 		console.error('Error in reports API:', err);
 		return json(
-			{ error: `Failed to load report data: ${err instanceof Error ? err.message : 'Unknown error'}` },
+			{
+				error: `Failed to load report data: ${err instanceof Error ? err.message : 'Unknown error'}`
+			},
 			{ status: 500 }
 		);
 	}

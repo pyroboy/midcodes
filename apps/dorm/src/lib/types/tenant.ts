@@ -1,9 +1,19 @@
-import type { Database } from '$lib/database.types';
-
-type DBTenant = Database['public']['Tables']['tenants']['Row'];
-type DBLease = Database['public']['Tables']['leases']['Row'];
-
 import type { EmergencyContact } from '../../routes/tenants/formSchema';
+
+type DBTenant = {
+	id: number;
+	name: string;
+	contact_number: string | null;
+	email: string | null;
+	created_at: string;
+	updated_at: string | null;
+	auth_id: string | null;
+	emergency_contact: Record<string, any> | null;
+	tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
+	created_by: string | null;
+	deleted_at: string | null;
+	profile_picture_url: string | null;
+};
 
 // Simplified lease type for tenant relationships (basic info only)
 export type TenantLease = {

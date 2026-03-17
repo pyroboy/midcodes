@@ -1,8 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../database.types';
-
-export type TypedSupabaseClient = SupabaseClient<Database>;
-
 export interface Floor {
 	id: number;
 	name: string;
@@ -96,7 +91,7 @@ export interface Lease {
 	billings: Billing[];
 	lease_tenants: {
 		tenant: {
-			profile_picture_url: any; name: string; contact_number?: string; email?: string; 
+			profile_picture_url: any; name: string; contact_number?: string; email?: string;
 };
 		name: string;
 		contact_number?: string;

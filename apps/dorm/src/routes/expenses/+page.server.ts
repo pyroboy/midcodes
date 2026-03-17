@@ -27,7 +27,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 					expenseDate: expenses.expenseDate,
 					createdBy: expenses.createdBy,
 					createdAt: expenses.createdAt,
-					updatedAt: expenses.updatedAt,
 					propertyName: properties.name,
 					propertyDbId: properties.id
 				})

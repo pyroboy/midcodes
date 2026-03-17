@@ -56,7 +56,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			})
 			.from(leaseTenants);
 
-		// Build nested structure to match original Supabase response
+		// Build nested structure to match expected response format
 		const floorsResult = floorsData.map((floor) => {
 			const floorUnits = unitsData
 				.filter((u) => u.floorId === floor.id)

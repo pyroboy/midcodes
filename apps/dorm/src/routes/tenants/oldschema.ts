@@ -1,10 +1,9 @@
 import { z } from 'zod';
-import type { Database } from '$lib/database.types';
 
 // Status Enums
-type DbTenantStatus = Database['public']['Enums']['tenant_status'];
-type DbLeaseType = Database['public']['Enums']['lease_type'];
-type DbLeaseStatus = Database['public']['Enums']['lease_status'];
+type DbTenantStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
+type DbLeaseType = 'BEDSPACER' | 'PRIVATEROOM';
+type DbLeaseStatus = 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'TERMINATED' | 'PENDING' | 'ARCHIVED';
 
 export const tenantStatusEnum = [
 	'ACTIVE',
@@ -213,7 +212,20 @@ export const formatCurrency = (amount: number | null | undefined): string => {
 
 // Type exports
 export type TenantFormData = z.infer<typeof tenantSchema>;
-export type Tenant = Database['public']['Tables']['tenants']['Row'];
+export interface Tenant {
+	id: number;
+	name: string;
+	contact_number: string | null;
+	email: string | null;
+	created_at: string;
+	updated_at: string | null;
+	auth_id: string | null;
+	emergency_contact: Record<string, any> | null;
+	tenant_status: DbTenantStatus;
+	created_by: string | null;
+	deleted_at: string | null;
+	profile_picture_url: string | null;
+}
 export type TenantStatus = (typeof tenantStatusEnum)[number];
 export type LeaseStatus = (typeof leaseStatusEnum)[number];
 export type LocationStatus = (typeof locationStatusEnum)[number];

@@ -71,7 +71,7 @@ async function loadPaymentsData(locals: any) {
 			leaseId: leases.id,
 			leaseName: leases.name,
 			unitId: rentalUnit.id,
-			unitNumber: rentalUnit.rentalUnitNumber,
+			unitNumber: rentalUnit.number,
 			floorNumber: floors.floorNumber,
 			floorWing: floors.wing,
 			propertyName: properties.name
@@ -98,7 +98,7 @@ async function loadPaymentsData(locals: any) {
 			leaseId: leases.id,
 			leaseName: leases.name,
 			unitId: rentalUnit.id,
-			unitNumber: rentalUnit.rentalUnitNumber,
+			unitNumber: rentalUnit.number,
 			floorNumber: floors.floorNumber,
 			floorWing: floors.wing,
 			propertyName: properties.name

@@ -1,10 +1,26 @@
-import type { Database } from '$lib/database.types';
 import { z } from 'zod';
 
 export type FloorSchema = z.infer<typeof floorSchema>;
 
-export type Floor = Database['public']['Tables']['floors']['Row'];
-export type Property = Database['public']['Tables']['properties']['Row'];
+export interface Floor {
+	id: number;
+	property_id: number;
+	floor_number: number;
+	wing: string | null;
+	status: string;
+	created_at: string;
+	updated_at: string | null;
+}
+
+export interface Property {
+	id: number;
+	name: string;
+	address: string;
+	type: string;
+	status: string;
+	created_at: string;
+	updated_at: string | null;
+}
 export type FloorWithProperty = Floor & {
 	property: Property | null;
 	rental_unit: {

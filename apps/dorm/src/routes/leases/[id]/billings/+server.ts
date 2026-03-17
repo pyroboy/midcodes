@@ -1,15 +1,14 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { db } from '$lib/server/db';
+import { billings } from '$lib/server/schema';
+import { eq, and, gte, lte } from 'drizzle-orm';
 
-export const GET: RequestHandler = async ({
-	params,
-	url,
-	locals: { supabase, safeGetSession }
-}) => {
-	const { user } = await safeGetSession();
+export const GET: RequestHandler = async ({ params, url, locals }) => {
+	const { user } = locals;
 	if (!user) throw error(401, 'Unauthorized');
 
-	const leaseId = params.id;
+	const leaseId = Number(params.id);
 	const year = url.searchParams.get('year');
 	const type = url.searchParams.get('type');
 
@@ -18,17 +17,17 @@ export const GET: RequestHandler = async ({
 	}
 
 	try {
-		const { data, error: dbError } = await supabase
-			.from('billings')
-			.select('*')
-			.eq('lease_id', leaseId)
-			.eq('type', type)
-			.gte('billing_date', `${year}-01-01`)
-			.lte('billing_date', `${year}-12-31`);
-
-		if (dbError) {
-			throw error(500, `Database error: ${dbError.message}`);
-		}
+		const data = await db
+			.select()
+			.from(billings)
+			.where(
+				and(
+					eq(billings.leaseId, leaseId),
+					eq(billings.type, type as any),
+					gte(billings.billingDate, `${year}-01-01`),
+					lte(billings.billingDate, `${year}-12-31`)
+				)
+			);
 
 		return json(data);
 	} catch (err) {
