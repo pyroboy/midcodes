@@ -30,7 +30,6 @@
     import { Info } from 'lucide-svelte';
     import { playSound } from '$lib/utils/audio';
     import ModalWrapper from '$lib/components/ModalWrapper.svelte';
-    import { SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { browser } from '$app/environment';
@@ -621,7 +620,6 @@
                 <!-- Header -->
                 <div class="pos-header-row flex items-center justify-between shrink-0 gap-1 sm:gap-2">
                     <div class="flex items-center gap-1 sm:gap-2 lg:gap-3">
-                        <SidebarTrigger class="pos-sidebar-trigger hidden md:flex h-9 w-9 text-gray-500" />
                         <h1 class="text-sm sm:text-base lg:text-lg font-bold text-gray-900">POS</h1>
                         <span class="badge-orange text-[10px] sm:text-xs px-1.5 sm:px-3 h-5 sm:h-7">{occupied} occ</span>
                         <span class="badge-green text-[10px] sm:text-xs px-1.5 sm:px-3 h-5 sm:h-7">{free} free</span>
