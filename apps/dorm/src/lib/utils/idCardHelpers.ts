@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
 
 export interface ImageUploadResult {
 	frontPath: string;
@@ -13,7 +13,6 @@ export interface ImageUploadError {
 }
 
 export async function handleImageUploads(
-	supabase: SupabaseClient,
 	formData: FormData,
 	orgId: string,
 	templateId: string
@@ -27,31 +26,29 @@ export async function handleImageUploads(
 		}
 
 		const timestamp = Date.now();
-		const frontPath = `${orgId}/${templateId}/${timestamp}_front.png`;
-		const backPath = `${orgId}/${templateId}/${timestamp}_back.png`;
+		const frontKey = `rendered-id-cards/${orgId}/${templateId}/${timestamp}_front.png`;
+		const backKey = `rendered-id-cards/${orgId}/${templateId}/${timestamp}_back.png`;
 
-		const frontUpload = await uploadToStorage(supabase, {
-			bucket: 'rendered-id-cards',
-			file: frontImage,
-			path: frontPath
-		});
-
-		if (frontUpload.error) {
+		let frontUrl: string;
+		try {
+			frontUrl = await uploadToR2(frontKey, frontImage, 'image/png');
+		} catch {
 			return { error: 'Front image upload failed' };
 		}
 
-		const backUpload = await uploadToStorage(supabase, {
-			bucket: 'rendered-id-cards',
-			file: backImage,
-			path: backPath
-		});
-
-		if (backUpload.error) {
-			await deleteFromStorage(supabase, 'rendered-id-cards', frontPath);
+		try {
+			await uploadToR2(backKey, backImage, 'image/png');
+		} catch {
+			// Clean up front image if back upload fails
+			try {
+				await deleteFromR2(frontKey);
+			} catch (cleanupErr) {
+				console.error('Failed to clean up front image after back upload failure:', cleanupErr);
+			}
 			return { error: 'Back image upload failed' };
 		}
 
-		return { frontPath, backPath };
+		return { frontPath: frontKey, backPath: backKey };
 	} catch (err) {
 		return {
 			error: err instanceof Error ? err.message : 'Failed to handle image uploads'
@@ -59,41 +56,46 @@ export async function handleImageUploads(
 	}
 }
 
-export async function saveIdCardData(
-	supabase: SupabaseClient,
-	{
-		templateId,
-		orgId,
-		frontPath,
-		backPath,
-		formFields
-	}: {
-		templateId: string;
-		orgId: string;
-		frontPath: string;
-		backPath: string;
-		formFields: Record<string, string>;
-	}
-) {
+export async function saveIdCardData({
+	templateId,
+	orgId,
+	frontPath,
+	backPath,
+	formFields
+}: {
+	templateId: string;
+	orgId: string;
+	frontPath: string;
+	backPath: string;
+	formFields: Record<string, string>;
+}) {
 	try {
-		const { data, error } = await supabase
-			.from('idcards')
-			.insert({
-				template_id: templateId,
-				org_id: orgId,
-				front_image: frontPath,
-				back_image: backPath,
+		// Import db and schema dynamically to avoid circular dependency issues
+		const { db } = await import('$lib/server/db');
+		const { idcards } = await import('$lib/server/schema');
+
+		const [data] = await db
+			.insert(idcards)
+			.values({
+				templateId,
+				orgId,
+				frontImage: frontPath,
+				backImage: backPath,
 				data: formFields
 			})
-			.select()
-			.single();
+			.returning();
 
-		if (error) {
+		if (!data) {
+			// Clean up uploaded images on DB failure
 			await Promise.all([
-				deleteFromStorage(supabase, 'rendered-id-cards', frontPath),
-				deleteFromStorage(supabase, 'rendered-id-cards', backPath)
+				deleteFromR2(frontPath).catch((e) =>
+					console.error('Cleanup failed for front image:', e)
+				),
+				deleteFromR2(backPath).catch((e) =>
+					console.error('Cleanup failed for back image:', e)
+				)
 			]);
-			return { error };
+			return { error: 'No data returned after insert' };
 		}
 
 		return { data };
@@ -102,44 +104,11 @@ export async function saveIdCardData(
 	}
 }
 
-export async function deleteFromStorage(
-	supabase: SupabaseClient,
-	bucket: string,
-	path: string
-): Promise<{ error?: string }> {
+export async function deleteFromStorage(key: string): Promise<{ error?: string }> {
 	try {
-		const { error } = await supabase.storage.from(bucket).remove([path]);
-		if (error) {
-			return { error: error.message };
-		}
+		await deleteFromR2(key);
 		return {};
 	} catch (err) {
 		return { error: err instanceof Error ? err.message : 'Failed to delete from storage' };
 	}
-}
-
-async function uploadToStorage(
-	supabase: SupabaseClient,
-	{
-		bucket,
-		file,
-		path,
-		options = {}
-	}: {
-		bucket: string;
-		file: Blob;
-		path: string;
-		options?: {
-			cacheControl?: string;
-			contentType?: string;
-			upsert?: boolean;
-		};
-	}
-) {
-	return await supabase.storage.from(bucket).upload(path, file, {
-		cacheControl: '3600',
-		contentType: 'image/png',
-		upsert: true,
-		...options
-	});
 }

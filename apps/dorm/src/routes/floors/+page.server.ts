@@ -4,9 +4,12 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { floorSchema } from './formSchema';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import type { FloorWithProperty, Property } from './formSchema';
+import { db } from '$lib/server/db';
+import { floors, properties, rentalUnit, leases, leaseTenants } from '$lib/server/schema';
+import { eq, and, asc, ne } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { user, permissions } = await locals.safeGetSession();
+	const { user, permissions } = locals;
 	const hasAccess = permissions.includes('properties.create');
 
 	if (!hasAccess) {
@@ -14,38 +17,84 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	try {
-		const floorsResult = await locals.supabase
-			.from('floors')
-			.select(
-				`
-      id,
-      property_id,
-      floor_number,
-      wing,
-      status,
-      property:properties!floors_property_id_fkey(
-        id,
-        name
-      ),
-      rental_unit (
-        id,
-        number,
-        leases(id, status, lease_tenants(tenant_id))
-      )
-    `
-			)
-			.order('floor_number');
+		// Fetch floors with property relationships
+		const floorsData = await db
+			.select({
+				id: floors.id,
+				propertyId: floors.propertyId,
+				floorNumber: floors.floorNumber,
+				wing: floors.wing,
+				status: floors.status,
+				propertyName: properties.name,
+				propertyDbId: properties.id
+			})
+			.from(floors)
+			.leftJoin(properties, eq(floors.propertyId, properties.id))
+			.orderBy(asc(floors.floorNumber));
 
-		if (floorsResult.error) {
-			console.error('Error loading floors:', floorsResult.error);
-			throw error(500, 'Failed to load floors');
-		}
+		// Fetch rental units with lease info for each floor
+		const unitsData = await db
+			.select({
+				id: rentalUnit.id,
+				number: rentalUnit.number,
+				floorId: rentalUnit.floorId
+			})
+			.from(rentalUnit);
+
+		const leasesData = await db
+			.select({
+				id: leases.id,
+				status: leases.status,
+				rentalUnitId: leases.rentalUnitId
+			})
+			.from(leases);
+
+		const leaseTenantsData = await db
+			.select({
+				leaseId: leaseTenants.leaseId,
+				tenantId: leaseTenants.tenantId
+			})
+			.from(leaseTenants);
+
+		// Build nested structure to match original Supabase response
+		const floorsResult = floorsData.map((floor) => {
+			const floorUnits = unitsData
+				.filter((u) => u.floorId === floor.id)
+				.map((unit) => {
+					const unitLeases = leasesData
+						.filter((l) => l.rentalUnitId === unit.id)
+						.map((lease) => ({
+							id: lease.id,
+							status: lease.status,
+							lease_tenants: leaseTenantsData
+								.filter((lt) => lt.leaseId === lease.id)
+								.map((lt) => ({ tenant_id: lt.tenantId }))
+						}));
+					return {
+						id: unit.id,
+						number: unit.number,
+						leases: unitLeases
+					};
+				});
+
+			return {
+				id: floor.id,
+				property_id: floor.propertyId,
+				floor_number: floor.floorNumber,
+				wing: floor.wing,
+				status: floor.status,
+				property: floor.propertyDbId
+					? { id: floor.propertyDbId, name: floor.propertyName }
+					: null,
+				rental_unit: floorUnits
+			};
+		});
 
 		const form = await superValidate(zod(floorSchema));
 
 		return {
 			form,
-			floors: floorsResult.data as unknown as FloorWithProperty[]
+			floors: floorsResult as unknown as FloorWithProperty[]
 		};
 	} catch (err) {
 		console.error('Unexpected error in load function:', err);
@@ -56,7 +105,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 // Declare - Actions
 
 export const actions: Actions = {
-	create: async ({ request, locals: { supabase } }: RequestEvent) => {
+	create: async ({ request }: RequestEvent) => {
 		const form = await superValidate(request, zod(floorSchema));
 
 		if (!form.valid) {
@@ -65,45 +114,41 @@ export const actions: Actions = {
 		}
 
 		// Check for duplicate floor number in the same property
-		const { data: existingFloor, error: checkError } = await supabase
-			.from('floors')
-			.select('id')
-			.eq('property_id', form.data.property_id)
-			.eq('floor_number', form.data.floor_number)
-			.maybeSingle();
+		const existingFloor = await db
+			.select({ id: floors.id })
+			.from(floors)
+			.where(
+				and(
+					eq(floors.propertyId, form.data.property_id),
+					eq(floors.floorNumber, form.data.floor_number)
+				)
+			)
+			.limit(1);
 
-		if (checkError) {
-			console.error('❌ Error checking for duplicate floor:', checkError);
-			return fail(500, {
-				form,
-				error: 'Failed to check for duplicate floor'
-			});
-		}
-
-		if (existingFloor) {
-			console.log('❌ Duplicate floor number detected');
+		if (existingFloor.length > 0) {
+			console.log('Duplicate floor number detected');
 			form.errors.floor_number = ['This floor number already exists for this property'];
 			return fail(400, { form });
 		}
 
 		console.log('Creating floor with data:', form.data);
 
-		const { error: insertError } = await supabase.from('floors').insert({
-			property_id: form.data.property_id,
-			floor_number: form.data.floor_number,
-			wing: form.data.wing || null,
-			status: form.data.status || 'ACTIVE'
-		});
-
-		if (insertError) {
-			console.error('❌ Error creating floor:', insertError);
+		try {
+			await db.insert(floors).values({
+				propertyId: form.data.property_id,
+				floorNumber: form.data.floor_number,
+				wing: form.data.wing || null,
+				status: form.data.status || 'ACTIVE'
+			});
+		} catch (err: any) {
+			console.error('Error creating floor:', err);
 			return fail(500, { form });
 		}
 
 		return { form };
 	},
 
-	update: async ({ request, locals: { supabase } }: RequestEvent) => {
+	update: async ({ request }: RequestEvent) => {
 		const form = await superValidate(request, zod(floorSchema));
 
 		if (!form.valid) {
@@ -112,49 +157,45 @@ export const actions: Actions = {
 		}
 
 		// Check for duplicate floor number in the same property (excluding current floor)
-		const { data: existingFloor, error: checkError } = await supabase
-			.from('floors')
-			.select('id')
-			.eq('property_id', form.data.property_id)
-			.eq('floor_number', form.data.floor_number)
-			.neq('id', form.data.id)
-			.maybeSingle();
+		const existingFloor = await db
+			.select({ id: floors.id })
+			.from(floors)
+			.where(
+				and(
+					eq(floors.propertyId, form.data.property_id),
+					eq(floors.floorNumber, form.data.floor_number),
+					ne(floors.id, form.data.id)
+				)
+			)
+			.limit(1);
 
-		if (checkError) {
-			console.error('❌ Error checking for duplicate floor:', checkError);
-			return fail(500, {
-				form,
-				error: 'Failed to check for duplicate floor'
-			});
-		}
-
-		if (existingFloor) {
-			console.log('❌ Duplicate floor number detected');
+		if (existingFloor.length > 0) {
+			console.log('Duplicate floor number detected');
 			form.errors.floor_number = ['This floor number already exists for this property'];
 			return fail(400, { form });
 		}
 
 		console.log('Updating floor with data:', form.data);
 
-		const { error: updateError } = await supabase
-			.from('floors')
-			.update({
-				property_id: form.data.property_id,
-				floor_number: form.data.floor_number,
-				wing: form.data.wing || null,
-				status: form.data.status || 'ACTIVE'
-			})
-			.eq('id', form.data.id);
-
-		if (updateError) {
-			console.error('❌ Error updating floor:', updateError);
+		try {
+			await db
+				.update(floors)
+				.set({
+					propertyId: form.data.property_id,
+					floorNumber: form.data.floor_number,
+					wing: form.data.wing || null,
+					status: form.data.status || 'ACTIVE'
+				})
+				.where(eq(floors.id, form.data.id));
+		} catch (err: any) {
+			console.error('Error updating floor:', err);
 			return fail(500, { form });
 		}
 
 		return { form };
 	},
 
-	delete: async ({ request, locals: { supabase } }: RequestEvent) => {
+	delete: async ({ request }: RequestEvent) => {
 		const data = await request.formData();
 		const id = data.get('id');
 
@@ -165,10 +206,10 @@ export const actions: Actions = {
 			return fail(400, { message: 'No floor ID provided' });
 		}
 
-		const { error: deleteError } = await supabase.from('floors').delete().eq('id', id);
-
-		if (deleteError) {
-			console.error('❌ Error deleting floor:', deleteError.message);
+		try {
+			await db.delete(floors).where(eq(floors.id, Number(id)));
+		} catch (err: any) {
+			console.error('Error deleting floor:', err.message);
 			return fail(500, { message: 'Failed to delete floor' });
 		}
 

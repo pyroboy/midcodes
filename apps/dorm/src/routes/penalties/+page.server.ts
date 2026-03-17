@@ -3,85 +3,119 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { updatePenaltySchema } from './formSchema';
 import type { Actions, PageServerLoad } from './$types';
-import type { PostgrestError } from '@supabase/postgrest-js';
 import type { PenaltyBilling } from './types';
+import { db } from '$lib/server/db';
+import { billings, leases, rentalUnit, floors, properties, leaseTenants, tenants } from '$lib/server/schema';
+import { eq, gt, lt, and, or, desc, sql, inArray } from 'drizzle-orm';
 
-export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, depends }) => {
-	const session = await safeGetSession();
-	if (!session.user) throw error(401, 'Unauthorized');
+export const load: PageServerLoad = async ({ locals, depends }) => {
+	const { user } = locals;
+	if (!user) throw error(401, 'Unauthorized');
 
 	// Set up dependencies for invalidation
 	depends('app:penalties');
 
 	// Return minimal data for instant navigation
 	return {
-		// Start with empty arrays for instant rendering
 		penaltyBillings: [],
 		form: await superValidate(zod(updatePenaltySchema)),
-		// Flag to indicate lazy loading
 		lazy: true,
-		// Return promise that resolves with the actual data
-		penaltyBillingsPromise: loadPenaltyBillingsData(supabase)
+		penaltyBillingsPromise: loadPenaltyBillingsData()
 	};
 };
 
-// Separate async function for heavy data loading
-async function loadPenaltyBillingsData(supabase: any) {
+async function loadPenaltyBillingsData() {
 	try {
-		// Get current date
 		const currentDate = new Date();
+		const currentIso = currentDate.toISOString();
+		const threeDaysFromNow = new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
-		// Fetch all billings that are:
-		// 1. Already have penalties (penalty_amount > 0)
-		// 2. Are overdue (due_date < current date and not fully paid)
-		// 3. Are approaching due date (due within 3 days)
-		const { data: penaltyBillings, error: penaltyError } = await supabase
-			.from('billings')
-			.select(
-				`
-        *,
-        lease:lease_id (
-          id,
-          name,
-          rental_unit (
-            name,
-            number,
-            floors (
-              floor_number,
-              wing
-            ),
-            properties (
-              name
-            )
-          ),
-          lease_tenants (
-            tenants (
-              id,
-              name,
-              email,
-              contact_number
-            )
-          )
-        )
-      `
+		const penaltyBillings = await db
+			.select()
+			.from(billings)
+			.where(
+				or(
+					gt(billings.penaltyAmount, 0),
+					and(lt(billings.dueDate, currentIso), gt(billings.balance, 0)),
+					and(gt(billings.dueDate, currentIso), lt(billings.dueDate, threeDaysFromNow))
+				)
 			)
-			.or(
-				'penalty_amount.gt.0, and(due_date.lt.' +
-					currentDate.toISOString() +
-					',balance.gt.0), and(due_date.gt.' +
-					currentDate.toISOString() +
-					',due_date.lt.' +
-					new Date(currentDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString() +
-					')'
-			)
-			.order('due_date', { ascending: false });
+			.orderBy(desc(billings.dueDate));
 
-		if (penaltyError) {
-			console.error('Error fetching penalty billings:', penaltyError);
-			throw new Error('Failed to load penalty billings');
+		const leaseIds = [...new Set(penaltyBillings.map((b: any) => b.leaseId).filter(Boolean))];
+
+		if (leaseIds.length === 0) {
+			return penaltyBillings as PenaltyBilling[];
 		}
 
-		return penaltyBillings as PenaltyBilling[];
+		const leasesData = await db
+			.select({
+				leaseId: leases.id,
+				leaseName: leases.name,
+				unitName: rentalUnit.name,
+				unitNumber: rentalUnit.number,
+				floorNumber: floors.floorNumber,
+				floorWing: floors.wing,
+				propertyName: properties.name
+			})
+			.from(leases)
+			.leftJoin(rentalUnit, eq(leases.rentalUnitId, rentalUnit.id))
+			.leftJoin(floors, eq(rentalUnit.floorId, floors.id))
+			.leftJoin(properties, eq(rentalUnit.propertyId, properties.id))
+			.where(inArray(leases.id, leaseIds));
+
+		const leaseTenantsData = await db
+			.select({
+				leaseId: leaseTenants.leaseId,
+				tenantId: tenants.id,
+				tenantName: tenants.name,
+				tenantEmail: tenants.email,
+				tenantContactNumber: tenants.contactNumber
+			})
+			.from(leaseTenants)
+			.innerJoin(tenants, eq(leaseTenants.tenantId, tenants.id))
+			.where(inArray(leaseTenants.leaseId, leaseIds));
+
+		const leasesMap = new Map(leasesData.map((l) => [l.leaseId, l]));
+		const leaseTenantsMap = new Map<number, any[]>();
+		for (const lt of leaseTenantsData) {
+			if (!leaseTenantsMap.has(lt.leaseId)) leaseTenantsMap.set(lt.leaseId, []);
+			leaseTenantsMap.get(lt.leaseId)!.push({
+				tenants: {
+					id: lt.tenantId,
+					name: lt.tenantName,
+					email: lt.tenantEmail,
+					contact_number: lt.tenantContactNumber
+				}
+			});
+		}
+
+		const enriched = penaltyBillings.map((billing: any) => {
+			const leaseData = leasesMap.get(billing.leaseId);
+			return {
+				...billing,
+				lease: leaseData
+					? {
+							id: billing.leaseId,
+							name: leaseData.leaseName,
+							rental_unit: {
+								name: leaseData.unitName,
+								number: leaseData.unitNumber,
+								floors: {
+									floor_number: leaseData.floorNumber,
+									wing: leaseData.floorWing
+								},
+								properties: {
+									name: leaseData.propertyName
+								}
+							},
+							lease_tenants: leaseTenantsMap.get(billing.leaseId) || []
+						}
+					: null
+			};
+		});
+
+		return enriched as PenaltyBilling[];
 	} catch (err) {
 		console.error('Error in loadPenaltyBillingsData:', err);
 		throw err;
@@ -89,10 +123,9 @@ async function loadPenaltyBillingsData(supabase: any) {
 }
 
 export const actions: Actions = {
-	// Update a penalty amount
-	updatePenalty: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const session = await safeGetSession();
-		if (!session.user) return fail(401, { message: 'Unauthorized' });
+	updatePenalty: async ({ request, locals }) => {
+		const { user } = locals;
+		if (!user) return fail(401, { message: 'Unauthorized' });
 
 		const form = await superValidate(request, zod(updatePenaltySchema));
 
@@ -103,40 +136,31 @@ export const actions: Actions = {
 		try {
 			const { id, penalty_amount, notes } = form.data;
 
-			// Fetch the current billing record
-			const { data: currentBilling, error: fetchError } = await supabase
-				.from('billings')
-				.select('*')
-				.eq('id', id)
-				.single();
+			const currentBillingResult = await db
+				.select()
+				.from(billings)
+				.where(eq(billings.id, id))
+				.limit(1);
 
-			if (fetchError) {
-				console.error('Error fetching billing:', fetchError);
+			const currentBilling = currentBillingResult[0];
+
+			if (!currentBilling) {
 				return fail(500, {
 					form,
 					message: 'Failed to fetch billing record'
 				});
 			}
 
-			// Update the billing record with the new penalty amount
-			const { error: updateError } = await supabase
-				.from('billings')
-				.update({
-					penalty_amount,
+			await db
+				.update(billings)
+				.set({
+					penaltyAmount: penalty_amount,
 					status: 'PENALIZED',
 					notes: notes || currentBilling.notes,
-					balance: currentBilling.balance - currentBilling.penalty_amount + penalty_amount,
-					updated_at: new Date().toISOString()
+					balance: currentBilling.balance - (currentBilling.penaltyAmount || 0) + penalty_amount,
+					updatedAt: new Date()
 				})
-				.eq('id', id);
-
-			if (updateError) {
-				console.error('Error updating penalty:', updateError);
-				return fail(500, {
-					form,
-					message: 'Failed to update penalty amount'
-				});
-			}
+				.where(eq(billings.id, id));
 
 			return { form };
 		} catch (err) {

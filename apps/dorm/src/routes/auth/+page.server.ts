@@ -3,13 +3,11 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { loginSchema, registerSchema } from './schema';
 import type { PageServerLoad, Actions } from './$types';
-import { AuthApiError } from '@supabase/supabase-js';
+import { auth } from '$lib/server/auth';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) => {
-	const { session } = await safeGetSession();
-
+export const load: PageServerLoad = async ({ locals, url }) => {
 	// If already logged in, redirect
-	if (session) {
+	if (locals.session) {
 		const returnTo = url.searchParams.get('returnTo') || '/';
 		throw redirect(303, returnTo);
 	}
@@ -22,7 +20,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) 
 };
 
 export const actions: Actions = {
-	login: async ({ request, locals: { supabase }, cookies }) => {
+	login: async ({ request }) => {
 		const form = await superValidate(request, zod(loginSchema));
 
 		if (!form.valid) {
@@ -31,46 +29,29 @@ export const actions: Actions = {
 
 		const { email, password } = form.data;
 
-		const { data, error } = await supabase.auth.signInWithPassword({
-			email,
-			password
-		});
+		try {
+			const result = await auth.api.signInEmailAndPassword({
+				body: { email, password }
+			});
 
-		if (error) {
-			if (error instanceof AuthApiError && error.status === 400) {
+			if (!result) {
 				return fail(400, {
 					form,
 					message: 'Invalid email or password'
 				});
 			}
-			return fail(500, {
+		} catch (e: any) {
+			const message = e?.message || 'Invalid email or password';
+			return fail(400, {
 				form,
-				message: 'Server error. Please try again later.'
+				message
 			});
-		}
-
-		// Standard Supabase Auth Cookie setting for SSR
-		/* Note: Supabase helpers usually handle this automatically, 
-		   but explicit setting ensures reliability in some environments */
-		if (data.session) {
-			const { access_token, refresh_token } = data.session;
-			// Cookies options should match your supabase client config
-			const cookieOptions = {
-				path: '/',
-				secure: true,
-				httpOnly: true,
-				sameSite: 'lax' as const,
-				maxAge: 60 * 60 * 24 * 7 // 1 week
-			};
-
-			cookies.set('sb-access-token', access_token, cookieOptions);
-			cookies.set('sb-refresh-token', refresh_token, cookieOptions);
 		}
 
 		throw redirect(303, '/');
 	},
 
-	register: async ({ request, url, locals: { supabase } }) => {
+	register: async ({ request }) => {
 		const form = await superValidate(request, zod(registerSchema));
 
 		if (!form.valid) {
@@ -79,25 +60,25 @@ export const actions: Actions = {
 
 		const { email, password } = form.data;
 
-		const { error } = await supabase.auth.signUp({
-			email,
-			password,
-			options: {
-				emailRedirectTo: `${url.origin}/auth/callback`
-			}
-		});
-
-		if (error) {
+		try {
+			await auth.api.signUpEmail({
+				body: {
+					email,
+					password,
+					name: email.split('@')[0] // Default name from email prefix
+				}
+			});
+		} catch (e: any) {
 			return fail(500, {
 				form,
-				message: error.message
+				message: e?.message || 'Registration failed. Please try again.'
 			});
 		}
 
 		return {
 			form,
 			success: true,
-			message: 'Registration successful! Please check your email to confirm your account.'
+			message: 'Registration successful! You can now log in.'
 		};
 	}
 };

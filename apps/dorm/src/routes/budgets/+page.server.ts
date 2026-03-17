@@ -3,62 +3,64 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { budgetSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { budgets, properties } from '$lib/server/schema';
+import { eq, desc, asc } from 'drizzle-orm';
 
 // Use Node runtime; avoid ISR on authed routes to prevent cache/redirect issues
 export const config = { runtime: 'nodejs20.x' };
 
-export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
-	const session = await safeGetSession();
-	if (!session) {
+export const load: PageServerLoad = async ({ locals }) => {
+	const { user, session } = locals;
+	if (!user) {
 		throw error(401, 'Unauthorized');
 	}
 
 	try {
 		// Fetch budgets and properties in parallel
-		const [
-			{ data: budgetsData, error: budgetsError },
-			{ data: propertiesData, error: propertiesError }
-		] = await Promise.all([
-			supabase
-				.from('budgets')
-				.select(
-					`
-          *,
-          property:properties(id, name)
-        `
-				)
-				.order('created_at', { ascending: false }),
+		const [budgetsRaw, propertiesData] = await Promise.all([
+			db
+				.select({
+					id: budgets.id,
+					propertyId: budgets.propertyId,
+					projectName: budgets.projectName,
+					projectDescription: budgets.projectDescription,
+					projectCategory: budgets.projectCategory,
+					plannedAmount: budgets.plannedAmount,
+					pendingAmount: budgets.pendingAmount,
+					actualAmount: budgets.actualAmount,
+					budgetItems: budgets.budgetItems,
+					status: budgets.status,
+					startDate: budgets.startDate,
+					endDate: budgets.endDate,
+					createdBy: budgets.createdBy,
+					createdAt: budgets.createdAt,
+					updatedAt: budgets.updatedAt,
+					propertyName: properties.name,
+					propertyDbId: properties.id
+				})
+				.from(budgets)
+				.leftJoin(properties, eq(budgets.propertyId, properties.id))
+				.orderBy(desc(budgets.createdAt)),
 
-			supabase.from('properties').select('id, name').order('name')
+			db
+				.select({ id: properties.id, name: properties.name })
+				.from(properties)
+				.orderBy(asc(properties.name))
 		]);
 
-		// Handle errors
-		if (budgetsError) {
-			console.error('Error fetching budgets:', budgetsError);
-			throw error(500, `Error fetching budgets: ${budgetsError.message}`);
-		}
+		let activeProperties = propertiesData || [];
 
-		if (propertiesError) {
-			console.error('Error fetching properties:', propertiesError);
-			throw error(500, `Error fetching properties: ${propertiesError.message}`);
-		}
-
-		// Create a mutable copy of properties data
-		let properties = propertiesData || [];
-
-		// Process budget data to include additional stats - with proper validation
-		const budgets =
-			budgetsData?.map((budget) => {
-				// Ensure budget_items is properly parsed from JSON if needed
+		// Process budget data to include additional stats
+		const processedBudgets =
+			budgetsRaw?.map((budget) => {
 				let budgetItems;
 				try {
-					// Check if budget_items is a string (JSON) and parse it
-					if (typeof budget.budget_items === 'string') {
-						budgetItems = JSON.parse(budget.budget_items);
+					if (typeof budget.budgetItems === 'string') {
+						budgetItems = JSON.parse(budget.budgetItems);
 					}
-					// Ensure it's an array
-					budgetItems = Array.isArray(budget.budget_items)
-						? budget.budget_items
+					budgetItems = Array.isArray(budget.budgetItems)
+						? budget.budgetItems
 						: Array.isArray(budgetItems)
 							? budgetItems
 							: [];
@@ -67,28 +69,25 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 					budgetItems = [];
 				}
 
-				// Calculate total allocated amount with proper validation for each item
 				const allocatedAmount = budgetItems.reduce((total: number, item: any) => {
-					// Validate cost and quantity before using them
 					const cost = typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0;
 					const quantity =
 						typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0;
-
 					return total + cost * quantity;
 				}, 0);
 
-				// Ensure planned_amount is a valid number
 				const plannedAmount =
-					typeof budget.planned_amount === 'number' && !isNaN(budget.planned_amount)
-						? budget.planned_amount
+					typeof budget.plannedAmount === 'number' && !isNaN(budget.plannedAmount)
+						? budget.plannedAmount
 						: 0;
 
 				return {
 					...budget,
+					property: budget.propertyDbId ? { id: budget.propertyDbId, name: budget.propertyName } : null,
+					planned_amount: plannedAmount,
 					allocatedAmount,
 					remainingAmount: plannedAmount - allocatedAmount,
 					isExpanded: false,
-					// Normalize budget_items to ensure they all have valid properties
 					budget_items: budgetItems.map((item: any) => ({
 						id: item.id || null,
 						name: item.name || '',
@@ -96,15 +95,15 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 						cost: typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0,
 						quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
 					})),
-					start_date: budget.start_date
-						? new Date(budget.start_date).toLocaleDateString('en-US', {
+					start_date: budget.startDate
+						? new Date(budget.startDate).toLocaleDateString('en-US', {
 								year: 'numeric',
 								month: '2-digit',
 								day: '2-digit'
 							})
 						: null,
-					end_date: budget.end_date
-						? new Date(budget.end_date).toLocaleDateString('en-US', {
+					end_date: budget.endDate
+						? new Date(budget.endDate).toLocaleDateString('en-US', {
 								year: 'numeric',
 								month: '2-digit',
 								day: '2-digit'
@@ -113,52 +112,32 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 				};
 			}) || [];
 
-		// If no properties found, try without any filter
-		if (properties.length === 0) {
+		// If no properties found, try without filter
+		if (activeProperties.length === 0) {
 			console.log('No properties found, trying without any filter');
-
-			const { data: allProperties, error: allPropertiesError } = await supabase
-				.from('properties')
-				.select('id, name')
-				.order('name');
-
-			if (allPropertiesError) {
-				console.error('Error fetching all properties:', allPropertiesError);
-			} else {
-				console.log(
-					`Found ${allProperties?.length || 0} properties without filter:`,
-					allProperties
-				);
-				properties = allProperties;
-			}
+			activeProperties = await db
+				.select({ id: properties.id, name: properties.name })
+				.from(properties)
+				.orderBy(asc(properties.name));
 		}
 
-		// Calculate overall budget statistics with validation
-		const statistics = budgets.reduce(
+		// Calculate statistics
+		const statistics = processedBudgets.reduce(
 			(stats: any, budget) => {
-				// Ensure we're using valid numbers for calculations
 				const plannedAmount =
 					typeof budget.planned_amount === 'number' && !isNaN(budget.planned_amount)
 						? budget.planned_amount
 						: 0;
-
 				const allocatedBudget =
 					typeof budget.allocatedAmount === 'number' && !isNaN(budget.allocatedAmount)
 						? budget.allocatedAmount
 						: 0;
 
-				// Add planned amount to total
 				stats.totalPlannedBudget += plannedAmount;
-
-				// Add allocated amount
 				stats.totalAllocatedBudget += allocatedBudget;
 
-				// Count by status
-				if (budget.status === 'COMPLETED') {
-					stats.completedProjects += 1;
-				} else if (budget.status === 'ONGOING') {
-					stats.ongoingProjects += 1;
-				}
+				if (budget.status === 'COMPLETED') stats.completedProjects += 1;
+				else if (budget.status === 'ONGOING') stats.ongoingProjects += 1;
 
 				return stats;
 			},
@@ -171,19 +150,17 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 			}
 		);
 
-		// Calculate remaining budget
 		statistics.totalRemainingBudget =
 			statistics.totalPlannedBudget - statistics.totalAllocatedBudget;
 
-		// Create form for superForm
 		const form = await superValidate(zod(budgetSchema));
 
 		return {
 			form,
-			budgets,
-			properties,
+			budgets: processedBudgets,
+			properties: activeProperties,
 			statistics,
-			user: session.user
+			user
 		};
 	} catch (err) {
 		console.error('Error in load function:', err);
@@ -192,9 +169,9 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 };
 
 export const actions: Actions = {
-	upsert: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const session = await safeGetSession();
-		if (!session) {
+	upsert: async ({ request, locals }) => {
+		const { user, session } = locals;
+		if (!user) {
 			throw error(401, 'Unauthorized');
 		}
 
@@ -208,7 +185,6 @@ export const actions: Actions = {
 		try {
 			const { id, ...budgetData } = form.data;
 
-			// Validate budget items before saving to prevent NaN values
 			const validatedBudgetItems = Array.isArray(budgetData.budget_items)
 				? budgetData.budget_items.map((item) => ({
 						...item,
@@ -217,20 +193,16 @@ export const actions: Actions = {
 					}))
 				: [];
 
-			// Ensure budget_items is properly formatted as JSONB
 			const formattedData = {
 				...budgetData,
-				// Ensure planned_amount is a valid number
 				planned_amount:
 					typeof budgetData.planned_amount === 'number' && !isNaN(budgetData.planned_amount)
 						? budgetData.planned_amount
 						: 0,
-				// Ensure pending_amount is a valid number
 				pending_amount:
 					typeof budgetData.pending_amount === 'number' && !isNaN(budgetData.pending_amount)
 						? budgetData.pending_amount
 						: 0,
-				// Ensure actual_amount is a valid number
 				actual_amount:
 					typeof budgetData.actual_amount === 'number' && !isNaN(budgetData.actual_amount)
 						? budgetData.actual_amount
@@ -238,62 +210,49 @@ export const actions: Actions = {
 				budget_items: JSON.stringify(validatedBudgetItems)
 			};
 
-			// Determine if we're creating or updating
 			if (id) {
-				// This is an update
-				const { data, error: updateError } = await supabase
-					.from('budgets')
-					.update({
-						property_id: formattedData.property_id,
-						project_name: formattedData.project_name,
-						project_description: formattedData.project_description,
-						project_category: formattedData.project_category,
-						planned_amount: formattedData.planned_amount,
-						pending_amount: formattedData.pending_amount,
-						actual_amount: formattedData.actual_amount,
-						budget_items: formattedData.budget_items,
+				const result = await db
+					.update(budgets)
+					.set({
+						propertyId: formattedData.property_id,
+						projectName: formattedData.project_name,
+						projectDescription: formattedData.project_description,
+						projectCategory: formattedData.project_category,
+						plannedAmount: formattedData.planned_amount,
+						pendingAmount: formattedData.pending_amount,
+						actualAmount: formattedData.actual_amount,
+						budgetItems: formattedData.budget_items,
 						status: formattedData.status,
-						start_date: formattedData.start_date,
-						end_date: formattedData.end_date,
-						updated_at: new Date().toISOString()
+						startDate: formattedData.start_date,
+						endDate: formattedData.end_date,
+						updatedAt: new Date()
 					})
-					.eq('id', id)
-					.select();
+					.where(eq(budgets.id, id))
+					.returning();
 
-				if (updateError) {
-					console.error('Error updating budget:', updateError);
-					return fail(500, { form, message: 'Failed to update budget' });
-				}
-
-				return { form, success: true, operation: 'update', budget: data?.[0] };
+				return { form, success: true, operation: 'update', budget: result?.[0] };
 			} else {
-				// This is a creation
-				const { data, error: insertError } = await supabase
-					.from('budgets')
-					.insert({
-						property_id: formattedData.property_id,
-						project_name: formattedData.project_name,
-						project_description: formattedData.project_description,
-						project_category: formattedData.project_category,
-						planned_amount: formattedData.planned_amount,
-						pending_amount: formattedData.pending_amount || 0,
-						actual_amount: formattedData.actual_amount || 0,
-						budget_items: formattedData.budget_items,
+				const result = await db
+					.insert(budgets)
+					.values({
+						propertyId: formattedData.property_id,
+						projectName: formattedData.project_name,
+						projectDescription: formattedData.project_description,
+						projectCategory: formattedData.project_category,
+						plannedAmount: formattedData.planned_amount,
+						pendingAmount: formattedData.pending_amount || 0,
+						actualAmount: formattedData.actual_amount || 0,
+						budgetItems: formattedData.budget_items,
 						status: formattedData.status,
-						start_date: formattedData.start_date,
-						end_date: formattedData.end_date,
-						created_by: session.user.id,
-						created_at: new Date().toISOString(),
-						updated_at: new Date().toISOString()
+						startDate: formattedData.start_date,
+						endDate: formattedData.end_date,
+						createdBy: user.id,
+						createdAt: new Date(),
+						updatedAt: new Date()
 					})
-					.select();
+					.returning();
 
-				if (insertError) {
-					console.error('Error creating budget:', insertError);
-					return fail(500, { form, message: 'Failed to create budget' });
-				}
-
-				return { form, success: true, operation: 'create', budget: data?.[0] };
+				return { form, success: true, operation: 'create', budget: result?.[0] };
 			}
 		} catch (err) {
 			console.error('Error in upsert operation:', err);
@@ -301,18 +260,15 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const session = await safeGetSession();
-		if (!session) {
+	delete: async ({ request, locals }) => {
+		const { user, session } = locals;
+		if (!user) {
 			throw error(401, 'Unauthorized');
 		}
 
-		let id;
-
 		try {
-			// Parse the request body as form data
 			const formData = await request.formData();
-			id = formData.get('id');
+			const id = formData.get('id');
 
 			console.log('Received delete request with ID:', id);
 
@@ -322,18 +278,12 @@ export const actions: Actions = {
 			}
 
 			console.log('Attempting to delete budget with ID:', id);
-			const { data, error: deleteError } = await supabase
-				.from('budgets')
-				.delete()
-				.eq('id', id)
-				.select();
+			const result = await db
+				.delete(budgets)
+				.where(eq(budgets.id, Number(id)))
+				.returning();
 
-			console.log('Delete result:', { data, error: deleteError });
-
-			if (deleteError) {
-				console.error('Error deleting budget:', deleteError);
-				return fail(500, { message: 'Failed to delete budget' });
-			}
+			console.log('Delete result:', { data: result });
 
 			return { success: true };
 		} catch (err) {

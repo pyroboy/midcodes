@@ -4,80 +4,97 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { rental_unitSchema } from './formSchema';
-import type { Database } from '$lib/database.types';
 import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
-
-type DBRentalUnit = Database['public']['Tables']['rental_unit']['Row'];
-type DBProperty = Database['public']['Tables']['properties']['Row'];
-type DBFloor = Database['public']['Tables']['floors']['Row'];
-
-export type RentalUnitResponse = DBRentalUnit & {
-	property: Pick<DBProperty, 'id' | 'name'> | null;
-	floor: Pick<DBFloor, 'id' | 'property_id' | 'floor_number' | 'wing'> | null;
-};
+import { db } from '$lib/server/db';
+import { rentalUnit, properties, floors } from '$lib/server/schema';
+import { eq, and, asc } from 'drizzle-orm';
 
 // Separate async function for loading rental units data with caching
 async function loadRentalUnitsData(locals: any) {
-	const { user, permissions } = await locals.safeGetSession();
+	const { permissions } = locals;
 	const hasAccess = permissions.includes('properties.create');
 
 	if (!hasAccess) {
 		return { rentalUnits: [], properties: [], floors: [] };
 	}
 
-	// Check cache first
 	const cacheKey = cacheKeys.rentalUnits();
 	const cached = cache.get<any>(cacheKey);
 	if (cached) {
-		console.log('🎯 CACHE HIT: Returning cached rental units data');
+		console.log('CACHE HIT: Returning cached rental units data');
 		return cached;
 	}
 
-	console.log('💾 CACHE MISS: Fetching rental units from database');
+	console.log('CACHE MISS: Fetching rental units from database');
 
 	try {
-		const [rentalUnitsResult, propertiesResult, floorsResult] = await Promise.all([
-			locals.supabase
-				.from('rental_unit')
-				.select(
-					`
-          *,
-          property:properties!rental_unit_property_id_fkey(id, name),
-          floor:floors!rental_unit_floor_id_fkey(id, property_id, floor_number, wing)
-        `
-				)
-				.order('property_id, floor_id, number'),
+		const [rentalUnitsData, propertiesData, floorsData] = await Promise.all([
+			db
+				.select({
+					id: rentalUnit.id,
+					name: rentalUnit.name,
+					number: rentalUnit.number,
+					type: rentalUnit.type,
+					baseRate: rentalUnit.baseRate,
+					capacity: rentalUnit.capacity,
+					rentalUnitStatus: rentalUnit.rentalUnitStatus,
+					propertyId: rentalUnit.propertyId,
+					floorId: rentalUnit.floorId,
+					createdAt: rentalUnit.createdAt,
+					updatedAt: rentalUnit.updatedAt,
+					propertyName: properties.name,
+					propertyDbId: properties.id,
+					floorDbId: floors.id,
+					floorPropertyId: floors.propertyId,
+					floorNumber: floors.floorNumber,
+					floorWing: floors.wing
+				})
+				.from(rentalUnit)
+				.leftJoin(properties, eq(rentalUnit.propertyId, properties.id))
+				.leftJoin(floors, eq(rentalUnit.floorId, floors.id))
+				.orderBy(asc(rentalUnit.propertyId), asc(rentalUnit.floorId), asc(rentalUnit.number)),
 
-			locals.supabase.from('properties').select('id, name').eq('status', 'ACTIVE').order('name'),
+			db
+				.select({ id: properties.id, name: properties.name })
+				.from(properties)
+				.where(eq(properties.status, 'ACTIVE'))
+				.orderBy(asc(properties.name)),
 
-			locals.supabase
-				.from('floors')
-				.select('id, property_id, floor_number, wing, status')
-				.eq('status', 'ACTIVE')
-				.order('property_id, floor_number')
+			db
+				.select({
+					id: floors.id,
+					propertyId: floors.propertyId,
+					floorNumber: floors.floorNumber,
+					wing: floors.wing,
+					status: floors.status
+				})
+				.from(floors)
+				.where(eq(floors.status, 'ACTIVE'))
+				.orderBy(asc(floors.propertyId), asc(floors.floorNumber))
 		]);
 
-		if (rentalUnitsResult.error) {
-			console.error('Rental Units Query Error:', rentalUnitsResult.error);
-			throw error(500, 'Failed to load rental units');
-		}
-
-		// Map the relationships manually
-		const rentalUnits = (rentalUnitsResult.data || []).map((unit) => ({
+		// Map rental units to match original structure
+		const mappedUnits = rentalUnitsData.map((unit) => ({
 			...unit,
-			property: unit.property || null,
-			floor: unit.floor || null
+			property: unit.propertyDbId ? { id: unit.propertyDbId, name: unit.propertyName } : null,
+			floor: unit.floorDbId
+				? {
+						id: unit.floorDbId,
+						property_id: unit.floorPropertyId,
+						floor_number: unit.floorNumber,
+						wing: unit.floorWing
+					}
+				: null
 		}));
 
 		const result = {
-			rentalUnits,
-			properties: propertiesResult.data || [],
-			floors: floorsResult.data || []
+			rentalUnits: mappedUnits,
+			properties: propertiesData || [],
+			floors: floorsData || []
 		};
 
-		// Cache the result
 		cache.set(cacheKey, result, CACHE_TTL.MEDIUM);
-		console.log('✅ Cached rental units data');
+		console.log('Cached rental units data');
 
 		return result;
 	} catch (err) {
@@ -91,10 +108,9 @@ async function loadRentalUnitsData(locals: any) {
 }
 
 export const load: PageServerLoad = async ({ locals, depends }) => {
-	// Set up cache invalidation dependency
 	depends('app:rental-units');
 
-	const { user, permissions } = await locals.safeGetSession();
+	const { permissions } = locals;
 	const hasAccess = permissions.includes('properties.create');
 
 	if (!hasAccess) {
@@ -103,7 +119,6 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 
 	const form = await superValidate(zod(rental_unitSchema));
 
-	// Return minimal data for instant navigation with lazy loading
 	return {
 		form,
 		rental_unit: [],
@@ -116,7 +131,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 };
 
 export const actions: Actions = {
-	create: async ({ request, locals: { supabase } }: RequestEvent) => {
+	create: async ({ request }: RequestEvent) => {
 		const form = await superValidate(request, zod(rental_unitSchema));
 
 		if (!form.valid) {
@@ -124,45 +139,47 @@ export const actions: Actions = {
 			return fail(400, { form });
 		}
 
-		// Check for duplicate rental unit number in the same property and floor
-		const { data: existingUnit } = await supabase
-			.from('rental_unit')
-			.select('id')
-			.eq('property_id', form.data.property_id)
-			.eq('floor_id', form.data.floor_id || null)
-			.eq('number', form.data.number)
-			.maybeSingle();
+		// Check for duplicate rental unit number
+		const existingUnit = await db
+			.select({ id: rentalUnit.id })
+			.from(rentalUnit)
+			.where(
+				and(
+					eq(rentalUnit.propertyId, form.data.property_id),
+					eq(rentalUnit.floorId, form.data.floor_id || null),
+					eq(rentalUnit.number, form.data.number)
+				)
+			)
+			.limit(1);
 
-		if (existingUnit) {
+		if (existingUnit.length > 0) {
 			form.errors.number = ['This unit number already exists on this floor'];
 			return fail(400, { form });
 		}
 
-		const { error: insertError } = await supabase.from('rental_unit').insert({
-			...form.data,
-			floor_id: form.data.floor_id || null
-		});
-
-		if (insertError) {
-			console.error('Error creating rental unit:', insertError);
+		try {
+			await db.insert(rentalUnit).values({
+				...form.data,
+				floorId: form.data.floor_id || null
+			});
+		} catch (err: any) {
+			console.error('Error creating rental unit:', err);
 			return fail(500, { form });
 		}
 
-		// Invalidate rental units cache
 		cache.delete(cacheKeys.rentalUnits());
-		console.log('🗑️ Invalidated rental units cache');
+		console.log('Invalidated rental units cache');
 
 		return { form };
 	},
 
-	update: async ({ request, locals: { supabase } }: RequestEvent) => {
+	update: async ({ request }: RequestEvent) => {
 		const formData = await request.formData();
 		const rawForm = await superValidate(formData, zod(rental_unitSchema));
 
 		// Remove embedded objects before validation
 		const { property, floor, ...updateData } = rawForm.data;
 
-		// Validate only the update data
 		const form = await superValidate(updateData, zod(rental_unitSchema));
 
 		if (!form.valid) {
@@ -170,31 +187,30 @@ export const actions: Actions = {
 			return fail(400, { form });
 		}
 
-		const { error: updateError } = await supabase
-			.from('rental_unit')
-			.update({
-				...updateData,
-				updated_at: new Date().toISOString()
-			} satisfies Database['public']['Tables']['rental_unit']['Update'])
-			.eq('id', form.data.id);
-
-		if (updateError) {
-			console.error('Error updating rental unit:', updateError);
-			if (updateError.message?.includes('Policy check failed')) {
+		try {
+			await db
+				.update(rentalUnit)
+				.set({
+					...updateData,
+					updatedAt: new Date()
+				})
+				.where(eq(rentalUnit.id, form.data.id));
+		} catch (err: any) {
+			console.error('Error updating rental unit:', err);
+			if (err.message?.includes('Policy check failed')) {
 				form.errors._errors = ['You do not have permission to update rental units'];
 				return fail(403, { form });
 			}
 			return fail(500, { form, message: 'Failed to update rental unit' });
 		}
 
-		// Invalidate rental units cache
 		cache.delete(cacheKeys.rentalUnits());
-		console.log('🗑️ Invalidated rental units cache');
+		console.log('Invalidated rental units cache');
 
 		return { form };
 	},
 
-	delete: async ({ request, locals: { supabase } }: RequestEvent) => {
+	delete: async ({ request }: RequestEvent) => {
 		const formData = await request.formData();
 		const id = formData.get('id');
 
@@ -207,17 +223,14 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invalid rental unit ID format' });
 		}
 
-		const { error: deleteError } = await supabase
-			.from('rental_unit')
-			.delete()
-			.eq('id', rentalUnitId);
-
-		if (deleteError) {
-			console.error('Error deleting rental unit:', deleteError);
-			if (deleteError.message?.includes('Policy check failed')) {
+		try {
+			await db.delete(rentalUnit).where(eq(rentalUnit.id, rentalUnitId));
+		} catch (err: any) {
+			console.error('Error deleting rental unit:', err);
+			if (err.message?.includes('Policy check failed')) {
 				return fail(403, { message: 'You do not have permission to delete rental units' });
 			}
-			if (deleteError.code === '23503') {
+			if (err.code === '23503') {
 				return fail(400, {
 					message: 'Cannot delete rental unit because it is referenced by other records'
 				});
@@ -225,9 +238,8 @@ export const actions: Actions = {
 			return fail(500, { message: 'Failed to delete rental unit' });
 		}
 
-		// Invalidate rental units cache
 		cache.delete(cacheKeys.rentalUnits());
-		console.log('🗑️ Invalidated rental units cache');
+		console.log('Invalidated rental units cache');
 
 		return { success: true };
 	}

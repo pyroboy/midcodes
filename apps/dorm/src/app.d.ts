@@ -1,23 +1,20 @@
 // src/app.d.ts
-import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
-import type { UserJWTPayload } from '$lib/types/auth';
-import type { AppPermission } from '$lib/types/permissions';
+import type { auth } from '$lib/server/auth';
 
 declare global {
 	namespace App {
 		interface Locals {
-			supabase: SupabaseClient;
-			safeGetSession: () => Promise<GetSessionResult>;
-			session?: Session | null;
-			user?: User | null;
-			special_url?: string;
-			decodedToken?: UserJWTPayload;
+			session: (typeof auth.$Infer.Session.session) | null;
+			user: (typeof auth.$Infer.Session.user) | null;
+			org_id?: string;
 			permissions?: string[];
+			effectiveRoles?: string[];
+			csrfToken?: string;
 		}
 
 		interface PageData {
-			session?: Session | null;
-			user?: User | null;
+			session?: (typeof auth.$Infer.Session.session) | null;
+			user?: (typeof auth.$Infer.Session.user) | null;
 			navigation?: NavigationState;
 			special_url?: string | undefined;
 			permissions?: string[];
@@ -37,11 +34,9 @@ declare global {
 	namespace NodeJS {
 		interface ProcessEnv {
 			NODE_ENV: 'development' | 'production' | 'test';
-			PUBLIC_SUPABASE_URL: string;
-			PUBLIC_SUPABASE_ANON_KEY: string;
-			PUBLIC_RECAPTCHA_SITE_KEY: string;
-			PRIVATE_SERVICE_ROLE: string;
-			RECAPTCHA_SECRET_KEY: string;
+			NEON_DATABASE_URL: string;
+			BETTER_AUTH_SECRET: string;
+			BETTER_AUTH_URL?: string;
 		}
 	}
 }

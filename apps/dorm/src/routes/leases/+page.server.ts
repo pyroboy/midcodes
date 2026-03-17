@@ -1,148 +1,198 @@
-import { fail, error, json } from '@sveltejs/kit';
+import { fail, error } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { leaseSchema, deleteLeaseSchema, leaseSchemaWithValidation } from './formSchema';
 import { securityDepositSchema } from './securityDepositSchema';
 import type { Actions, PageServerLoad } from './$types';
-import type { PostgrestError } from '@supabase/postgrest-js';
 import { createPaymentSchedules } from './utils';
 import { mapLeaseData, getLeaseData } from '$lib/utils/lease';
 import type { LeaseResponse, Billing } from '$lib/types/lease';
 import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
-
-interface PaymentAllocation {
-	billingId: number;
-	amount: number;
-}
-
-interface PaymentDetails {
-	amount: number;
-	method: 'CASH' | 'GCASH' | 'BANK_TRANSFER' | 'SECURITY_DEPOSIT';
-	reference_number: string | null;
-	paid_by: string;
-	paid_at: string;
-	notes: string | null;
-	billing_ids: number[];
-}
+import { db } from '$lib/server/db';
+import {
+	leases, rentalUnit, floors, properties, leaseTenants, tenants,
+	billings, paymentAllocations, payments
+} from '$lib/server/schema';
+import { eq, and, desc, asc, isNull, inArray, gte, lte, sql, isNotNull } from 'drizzle-orm';
 
 // Fast core lease data - essential info for initial render with caching
-async function loadCoreLeasesData(locals: any) {
-	const { supabase } = locals;
-
-	// Check cache first
+async function loadCoreLeasesData() {
 	const cacheKey = cacheKeys.leasesCore();
 	const cached = cache.get<any[]>(cacheKey);
 	if (cached) {
-		console.log('🎯 CACHE HIT: Returning cached core leases data');
+		console.log('CACHE HIT: Returning cached core leases data');
 		return cached;
 	}
 
-	console.log('💾 CACHE MISS: Fetching core leases from database');
-	const { data: leasesData, error: fetchError } = await supabase
-		.from('leases')
-		.select(
-			`
-			*,
-			rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
-			lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number, profile_picture_url, deleted_at)),
-			billings!billings_lease_id_fkey (
-				id,
-				type,
-				amount,
-				paid_amount,
-				balance,
-				status,
-				due_date,
-				billing_date,
-				penalty_amount,
-				notes
-			)
-		`
-		)
-		.is('deleted_at', null)
-		.order('created_at', { ascending: false });
+	console.log('CACHE MISS: Fetching core leases from database');
 
-	if (fetchError) {
-		console.error('Error fetching core leases:', fetchError);
-		throw new Error('Failed to load core leases');
+	// Fetch leases with relationships
+	const leasesData = await db
+		.select()
+		.from(leases)
+		.where(isNull(leases.deletedAt))
+		.orderBy(desc(leases.createdAt));
+
+	// Fetch rental units, floors, properties
+	const rentalUnitsData = await db
+		.select()
+		.from(rentalUnit);
+	const floorsData = await db.select().from(floors);
+	const propertiesData = await db.select().from(properties);
+
+	// Fetch lease tenants with tenant info (excluding soft-deleted)
+	const leaseTenantsData = await db
+		.select({
+			leaseId: leaseTenants.leaseId,
+			tenantName: tenants.name,
+			tenantEmail: tenants.email,
+			tenantContactNumber: tenants.contactNumber,
+			tenantProfilePictureUrl: tenants.profilePictureUrl,
+			tenantDeletedAt: tenants.deletedAt
+		})
+		.from(leaseTenants)
+		.innerJoin(tenants, eq(leaseTenants.tenantId, tenants.id));
+
+	// Fetch billings for all leases
+	const billingsData = await db
+		.select({
+			id: billings.id,
+			leaseId: billings.leaseId,
+			type: billings.type,
+			amount: billings.amount,
+			paidAmount: billings.paidAmount,
+			balance: billings.balance,
+			status: billings.status,
+			dueDate: billings.dueDate,
+			billingDate: billings.billingDate,
+			penaltyAmount: billings.penaltyAmount,
+			notes: billings.notes
+		})
+		.from(billings);
+
+	// Build lookup maps
+	const unitsMap = new Map(rentalUnitsData.map((u: any) => [u.id, u]));
+	const floorsMap = new Map(floorsData.map((f: any) => [f.id, f]));
+	const propertiesMap = new Map(propertiesData.map((p: any) => [p.id, p]));
+
+	// Build lease-tenants map (filter soft-deleted)
+	const leaseTenantsMap = new Map<number, any[]>();
+	for (const lt of leaseTenantsData) {
+		if (lt.tenantDeletedAt) continue; // Skip soft-deleted tenants
+		if (!leaseTenantsMap.has(lt.leaseId)) leaseTenantsMap.set(lt.leaseId, []);
+		leaseTenantsMap.get(lt.leaseId)!.push({
+			tenant: {
+				name: lt.tenantName,
+				email: lt.tenantEmail,
+				contact_number: lt.tenantContactNumber,
+				profile_picture_url: lt.tenantProfilePictureUrl
+			}
+		});
 	}
 
-	const floors = await supabase.from('floors').select('*');
-	const floorsMap = new Map<number, any>((floors.data || []).map((f: any) => [f.id, f]));
-
-	// Filter out soft-deleted tenants from embedded lease_tenants before mapping
-	for (const lease of leasesData) {
-		if (Array.isArray(lease.lease_tenants)) {
-			lease.lease_tenants = lease.lease_tenants.filter((lt: any) => !lt?.tenant?.deleted_at);
-		}
+	// Build billings map by lease
+	const billingsMap = new Map<number, any[]>();
+	for (const b of billingsData) {
+		if (!billingsMap.has(b.leaseId)) billingsMap.set(b.leaseId, []);
+		billingsMap.get(b.leaseId)!.push({
+			id: b.id,
+			type: b.type,
+			amount: b.amount,
+			paid_amount: b.paidAmount,
+			balance: b.balance,
+			status: b.status,
+			due_date: b.dueDate,
+			billing_date: b.billingDate,
+			penalty_amount: b.penaltyAmount,
+			notes: b.notes
+		});
 	}
 
-	const mappedData = leasesData.map((lease: any) => mapLeaseData(lease, floorsMap));
+	// Build nested lease structures
+	const mappedData = leasesData.map((lease: any) => {
+		const unit = unitsMap.get(lease.rentalUnitId);
+		const floor = unit ? floorsMap.get(unit.floorId) : null;
+		const property = unit ? propertiesMap.get(unit.propertyId) : null;
 
-	// Cache for 3 minutes
+		const leaseObj = {
+			...lease,
+			rental_unit: unit
+				? {
+						...unit,
+						floor: floor || null,
+						property: property || null
+					}
+				: null,
+			lease_tenants: leaseTenantsMap.get(lease.id) || [],
+			billings: billingsMap.get(lease.id) || []
+		};
+
+		return mapLeaseData(leaseObj, floorsMap);
+	});
+
 	cache.set(cacheKey, mappedData, CACHE_TTL.SHORT);
-	console.log('✅ Cached core leases data');
+	console.log('Cached core leases data');
 
 	return mappedData;
 }
 
 // Heavy financial data - payment allocations and penalties
-async function loadLeasesFinancialData(locals: any, leasesData: any[]) {
-	const { supabase } = locals;
-
-	// Extract all billing IDs from the leases
+async function loadLeasesFinancialData(leasesData: any[]) {
 	const allBillingIds = leasesData
 		.flatMap((lease: any) => lease.billings.map((b: Billing) => b.id))
 		.filter(Boolean);
 
 	if (allBillingIds.length === 0) {
-		return leasesData; // No billings to process
+		return leasesData;
 	}
 
-	// OPTIMIZATION: Batch fetch allocations and penalties in parallel
-	const [allocationsResponse, penaltiesResponse] = await Promise.all([
-		supabase
-			.from('payment_allocations')
-			.select('*, payment:payments(*)')
-			.in('billing_id', allBillingIds),
-		// Use batch penalty calculation instead of individual calls
-		supabase.rpc('calculate_penalties_batch', { p_billing_ids: allBillingIds })
+	// Batch fetch allocations and penalties in parallel
+	const [allocationsData, penaltyData] = await Promise.all([
+		db
+			.select({
+				id: paymentAllocations.id,
+				billingId: paymentAllocations.billingId,
+				paymentId: paymentAllocations.paymentId,
+				amount: paymentAllocations.amount
+			})
+			.from(paymentAllocations)
+			.where(inArray(paymentAllocations.billingId, allBillingIds)),
+
+		// For batch penalty calculation, use raw SQL to call the RPC
+		db.execute(sql`SELECT * FROM calculate_penalties_batch(${allBillingIds})`)
 	]);
 
-	const { data: allocationsData, error: allocationsError } = allocationsResponse;
-	if (allocationsError) {
-		console.error('Error fetching payment allocations:', allocationsError);
+	// Fetch payments for allocations to filter reverted ones
+	const paymentIds = [...new Set(allocationsData.map((a) => a.paymentId).filter(Boolean))];
+	let paymentsMap = new Map<number, any>();
+	if (paymentIds.length > 0) {
+		const paymentsData = await db
+			.select({ id: payments.id, revertedAt: payments.revertedAt })
+			.from(payments)
+			.where(inArray(payments.id, paymentIds));
+		paymentsMap = new Map(paymentsData.map((p) => [p.id, p]));
 	}
 
 	const allocationsMap = new Map<number, any[]>();
-	if (allocationsData) {
-		for (const allocation of allocationsData) {
-			// Skip allocations from reverted payments
-			if (allocation.payment && allocation.payment.reverted_at) {
-				continue;
-			}
-			if (!allocationsMap.has(allocation.billing_id)) {
-				allocationsMap.set(allocation.billing_id, []);
-			}
-			allocationsMap.get(allocation.billing_id)?.push(allocation);
+	for (const allocation of allocationsData) {
+		const payment = paymentsMap.get(allocation.paymentId);
+		if (payment?.revertedAt) continue;
+		if (!allocationsMap.has(allocation.billingId)) {
+			allocationsMap.set(allocation.billingId, []);
 		}
+		allocationsMap.get(allocation.billingId)?.push(allocation);
 	}
 
 	// Process batch penalty results
 	const penaltiesMap = new Map<number, number>();
-	const { data: penaltyData, error: penaltyError } = penaltiesResponse;
-	if (penaltyError) {
-		console.error('Error calculating penalties:', penaltyError);
-		// Fallback to zero penalties if batch calculation fails
-	} else if (penaltyData) {
-		for (const result of penaltyData) {
+	if (penaltyData?.rows) {
+		for (const result of penaltyData.rows as any[]) {
 			if (result.penalty_amount > 0) {
 				penaltiesMap.set(result.billing_id, result.penalty_amount);
 			}
 		}
 	}
 
-	// Create enhanced leases with financial data
 	return leasesData.map((lease: any) => {
 		const enhancedLease = { ...lease };
 		enhancedLease.billings = lease.billings.map((billing: any) => {
@@ -151,84 +201,85 @@ async function loadLeasesFinancialData(locals: any, leasesData: any[]) {
 				...billing,
 				allocations: allocationsMap.get(billing.id) || [],
 				penalty: penalty,
-				status: penalty > 0 && billing.status === 'PENDING'
-					? 'PENALIZED'
-					: billing.status
+				status:
+					penalty > 0 && billing.status === 'PENDING' ? 'PENALIZED' : billing.status
 			};
 		});
 		return enhancedLease;
 	});
 }
 
-// Legacy function for backward compatibility and actions
-async function loadLeasesData(locals: any) {
-	const coreLeasesData = await loadCoreLeasesData(locals);
-	return await loadLeasesFinancialData(locals, coreLeasesData);
-}
-
-async function loadTenantsData(locals: any) {
-	const { supabase } = locals;
-
-	// Check cache first
+async function loadTenantsData() {
 	const cacheKey = cacheKeys.tenants();
 	const cached = cache.get<any[]>(cacheKey);
 	if (cached) {
-		console.log('🎯 CACHE HIT: Returning cached tenants data (leases route)');
+		console.log('CACHE HIT: Returning cached tenants data (leases route)');
 		return cached;
 	}
 
-	console.log('💾 CACHE MISS: Fetching tenants from database (leases route)');
-	const { data, error } = await supabase
-		.from('tenants')
-    .select('id, name, email, contact_number, profile_picture_url')
-    .is('deleted_at', null)
-    .order('name');
+	console.log('CACHE MISS: Fetching tenants from database (leases route)');
+	const data = await db
+		.select({
+			id: tenants.id,
+			name: tenants.name,
+			email: tenants.email,
+			contactNumber: tenants.contactNumber,
+			profilePictureUrl: tenants.profilePictureUrl
+		})
+		.from(tenants)
+		.where(isNull(tenants.deletedAt))
+		.orderBy(asc(tenants.name));
 
-	if (error) {
-		console.error('Error fetching tenants:', error);
-		return [];
-	}
+	// Map to snake_case for compatibility
+	const mapped = data.map((t) => ({
+		id: t.id,
+		name: t.name,
+		email: t.email,
+		contact_number: t.contactNumber,
+		profile_picture_url: t.profilePictureUrl
+	}));
 
-	// Cache the data
-	cache.set(cacheKey, data || [], CACHE_TTL.MEDIUM);
-	console.log('✅ Cached tenants data (leases route)');
-
-	return data || [];
+	cache.set(cacheKey, mapped, CACHE_TTL.MEDIUM);
+	return mapped;
 }
 
-async function loadRentalUnitsData(locals: any) {
-	const { supabase } = locals;
-
-	// Check cache first
+async function loadRentalUnitsData() {
 	const cacheKey = cacheKeys.rentalUnits();
 	const cached = cache.get<any[]>(cacheKey);
 	if (cached) {
-		console.log('🎯 CACHE HIT: Returning cached rental units data (leases route)');
+		console.log('CACHE HIT: Returning cached rental units data (leases route)');
 		return cached;
 	}
 
-	console.log('💾 CACHE MISS: Fetching rental units from database (leases route)');
-	const { data, error } = await supabase
-		.from('rental_unit')
-		.select(`*, property:properties!rental_unit_property_id_fkey(id, name)`);
+	console.log('CACHE MISS: Fetching rental units from database (leases route)');
+	const data = await db
+		.select({
+			id: rentalUnit.id,
+			name: rentalUnit.name,
+			number: rentalUnit.number,
+			type: rentalUnit.type,
+			baseRate: rentalUnit.baseRate,
+			propertyId: rentalUnit.propertyId,
+			floorId: rentalUnit.floorId,
+			propertyName: properties.name,
+			propertyDbId: properties.id
+		})
+		.from(rentalUnit)
+		.leftJoin(properties, eq(rentalUnit.propertyId, properties.id));
 
-	if (error) {
-		console.error('Error fetching rental units:', error);
-		return [];
-	}
+	const mapped = data.map((u) => ({
+		...u,
+		property: u.propertyDbId ? { id: u.propertyDbId, name: u.propertyName } : null
+	}));
 
-	// Cache the data
-	cache.set(cacheKey, data || [], CACHE_TTL.MEDIUM);
-	console.log('✅ Cached rental units data (leases route)');
-
-	return data || [];
+	cache.set(cacheKey, mapped, CACHE_TTL.MEDIUM);
+	return mapped;
 }
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase }, depends }) => {
-	const { user } = await safeGetSession();
+export const load: PageServerLoad = async ({ locals, depends }) => {
+	const { user } = locals;
 	if (!user) throw error(401, 'Unauthorized');
 
-	// Set up dependencies for invalidation
 	depends('app:leases');
 	depends('app:tenants');
 	depends('app:rental-units');
@@ -237,29 +288,22 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 		const form = await superValidate(zod(leaseSchema));
 		const deleteForm = await superValidate(zod(deleteLeaseSchema));
 
-		// Progressive loading helper
 		async function loadFinancialDataAsync() {
-			const coreLeases = await loadCoreLeasesData({ supabase });
-			return await loadLeasesFinancialData({ supabase }, coreLeases);
+			const coreLeases = await loadCoreLeasesData();
+			return await loadLeasesFinancialData(coreLeases);
 		}
 
-		// Return minimal data for instant navigation
 		return {
 			form,
 			deleteForm,
-			// Start with empty arrays for instant rendering
 			leases: [],
 			tenants: [],
 			rental_units: [],
-			// Flag to indicate lazy loading
 			lazy: true,
-			// Progressive loading: fast core data first
-			coreLeasesPromise: loadCoreLeasesData({ supabase }),
-			tenantsPromise: loadTenantsData({ supabase }),
-			rentalUnitsPromise: loadRentalUnitsData({ supabase }),
-			// Heavy financial data loaded as a complete promise
+			coreLeasesPromise: loadCoreLeasesData(),
+			tenantsPromise: loadTenantsData(),
+			rentalUnitsPromise: loadRentalUnitsData(),
 			financialLeasesPromise: loadFinancialDataAsync(),
-			// Cache status for debugging
 			cacheStatus: {
 				leasesCached: !!cache.get(cacheKeys.leasesCore()),
 				tenantsCached: !!cache.get(cacheKeys.tenants()),
@@ -273,20 +317,19 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 };
 
 export const actions: Actions = {
-	create: async ({ request, locals: { supabase, safeGetSession } }) => {
-		console.log('🚀 Creating lease');
+	create: async ({ request, locals }) => {
+		console.log('Creating lease');
 		const form = await superValidate(request, zod(leaseSchemaWithValidation));
 
 		if (!form.valid) {
-			console.error('L-1003 - ❌ Form validation failed:', form.errors);
+			console.error('L-1003 - Form validation failed:', form.errors);
 			return fail(400, { form });
 		}
 
-		const { user } = await safeGetSession();
+		const { user } = locals;
 		if (!user) return fail(403, { form, message: ['Unauthorized'] });
 
 		try {
-			// Calculate end_date if not provided
 			let endDate = form.data.end_date;
 			if (!endDate && form.data.start_date && form.data.terms_month > 0) {
 				const start = new Date(form.data.start_date);
@@ -295,98 +338,62 @@ export const actions: Actions = {
 				endDate = end.toISOString().split('T')[0];
 			}
 
-			// Extract tenant IDs and prepare lease data
 			const { tenantIds, ...leaseData } = form.data;
-
-			// tenantIds is already transformed to an array by the schema
 			const tenantIdsArray = tenantIds;
-
 			const leaseName = leaseData.name || `Unit ${leaseData.rental_unit_id}`;
 
-			// Start a transaction
-			const { data: lease, error: leaseError } = await supabase
-				.from('leases')
-				.insert({
-					rental_unit_id: leaseData.rental_unit_id,
+			const leaseResult = await db
+				.insert(leases)
+				.values({
+					rentalUnitId: leaseData.rental_unit_id,
 					name: leaseName,
-					start_date: leaseData.start_date,
-					end_date: endDate,
-					// Set rent amount from form data
-					rent_amount: leaseData.rent_amount || 0,
-					security_deposit: 0, // Default value since you don't use this field
+					startDate: leaseData.start_date,
+					endDate: endDate,
+					rentAmount: leaseData.rent_amount || 0,
+					securityDeposit: 0,
 					notes: leaseData.notes || null,
-					created_by: user.id,
-					terms_month: leaseData.terms_month,
+					createdBy: user.id,
+					termsMonth: leaseData.terms_month,
 					status: leaseData.status,
-					created_at: new Date().toISOString()
+					createdAt: new Date()
 				})
-				.select()
-				.single();
+				.returning();
 
-			if (leaseError) throw leaseError;
+			const lease = leaseResult[0];
+			if (!lease) throw new Error('Failed to create lease');
 
 			// Create lease-tenant relationships
-			const leaseTenants = tenantIdsArray.map((tenant_id: number) => ({
-				lease_id: lease.id,
-				tenant_id
+			const leaseTenantsToInsert = tenantIdsArray.map((tenant_id: number) => ({
+				leaseId: lease.id,
+				tenantId: tenant_id
 			}));
 
-			const { error: relationError } = await supabase.from('lease_tenants').insert(leaseTenants);
-
-			if (relationError) {
-				// Rollback lease creation if tenant relationship fails
-				await supabase.from('leases').delete().eq('id', lease.id);
+			try {
+				await db.insert(leaseTenants).values(leaseTenantsToInsert);
+			} catch (relationError) {
+				// Rollback lease creation
+				await db.delete(leases).where(eq(leases.id, lease.id));
 				throw relationError;
 			}
 
-			// Fetch the newly created lease with all relationships
-			const { data: newLease, error: fetchError } = await supabase
-				.from('leases')
-				.select(
-					`
-				*,
-				rental_unit:rental_unit_id ( *, floor:floors (*), property:properties (*) ),
-				lease_tenants:lease_tenants!lease_id ( tenants ( name, email, contact_number ) ),
-				billings!billings_lease_id_fkey ( * )
-			`
-				)
-				.eq('id', lease.id)
-				.single();
-
-			if (fetchError) {
-				console.error('Error fetching new lease data:', fetchError);
-				throw new Error(fetchError.message);
-			}
-
-			const floors = await supabase.from('floors').select('*');
-			const floorsMap = new Map((floors.data || []).map((f) => [f.id, f]));
-			const mappedLease = mapLeaseData(newLease, floorsMap);
-
-			// Invalidate leases cache
 			cache.deletePattern(/^leases:/);
-			console.log('🗑️ Invalidated leases cache');
+			console.log('Invalidated leases cache');
 
-			return {
-				form,
-				lease: mappedLease
-			};
-		} catch (error) {
-			console.error('Lease creation failed:', error);
-			return fail(500, {
-				message: 'Failed to create lease'
-			});
+			return { form, lease };
+		} catch (err) {
+			console.error('Lease creation failed:', err);
+			return fail(500, { message: 'Failed to create lease' });
 		}
 	},
 
-	updateLease: async ({ request, locals: { supabase, safeGetSession } }) => {
-		console.log('🔄 Updating lease via form action');
+	updateLease: async ({ request, locals }) => {
+		console.log('Updating lease via form action');
 		const formData = await request.formData();
 
-		const { user } = await safeGetSession();
+		const { user } = locals;
 		if (!user) return fail(403, { message: ['Unauthorized'] });
 
 		try {
-			// Extract form data
 			const id = Number(formData.get('id'));
 			const name = formData.get('name') as string;
 			const start_date = formData.get('start_date') as string;
@@ -396,24 +403,24 @@ export const actions: Actions = {
 			const notes = formData.get('notes') as string;
 			const rental_unit_id = Number(formData.get('rental_unit_id'));
 			const rent_amount = Number(formData.get('rent_amount')) || 0;
-			const tenantIds = formData.get('tenantIds') as string;
+			const tenantIdsStr = formData.get('tenantIds') as string;
 
 			if (!id || id <= 0) {
 				return fail(400, { message: ['Valid lease ID is required'] });
 			}
 
-			// Get existing lease to preserve required fields
-			const { data: existingLease, error: fetchError } = await supabase
-				.from('leases')
-				.select('*')
-				.eq('id', id)
-				.single();
+			// Get existing lease
+			const existingResult = await db
+				.select()
+				.from(leases)
+				.where(eq(leases.id, id))
+				.limit(1);
 
-			if (fetchError || !existingLease) {
+			const existingLease = existingResult[0];
+			if (!existingLease) {
 				return fail(404, { message: ['Lease not found'] });
 			}
 
-			// Calculate end_date if not provided
 			let calculatedEndDate = end_date;
 			if (!calculatedEndDate && start_date && terms_month > 0) {
 				const start = new Date(start_date);
@@ -422,70 +429,52 @@ export const actions: Actions = {
 				calculatedEndDate = end.toISOString().split('T')[0];
 			}
 
-			// Update the lease
-			const { data: updatedLease, error: leaseError } = await supabase
-				.from('leases')
-				.update({
+			const updatedResult = await db
+				.update(leases)
+				.set({
 					name: name.trim(),
-					start_date,
-					end_date: calculatedEndDate,
-					terms_month,
+					startDate: start_date,
+					endDate: calculatedEndDate,
+					termsMonth: terms_month,
 					status,
 					notes: notes?.trim() || null,
-					rental_unit_id,
-					// Update rent amount from form data
-					rent_amount: rent_amount,
-					security_deposit: existingLease.security_deposit,
+					rentalUnitId: rental_unit_id,
+					rentAmount: rent_amount,
+					securityDeposit: existingLease.securityDeposit,
 					balance: existingLease.balance,
-					updated_at: new Date().toISOString()
+					updatedAt: new Date()
 				})
-				.eq('id', id)
-				.select('*')
-				.single();
-
-			if (leaseError) {
-				console.error('Supabase error updating lease:', leaseError);
-				return fail(500, { message: ['Database error'] });
-			}
+				.where(eq(leases.id, id))
+				.returning();
 
 			// Update tenant relationships
-			if (tenantIds) {
-				const tenantIdsArray = JSON.parse(tenantIds);
+			if (tenantIdsStr) {
+				const tenantIdsArray = JSON.parse(tenantIdsStr);
 
 				if (tenantIdsArray && tenantIdsArray.length > 0) {
-					// Delete existing relationships
-					await supabase.from('lease_tenants').delete().eq('lease_id', id);
+					await db.delete(leaseTenants).where(eq(leaseTenants.leaseId, id));
 
-					// Create new relationships
-					const leaseTenants = tenantIdsArray.map((tenant_id: number) => ({
-						lease_id: id,
-						tenant_id
+					const newRelationships = tenantIdsArray.map((tenant_id: number) => ({
+						leaseId: id,
+						tenantId: tenant_id
 					}));
 
-					const { error: relationError } = await supabase
-						.from('lease_tenants')
-						.insert(leaseTenants);
-
-					if (relationError) {
-						console.error('Error creating tenant relationships:', relationError);
-						return fail(500, { message: ['Failed to update tenant relationships'] });
-					}
+					await db.insert(leaseTenants).values(newRelationships);
 				}
 			}
 
-			// Invalidate leases cache
 			cache.deletePattern(/^leases:/);
-			console.log('🗑️ Invalidated leases cache');
+			console.log('Invalidated leases cache');
 
-			return { success: true, lease: updatedLease };
-		} catch (error) {
-			console.error('Lease update failed:', error);
+			return { success: true, lease: updatedResult[0] };
+		} catch (err) {
+			console.error('Lease update failed:', err);
 			return fail(500, { message: ['Failed to update lease'] });
 		}
 	},
 
-	delete: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const { user } = await safeGetSession();
+	delete: async ({ request, locals }) => {
+		const { user } = locals;
 		if (!user) {
 			return fail(401, { error: 'Unauthorized' });
 		}
@@ -499,33 +488,23 @@ export const actions: Actions = {
 		}
 
 		try {
-			// Soft delete the lease (preserves all payment data)
-			const { error: deleteError } = await supabase.rpc('soft_delete_lease', {
-				p_lease_id: leaseId,
-				p_deleted_by: user.id,
-				p_reason: reason
-			});
+			// Soft delete the lease using RPC
+			await db.execute(
+				sql`SELECT soft_delete_lease(${leaseId}::int, ${user.id}::text, ${reason}::text)`
+			);
 
-			if (deleteError) {
-				console.error('Error soft deleting lease:', deleteError);
-				throw new Error(deleteError.message);
-			}
-
-			// Invalidate leases cache
 			cache.deletePattern(/^leases:/);
-			console.log('🗑️ Invalidated leases cache');
+			console.log('Invalidated leases cache');
 
 			return { success: true, deletedLeaseId: leaseId };
-		} catch (error) {
-			console.error('Soft delete failed:', error);
-			return fail(500, {
-				error: 'Failed to archive lease'
-			});
+		} catch (err) {
+			console.error('Soft delete failed:', err);
+			return fail(500, { error: 'Failed to archive lease' });
 		}
 	},
 
-	submitPayment: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const { user } = await safeGetSession();
+	submitPayment: async ({ request, locals }) => {
+		const { user } = locals;
 		if (!user) {
 			return fail(401, { error: 'Unauthorized' });
 		}
@@ -538,44 +517,39 @@ export const actions: Actions = {
 				return fail(400, { error: 'Missing payment details' });
 			}
 
-			const paymentDetails: PaymentDetails = JSON.parse(paymentDetailsJSON as string);
+			const paymentDetails = JSON.parse(paymentDetailsJSON as string);
 
-			let data, rpcError;
+			let result;
 
 			// Use different RPC function based on payment method
 			if (paymentDetails.method === 'SECURITY_DEPOSIT') {
-				const result = await supabase.rpc('create_security_deposit_payment', {
-					p_amount: paymentDetails.amount,
-					p_billing_ids: paymentDetails.billing_ids,
-					p_paid_by: paymentDetails.paid_by,
-					p_paid_at: paymentDetails.paid_at,
-					p_reference_number: paymentDetails.reference_number,
-					p_notes: paymentDetails.notes,
-					p_created_by: user.id
-				});
-				data = result.data;
-				rpcError = result.error;
+				result = await db.execute(
+					sql`SELECT create_security_deposit_payment(
+						${paymentDetails.amount}::numeric,
+						${paymentDetails.billing_ids}::int[],
+						${paymentDetails.paid_by}::text,
+						${paymentDetails.paid_at}::timestamptz,
+						${paymentDetails.reference_number}::text,
+						${paymentDetails.notes}::text,
+						${user.id}::text
+					)`
+				);
 			} else {
-				const result = await supabase.rpc('create_payment', {
-					p_amount: paymentDetails.amount,
-					p_method: paymentDetails.method as any,
-					p_billing_ids: paymentDetails.billing_ids,
-					p_paid_by: paymentDetails.paid_by,
-					p_paid_at: paymentDetails.paid_at,
-					p_reference_number: paymentDetails.reference_number,
-					p_notes: paymentDetails.notes,
-					p_created_by: user.id
-				});
-				data = result.data;
-				rpcError = result.error;
+				result = await db.execute(
+					sql`SELECT create_payment(
+						${paymentDetails.amount}::numeric,
+						${paymentDetails.method}::text,
+						${paymentDetails.billing_ids}::int[],
+						${paymentDetails.paid_by}::text,
+						${paymentDetails.paid_at}::timestamptz,
+						${paymentDetails.reference_number}::text,
+						${paymentDetails.notes}::text,
+						${user.id}::text
+					)`
+				);
 			}
 
-			if (rpcError) {
-				console.error('Error creating payment via RPC:', rpcError);
-				return fail(500, { error: `Payment processing failed: ${rpcError.message}` });
-			}
-
-			return { success: true, payment: data };
+			return { success: true, payment: result };
 		} catch (e) {
 			const err = e as Error;
 			console.error('Error processing payment submission:', err);
@@ -586,38 +560,35 @@ export const actions: Actions = {
 		}
 	},
 
-	updateName: async ({ request, locals: { supabase } }) => {
+	updateName: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get('id');
 		const name = data.get('name');
 
 		if (!id || !name) {
-			return {
-				success: false,
-				message: 'Missing required fields'
-			};
+			return { success: false, message: 'Missing required fields' };
 		}
 
-		const { error } = await supabase.from('leases').update({ name }).eq('id', id);
-
-		if (error) {
-			return {
-				success: false,
-				message: error.message
-			};
+		try {
+			await db
+				.update(leases)
+				.set({ name: name as string })
+				.where(eq(leases.id, Number(id)));
+		} catch (err: any) {
+			return { success: false, message: err.message };
 		}
 
 		return { success: true };
 	},
 
-	manageRentBillings: async ({ request, locals: { supabase, safeGetSession } }) => {
+	manageRentBillings: async ({ request, locals }) => {
 		type MonthlyRent = {
 			month: number;
 			isActive: boolean;
 			amount: number;
 			dueDate: string;
 		};
-		const { user } = await safeGetSession();
+		const { user } = locals;
 		if (!user) return fail(401, { message: 'Unauthorized' });
 
 		const formData = await request.formData();
@@ -631,146 +602,118 @@ export const actions: Actions = {
 
 		const monthlyRents = JSON.parse(monthlyRentsRaw as string);
 
-		console.log(
-			'📥 Received monthly rents data:',
-			monthlyRents.map((r: any) => ({
-				month: r.month,
-				isActive: r.isActive,
-				amount: r.amount,
-				dueDate: r.dueDate
-			}))
-		);
-
 		try {
-			// 1. Fetch existing rent billings for the year
-			const { data: existingBillings, error: fetchError } = await supabase
-				.from('billings')
-				.select('*')
-				.eq('lease_id', leaseId)
-				.eq('type', 'RENT')
-				.gte('billing_date', `${year}-01-01`)
-				.lte('billing_date', `${year}-12-31`);
-
-			if (fetchError) throw new Error(`Failed to fetch existing billings: ${fetchError.message}`);
+			// Fetch existing rent billings for the year
+			const existingBillings = await db
+				.select()
+				.from(billings)
+				.where(
+					and(
+						eq(billings.leaseId, Number(leaseId)),
+						eq(billings.type, 'RENT'),
+						gte(billings.billingDate, `${year}-01-01`),
+						lte(billings.billingDate, `${year}-12-31`)
+					)
+				);
 
 			const existingBillingsMap = new Map(
-				existingBillings.map((b) => [new Date(b.billing_date).getUTCMonth() + 1, b])
+				existingBillings.map((b: any) => [new Date(b.billingDate).getUTCMonth() + 1, b])
 			);
 
 			const operations = monthlyRents.map(async (rent: MonthlyRent) => {
 				const existingBilling = existingBillingsMap.get(rent.month);
-
-				// Use the actual due date provided by the user (no timezone conversion)
-				const normalizedDueDate = rent.dueDate; // Use the date string directly
-
-				console.log(`📅 Month ${rent.month}: Due date: ${rent.dueDate}`);
+				const normalizedDueDate = rent.dueDate;
 
 				// Case 1: Create new billing
 				if (rent.isActive && !existingBilling) {
-					return supabase.from('billings').insert({
-						lease_id: leaseId,
+					await db.insert(billings).values({
+						leaseId: Number(leaseId),
 						type: 'RENT',
 						amount: rent.amount,
-						paid_amount: 0,
+						paidAmount: 0,
 						balance: rent.amount,
 						status: 'PENDING',
-						due_date: normalizedDueDate,
-						billing_date: `${year}-${String(rent.month).padStart(2, '0')}-01`,
+						dueDate: normalizedDueDate,
+						billingDate: `${year}-${String(rent.month).padStart(2, '0')}-01`,
 						notes: 'Monthly Rent'
 					});
+					return;
 				}
 
 				// Case 2: Update existing billing
 				if (rent.isActive && existingBilling) {
 					if (
 						existingBilling.amount !== rent.amount ||
-						existingBilling.due_date !== normalizedDueDate
+						existingBilling.dueDate !== normalizedDueDate
 					) {
 						const newBalance = existingBilling.balance - existingBilling.amount + rent.amount;
-						return supabase
-							.from('billings')
-							.update({
+						await db
+							.update(billings)
+							.set({
 								amount: rent.amount,
-								due_date: normalizedDueDate,
+								dueDate: normalizedDueDate,
 								balance: newBalance
 							})
-							.eq('id', existingBilling.id);
+							.where(eq(billings.id, existingBilling.id));
 					}
+					return;
 				}
 
 				// Case 3: Delete existing billing
 				if (!rent.isActive && existingBilling) {
-					if (existingBilling.paid_amount > 0) {
+					if (existingBilling.paidAmount > 0) {
 						throw new Error(`Cannot delete billing for month ${rent.month} as it has payments.`);
 					}
-					return supabase.from('billings').delete().eq('id', existingBilling.id);
+					await db.delete(billings).where(eq(billings.id, existingBilling.id));
+					return;
 				}
-
-				return Promise.resolve({ error: null }); // No operation needed
 			});
 
-			const results = await Promise.all(operations);
-			const errors = results.filter((r) => r.error).map((r) => r.error);
-
-			if (errors.length > 0) {
-				throw new Error(`Some operations failed: ${errors.map((e) => e.message).join(', ')}`);
-			}
+			await Promise.all(operations);
 
 			return { success: true, message: 'Rent billings updated successfully.' };
-		} catch (error) {
+		} catch (err) {
 			return fail(500, {
-				message: error instanceof Error ? error.message : 'An unexpected error occurred.'
+				message: err instanceof Error ? err.message : 'An unexpected error occurred.'
 			});
 		}
 	},
 
-	updateStatus: async ({ request, locals: { supabase } }) => {
-		console.log('🔄 Updating lease status');
+	updateStatus: async ({ request }) => {
+		console.log('Updating lease status');
 		const formData = await request.formData();
 		const id = formData.get('id');
 		const status = formData.get('status');
 
-		console.log('Update details:', { id, status });
-
 		if (!id || !status) {
-			return {
-				success: false,
-				message: 'Missing required fields'
-			};
+			return { success: false, message: 'Missing required fields' };
 		}
 
 		try {
-			const { error: updateError } = await supabase.from('leases').update({ status }).eq('id', id);
+			await db
+				.update(leases)
+				.set({ status: status as string })
+				.where(eq(leases.id, Number(id)));
 
-			if (updateError) {
-				console.error('Error updating lease status:', updateError);
-				return fail(500, { message: updateError.message });
-			}
-
-			return {
-				success: true,
-				status: 200,
-				data: { id, status }
-			};
-		} catch (error) {
-			console.error('Error updating lease status:', error);
+			return { success: true, status: 200, data: { id, status } };
+		} catch (err) {
+			console.error('Error updating lease status:', err);
 			return {
 				success: false,
 				status: 500,
-				message: error instanceof Error ? error.message : 'Failed to update lease status'
+				message: err instanceof Error ? err.message : 'Failed to update lease status'
 			};
 		}
 	},
 
-	manageSecurityDepositBillings: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const { user } = await safeGetSession();
+	manageSecurityDepositBillings: async ({ request, locals }) => {
+		const { user } = locals;
 		if (!user) throw error(401, 'Unauthorized');
 
-		// Validate form data using Superforms
 		const form = await superValidate(request, zod(securityDepositSchema));
 
 		if (!form.valid) {
-			console.error('❌ Form validation failed:', form.errors);
+			console.error('Form validation failed:', form.errors);
 			return fail(400, { form });
 		}
 
@@ -787,23 +730,18 @@ export const actions: Actions = {
 			} = form.data;
 
 			if (action === 'create') {
-				const { error: insertError } = await supabase.from('billings').insert({
-					lease_id: leaseId,
+				await db.insert(billings).values({
+					leaseId,
 					type: type as 'SECURITY_DEPOSIT',
-					amount: amount,
-					paid_amount: 0,
+					amount,
+					paidAmount: 0,
 					balance: amount,
 					status: 'PENDING',
-					due_date: dueDate,
-					billing_date: billingDate,
-					notes: notes,
-					penalty_amount: 0
+					dueDate,
+					billingDate,
+					notes,
+					penaltyAmount: 0
 				});
-
-				if (insertError) {
-					console.error('❌ Error creating security deposit billing:', insertError);
-					return fail(500, { form, message: 'Failed to create security deposit billing' });
-				}
 
 				return { form, success: true, message: 'Security deposit billing created successfully' };
 			} else if (action === 'update') {
@@ -811,21 +749,16 @@ export const actions: Actions = {
 					return fail(400, { form, message: 'Billing ID is required for update' });
 				}
 
-				const { error: updateError } = await supabase
-					.from('billings')
-					.update({
-						amount: amount,
-						balance: amount, // Reset balance when amount changes
-						due_date: dueDate,
-						billing_date: billingDate,
-						notes: notes
+				await db
+					.update(billings)
+					.set({
+						amount,
+						balance: amount,
+						dueDate,
+						billingDate,
+						notes
 					})
-					.eq('id', billingId);
-
-				if (updateError) {
-					console.error('Error updating security deposit billing:', updateError);
-					return fail(500, { form, message: 'Failed to update security deposit billing' });
-				}
+					.where(eq(billings.id, billingId));
 
 				return { form, success: true, message: 'Security deposit billing updated successfully' };
 			} else if (action === 'delete') {
@@ -833,31 +766,20 @@ export const actions: Actions = {
 					return fail(400, { form, message: 'Billing ID is required for delete' });
 				}
 
-				// First, delete any payment allocations that reference this billing
-				const { error: deleteAllocationsError } = await supabase
-					.from('payment_allocations')
-					.delete()
-					.eq('billing_id', billingId);
+				// Delete payment allocations first
+				await db
+					.delete(paymentAllocations)
+					.where(eq(paymentAllocations.billingId, billingId));
 
-				if (deleteAllocationsError) {
-					console.error('Error deleting payment allocations:', deleteAllocationsError);
-					return fail(500, { form, message: 'Failed to delete associated payment allocations' });
-				}
-
-				// Then delete the billing record
-				const { error: deleteError } = await supabase.from('billings').delete().eq('id', billingId);
-
-				if (deleteError) {
-					console.error('Error deleting security deposit billing:', deleteError);
-					return fail(500, { form, message: 'Failed to delete security deposit billing' });
-				}
+				// Then delete the billing
+				await db.delete(billings).where(eq(billings.id, billingId));
 
 				return { form, success: true, message: 'Security deposit billing deleted successfully' };
 			} else {
 				return fail(400, { form, message: 'Invalid action' });
 			}
-		} catch (error) {
-			console.error('Error managing security deposit billings:', error);
+		} catch (err) {
+			console.error('Error managing security deposit billings:', err);
 			return fail(500, { form, message: 'Failed to manage security deposit billings' });
 		}
 	}

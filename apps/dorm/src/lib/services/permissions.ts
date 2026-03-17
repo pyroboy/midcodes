@@ -1,58 +1,157 @@
 // src/lib/services/permissions.ts
-import type { SupabaseClient } from '@supabase/supabase-js';
+/**
+ * Permission caching and management service
+ * SECURITY: Implements cache invalidation to prevent stale permissions
+ */
+import { db } from '$lib/server/db';
+import { rolePermissions } from '$lib/server/schema';
+import { inArray } from 'drizzle-orm';
 
-// Simple in-memory cache with TTL
-const permissionCache = new Map<string, { permissions: string[]; expires: number }>();
+interface CacheEntry {
+	permissions: string[];
+	timestamp: number;
+	userId?: string;
+}
+
+interface PermissionCache {
+	[roleKey: string]: CacheEntry;
+}
+
+interface UserCacheIndex {
+	[userId: string]: Set<string>;
+}
+
+let permissionCache: PermissionCache = {};
+let userCacheIndex: UserCacheIndex = {};
+
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-/**
- * Fetches unique permissions for a given set of user roles from the database.
- * Uses caching to reduce database calls and improve performance.
- * @param roles - An array of user roles.
- * @param supabase - The Supabase client instance.
- * @returns A promise that resolves to an array of unique permission strings.
- */
 export async function getUserPermissions(
-	roles: string[],
-	supabase: SupabaseClient
+	roles: string[] | undefined,
+	userId?: string
 ): Promise<string[]> {
 	if (!roles || roles.length === 0) {
 		return [];
 	}
 
-	// Create cache key from sorted roles
 	const cacheKey = roles.sort().join(',');
 	const now = Date.now();
-	
-	// Check cache first
-	const cached = permissionCache.get(cacheKey);
-	if (cached && cached.expires > now) {
-		return cached.permissions;
+
+	if (permissionCache[cacheKey] && now - permissionCache[cacheKey].timestamp < CACHE_TTL) {
+		return permissionCache[cacheKey].permissions;
 	}
 
-	try {
-		const { data, error } = await supabase
-			.from('role_permissions')
-			.select('permission')
-			.in('role', roles);
+	const data = await db
+		.select({ permission: rolePermissions.permission })
+		.from(rolePermissions)
+		.where(inArray(rolePermissions.role, roles as any));
 
-		if (error) {
-			console.error('Error fetching permissions:', error);
-			return [];
+	const permissions = [...new Set(data.map((rp) => rp.permission as string))];
+
+	// Update cache
+	permissionCache[cacheKey] = {
+		permissions,
+		timestamp: now,
+		userId
+	};
+
+	// Update user cache index for targeted invalidation
+	if (userId) {
+		if (!userCacheIndex[userId]) {
+			userCacheIndex[userId] = new Set();
 		}
-
-		// Use a Set to get unique permission values
-		const permissions = [...new Set(data.map((rp) => rp.permission))];
-		
-		// Cache the result
-		permissionCache.set(cacheKey, {
-			permissions,
-			expires: now + CACHE_TTL
-		});
-		
-		return permissions;
-	} catch (error) {
-		console.error('Exception while fetching permissions:', error);
-		return [];
+		userCacheIndex[userId].add(cacheKey);
 	}
+
+	return permissions;
+}
+
+/**
+ * SECURITY: Invalidate all cached permissions for a specific user
+ * Call this when a user's roles change to prevent stale permissions
+ */
+export function invalidateUserPermissionCache(userId: string): void {
+	const cacheKeys = userCacheIndex[userId];
+
+	if (cacheKeys) {
+		for (const key of cacheKeys) {
+			delete permissionCache[key];
+			console.log(`[Permissions] Invalidated cache for user ${userId}, key: ${key}`);
+		}
+		delete userCacheIndex[userId];
+	}
+}
+
+/**
+ * SECURITY: Invalidate permissions for specific role combinations
+ * Call this when role definitions change (e.g., admin updates role_permissions table)
+ */
+export function invalidateRolePermissions(roles: string[]): void {
+	const roleSet = new Set(roles);
+
+	for (const [cacheKey, entry] of Object.entries(permissionCache)) {
+		const cachedRoles = cacheKey.split(',');
+		const hasAffectedRole = cachedRoles.some((role) => roleSet.has(role));
+
+		if (hasAffectedRole) {
+			delete permissionCache[cacheKey];
+			console.log(`[Permissions] Invalidated cache for roles: ${cacheKey}`);
+		}
+	}
+}
+
+/**
+ * Clean up expired cache entries
+ * Can be called periodically to prevent memory leaks
+ */
+export function cleanupPermissionCache(): void {
+	const now = Date.now();
+	let cleanedCount = 0;
+
+	Object.keys(permissionCache).forEach((key) => {
+		if (now - permissionCache[key].timestamp > CACHE_TTL) {
+			const userId = permissionCache[key].userId;
+			if (userId && userCacheIndex[userId]) {
+				userCacheIndex[userId].delete(key);
+				if (userCacheIndex[userId].size === 0) {
+					delete userCacheIndex[userId];
+				}
+			}
+
+			delete permissionCache[key];
+			cleanedCount++;
+		}
+	});
+
+	if (cleanedCount > 0) {
+		console.log(`[Permissions] Cleaned up ${cleanedCount} expired cache entries`);
+	}
+}
+
+/**
+ * Clear all permission caches
+ * Use for testing or emergency cache reset
+ */
+export function clearPermissionCache(): void {
+	permissionCache = {};
+	userCacheIndex = {};
+	console.log('[Permissions] All caches cleared');
+}
+
+/**
+ * Get current cache statistics (for debugging/monitoring)
+ */
+export function getCacheStats(): {
+	totalEntries: number;
+	usersTracked: number;
+	oldestEntry: number | null;
+} {
+	const entries = Object.values(permissionCache);
+	const oldestTimestamp = entries.length > 0 ? Math.min(...entries.map((e) => e.timestamp)) : null;
+
+	return {
+		totalEntries: entries.length,
+		usersTracked: Object.keys(userCacheIndex).length,
+		oldestEntry: oldestTimestamp ? Date.now() - oldestTimestamp : null
+	};
 }

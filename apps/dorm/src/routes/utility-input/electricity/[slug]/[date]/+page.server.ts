@@ -1,85 +1,59 @@
 import type { ServerLoad } from '@sveltejs/kit';
 import type { ElectricityMeter } from './+page';
-import { createClient } from '@supabase/supabase-js';
-import { env } from '$env/dynamic/private';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { readingSubmissionSchema } from './formSchema';
 import type { Actions } from '@sveltejs/kit';
 import { fail, error } from '@sveltejs/kit';
-// import { getUserPermissions } from '$lib/services/permissions'; // COMMENTED OUT - PUBLIC ACCESS ENABLED
+import { db } from '$lib/server/db';
+import { properties, meters, readings, floors, rentalUnit } from '$lib/server/schema';
+import { eq, and, asc, desc, inArray, lt, isNotNull } from 'drizzle-orm';
 
 export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	const { slug: propertySlug, date } = params;
-	console.log(`🔄 [LOAD] Loading utility input page for ${propertySlug}/${date}`);
+	console.log(`[LOAD] Loading utility input page for ${propertySlug}/${date}`);
 
-	// OPTIMIZATION: Cache the GET request for a short time (browser + CDN)
+	// OPTIMIZATION: Cache the GET request
 	setHeaders({
 		'cache-control': 'public, max-age=60, s-maxage=60'
 	});
 
-	// Initialize error state
 	let errors: string[] = [];
 	let errorDetails: string[] = [];
 
-	if (!propertySlug) {
-		errorDetails.push('Property slug is required');
-	}
+	if (!propertySlug) errorDetails.push('Property slug is required');
+	if (!date) errorDetails.push('Date parameter is required');
 
-	if (!date) {
-		errorDetails.push('Date parameter is required');
-	}
+	// Since Drizzle doesn't have RLS, we query directly (no service role needed)
 
-	// Create service role client for public route (bypasses RLS)
-	let supabaseClient = locals.supabase;
-	try {
-		if (env.PRIVATE_SERVICE_ROLE) {
-			supabaseClient = createClient(PUBLIC_SUPABASE_URL, env.PRIVATE_SERVICE_ROLE);
-			console.log('✅ Using service role client for public access');
-		} else {
-			console.warn('❌ Private service role key not found, falling back to regular client');
-		}
-	} catch (error) {
-		console.error('❌ Error creating service role client:', error);
-		console.warn('Falling back to regular client with RLS');
-	}
-
-	// Fetch property details by slug (public route - no RLS restrictions)
+	// Fetch property details by slug
 	let property = null;
 	if (propertySlug && !errorDetails.length) {
-		console.log(`🔍 Looking for property with slug: "${propertySlug}"`);
+		console.log(`Looking for property with slug: "${propertySlug}"`);
 
-		const { data: propertyData, error: propertyError } = await supabaseClient
-			.from('properties')
-			.select('id, name, slug, status')
-			.eq('slug', propertySlug)
-			.maybeSingle();
+		const propertyResult = await db
+			.select({ id: properties.id, name: properties.name, slug: properties.slug, status: properties.status })
+			.from(properties)
+			.where(eq(properties.slug, propertySlug))
+			.limit(1);
 
-		console.log('🔍 Property query result:', { data: propertyData, error: propertyError });
+		const propertyData = propertyResult[0];
 
-		if (propertyError) {
-			console.error('❌ Database error:', propertyError);
-			errorDetails.push(`Database error: ${propertyError.message}`);
-		} else if (!propertyData) {
-			console.warn(`❌ Property with slug "${propertySlug}" not found`);
+		if (!propertyData) {
 			errorDetails.push(`Property with slug "${propertySlug}" not found`);
 		} else if (propertyData.status !== 'ACTIVE') {
-			console.warn(`❌ Property is not active: ${propertyData.status}`);
 			errorDetails.push(`Property is not active`);
 		} else {
-			console.log(`✅ Property found: ${propertyData.name} (${propertyData.slug})`);
+			console.log(`Property found: ${propertyData.name} (${propertyData.slug})`);
 			property = propertyData;
 		}
 	}
 
 	// Helper function to generate future date links
-	function generateFutureDateLinks(propertySlug: string, currentDate: string) {
+	function generateFutureDateLinks(propSlug: string, currentDate: string) {
 		const serverToday = new Date().toISOString().split('T')[0];
-		const currentDateObj = new Date(currentDate);
 		const todayObj = new Date(serverToday);
 
-		// Generate links for tomorrow's date only
 		const futureDates = [];
 		const tomorrowDate = new Date(todayObj);
 		tomorrowDate.setDate(todayObj.getDate() + 1);
@@ -94,183 +68,147 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		const isCurrentViewingDate = tomorrowStr === currentDate;
 		const label = tomorrowFormatted;
 
-		// Make current viewing date non-clickable (plain text), tomorrow as link
 		if (isCurrentViewingDate) {
 			futureDates.push(`${label} *(current)*`);
 		} else {
-			futureDates.push(`[${label}](/utility-input/electricity/${propertySlug}/${tomorrowStr})`);
+			futureDates.push(`[${label}](/utility-input/electricity/${propSlug}/${tomorrowStr})`);
 		}
 
 		if (futureDates.length > 0) {
-			return `\n\n📅 **Tomorrow's input:**\n${futureDates.join('')}`;
+			return `\n\n** Tomorrow's input:**\n${futureDates.join('')}`;
 		}
-
 		return '';
 	}
 
-	// EARLY CHECK: If property exists, check for existing readings BEFORE fetching meters
+	// EARLY CHECK: If property exists, check for existing readings
 	let existingReadingsCount = 0;
 	if (property && date && !errorDetails.length) {
-		console.log(`🔍 [EARLY CHECK] Checking for existing readings for property ${property.id} on date ${date}`);
+		const meterIdsResult = await db
+			.select({ id: meters.id })
+			.from(meters)
+			.where(
+				and(
+					eq(meters.propertyId, property.id),
+					eq(meters.type, 'ELECTRICITY'),
+					eq(meters.isActive, true)
+				)
+			);
 
-		// First get meter IDs for this property
-		const { data: meterIds, error: meterError } = await supabaseClient
-			.from('meters')
-			.select('id')
-			.eq('property_id', property.id)
-			.eq('type', 'ELECTRICITY')
-			.eq('is_active', true);
+		const meterIdList = meterIdsResult.map((m) => m.id);
 
-		if (meterError) {
-			console.warn('⚠️ Could not fetch meter IDs:', meterError);
-		} else if (meterIds && meterIds.length > 0) {
-			const meterIdList = meterIds.map(m => m.id);
-			console.log(`🔍 [EARLY CHECK] Found ${meterIdList.length} active electricity meters`);
+		if (meterIdList.length > 0) {
+			const existingReadings = await db
+				.select({ id: readings.id, meterId: readings.meterId, readingDate: readings.readingDate, reading: readings.reading })
+				.from(readings)
+				.where(
+					and(
+						eq(readings.readingDate, date),
+						inArray(readings.meterId, meterIdList),
+						isNotNull(readings.reading)
+					)
+				);
 
-			// Now check for existing readings on this date for these meters
-			const { data: existingReadings, error: readingsCheckError } = await supabaseClient
-				.from('readings')
-				.select('id, meter_id, reading_date, reading')
-				.eq('reading_date', date)
-				.in('meter_id', meterIdList)
-				.not('reading', 'is', null); // Ensure reading value is not null
+			const validReadings = existingReadings.filter((r) => r.reading !== null && r.reading !== undefined);
+			existingReadingsCount = validReadings.length;
 
-			if (readingsCheckError) {
-				console.warn('⚠️ Could not check for existing readings:', readingsCheckError);
-				console.log(`🔄 [EARLY CHECK] Continuing to show input form due to error`);
-			} else if (existingReadings && existingReadings.length > 0) {
-				// Double-check that we have valid readings with actual values
-				const validReadings = existingReadings.filter(reading => reading.reading !== null && reading.reading !== undefined);
-				existingReadingsCount = validReadings.length;
+			if (existingReadingsCount > 0) {
+				const futureDateLinks = generateFutureDateLinks(property.slug!, date);
+				const displayDate = new Date(date).toLocaleDateString('en-US', {
+					weekday: 'long',
+					year: 'numeric',
+					month: 'long',
+					day: 'numeric'
+				});
 
-				console.log(`✅ [EARLY CHECK] Found ${existingReadingsCount} valid readings for ${date}`);
-				console.log(`📊 [EARLY CHECK] Reading details:`, validReadings.map(r => ({ id: r.id, meter_id: r.meter_id, reading: r.reading })));
+				const successMessage = `Information:\n Existing Data Found\n\n**${displayDate}** already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nYou can view or update the existing readings below.${futureDateLinks}`;
 
-				if (existingReadingsCount > 0) {
-					// Generate future date links
-					const futureDateLinks = generateFutureDateLinks(property.slug, date);
-
-					// Format the date for display
-					const displayDate = new Date(date).toLocaleDateString('en-US', {
-						weekday: 'long',
-						year: 'numeric',
-						month: 'long',
-						day: 'numeric'
-					});
-
-					// Create informational message for existing data
-					const successMessage = `ℹ️ Information:\n📊 Existing Data Found\n\n**${displayDate}** already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nYou can view or update the existing readings below.${futureDateLinks}`;
-
-					console.log(`🎯 [EARLY CHECK] Returning success response for ${existingReadingsCount} readings`);
-
-					return {
-						meters: [], // Empty meters since we're showing success message
-						property: property,
-						date: date,
-						errors: [successMessage],
-						form: await superValidate(zod(readingSubmissionSchema)),
-						currentServerDate: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
-					};
-				} else {
-					console.log(`⚠️ [EARLY CHECK] Found readings but none have valid values, showing input form`);
-				}
-			} else {
-				console.log(`ℹ️ [EARLY CHECK] No existing readings found for ${date}, will show input form`);
+				return {
+					meters: [],
+					property: property,
+					date: date,
+					errors: [successMessage],
+					form: await superValidate(zod(readingSubmissionSchema)),
+					currentServerDate: new Date().toISOString().split('T')[0]
+				};
 			}
-		} else {
-			console.log(`ℹ️ [EARLY CHECK] No active electricity meters found for property, will show input form`);
 		}
 	}
 
 	// Fetch active electricity meters for this property
-	let meters = null;
+	let metersData: any[] = [];
 	if (property && !errorDetails.length) {
-		const { data: metersData, error: metersError } = await supabaseClient
-			.from('meters')
-			.select(`
-				id,
-				name,
-				location_type,
-				property_id,
-				floor_id,
-				rental_unit_id,
-				type,
-				initial_reading,
-				is_active,
-				notes,
-				created_at,
-				property:properties(
-					name
-				),
-				floor:floors(
-					floor_number,
-					wing
-				),
-				rental_unit:rental_unit(
-					number
+		const metersResult = await db
+			.select({
+				id: meters.id,
+				name: meters.name,
+				locationType: meters.locationType,
+				propertyId: meters.propertyId,
+				floorId: meters.floorId,
+				rentalUnitId: meters.rentalUnitId,
+				type: meters.type,
+				initialReading: meters.initialReading,
+				isActive: meters.isActive,
+				notes: meters.notes,
+				createdAt: meters.createdAt,
+				propertyName: properties.name,
+				floorNumber: floors.floorNumber,
+				floorWing: floors.wing,
+				unitNumber: rentalUnit.number
+			})
+			.from(meters)
+			.leftJoin(properties, eq(meters.propertyId, properties.id))
+			.leftJoin(floors, eq(meters.floorId, floors.id))
+			.leftJoin(rentalUnit, eq(meters.rentalUnitId, rentalUnit.id))
+			.where(
+				and(
+					eq(meters.propertyId, property.id),
+					eq(meters.type, 'ELECTRICITY'),
+					eq(meters.isActive, true)
 				)
-			`)
-			.eq('property_id', property.id)
-			.eq('type', 'ELECTRICITY')
-			.eq('is_active', true)
-			.order('name');
+			)
+			.orderBy(asc(meters.name));
 
-		if (metersError) {
-			errorDetails.push(`Failed to fetch electricity meters: ${metersError.message}`);
-		} else {
-			meters = metersData;
-		}
+		metersData = metersResult.map((m) => ({
+			...m,
+			property: m.propertyName ? { name: m.propertyName } : null,
+			floor: m.floorNumber !== null ? { floor_number: m.floorNumber, wing: m.floorWing } : null,
+			rental_unit: m.unitNumber !== null ? { number: m.unitNumber } : null
+		}));
 	}
 
-	// Fetch only latest readings for these meters (optimized query)
-	const meterIds = meters?.map((m: any) => m.id) || [];
+	// Fetch latest readings for these meters
+	const meterIds = metersData.map((m: any) => m.id);
 	let latestReadings: Record<number, { value: number; date: string }> = {};
 
-	console.log(`🔍 [LOAD] Looking for readings for meter IDs:`, meterIds);
-
 	if (meterIds.length > 0 && !errorDetails.length) {
-		// Use optimized query to get only latest reading per meter
-		const { data: readings, error: readingsError } = await supabaseClient
-			.from('readings')
-			.select('meter_id, reading, reading_date')
-			.in('meter_id', meterIds)
-			.order('reading_date', { ascending: false });
+		const readingsResult = await db
+			.select({ meterId: readings.meterId, reading: readings.reading, readingDate: readings.readingDate })
+			.from(readings)
+			.where(inArray(readings.meterId, meterIds))
+			.orderBy(desc(readings.readingDate));
 
-		console.log(`🔍 [LOAD] Readings query result:`, {
-			count: readings?.length || 0,
-			error: readingsError,
-			sample: readings?.slice(0, 3)
+		readingsResult.forEach((reading: any) => {
+			if (!latestReadings[reading.meterId]) {
+				latestReadings[reading.meterId] = {
+					value: reading.reading,
+					date: reading.readingDate
+				};
+			}
 		});
-
-		if (readingsError) {
-			errorDetails.push(`Failed to fetch meter readings: ${readingsError.message}`);
-		} else if (readings) {
-			// Group latest readings by meter_id (only take first per meter due to order)
-			readings.forEach((reading: any) => {
-				if (!latestReadings[reading.meter_id]) {
-					latestReadings[reading.meter_id] = {
-						value: reading.reading,
-						date: reading.reading_date
-					};
-				}
-			});
-			console.log(`✅ [LOAD] Found ${Object.keys(latestReadings).length} meters with readings`);
-		}
 	}
 
 	// Attach readings to meters
-	const metersWithReadings: ElectricityMeter[] = meters?.map((meter: any) => ({
+	const metersWithReadings: ElectricityMeter[] = metersData.map((meter: any) => ({
 		...meter,
 		latest_reading: latestReadings[meter.id]
-	})) || [];
+	}));
 
-	// Initialize Superforms form with meter reading fields
+	// Initialize form
 	const initialFormData: Record<string, any> = {
 		readings_json: '',
 		reading_date: date || ''
 	};
 
-	// Add reading fields for each meter
 	if (metersWithReadings.length > 0) {
 		metersWithReadings.forEach((meter: ElectricityMeter) => {
 			initialFormData[`reading_${meter.id}`] = '';
@@ -279,87 +217,55 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 
 	const form = await superValidate(zod(readingSubmissionSchema), { defaults: initialFormData });
 
-	// Validate date is not before the last reading date
+	// Validate date is not before last reading
 	if (date && metersWithReadings.length > 0) {
-		console.log(`🔍 [LOAD] Checking future readings for date: ${date}`);
-		console.log(`🔍 [LOAD] Meters with readings: ${metersWithReadings.length}`);
-
-		// Find the most recent reading date across all meters
-		const metersWithReadingsFiltered = metersWithReadings.filter(meter => meter.latest_reading);
-		console.log(`🔍 [LOAD] Meters with latest readings: ${metersWithReadingsFiltered.length}`);
+		const metersWithReadingsFiltered = metersWithReadings.filter((meter) => meter.latest_reading);
 
 		if (metersWithReadingsFiltered.length > 0) {
-			// Find the most recent reading date
-			const maxTimestamp = Math.max(...metersWithReadingsFiltered
-				.map(meter => new Date(meter.latest_reading!.date).getTime())
+			const maxTimestamp = Math.max(
+				...metersWithReadingsFiltered.map((meter) => new Date(meter.latest_reading!.date).getTime())
 			);
 
-			// Create date object and normalize using UTC to avoid timezone issues
 			const lastReadingDate = new Date(maxTimestamp);
-			lastReadingDate.setUTCHours(0, 0, 0, 0); // Set to start of day in UTC
-
-			const requestedDate = new Date(date + 'T00:00:00.000Z'); // Parse as UTC
-			requestedDate.setUTCHours(0, 0, 0, 0); // Set to start of requested date in UTC
+			lastReadingDate.setUTCHours(0, 0, 0, 0);
+			const requestedDate = new Date(date + 'T00:00:00.000Z');
+			requestedDate.setUTCHours(0, 0, 0, 0);
 
 			if (requestedDate < lastReadingDate) {
 				const requestedFormatted = new Date(date).toLocaleDateString('en-US', {
-					weekday: 'long',
-					year: 'numeric',
-					month: 'long',
-					day: 'numeric'
+					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
 				const lastReadingFormatted = lastReadingDate.toLocaleDateString('en-US', {
-					weekday: 'long',
-					year: 'numeric',
-					month: 'long',
-					day: 'numeric'
+					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
-				// Create date one day after the last reading
-				const nextDay = new Date(lastReadingDate.getTime() + (24 * 60 * 60 * 1000)); // Add exactly 24 hours
 
-				// Create consistent date string for both display and URL
+				const nextDay = new Date(lastReadingDate.getTime() + 24 * 60 * 60 * 1000);
 				const year = nextDay.getFullYear();
 				const month = String(nextDay.getMonth() + 1).padStart(2, '0');
 				const day = String(nextDay.getDate()).padStart(2, '0');
 				const dateString = `${year}-${month}-${day}`;
 
-				console.log(`🔍 Last reading date: ${lastReadingDate.toISOString()}`);
-				console.log(`🔍 Next day calculated: ${nextDay.toISOString()}`);
-				console.log(`🔍 Next day URL: ${dateString}`);
-
 				const nextDayFormatted = nextDay.toLocaleDateString('en-US', {
-					weekday: 'long',
-					year: 'numeric',
-					month: 'long',
-					day: 'numeric'
+					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
 				const validDateUrl = `/utility-input/electricity/${propertySlug}/${dateString}`;
 				const validDateButton = `[Next Reading Date: ${nextDayFormatted}](${validDateUrl})`;
 
-				// Add today's date button
 				const today = new Date();
-				const todayYear = today.getFullYear();
-				const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
-				const todayDay = String(today.getDate()).padStart(2, '0');
-				const todayString = `${todayYear}-${todayMonth}-${todayDay}`;
+				const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 				const todayFormatted = today.toLocaleDateString('en-US', {
-					weekday: 'long',
-					year: 'numeric',
-					month: 'long',
-					day: 'numeric'
+					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
 				const todayButton = `[Today's Date: ${todayFormatted}](/utility-input/electricity/${propertySlug}/${todayString})`;
 
-				errorDetails.push(`⚠️ Date Restriction\n\nYou requested: ${requestedFormatted}\nLast reading: ${lastReadingFormatted}\n\nCannot access dates before your most recent meter reading.\n\n${validDateButton}\n\n${todayButton}`);
+				errorDetails.push(
+					`Date Restriction\n\nYou requested: ${requestedFormatted}\nLast reading: ${lastReadingFormatted}\n\nCannot access dates before your most recent meter reading.\n\n${validDateButton}\n\n${todayButton}`
+				);
 			}
 		}
 	}
 
-	// (Removed redundant future-reading message logic; date restriction above already handles this case)
-
-	// Pass collected messages directly to the client (avoid redundant consolidation)
 	if (errorDetails.length > 0) {
-		console.log(`📋 [LOAD] Returning ${errorDetails.length} message(s)`);
 		errors = errorDetails;
 	}
 
@@ -369,252 +275,136 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		date: date || '',
 		errors: errors,
 		form,
-		currentServerDate: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+		currentServerDate: new Date().toISOString().split('T')[0]
 	};
 };
 
 export const actions: Actions = {
-	addReadings: async ({ request, locals: { supabase } }) => {
-		console.log('🚀 Server: addReadings action started');
+	addReadings: async ({ request }) => {
+		console.log('Server: addReadings action started');
 
-		// Validate request with Superforms
 		const form = await superValidate(request, zod(readingSubmissionSchema));
-		console.log('📋 Server: Form validation result:', { valid: form.valid, errors: form.errors });
 
 		if (!form.valid) {
-			console.log('❌ Server: Form validation failed:', form.errors);
 			return fail(400, { form, error: 'Validation failed. Please correct the errors and try again.' });
 		}
 
-		console.log('✅ Server: Form validation passed');
-		console.log('📊 Server: Form data:', form.data);
-
 		try {
-			// COMMENTED OUT AUTHENTICATION - PUBLIC ACCESS ENABLED
-			/*
-			const session = await safeGetSession();
-			if (!session) throw error(401, 'Unauthorized');
+			// PUBLIC ACCESS: Skip authentication checks (since Drizzle has no RLS)
 
-			const userRoles = session.user.user_metadata?.user_roles || [];
-			const userPermissions = await getUserPermissions(userRoles, supabase);
-
-			let hasReadingsPermission = userPermissions.includes('readings.create');
-			let isSuperAdmin = userRoles.includes('super_admin');
-			let isPropertyAdmin = userRoles.includes('property_admin');
-			let isPropertyUser = userRoles.includes('property_user');
-
-			if (userRoles.length === 0) {
-				const { data: profile, error: profileError } = await supabase
-					.from('profiles')
-					.select('role')
-					.eq('id', session.user.id)
-					.single();
-
-				if (!profileError && profile) {
-					isSuperAdmin = profile.role === 'super_admin';
-					isPropertyAdmin = profile.role === 'property_admin';
-					isPropertyUser = profile.role === 'property_user';
-
-					const fallbackPermissions = await getUserPermissions([profile.role], supabase);
-					hasReadingsPermission = fallbackPermissions.includes('readings.create');
-				}
-			}
-
-			if (!hasReadingsPermission && !isSuperAdmin && !isPropertyAdmin && !isPropertyUser) {
-				return fail(403, { form, error: 'Insufficient permissions to add meter readings.' });
-			}
-			*/
-
-			// PUBLIC ACCESS: Skip authentication checks
-
-			// Parse readings
-			const readings = JSON.parse(form.data.readings_json) as Array<{
+			const readingsInput = JSON.parse(form.data.readings_json) as Array<{
 				meter_id: number;
 				reading: number;
 				reading_date: string;
 			}>;
 
-			const meterIds = readings.map((r) => r.meter_id);
+			const meterIds = readingsInput.map((r) => r.meter_id);
 
-			// Check for duplicate readings for the same date
-			const { data: existingReadings, error: existingError } = await supabase
-				.from('readings')
-				.select('meter_id, reading_date')
-				.in('meter_id', meterIds)
-				.eq('reading_date', form.data.reading_date);
+			// Check for duplicate readings
+			const existingReadings = await db
+				.select({ meterId: readings.meterId, readingDate: readings.readingDate })
+				.from(readings)
+				.where(
+					and(
+						inArray(readings.meterId, meterIds),
+						eq(readings.readingDate, form.data.reading_date)
+					)
+				);
 
-			if (existingError) {
-				return fail(500, { form, error: `Error checking for existing readings: ${existingError.message}` });
-			}
-
-			if (existingReadings && existingReadings.length > 0) {
-				const duplicateMeters = existingReadings.map(r => r.meter_id);
-				const { data: meterNames } = await supabase
-					.from('meters')
-					.select('id, name')
-					.in('id', duplicateMeters);
-
-				const names = meterNames?.map(m => m.name).join(', ') || 'Unknown meters';
+			if (existingReadings.length > 0) {
+				const duplicateMeters = existingReadings.map((r) => r.meterId);
+				const meterNames = await db
+					.select({ id: meters.id, name: meters.name })
+					.from(meters)
+					.where(inArray(meters.id, duplicateMeters));
+				const names = meterNames.map((m) => m.name).join(', ') || 'Unknown meters';
 				return fail(400, {
 					form,
-					error: `Readings already exist for ${form.data.reading_date} for: ${names}. Please edit existing readings or choose a different date.`
+					error: `Readings already exist for ${form.data.reading_date} for: ${names}.`
 				});
 			}
 
-			// Load previous readings to enforce monotonic increase (only readings BEFORE the current date)
-			const { data: previousReadings, error: prevError } = await supabase
-				.from('readings')
-				.select('meter_id, reading, reading_date')
-				.in('meter_id', meterIds)
-				.lt('reading_date', form.data.reading_date) // Only get readings BEFORE the current input date
-				.order('reading_date', { ascending: false });
-			if (prevError) {
-				return fail(500, { form, error: `Error fetching previous readings: ${prevError.message}` });
-			}
+			// Load previous readings
+			const previousReadings = await db
+				.select({ meterId: readings.meterId, reading: readings.reading, readingDate: readings.readingDate })
+				.from(readings)
+				.where(
+					and(
+						inArray(readings.meterId, meterIds),
+						lt(readings.readingDate, form.data.reading_date)
+					)
+				)
+				.orderBy(desc(readings.readingDate));
 
 			// Fallback to initial meter readings
-			const { data: meters, error: metersError } = await supabase
-				.from('meters')
-				.select('id, initial_reading, name')
-				.in('id', meterIds);
-			if (metersError) {
-				return fail(500, { form, error: `Error fetching meter data: ${metersError.message}` });
-			}
+			const metersData = await db
+				.select({ id: meters.id, initialReading: meters.initialReading, name: meters.name })
+				.from(meters)
+				.where(inArray(meters.id, meterIds));
 
 			const previousReadingMap: Record<number, number> = {};
-			for (const r of previousReadings || []) {
-				if (previousReadingMap[r.meter_id] === undefined) previousReadingMap[r.meter_id] = r.reading;
+			for (const r of previousReadings) {
+				if (previousReadingMap[r.meterId] === undefined) previousReadingMap[r.meterId] = r.reading;
 			}
 			const initialReadingMap: Record<number, number> = Object.fromEntries(
-				(meters || []).map((m) => [m.id, m.initial_reading ?? 0])
+				metersData.map((m) => [m.id, m.initialReading ?? 0])
 			);
 			const meterNameMap: Record<number, string> = Object.fromEntries(
-				(meters || []).map((m) => [m.id, m.name])
+				metersData.map((m) => [m.id, m.name])
 			);
 
-			const readingsToInsert = readings.map((r) => {
+			const readingsToInsert = readingsInput.map((r) => {
 				const current = Number(r.reading);
-				// Fix baseline calculation - properly handle null initial readings
-				let previous: number;
 				const hasValidPreviousReading = previousReadingMap[r.meter_id] !== undefined;
-				
+				let previous: number;
+
 				if (hasValidPreviousReading) {
 					previous = previousReadingMap[r.meter_id];
 				} else {
-					// Use initial reading if available
 					const initialReading = initialReadingMap[r.meter_id];
 					if (initialReading !== null && initialReading !== undefined) {
 						previous = initialReading;
 					} else {
-						// No previous data available - validate against reasonable first reading limits
 						const meterName = meterNameMap[r.meter_id] || `ID ${r.meter_id}`;
-						console.log(`ℹ️ [VALIDATION] Meter ${meterName}: No baseline reading available, applying first reading limits`);
-
-						// For first readings with no baseline, apply absolute maximum
-						const FIRST_READING_MAX = 999999; // 999,999 kWh max for first reading
-
+						const FIRST_READING_MAX = 999999;
 						if (current > FIRST_READING_MAX) {
 							throw new Error(
-								`⚠️ First Reading Validation for meter ${meterName}:\n` +
-								`• Current reading: ${current.toLocaleString()} kWh\n` +
-								`• Maximum allowed for first reading: ${FIRST_READING_MAX.toLocaleString()} kWh\n\n` +
-								`This value exceeds the maximum allowed for a first reading.\n` +
-								`Please verify the reading is accurate.`
+								`First Reading Validation for meter ${meterName}: ${current.toLocaleString()} kWh exceeds maximum of ${FIRST_READING_MAX.toLocaleString()} kWh.`
 							);
 						}
-
-						// Accept the reading but still require review
 						return {
-							meter_id: r.meter_id,
+							meterId: r.meter_id,
 							reading: current,
-							reading_date: r.reading_date,
-							review_status: 'PENDING_REVIEW'
+							readingDate: r.reading_date,
+							reviewStatus: 'PENDING_REVIEW'
 						};
 					}
 				}
 
 				const meterName = meterNameMap[r.meter_id] || `ID ${r.meter_id}`;
 
-				// Validate reading is not less than previous reading
 				if (current < previous) {
 					throw new Error(
-						`Invalid reading for meter ${meterName}: ${current} is less than previous reading ${previous}. Readings must be monotonically increasing.`
+						`Invalid reading for meter ${meterName}: ${current} is less than previous reading ${previous}.`
 					);
 				}
 
-				// Calculate consumption
 				const consumption = current - previous;
-
-				// Tiered consumption validation - realistic thresholds
-				const NORMAL_DAILY_MAX = 50;      // 0-50 kWh: Normal daily usage - no validation needed
-				const MODERATE_DAILY_MAX = 200;   // 51-200 kWh: Moderate usage - soft warning only
-				const HIGH_DAILY_MAX = 500;       // 201-500 kWh: High usage - require verification
-				const EXTREME_THRESHOLD = 1000;   // >1000 kWh: Extreme - likely error
-
-				// Determine reading context for appropriate threshold
 				const isFirstReading = !hasValidPreviousReading;
+				const EXTREME_THRESHOLD = 1000;
+				const threshold = isFirstReading ? EXTREME_THRESHOLD * 2 : EXTREME_THRESHOLD;
 
-				// Debug logging
-				console.log(`🔍 [VALIDATION] Meter ${meterName}: current=${current}, previous=${previous}, consumption=${consumption}, isFirstReading=${isFirstReading}`);
-
-				// Skip validation for normal daily consumption
-				if (consumption <= NORMAL_DAILY_MAX) {
-					console.log(`✅ [VALIDATION] Meter ${meterName}: Normal consumption (${consumption} kWh) - validation passed`);
-				}
-				// Moderate consumption - log warning but allow
-				else if (consumption <= MODERATE_DAILY_MAX) {
-					console.warn(`⚠️ [VALIDATION] Meter ${meterName}: Moderate consumption (${consumption} kWh) - monitoring for patterns`);
-				}
-				// High consumption - validate with context-aware thresholds
-				else if (consumption <= HIGH_DAILY_MAX) {
-					// Allow high consumption for first readings (could be catch-up from installation)
-					if (isFirstReading) {
-						console.log(`ℹ️ [VALIDATION] Meter ${meterName}: High consumption (${consumption} kWh) allowed for first reading`);
-					} else {
-						console.warn(`🔶 [VALIDATION] Meter ${meterName}: High consumption (${consumption} kWh) - within acceptable range but monitoring`);
-					}
-				}
-				// Extreme consumption - block with detailed error
-				else {
-					// Use higher threshold for first readings to account for installation catch-up
-					const threshold = isFirstReading ? EXTREME_THRESHOLD * 2 : EXTREME_THRESHOLD;
-					
-					if (consumption > threshold) {
-						const contextMessage = isFirstReading 
-							? 'first reading after installation' 
-							: 'regular daily reading';
-						
-						throw new Error(
-							`⚠️ Extreme Consumption Alert for meter ${meterName}:\n` +
-							`• Current reading: ${current.toLocaleString()} kWh\n` +
-							`• Previous reading: ${previous.toLocaleString()} kWh\n` +
-							`• Consumption: ${consumption.toLocaleString()} kWh\n` +
-							`• Threshold: ${threshold.toLocaleString()} kWh (for ${contextMessage})\n\n` +
-							`This consumption level is unusually high and may indicate:\n` +
-							`• Meter reading error\n` +
-							`• Equipment malfunction\n` +
-							`• Extended period between readings\n\n` +
-							`Please verify the reading is accurate before proceeding.`
-						);
-					} else {
-						// Consumption is between 501-999 (or 501-1999 for first reading) - log warning but allow
-						const contextMessage = isFirstReading 
-							? 'first reading after installation' 
-							: 'regular daily reading';
-						console.warn(`🔶 [VALIDATION] Meter ${meterName}: Very high consumption (${consumption} kWh) for ${contextMessage} - within threshold (${threshold} kWh) but monitoring closely`);
-					}
-				}
-
-				// Additional validation: Check for unrealistic zero consumption (except for first readings)
-				if (!isFirstReading && consumption === 0 && current === previous) {
-					console.warn(`⚠️ Zero consumption detected for meter ${meterName}: Reading unchanged from previous value`);
+				if (consumption > threshold) {
+					throw new Error(
+						`Extreme Consumption Alert for meter ${meterName}: consumption ${consumption.toLocaleString()} kWh exceeds threshold ${threshold.toLocaleString()} kWh.`
+					);
 				}
 
 				return {
-					meter_id: r.meter_id,
+					meterId: r.meter_id,
 					reading: current,
-					reading_date: r.reading_date,
-					review_status: 'PENDING_REVIEW'
+					readingDate: r.reading_date,
+					reviewStatus: 'PENDING_REVIEW'
 				};
 			});
 
@@ -622,13 +412,7 @@ export const actions: Actions = {
 				return fail(400, { form, error: 'Please enter at least one valid reading.' });
 			}
 
-			const { data: newReadings, error: insertError } = await supabase
-				.from('readings')
-				.insert(readingsToInsert)
-				.select();
-			if (insertError) {
-				return fail(500, { form, error: `Failed to insert readings: ${insertError.message}` });
-			}
+			const newReadings = await db.insert(readings).values(readingsToInsert).returning();
 
 			return {
 				form,

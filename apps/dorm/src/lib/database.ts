@@ -1,4 +1,7 @@
-import { supabase } from '$lib/supabaseClient';
+import { db } from '$lib/server/db';
+import { templates } from '$lib/server/schema';
+import { uploadToR2, getPublicUrl } from '$lib/server/s3';
+import { eq } from 'drizzle-orm';
 import type { TemplateElement } from './types';
 
 interface TemplateData {
@@ -12,64 +15,57 @@ interface TemplateData {
 	template_elements: TemplateElement[];
 }
 
-// Update the fetchTemplateDetails function
-
-// In src/lib/database.ts
-
 export async function saveTemplate(
 	templateData: TemplateData,
 	frontElements: TemplateElement[],
 	backElements: TemplateElement[]
 ) {
-	const { data: savedTemplate, error: templateError } = await supabase
-		.from('templates')
-		.insert(templateData)
-		.select()
-		.single();
+	const allElements = [...frontElements, ...backElements];
 
-	if (templateError) throw templateError;
+	const [savedTemplate] = await db
+		.insert(templates)
+		.values({
+			id: templateData.id,
+			userId: templateData.user_id,
+			orgId: templateData.org_id,
+			name: templateData.name,
+			frontBackground: templateData.front_background,
+			backBackground: templateData.back_background,
+			orientation: templateData.orientation,
+			templateElements: allElements
+		})
+		.returning();
+
 	if (!savedTemplate) throw new Error('No template data returned after insert');
 
-	const elements = [...frontElements, ...backElements].map((el) => ({
-		template_id: savedTemplate.id,
-		// side: frontElements.includes(el) ? 'front' : 'back',
-		...el
-	}));
-
-	const { data: elementData, error: elementError } = await supabase
-		.from('template_elements')
-		.insert(elements);
-
-	if (elementError) throw elementError;
-
-	return { savedTemplate, elementData };
+	return { savedTemplate, elementData: allElements };
 }
-export async function fetchTemplateDetails(templateId: string): Promise<TemplateData> {
-	const { data, error } = await supabase
-		.from('templates')
-		.select(
-			`
-            *,
-            template_elements (*)
-        `
-		)
-		.eq('id', templateId)
-		.single();
 
-	if (error) throw error;
+export async function fetchTemplateDetails(templateId: string): Promise<TemplateData> {
+	const data = await db.query.templates.findFirst({
+		where: eq(templates.id, templateId)
+	});
+
 	if (!data) throw new Error('Template not found');
 
-	return data as TemplateData;
+	return {
+		id: data.id,
+		user_id: data.userId ?? '',
+		org_id: data.orgId ?? null,
+		name: data.name,
+		front_background: data.frontBackground ?? '',
+		back_background: data.backBackground ?? '',
+		orientation: (data.orientation as 'landscape' | 'portrait') ?? 'landscape',
+		template_elements: (data.templateElements as TemplateElement[]) ?? []
+	};
 }
+
 export async function uploadImage(file: File, side: string, userId: string): Promise<string> {
 	const fileExt = file.name.split('.').pop();
-	const fileName = `${userId}/${side}_${Date.now()}.${fileExt}`;
+	const key = `templates/${userId}/${side}_${Date.now()}.${fileExt}`;
 
-	const { error: uploadError } = await supabase.storage.from('templates').upload(fileName, file);
+	const buffer = Buffer.from(await file.arrayBuffer());
+	const publicUrl = await uploadToR2(key, buffer, file.type);
 
-	if (uploadError) throw uploadError;
-
-	const { data: urlData } = supabase.storage.from('templates').getPublicUrl(fileName);
-
-	return urlData.publicUrl;
+	return publicUrl;
 }

@@ -11,105 +11,65 @@ import type {
 	MonthlyPaymentStatus,
 	LeaseReportData
 } from './reportSchema';
+import { db } from '$lib/server/db';
+import { floors, properties, rentalUnit, leases, leaseTenants, tenants, billings } from '$lib/server/schema';
+import { eq, and, inArray, asc } from 'drizzle-orm';
 
 // Configure ISR for lease report caching
 export const config = {
 	isr: {
-		expiration: 180, // Cache for 3 minutes (180 seconds)
+		expiration: 180,
 		allowQuery: ['propertyId', 'startMonth', 'monthCount']
 	}
 };
 
-/**
- * Get array of month strings in YYYY-MM format from startMonth for specified number of months
- */
 function getMonthsArray(startMonth: string, monthCount: number): string[] {
 	const [year, month] = startMonth.split('-').map((n) => parseInt(n));
 	const months: string[] = [];
-
 	for (let i = 0; i < monthCount; i++) {
-		const newMonth = ((month + i - 1) % 12) + 1; // Adjust for zero-based month (0-11)
+		const newMonth = ((month + i - 1) % 12) + 1;
 		const newYear = year + Math.floor((month + i - 1) / 12);
 		months.push(`${newYear}-${newMonth.toString().padStart(2, '0')}`);
 	}
-
 	return months;
 }
 
-/**
- * Determine payment status for a tenant for a specific month and billing type
- */
 function getMonthlyPaymentStatus(
-	billings: Billing[],
+	billingsArr: Billing[],
 	month: string,
 	type: 'RENT' | 'UTILITIES' | 'PENALTY'
 ): 'PAID' | 'PENDING' | 'PARTIAL' | 'OVERDUE' {
-	// For utilities, accept both 'UTILITIES' and 'UTILITY' types
 	let billingTypes: string[] = [];
-	if (type === 'UTILITIES') {
-		billingTypes = ['UTILITIES', 'UTILITY'];
-	} else if (type === 'PENALTY') {
-		billingTypes = ['PENALTY'];
-	} else {
-		billingTypes = ['RENT'];
-	}
+	if (type === 'UTILITIES') billingTypes = ['UTILITIES', 'UTILITY'];
+	else if (type === 'PENALTY') billingTypes = ['PENALTY'];
+	else billingTypes = ['RENT'];
 
-	// Filter billings for the current month and type
-	const relevantBillings = billings.filter((billing) => {
-		const billingMonth = billing.due_date.substring(0, 7); // Get YYYY-MM from date
+	const relevantBillings = billingsArr.filter((billing) => {
+		const billingMonth = billing.due_date.substring(0, 7);
 		return billingMonth === month && billingTypes.includes(billing.type);
 	});
 
-	if (relevantBillings.length === 0) {
-		return 'PENDING';
-	}
-
-	// Check if all billings are paid
-	const allPaid = relevantBillings.every((b) => b.status === 'PAID');
-	if (allPaid) return 'PAID';
-
-	// Check if any billing is OVERDUE
-	const anyOverdue = relevantBillings.some((b) => b.status === 'OVERDUE');
-	if (anyOverdue) return 'OVERDUE';
-
-	// Check if any billing is PARTIAL
-	const anyPartial = relevantBillings.some((b) => b.status === 'PARTIAL');
-	if (anyPartial) return 'PARTIAL';
-
+	if (relevantBillings.length === 0) return 'PENDING';
+	if (relevantBillings.every((b) => b.status === 'PAID')) return 'PAID';
+	if (relevantBillings.some((b) => b.status === 'OVERDUE')) return 'OVERDUE';
+	if (relevantBillings.some((b) => b.status === 'PARTIAL')) return 'PARTIAL';
 	return 'PENDING';
 }
 
-/**
- * Get the total amount for a specific month and billing type
- */
-function getMonthlyAmount(
-	billings: Billing[],
-	month: string,
-	type: 'RENT' | 'UTILITIES' | 'PENALTY'
-): number {
-	// For utilities, accept both 'UTILITIES' and 'UTILITY' types
+function getMonthlyAmount(billingsArr: Billing[], month: string, type: 'RENT' | 'UTILITIES' | 'PENALTY'): number {
 	let billingTypes: string[] = [];
-	if (type === 'UTILITIES') {
-		billingTypes = ['UTILITIES', 'UTILITY'];
-	} else if (type === 'PENALTY') {
-		billingTypes = ['PENALTY'];
-	} else {
-		billingTypes = ['RENT'];
-	}
+	if (type === 'UTILITIES') billingTypes = ['UTILITIES', 'UTILITY'];
+	else if (type === 'PENALTY') billingTypes = ['PENALTY'];
+	else billingTypes = ['RENT'];
 
-	// Filter billings for the current month and type
-	const relevantBillings = billings.filter((billing) => {
-		const billingMonth = billing.due_date.substring(0, 7); // Get YYYY-MM from date
-		return billingMonth === month && billingTypes.includes(billing.type);
-	});
-
-	// Sum all amounts
-	return relevantBillings.reduce((total, billing) => total + billing.amount, 0);
+	return billingsArr
+		.filter((billing) => {
+			const billingMonth = billing.due_date.substring(0, 7);
+			return billingMonth === month && billingTypes.includes(billing.type);
+		})
+		.reduce((total, billing) => total + billing.amount, 0);
 }
 
-/**
- * Helper function to get the correct suffix for floor numbers
- */
 function getFloorSuffix(floorNumber: number): string {
 	if (floorNumber === 1) return 'st';
 	if (floorNumber === 2) return 'nd';
@@ -117,94 +77,44 @@ function getFloorSuffix(floorNumber: number): string {
 	return 'th';
 }
 
-/**
- * Calculate payment totals for a tenant
- */
-function calculatePaymentTotals(leaseBillings: Billing[]): {
-	totalPaid: number;
-	totalRentPaid: number;
-	totalUtilitiesPaid: number;
-	totalPenaltyPaid: number;
-	totalPending: number;
-} {
-	let totalPaid = 0;
-	let totalRentPaid = 0;
-	let totalUtilitiesPaid = 0;
-	let totalPenaltyPaid = 0;
-	let totalPending = 0;
-
-	// First, let's log what we're working with
-	console.log('Calculating totals for', leaseBillings.length, 'billings');
+function calculatePaymentTotals(leaseBillings: Billing[]) {
+	let totalPaid = 0, totalRentPaid = 0, totalUtilitiesPaid = 0, totalPenaltyPaid = 0, totalPending = 0;
 
 	leaseBillings.forEach((billing) => {
-		// Add to the appropriate total based on billing type and status
-		console.log(
-			`Processing billing: type=${billing.type}, status=${billing.status}, amount=${billing.amount}, paid_amount=${billing.paid_amount || 0}`
-		);
+		const processType = (paidTarget: { add: (v: number) => void }) => {
+			if (billing.status === 'PAID') {
+				const amt = billing.paid_amount || 0;
+				paidTarget.add(amt);
+				totalPaid += amt;
+			} else if (billing.status === 'PARTIAL') {
+				const paidAmount = billing.paid_amount || 0;
+				paidTarget.add(paidAmount);
+				totalPaid += paidAmount;
+				totalPending += billing.amount - paidAmount;
+			} else if (billing.status === 'PENDING' || billing.status === 'OVERDUE') {
+				totalPending += billing.amount;
+			}
+		};
 
 		if (billing.type === 'RENT') {
-			if (billing.status === 'PAID') {
-				totalRentPaid += billing.paid_amount || 0;
-				totalPaid += billing.paid_amount || 0;
-			} else if (billing.status === 'PARTIAL') {
-				const paidAmount = billing.paid_amount || 0;
-				totalRentPaid += paidAmount;
-				totalPaid += paidAmount;
-				totalPending += billing.amount - paidAmount;
-			} else if (billing.status === 'PENDING' || billing.status === 'OVERDUE') {
-				totalPending += billing.amount;
-			}
+			processType({ add: (v) => { totalRentPaid += v; } });
 		} else if (billing.type === 'UTILITIES' || billing.type === 'UTILITY') {
-			if (billing.status === 'PAID') {
-				totalUtilitiesPaid += billing.paid_amount || 0;
-				totalPaid += billing.paid_amount || 0;
-			} else if (billing.status === 'PARTIAL') {
-				const paidAmount = billing.paid_amount || 0;
-				totalUtilitiesPaid += paidAmount;
-				totalPaid += paidAmount;
-				totalPending += billing.amount - paidAmount;
-			} else if (billing.status === 'PENDING' || billing.status === 'OVERDUE') {
-				// If the billing is pending/overdue, add to pending amount
-				totalPending += billing.amount;
-			}
+			processType({ add: (v) => { totalUtilitiesPaid += v; } });
 		} else if (billing.type === 'PENALTY') {
-			if (billing.status === 'PAID') {
-				totalPenaltyPaid += billing.paid_amount || 0;
-				totalPaid += billing.paid_amount || 0;
-			} else if (billing.status === 'PARTIAL') {
-				const paidAmount = billing.paid_amount || 0;
-				totalPenaltyPaid += paidAmount;
-				totalPaid += paidAmount;
-				totalPending += billing.amount - paidAmount;
-			} else if (billing.status === 'PENDING' || billing.status === 'OVERDUE') {
-				totalPending += billing.amount;
-			}
+			processType({ add: (v) => { totalPenaltyPaid += v; } });
 		}
 	});
 
-	const result = {
-		totalPaid,
-		totalRentPaid,
-		totalUtilitiesPaid,
-		totalPenaltyPaid,
-		totalPending
-	};
-
-	console.log('Final calculated totals:', result);
-	return result;
+	return { totalPaid, totalRentPaid, totalUtilitiesPaid, totalPenaltyPaid, totalPending };
 }
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase }, url }) => {
-	console.log('🔄 Starting lease-report load');
-
-	const { user } = await safeGetSession();
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const { user } = locals;
 	if (!user) throw error(401, 'Unauthorized');
 
-	// Current date as default start month
 	const today = new Date();
 	const defaultStartMonth = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
 
-	// Create and validate filter form
 	const filterForm = await superValidate(
 		{
 			startMonth: url.searchParams.get('startMonth') || defaultStartMonth,
@@ -223,92 +133,102 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 	try {
 		const startTime = performance.now();
 
-		// Fetch all required data for the report
-		const [
-			{ data: floors, error: floorsError },
-			{ data: properties, error: propertiesError },
-			{ data: rentalUnits, error: rentalUnitsError }
-		] = await Promise.all([
-			supabase.from('floors').select('*').eq('status', 'ACTIVE'),
-			supabase.from('properties').select('*').eq('status', 'ACTIVE'),
-			supabase.from('rental_unit').select('*, property:properties(id, name)')
+		// Fetch all required data
+		const [floorsData, propertiesData, rentalUnitsData] = await Promise.all([
+			db.select().from(floors).where(eq(floors.status, 'ACTIVE')),
+			db.select().from(properties).where(eq(properties.status, 'ACTIVE')),
+			db
+				.select({
+					id: rentalUnit.id,
+					name: rentalUnit.name,
+					number: rentalUnit.number,
+					capacity: rentalUnit.capacity,
+					floorId: rentalUnit.floorId,
+					propertyId: rentalUnit.propertyId,
+					propertyName: properties.name,
+					propertyDbId: properties.id
+				})
+				.from(rentalUnit)
+				.leftJoin(properties, eq(rentalUnit.propertyId, properties.id))
 		]);
 
-		if (floorsError) throw error(500, 'LR-1000 - Failed to load floors');
-		if (propertiesError) throw error(500, 'LR-1001 - Failed to load properties');
-		if (rentalUnitsError) throw error(500, 'LR-1002 - Failed to load rental units');
-
-		// Build lease query based on filters
-		let leaseQuery = supabase.from('leases').select(`
-        *,
-        rental_unit:rental_unit_id(*),
-        lease_tenants(*, tenant:tenant_id(*))
-      `);
-
-		// Apply status filter
+		// Build lease query
+		let leasesData;
 		if (!filterForm.data.showInactiveLeases) {
-			leaseQuery = leaseQuery.eq('status', 'ACTIVE');
+			leasesData = await db.select().from(leases).where(eq(leases.status, 'ACTIVE'));
+		} else {
+			leasesData = await db.select().from(leases);
 		}
 
-		// Get lease data
-		const { data: leases, error: leasesError } = await leaseQuery;
-		if (leasesError) throw error(500, 'LR-1003 - Failed to load leases');
+		// Fetch lease tenants with tenant data
+		const leaseIds = leasesData.map((l: any) => l.id);
+		const leaseTenantsData = leaseIds.length > 0
+			? await db
+					.select({
+						leaseId: leaseTenants.leaseId,
+						tenantId: tenants.id,
+						tenantName: tenants.name
+					})
+					.from(leaseTenants)
+					.innerJoin(tenants, eq(leaseTenants.tenantId, tenants.id))
+					.where(inArray(leaseTenants.leaseId, leaseIds))
+			: [];
 
-		// Get all unique lease IDs
-		const leaseIds = leases?.map((lease) => lease.id) || [];
+		// Fetch billings for these leases
+		const billingsData = leaseIds.length > 0
+			? await db.select().from(billings).where(inArray(billings.leaseId, leaseIds))
+			: [];
 
-		// Get all billings for these leases
-		const { data: billings, error: billingsError } = await supabase
-			.from('billings')
-			.select('*')
-			.in('lease_id', leaseIds);
+		// Build lookup maps
+		const ltMap = new Map<number, any[]>();
+		for (const lt of leaseTenantsData) {
+			if (!ltMap.has(lt.leaseId)) ltMap.set(lt.leaseId, []);
+			ltMap.get(lt.leaseId)!.push({ tenant: { id: lt.tenantId, name: lt.tenantName } });
+		}
 
-		if (billingsError) throw error(500, 'LR-1004 - Failed to load billings');
+		const billingsMap = new Map<number, any[]>();
+		for (const b of billingsData) {
+			const mapped = {
+				...b,
+				due_date: b.dueDate,
+				paid_amount: b.paidAmount,
+				lease_id: b.leaseId
+			};
+			if (!billingsMap.has(b.leaseId)) billingsMap.set(b.leaseId, []);
+			billingsMap.get(b.leaseId)!.push(mapped);
+		}
 
-		// Generate months array for report period
+		// Generate months array
 		const months = getMonthsArray(filterForm.data.startMonth, filterForm.data.monthCount);
 		const endMonth = months[months.length - 1];
 
-		// Build the report data structure
 		const reportData: LeaseReportData = {
 			floors: [],
-			reportPeriod: {
-				startMonth: filterForm.data.startMonth,
-				endMonth,
-				months
-			}
+			reportPeriod: { startMonth: filterForm.data.startMonth, endMonth, months }
 		};
 
-		// Filter floors if floorId is specified
-		let filteredFloors = floors || [];
+		let filteredFloors = floorsData || [];
 		if (filterForm.data.floorId) {
-			filteredFloors = filteredFloors.filter((floor) => floor.id === filterForm.data.floorId);
+			filteredFloors = filteredFloors.filter((floor: any) => floor.id === filterForm.data.floorId);
 		}
-
-		// Filter by property if specified
 		if (filterForm.data.propertyId) {
 			filteredFloors = filteredFloors.filter(
-				(floor) => floor.property_id === filterForm.data.propertyId
+				(floor: any) => floor.propertyId === filterForm.data.propertyId
 			);
 		}
+		filteredFloors.sort((a: any, b: any) => a.floorNumber - b.floorNumber);
 
-		// Sort floors by floor_number
-		filteredFloors.sort((a, b) => a.floor_number - b.floor_number);
-
-		// Build the hierarchical structure: Floor -> Rental Unit -> Lease -> Tenant
-		for (const floor of filteredFloors) {
+		for (const floor of filteredFloors as any[]) {
 			const floorGroup: FloorGroup = {
 				floorId: floor.id,
-				floorNumber: `${floor.floor_number}${getFloorSuffix(floor.floor_number)} Floor`,
+				floorNumber: `${floor.floorNumber}${getFloorSuffix(floor.floorNumber)} Floor`,
 				wing: floor.wing,
 				rentalUnits: []
 			};
 
-			// Get rental units for this floor
-			const floorRentalUnits = rentalUnits?.filter((unit) => unit.floor_id === floor.id) || [];
-
-			// Sort rental units by number
-			floorRentalUnits.sort((a, b) => a.number - b.number);
+			const floorRentalUnits = rentalUnitsData
+				.filter((unit: any) => unit.floorId === floor.id)
+				.sort((a: any, b: any) => a.number - b.number);
 
 			for (const unit of floorRentalUnits) {
 				const unitGroup: RentalUnitGroup = {
@@ -318,41 +238,32 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 					tenantRecords: []
 				};
 
-				// Get leases for this rental unit
-				const unitLeases = leases?.filter((lease) => lease.rental_unit_id === unit.id) || [];
+				const unitLeases = leasesData.filter((l: any) => l.rentalUnitId === unit.id);
 
-				for (const lease of unitLeases) {
-					const leaseTenants = lease.lease_tenants || [];
+				for (const lease of unitLeases as any[]) {
+					const leaseTenantsForLease = ltMap.get(lease.id) || [];
 
-					// Create one record per tenant
-					for (const leaseTenant of leaseTenants) {
+					for (const leaseTenant of leaseTenantsForLease) {
 						const tenant = leaseTenant.tenant;
 						if (!tenant) continue;
 
-						const leaseBillings = billings?.filter((b) => b.lease_id === lease.id) || [];
+						const leaseBillings = billingsMap.get(lease.id) || [];
 
-						// Fix for the unterminated string literal
-						console.log(
-							`\nInspecting billings for lease ID ${lease.id} (${lease.name}), tenant ${tenant.name}:`
-						);
-						// Determine payment status for each month
 						const monthlyPayments: MonthlyPaymentStatus[] = months.map((month) => {
-							// Calculate rent, utility, and penalty paid amounts for this month
 							const rentPaidAmount = leaseBillings
-								.filter((b) => b.type === 'RENT' && b.due_date.substring(0, 7) === month)
-								.reduce((total, billing) => total + (billing.paid_amount || 0), 0);
+								.filter((b: any) => b.type === 'RENT' && b.due_date.substring(0, 7) === month)
+								.reduce((total: number, b: any) => total + (b.paid_amount || 0), 0);
 
 							const utilitiesPaidAmount = leaseBillings
-								.filter(
-									(b) =>
-										(b.type === 'UTILITIES' || b.type === 'UTILITY') &&
-										b.due_date.substring(0, 7) === month
+								.filter((b: any) =>
+									(b.type === 'UTILITIES' || b.type === 'UTILITY') &&
+									b.due_date.substring(0, 7) === month
 								)
-								.reduce((total, billing) => total + (billing.paid_amount || 0), 0);
+								.reduce((total: number, b: any) => total + (b.paid_amount || 0), 0);
 
 							const penaltyPaidAmount = leaseBillings
-								.filter((b) => b.type === 'PENALTY' && b.due_date.substring(0, 7) === month)
-								.reduce((total, billing) => total + (billing.paid_amount || 0), 0);
+								.filter((b: any) => b.type === 'PENALTY' && b.due_date.substring(0, 7) === month)
+								.reduce((total: number, b: any) => total + (b.paid_amount || 0), 0);
 
 							return {
 								month,
@@ -368,20 +279,15 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 							};
 						});
 
-						// Calculate payment totals
 						const paymentTotals = calculatePaymentTotals(leaseBillings);
 
-						console.log(`Creating tenant record for ${tenant.name}, Lease ID: ${lease.id}`);
-						console.log('Payment totals:', paymentTotals);
-
-						// Create tenant record
 						const tenantRecord: TenantPaymentRecord = {
 							tenantId: tenant.id,
 							tenantName: tenant.name,
 							leaseId: lease.id,
 							leaseName: lease.name,
-							securityDeposit: lease.security_deposit,
-							startDate: lease.start_date,
+							securityDeposit: lease.securityDeposit,
+							startDate: lease.startDate,
 							monthlyPayments,
 							totalPaid: paymentTotals.totalPaid,
 							totalRentPaid: paymentTotals.totalRentPaid,
@@ -390,26 +296,22 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 							totalPending: paymentTotals.totalPending
 						};
 
-						console.log('Created tenant record:', tenantRecord);
-
 						unitGroup.tenantRecords.push(tenantRecord);
 					}
 				}
 
-				// Only add rental units that have tenants
 				if (unitGroup.tenantRecords.length > 0) {
 					floorGroup.rentalUnits.push(unitGroup);
 				}
 			}
 
-			// Only add floors that have rental units with tenants
 			if (floorGroup.rentalUnits.length > 0) {
 				reportData.floors.push(floorGroup);
 			}
 		}
 
 		const queryTime = performance.now() - startTime;
-		console.log('⏱️ Data fetch completed:', {
+		console.log('Data fetch completed:', {
 			floors: reportData.floors.length,
 			time: `${queryTime.toFixed(2)}ms`
 		});
@@ -417,7 +319,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 		return {
 			filterForm,
 			reportData,
-			properties: properties || []
+			properties: propertiesData || []
 		};
 	} catch (err) {
 		console.error('LR-1005 - Error in load function:', err);
@@ -428,23 +330,20 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 export const actions: Actions = {
 	default: async ({ request, url }) => {
 		const formData = await request.formData();
-		
-		// Extract form values and build URL parameters
 		const params = new URLSearchParams();
-		
+
 		const startMonth = formData.get('startMonth') as string;
 		const monthCount = formData.get('monthCount') as string;
 		const propertyId = formData.get('propertyId') as string;
 		const floorId = formData.get('floorId') as string;
 		const showInactiveLeases = formData.get('showInactiveLeases') as string;
-		
+
 		if (startMonth) params.set('startMonth', startMonth);
 		if (monthCount) params.set('monthCount', monthCount);
 		if (propertyId) params.set('propertyId', propertyId);
 		if (floorId) params.set('floorId', floorId);
 		if (showInactiveLeases) params.set('showInactiveLeases', 'true');
-		
-		// Redirect to the same page with updated URL parameters
+
 		const newUrl = url.pathname + '?' + params.toString();
 		throw redirect(302, newUrl);
 	}

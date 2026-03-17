@@ -1,6 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { supabase } from '$lib/supabaseClient';
-import type { Database } from '$lib/database.types';
+import { db } from '$lib/server/db';
+import { leases, leaseTenants } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 
 interface UpdateLeaseRequest {
 	id: number | string;
@@ -8,7 +9,7 @@ interface UpdateLeaseRequest {
 	start_date: string;
 	end_date?: string;
 	terms_month: number;
-	status: Database['public']['Enums']['lease_status'];
+	status: string;
 	unit_type: 'BEDSPACER' | 'PRIVATE_ROOM';
 	notes?: string;
 	rental_unit_id: number;
@@ -33,14 +34,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		// First, get the existing lease to preserve required fields
-		const { data: existingLease, error: fetchError } = await supabase
-			.from('leases')
-			.select('*')
-			.eq('id', leaseId)
-			.single();
+		const existingResult = await db
+			.select()
+			.from(leases)
+			.where(eq(leases.id, leaseId))
+			.limit(1);
 
-		if (fetchError || !existingLease) {
-			console.error('Lease not found:', fetchError);
+		const existingLease = existingResult[0];
+
+		if (!existingLease) {
+			console.error('Lease not found');
 			return json({ success: false, error: 'Lease not found' }, { status: 404 });
 		}
 
@@ -80,63 +83,50 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			calculatedEndDate = end.toISOString().split('T')[0];
 		}
 
-		// Create the update object, preserving required financial fields
-		const updateData: Database['public']['Tables']['leases']['Update'] = {
-			name: leaseUpdates.name.trim(),
-			start_date: leaseUpdates.start_date,
-			end_date: calculatedEndDate,
-			terms_month: leaseUpdates.terms_month,
-			status: leaseUpdates.status,
-			notes: leaseUpdates.notes?.trim() || null,
-			rental_unit_id: leaseUpdates.rental_unit_id,
-			// Preserve existing financial fields since they're required
-			rent_amount: existingLease.rent_amount,
-			security_deposit: existingLease.security_deposit,
-			balance: existingLease.balance,
-			updated_at: new Date().toISOString()
-		};
-
 		// Update the lease
-		const { data: updatedLease, error: leaseError } = await supabase
-			.from('leases')
-			.update(updateData)
-			.eq('id', leaseId)
-			.select('*')
-			.single();
+		const updatedResult = await db
+			.update(leases)
+			.set({
+				name: leaseUpdates.name.trim(),
+				startDate: leaseUpdates.start_date,
+				endDate: calculatedEndDate,
+				termsMonth: leaseUpdates.terms_month,
+				status: leaseUpdates.status,
+				notes: leaseUpdates.notes?.trim() || null,
+				rentalUnitId: leaseUpdates.rental_unit_id,
+				// Preserve existing financial fields
+				rentAmount: existingLease.rentAmount,
+				securityDeposit: existingLease.securityDeposit,
+				balance: existingLease.balance,
+				updatedAt: new Date()
+			})
+			.where(eq(leases.id, leaseId))
+			.returning();
 
-		if (leaseError) {
-			console.error('Supabase error updating lease:', leaseError);
+		const updatedLease = updatedResult[0];
+
+		if (!updatedLease) {
+			console.error('Failed to update lease');
 			return json(
-				{ success: false, error: `Database error: ${leaseError.message}` },
+				{ success: false, error: 'Database error: Failed to update lease' },
 				{ status: 500 }
 			);
 		}
 
 		// Update tenant relationships
 		if (tenantIds && tenantIds.length > 0) {
-			// First, delete existing tenant relationships
-			const { error: deleteError } = await supabase
-				.from('lease_tenants')
-				.delete()
-				.eq('lease_id', leaseId);
+			// Delete existing relationships
+			await db.delete(leaseTenants).where(eq(leaseTenants.leaseId, leaseId));
 
-			if (deleteError) {
-				console.error('Error deleting existing tenant relationships:', deleteError);
-				return json(
-					{ success: false, error: 'Failed to update tenant relationships' },
-					{ status: 500 }
-				);
-			}
-
-			// Then, create new tenant relationships
-			const leaseTenants = tenantIds.map((tenant_id) => ({
-				lease_id: leaseId,
-				tenant_id
+			// Create new relationships
+			const leaseTenantsToInsert = tenantIds.map((tenant_id) => ({
+				leaseId: leaseId,
+				tenantId: tenant_id
 			}));
 
-			const { error: relationError } = await supabase.from('lease_tenants').insert(leaseTenants);
-
-			if (relationError) {
+			try {
+				await db.insert(leaseTenants).values(leaseTenantsToInsert);
+			} catch (relationError: any) {
 				console.error('Error creating tenant relationships:', relationError);
 				return json(
 					{ success: false, error: 'Failed to update tenant relationships' },
@@ -150,12 +140,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			data: updatedLease,
 			message: 'Lease updated successfully'
 		});
-	} catch (error) {
-		console.error('Error in API endpoint:', error);
+	} catch (err) {
+		console.error('Error in API endpoint:', err);
 		return json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : 'An unexpected error occurred'
+				error: err instanceof Error ? err.message : 'An unexpected error occurred'
 			},
 			{ status: 500 }
 		);

@@ -3,115 +3,77 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { expenseSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { expenses, properties } from '$lib/server/schema';
+import { eq, desc, asc } from 'drizzle-orm';
 
-export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
-	const session = await safeGetSession();
-	if (!session) {
+export const load: PageServerLoad = async ({ locals }) => {
+	const { user, session } = locals;
+	if (!user) {
 		throw error(401, 'Unauthorized');
 	}
 
 	try {
 		// Fetch expenses and properties in parallel
-		const [
-			{ data: expensesData, error: expensesError },
-			{ data: propertiesData, error: propertiesError }
-		] = await Promise.all([
-			supabase
-				.from('expenses')
-				.select(
-					`
-          *,
-          property:properties(id, name)
-        `
-				)
-				.order('expense_date', { ascending: false }),
+		const [expensesData, propertiesData] = await Promise.all([
+			db
+				.select({
+					id: expenses.id,
+					propertyId: expenses.propertyId,
+					amount: expenses.amount,
+					description: expenses.description,
+					type: expenses.type,
+					status: expenses.status,
+					expenseDate: expenses.expenseDate,
+					createdBy: expenses.createdBy,
+					createdAt: expenses.createdAt,
+					updatedAt: expenses.updatedAt,
+					propertyName: properties.name,
+					propertyDbId: properties.id
+				})
+				.from(expenses)
+				.leftJoin(properties, eq(expenses.propertyId, properties.id))
+				.orderBy(desc(expenses.expenseDate)),
 
-			supabase
-				.from('properties')
-				.select('id, name')
-				// .eq('is_active', true)
-				.order('name')
+			db
+				.select({ id: properties.id, name: properties.name })
+				.from(properties)
+				.orderBy(asc(properties.name))
 		]);
 
-		// Handle errors
-		if (expensesError) {
-			console.error('Error fetching expenses:', expensesError);
-			throw error(500, `Error fetching expenses: ${expensesError.message}`);
+		// Format expenses to match original structure
+		const formattedExpenses = expensesData.map((expense) => ({
+			...expense,
+			property: expense.propertyDbId ? { id: expense.propertyDbId, name: expense.propertyName } : null,
+			expense_date: new Date(expense.expenseDate).toLocaleDateString('en-US', {
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit'
+			})
+		}));
+
+		let activeProperties = propertiesData || [];
+
+		// If no properties found, try without status filter
+		if (activeProperties.length === 0) {
+			console.log('No properties found, trying without any filter');
+			activeProperties = await db
+				.select({ id: properties.id, name: properties.name })
+				.from(properties)
+				.orderBy(asc(properties.name));
 		}
 
-		if (propertiesError) {
-			console.error('Error fetching properties:', propertiesError);
-			throw error(500, `Error fetching properties: ${propertiesError.message}`);
-		}
-
-		// Create a mutable copy of properties data
-		let properties = propertiesData || [];
-
-		// Format dates for expenses
-		const expenses =
-			expensesData?.map((expense) => ({
-				...expense,
-				expense_date: new Date(expense.expense_date).toLocaleDateString('en-US', {
-					year: 'numeric',
-					month: '2-digit',
-					day: '2-digit'
-				})
-			})) || [];
-
-		// Debug logging
 		console.log(
-			`Loaded ${expenses?.length || 0} expenses and ${properties.length || 0} properties`
+			`Loaded ${formattedExpenses.length || 0} expenses and ${activeProperties.length || 0} properties`
 		);
-		console.log('Properties data:', properties);
 
-		// If no properties found with is_active=true, try without the filter
-		if (properties.length === 0) {
-			console.log('No properties found with is_active=true, trying with status=ACTIVE');
-
-			// Try with status=ACTIVE
-			const { data: activeProperties, error: activePropertiesError } = await supabase
-				.from('properties')
-				.select('id, name')
-				.eq('status', 'ACTIVE')
-				.order('name');
-
-			if (activePropertiesError) {
-				console.error('Error fetching properties with status=ACTIVE:', activePropertiesError);
-			} else if (activeProperties && activeProperties.length > 0) {
-				console.log(
-					`Found ${activeProperties.length} properties with status=ACTIVE:`,
-					activeProperties
-				);
-				properties = activeProperties;
-			} else {
-				console.log('No properties found with status=ACTIVE, trying without any filter');
-
-				// Try without any filter
-				const { data: allProperties, error: allPropertiesError } = await supabase
-					.from('properties')
-					.select('id, name')
-					.order('name');
-
-				if (allPropertiesError) {
-					console.error('Error fetching all properties:', allPropertiesError);
-				} else {
-					console.log(
-						`Found ${allProperties?.length || 0} properties without filter:`,
-						allProperties
-					);
-					properties = allProperties;
-				}
-			}
-		}
-
-		// Create form for superForm
 		const form = await superValidate(zod(expenseSchema));
 
 		return {
 			form,
-			expenses,
-			properties,
-			user: session.user
+			expenses: formattedExpenses,
+			properties: activeProperties,
+			user
 		};
 	} catch (err) {
 		console.error('Error in load function:', err);
@@ -120,9 +82,9 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 };
 
 export const actions: Actions = {
-	upsert: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const session = await safeGetSession();
-		if (!session) {
+	upsert: async ({ request, locals }) => {
+		const { user, session } = locals;
+		if (!user) {
 			throw error(401, 'Unauthorized');
 		}
 
@@ -136,55 +98,44 @@ export const actions: Actions = {
 		try {
 			const { id, ...expenseData } = form.data;
 
-			// Determine if we're creating or updating
 			if (id) {
-				// This is an update
-				const { data, error: updateError } = await supabase
-					.from('expenses')
-					.update({
-						property_id: expenseData.property_id,
+				// Update
+				const result = await db
+					.update(expenses)
+					.set({
+						propertyId: expenseData.property_id,
 						amount: expenseData.amount,
 						description: expenseData.description,
 						type: expenseData.type,
 						status: expenseData.expense_status,
-						expense_date: expenseData.expense_date
+						expenseDate: expenseData.expense_date
 					})
-					.eq('id', id)
-					.select();
+					.where(eq(expenses.id, id))
+					.returning();
 
-				if (updateError) {
-					console.error('Error updating expense:', updateError);
-					return fail(500, { form, message: 'Failed to update expense' });
-				}
-
-				return { form, success: true, operation: 'update', expense: data?.[0] };
+				return { form, success: true, operation: 'update', expense: result?.[0] };
 			} else {
-				// This is a creation
-				const { data, error: insertError } = await supabase
-					.from('expenses')
-					.insert({
-						property_id: expenseData.property_id,
+				// Create
+				const result = await db
+					.insert(expenses)
+					.values({
+						propertyId: expenseData.property_id,
 						amount: expenseData.amount,
 						description: expenseData.description,
 						type: expenseData.type,
 						status: expenseData.expense_status,
-						expense_date: expenseData.expense_date,
-						created_by: session.user.id
+						expenseDate: expenseData.expense_date,
+						createdBy: user.id
 					})
-					.select();
+					.returning();
 
 				console.log('Creating expense with data:', {
 					inputData: expenseData,
-					dbData: data,
+					dbData: result,
 					type: expenseData.type
 				});
 
-				if (insertError) {
-					console.error('Error creating expense:', insertError);
-					return fail(500, { form, message: 'Failed to create expense' });
-				}
-
-				return { form, success: true, operation: 'create', expense: data?.[0] };
+				return { form, success: true, operation: 'create', expense: result?.[0] };
 			}
 		} catch (err) {
 			console.error('Error in upsert operation:', err);
@@ -192,18 +143,15 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const session = await safeGetSession();
-		if (!session) {
+	delete: async ({ request, locals }) => {
+		const { user, session } = locals;
+		if (!user) {
 			throw error(401, 'Unauthorized');
 		}
 
-		let id;
-
 		try {
-			// Parse the request body as form data
 			const formData = await request.formData();
-			id = formData.get('id');
+			const id = formData.get('id');
 
 			console.log('Received delete request with ID:', id);
 
@@ -213,18 +161,12 @@ export const actions: Actions = {
 			}
 
 			console.log('Attempting to delete expense with ID:', id);
-			const { data, error: deleteError } = await supabase
-				.from('expenses')
-				.delete()
-				.eq('id', id)
-				.select();
+			const result = await db
+				.delete(expenses)
+				.where(eq(expenses.id, Number(id)))
+				.returning();
 
-			console.log('Delete result:', { data, error: deleteError });
-
-			if (deleteError) {
-				console.error('Error deleting expense:', deleteError);
-				return fail(500, { message: 'Failed to delete expense' });
-			}
+			console.log('Delete result:', { data: result });
 
 			return { success: true };
 		} catch (err) {

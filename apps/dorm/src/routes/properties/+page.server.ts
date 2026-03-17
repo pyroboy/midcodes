@@ -4,9 +4,12 @@ import type { PageServerLoad, Actions, RequestEvent } from './$types';
 import { zod } from 'sveltekit-superforms/adapters';
 import { propertySchema, preparePropertyData } from './formSchema';
 import { cache, cacheKeys } from '$lib/services/cache';
+import { db } from '$lib/server/db';
+import { properties } from '$lib/server/schema';
+import { eq, desc, asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, permissions } = locals;
+	const { permissions } = locals;
 
 	// Log the current user's permissions for this page load.
 	console.log('[Properties Page] Current user permissions:', permissions);
@@ -17,34 +20,34 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw error(403, 'Forbidden: You do not have permission to view properties.');
 	}
 
-	// CORRECTED: This query now fetches ALL properties, ignoring URL parameters.
-	// This makes the /properties page the source of truth for the complete list.
-	const propertiesResult = await supabase.from('properties').select('*').order('name');
+	try {
+		// Fetch ALL properties, ordered by name
+		const propertiesData = await db
+			.select()
+			.from(properties)
+			.orderBy(asc(properties.name));
 
-	// Handle potential database errors.
-	if (propertiesResult.error) {
-		console.error('Error loading properties:', propertiesResult.error);
+		// Prepare the form for the page.
+		const form = await superValidate(zod(propertySchema));
+
+		return {
+			form,
+			properties: propertiesData ?? []
+		};
+	} catch (err) {
+		console.error('Error loading properties:', err);
 		// Return a valid state for the page to render, even on error.
 		return {
 			form: await superValidate(zod(propertySchema)),
 			properties: []
 		};
 	}
-
-	// Prepare the form for the page.
-	const form = await superValidate(zod(propertySchema));
-
-	return {
-		form,
-		properties: propertiesResult.data ?? []
-	};
 };
 
 // --- ACTIONS ---
-// (Your existing actions for create, update, and delete remain unchanged)
 
 export const actions: Actions = {
-	create: async ({ request, locals: { supabase } }) => {
+	create: async ({ request }) => {
 		const form = await superValidate(request, zod(propertySchema));
 
 		if (!form.valid) {
@@ -53,10 +56,11 @@ export const actions: Actions = {
 
 		// remove id, created_at, updated_at
 		const { id, created_at, updated_at, ...propertyData } = form.data;
-		const { error } = await supabase.from('properties').insert(propertyData);
 
-		if (error) {
-			if (error.message?.includes('Policy check failed')) {
+		try {
+			await db.insert(properties).values(propertyData);
+		} catch (err: any) {
+			if (err.message?.includes('Policy check failed')) {
 				return fail(403, { form, message: 'You do not have permission to create properties' });
 			}
 			return fail(500, { form, message: 'Failed to create property' });
@@ -67,7 +71,7 @@ export const actions: Actions = {
 
 		return { form };
 	},
-	update: async ({ request, locals: { supabase } }: RequestEvent) => {
+	update: async ({ request }: RequestEvent) => {
 		const form = await superValidate(request, zod(propertySchema));
 
 		if (!form.valid) {
@@ -76,10 +80,13 @@ export const actions: Actions = {
 
 		const propertyData = preparePropertyData(form.data);
 
-		const { error } = await supabase.from('properties').update(propertyData).eq('id', form.data.id);
-
-		if (error) {
-			console.error('Error updating property:', error);
+		try {
+			await db
+				.update(properties)
+				.set(propertyData)
+				.where(eq(properties.id, form.data.id));
+		} catch (err: any) {
+			console.error('Error updating property:', err);
 			return fail(500, {
 				form,
 				error: 'Failed to update property'
@@ -92,7 +99,7 @@ export const actions: Actions = {
 		return { form };
 	},
 
-	delete: async ({ request, locals: { supabase } }: RequestEvent) => {
+	delete: async ({ request }: RequestEvent) => {
 		const data = await request.formData();
 		const id = data.get('id');
 
@@ -104,27 +111,17 @@ export const actions: Actions = {
 		}
 
 		try {
-			const { error: deleteError } = await supabase.from('properties').delete().eq('id', id);
-
-			if (deleteError) {
-				console.error('Delete error details:', {
-					message: deleteError.message,
-					code: deleteError.code,
-					details: deleteError.details,
-					hint: deleteError.hint
-				});
-				throw deleteError;
-			}
+			await db.delete(properties).where(eq(properties.id, Number(id)));
 
 			// Invalidate properties cache after delete
 			cache.deletePattern(/^properties:/);
 
 			return { success: true };
-		} catch (error: any) {
-			console.error('Delete error full details:', error);
+		} catch (err: any) {
+			console.error('Delete error full details:', err);
 
 			// Handle specific PostgreSQL error codes
-			switch (error?.code) {
+			switch (err?.code) {
 				case '23503': // foreign key violation
 					return fail(400, {
 						error: 'Cannot delete property because it has units or leases attached to it'
@@ -135,7 +132,7 @@ export const actions: Actions = {
 					});
 				default:
 					return fail(500, {
-						error: error.message || 'Failed to delete property'
+						error: err.message || 'Failed to delete property'
 					});
 			}
 		}

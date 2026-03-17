@@ -1,219 +1,157 @@
-import { createServerClient } from '@supabase/ssr';
-import type { User, Session } from '@supabase/supabase-js';
+import { auth } from '$lib/server/auth';
+import { db, dbQuery } from '$lib/server/db';
+import { profiles } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 import { sequence } from '@sveltejs/kit/hooks';
-import { redirect, error as throwError } from '@sveltejs/kit';
-import { env as publicEnv } from '$env/dynamic/public';
+import { redirect } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import type { Handle } from '@sveltejs/kit';
-import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
-import type { UserJWTPayload } from '$lib/types/auth';
+import { initializeEnv } from '$lib/server/env';
 
-export interface GetSessionResult {
-	session: Session | null;
-	error: Error | null;
-	user: User | null;
-	decodedToken: UserJWTPayload | null;
-	permissions?: string[];
-}
+// Flag to track if environment has been validated (runs once on first request)
+let _envValidated = false;
 
-const initializeSupabase: Handle = async ({ event, resolve }) => {
-    const supabaseUrl = publicEnv.PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = publicEnv.PUBLIC_SUPABASE_ANON_KEY;
+const betterAuthHandle: Handle = async ({ event, resolve }) => {
+	// SECURITY: Validate environment variables on first request
+	if (!_envValidated) {
+		try {
+			initializeEnv();
+		} catch (e) {
+			console.error('[AUTH] Environment init FAILED:', e);
+			throw e;
+		}
+		_envValidated = true;
+	}
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-        console.error('Supabase environment variables are missing. Please set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY.');
-        throw throwError(500, 'Server configuration error');
-    }
+	// Better Auth session management with retry and timeout
+	let result: any = null;
+	try {
+		result = await dbQuery(
+			() =>
+				auth.api.getSession({
+					headers: event.request.headers
+				}),
+			3000 // 3 second timeout for session retrieval
+		);
+	} catch (e) {
+		console.error('[AUTH] getSession FAILED:', e);
+		// Don't throw - allow request to continue without session
+	}
 
-    event.locals.supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-		cookies: {
-			get: (key) => event.cookies.get(key),
-			set: (key, value, options) => {
-				try {
-					event.cookies.set(key, value, {
-						...options,
-						path: '/',
-						sameSite: 'lax',
-						secure: process.env.NODE_ENV === 'production'
-					});
-				} catch (error) {
-					console.error('Cookie could not be set:', error);
-				}
-			},
-			remove: (key, options) => {
-				try {
-					event.cookies.delete(key, { path: '/', ...options });
-				} catch (error) {
-					console.error('Cookie could not be removed:', error);
-				}
+	event.locals.session = result?.session ?? null;
+	event.locals.user = result?.user ?? null;
+
+	if (result?.user) {
+		// Fetch profile data from Neon via Drizzle with retry and timeout
+		let userProfile: any = null;
+		try {
+			const [profile] = await dbQuery(
+				() =>
+					db
+						.select()
+						.from(profiles)
+						.where(eq(profiles.id, result.user.id))
+						.limit(1),
+				5000 // 5 second timeout for profile fetch
+			);
+			userProfile = profile;
+		} catch (e) {
+			console.error('[AUTH] Profile fetch FAILED:', e);
+			// Continue without profile - user will have limited access
+		}
+
+		if (userProfile) {
+			const roles = userProfile.role ? [userProfile.role] : [];
+			const effectiveRoles = roles;
+
+			// Get permissions with retry and timeout
+			let permissions: string[] = [];
+			try {
+				permissions = await dbQuery(
+					() => getUserPermissions(effectiveRoles, userProfile.id),
+					3000 // 3 second timeout for permissions
+				);
+			} catch (e) {
+				console.error('[AUTH] Permissions fetch FAILED:', e);
 			}
+
+			event.locals.org_id = userProfile.orgId ?? undefined;
+			event.locals.permissions = permissions;
+			event.locals.effectiveRoles = effectiveRoles;
 		}
-	});
-
-	event.locals.safeGetSession = async () => {
-		// Parallel fetch of user and session data
-		const [userResponse, sessionResponse] = await Promise.all([
-			event.locals.supabase.auth.getUser(),
-			event.locals.supabase.auth.getSession()
-		]);
-
-		const {
-			data: { user },
-			error: userError
-		} = userResponse;
-		const {
-			data: { session: initialSession },
-			error: sessionError
-		} = sessionResponse;
-
-		if (userError || !user) {
-			return {
-				session: null,
-				error: userError || new Error('User not authenticated'),
-				user: null,
-				decodedToken: null,
-				permissions: []
-			};
-		}
-
-		if (sessionError || !initialSession) {
-			return {
-				session: null,
-				error: sessionError || new Error('Invalid session'),
-				user: null,
-				decodedToken: null,
-				permissions: []
-			};
-		}
-
-		let currentSession = initialSession;
-		if (currentSession.expires_at) {
-			const expiresAt = Math.floor(new Date(currentSession.expires_at).getTime() / 1000);
-			const now = Math.floor(Date.now() / 1000);
-
-			if (now > expiresAt) {
-				try {
-					const {
-						data: { session: refreshedSession },
-						error
-					} = await event.locals.supabase.auth.setSession({
-						access_token: currentSession.access_token,
-						refresh_token: currentSession.refresh_token
-					});
-
-					if (!error && refreshedSession) {
-						currentSession = refreshedSession;
-					}
-				} catch (err) {
-					console.warn('Session refresh failed:', err);
-					// Continue with existing session
-				}
-			}
-		}
-
-		// Decode JWT and get permissions
-		const decodedToken = currentSession.access_token
-			? jwtDecode<UserJWTPayload>(currentSession.access_token)
-			: null;
-
-		// Debug JWT decoding - only in development
-		if (process.env.NODE_ENV === 'development' && decodedToken) {
-			console.log('🔍 JWT Decoded:', {
-				userId: user.id,
-				userRoles: decodedToken.user_roles,
-				hasUserRoles: !!decodedToken.user_roles,
-				userRolesLength: decodedToken.user_roles?.length || 0,
-				userMetadata: user.user_metadata
-			});
-		}
-
-		// Get permissions directly without caching
-		const permissions = decodedToken
-			? await getUserPermissions(decodedToken.user_roles, event.locals.supabase)
-			: [];
-
-		return {
-			session: currentSession,
-			error: null,
-			user,
-			decodedToken,
-			permissions
-		};
-	};
+	}
 
 	return resolve(event);
 };
 
-const cacheControl: Handle = async ({ event, resolve }) => {
-	const response = await resolve(event);
+const securityHeadersHandle: Handle = async ({ event, resolve }) => {
+	// SECURITY: Build Content Security Policy
+	const connectSrc = dev
+		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* ws://localhost:*"
+		: "connect-src 'self' https://*.neon.tech";
 
-	// Skip cache headers in development to avoid conflicts with Vite dev server
-	if (process.env.NODE_ENV === 'development') {
-		return response;
-	}
+	const cspDirectives = [
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+		"img-src 'self' data: blob: https://*.neon.tech",
+		connectSrc,
+		"worker-src 'self' blob:",
+		"frame-ancestors 'none'",
+		"base-uri 'self'",
+		"form-action 'self'"
+	].join('; ');
 
-	// Add cache headers only in production
-	if (event.url.pathname.startsWith('/_app/') || event.url.pathname.startsWith('/favicon')) {
-		response.headers.set('cache-control', 'public, max-age=31536000, immutable');
-	} else if (
-		response.status === 200 &&
-		(event.url.pathname.startsWith('/reports') || event.url.pathname.startsWith('/lease-report'))
-	) {
-		response.headers.set('cache-control', 'public, max-age=300, stale-while-revalidate=600');
-		response.headers.set('vary', 'Accept-Encoding');
-	}
+	event.setHeaders({
+		'X-Frame-Options': 'DENY',
+		'X-Content-Type-Options': 'nosniff',
+		'Referrer-Policy': 'strict-origin-when-cross-origin',
+		'Permissions-Policy': 'geolocation=(), microphone=(), camera=(self)',
+		'Content-Security-Policy': cspDirectives,
+		...(dev
+			? {}
+			: {
+					'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+				})
+	});
 
-	// Security headers for production
-	response.headers.set('x-frame-options', 'DENY');
-	response.headers.set('x-content-type-options', 'nosniff');
-	response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
-
-	return response;
+	return resolve(event);
 };
 
 const authGuard: Handle = async ({ event, resolve }) => {
-	const sessionInfo = await event.locals.safeGetSession();
+	const path = event.url.pathname;
+	const isUserLoggedIn = !!event.locals.user;
 
-	// Set all info in locals
-	event.locals.session = sessionInfo.session;
-	event.locals.user = sessionInfo.user;
-	event.locals.decodedToken = sessionInfo.decodedToken ?? undefined;
-	event.locals.permissions = sessionInfo.permissions;
-
-	// Handle API routes
-	if (event.url.pathname.startsWith('/api')) {
-		if (!sessionInfo.user) {
-			throw throwError(401, 'Unauthorized');
+	// 1. Handle API routes (except auth API)
+	if (path.startsWith('/api') && !path.startsWith('/api/auth')) {
+		if (!isUserLoggedIn) {
+			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+				status: 401,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		}
-		return resolve(event);
 	}
 
-	// Allow access to auth routes when not authenticated
-	if (event.url.pathname.startsWith('/auth')) {
-		// If user is already authenticated and trying to access auth routes (except signout),
-		// handle role-based redirects
-		if (sessionInfo.decodedToken && event.url.pathname !== '/auth/signout') {
+	// 2. Public vs Private routing
+	const isAuthRoute = path.startsWith('/auth') || path.startsWith('/api/auth');
+	const isPublicRoute = path.startsWith('/utility-input/');
+
+	if (isUserLoggedIn) {
+		// Redirect logged-in users away from auth pages (except signout)
+		if (path.startsWith('/auth') && !path.startsWith('/auth/signout')) {
 			const returnTo = event.url.searchParams.get('returnTo');
-			if (returnTo) {
+			if (returnTo && !returnTo.startsWith('/auth')) {
 				throw redirect(303, returnTo);
 			}
-			// If no returnTo is specified, redirect to the home page
 			throw redirect(303, '/');
 		}
-		return resolve(event);
-	}
-
-	// Allow PUBLIC access to utility input routes
-	if (event.url.pathname.startsWith('/utility-input/')) {
-		return resolve(event);
-	}
-
-	// Require authentication for all other routes
-	if (!sessionInfo.session && !event.url.pathname.startsWith('/auth')) {
-		throw redirect(303, `/auth?returnTo=${event.url.pathname}`);
+	} else if (!isAuthRoute && !isPublicRoute) {
+		// Redirect unauthenticated users to auth page
+		throw redirect(303, `/auth?returnTo=${encodeURIComponent(path)}`);
 	}
 
 	return resolve(event);
 };
 
-export const handle = sequence(initializeSupabase, authGuard, cacheControl);
+export const handle = sequence(betterAuthHandle, securityHeadersHandle, authGuard);

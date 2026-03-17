@@ -1,6 +1,5 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { Database } from '$lib/database.types';
 
 // Configure ISR for report caching
 export const config = {
@@ -10,9 +9,9 @@ export const config = {
 	}
 };
 
-export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, url }) => {
-	const session = await safeGetSession();
-	if (!session) {
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const { user } = locals;
+	if (!user) {
 		throw error(401, 'Unauthorized');
 	}
 
@@ -21,7 +20,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 	const month =
 		url.searchParams.get('month') ||
 		new Date().toLocaleString('en-US', { month: 'long' }).toLowerCase();
-	
+
 	// Property will be handled by global state, but still accept URL override for deep linking
 	const propertyIdOverride = url.searchParams.get('propertyId') || null;
 

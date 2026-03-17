@@ -9,12 +9,14 @@ import {
 	type EmergencyContact,
 	parseEmergencyContactFromForm
 } from './formSchema';
-import type { Database } from '$lib/database.types';
 import type { TenantResponse } from '$lib/types/tenant';
 import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+import { db } from '$lib/server/db';
+import { tenants, leaseTenants, leases, rentalUnit, properties } from '$lib/server/schema';
+import { eq, and, asc, ne, isNull, ilike, sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, depends }) => {
-	const { user, permissions } = await locals.safeGetSession();
+	const { user, permissions } = locals;
 	if (!permissions.includes('tenants.read')) throw error(401, 'Unauthorized');
 
 	// Set up dependencies for invalidation
@@ -22,157 +24,139 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 
 	// Return minimal data for instant navigation
 	return {
-		// Start with empty arrays for instant rendering
 		tenants: [],
 		properties: [],
 		form: await superValidate(zod(tenantFormSchema)),
-		// Flag to indicate lazy loading
 		lazy: true,
-		// Return promises that resolve with the actual data (server-side cached)
-		tenantsPromise: loadTenantsData(locals),
-		propertiesPromise: loadPropertiesData(locals)
+		tenantsPromise: loadTenantsData(),
+		propertiesPromise: loadPropertiesData()
 	};
 };
 
-// Separate function to load tenants data with server-side caching
-async function loadTenantsData(locals: any) {
-	// Check cache first
+async function loadTenantsData() {
 	const cacheKey = cacheKeys.tenants();
 	const cached = cache.get<TenantResponse[]>(cacheKey);
 	if (cached) {
-		console.log('🎯 CACHE HIT: Returning cached tenants data');
+		console.log('CACHE HIT: Returning cached tenants data');
 		return cached;
 	}
 
-	console.log('💾 CACHE MISS: Fetching tenants from database');
-	const tenantsResult = await locals.supabase
-		.from('tenants')
-		.select(
-			`
-      *,
-      lease_tenants:lease_tenants!tenant_id(
-        lease:leases(
-          id,
-          name,
-          start_date,
-          end_date,
-          status,
-          rental_unit:rental_unit_id(
-            id,
-            name,
-            number,
-            base_rate,
-            property:properties!rental_unit_property_id_fkey(id, name)
-          )
-        )
-      )
-    `
-		)
-		.is('deleted_at', null) // Only load non-deleted tenants
-		.order('name');
+	console.log('CACHE MISS: Fetching tenants from database');
 
-	if (tenantsResult.error) {
-		console.error('Error loading tenants:', tenantsResult.error);
-		throw error(500, 'Failed to load tenants');
+	// Fetch all non-deleted tenants
+	const tenantsData = await db
+		.select()
+		.from(tenants)
+		.where(isNull(tenants.deletedAt))
+		.orderBy(asc(tenants.name));
+
+	// Fetch lease-tenant relationships with lease and rental unit data
+	const leaseTenantsData = await db
+		.select({
+			tenantId: leaseTenants.tenantId,
+			leaseId: leases.id,
+			leaseName: leases.name,
+			leaseStartDate: leases.startDate,
+			leaseEndDate: leases.endDate,
+			leaseStatus: leases.status,
+			unitId: rentalUnit.id,
+			unitName: rentalUnit.name,
+			unitNumber: rentalUnit.number,
+			unitBaseRate: rentalUnit.baseRate,
+			propertyId: properties.id,
+			propertyName: properties.name
+		})
+		.from(leaseTenants)
+		.innerJoin(leases, eq(leaseTenants.leaseId, leases.id))
+		.leftJoin(rentalUnit, eq(leases.rentalUnitId, rentalUnit.id))
+		.leftJoin(properties, eq(rentalUnit.propertyId, properties.id));
+
+	// Build tenant -> leases map
+	const tenantLeasesMap = new Map<number, any[]>();
+	for (const lt of leaseTenantsData) {
+		if (!tenantLeasesMap.has(lt.tenantId)) tenantLeasesMap.set(lt.tenantId, []);
+		tenantLeasesMap.get(lt.tenantId)!.push({
+			id: lt.leaseId,
+			name: lt.leaseName,
+			start_date: lt.leaseStartDate,
+			end_date: lt.leaseEndDate,
+			status: lt.leaseStatus,
+			rental_unit: lt.unitId
+				? {
+						id: lt.unitId,
+						name: lt.unitName,
+						number: lt.unitNumber,
+						property: lt.propertyId ? { id: lt.propertyId, name: lt.propertyName } : null
+					}
+				: null
+		});
 	}
 
-	console.log(`📊 Fetched ${tenantsResult.data?.length || 0} tenants from database`);
+	// Process tenants with lease info
+	const processedTenants = tenantsData.map((tenant) => {
+		const tenantLeases = tenantLeasesMap.get(tenant.id) || [];
+		const primaryLease =
+			tenantLeases.find((l: any) => l.status === 'ACTIVE') || tenantLeases[0] || null;
 
-	// Process all leases for each tenant (not just the first one)
-	const tenants = tenantsResult.data.map((tenant: any) => {
-		// Extract all leases for this tenant
-		const leases = tenant.lease_tenants
-			?.map((lt: any) => lt.lease)
-			.filter((lease: any) => lease !== null)
-			.map((lease: any) => ({
-				id: lease.id,
-				name: lease.name,
-				start_date: lease.start_date,
-				end_date: lease.end_date,
-				status: lease.status,
-				rental_unit: lease.rental_unit ? {
-					id: lease.rental_unit.id,
-					name: lease.rental_unit.name,
-					number: lease.rental_unit.number,
-					property: lease.rental_unit.property
-				} : null
-			})) || [];
-
-		// For backward compatibility, set the primary lease (first active lease or first lease)
-		const primaryLease = leases.find((l: any) => l.status === 'ACTIVE') || leases[0] || null;
-
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const { lease_tenants, ...rest } = tenant;
-
-		const processedTenant = {
-			...rest,
-			leases,
-			lease: primaryLease // backward compatibility
+		return {
+			...tenant,
+			leases: tenantLeases,
+			lease: primaryLease
 		};
-
-		return processedTenant;
 	}) as TenantResponse[];
 
-	console.log(`✅ Processed ${tenants.length} tenants with status breakdown:`, {
-		active: tenants.filter(t => t.tenant_status === 'ACTIVE').length,
-		inactive: tenants.filter(t => t.tenant_status === 'INACTIVE').length,
-		pending: tenants.filter(t => t.tenant_status === 'PENDING').length,
-		blacklisted: tenants.filter(t => t.tenant_status === 'BLACKLISTED').length
+	console.log(`Processed ${processedTenants.length} tenants with status breakdown:`, {
+		active: processedTenants.filter((t) => t.tenant_status === 'ACTIVE').length,
+		inactive: processedTenants.filter((t) => t.tenant_status === 'INACTIVE').length,
+		pending: processedTenants.filter((t) => t.tenant_status === 'PENDING').length,
+		blacklisted: processedTenants.filter((t) => t.tenant_status === 'BLACKLISTED').length
 	});
 
-	// Cache the data (5 minutes TTL)
-	cache.set(cacheKey, tenants, CACHE_TTL.MEDIUM);
-	console.log('✅ Cached tenants data');
+	cache.set(cacheKey, processedTenants, CACHE_TTL.MEDIUM);
+	console.log('Cached tenants data');
 
-	return tenants;
+	return processedTenants;
 }
 
-// Separate function to load properties data with server-side caching
-async function loadPropertiesData(locals: any) {
-	// Check cache first
+async function loadPropertiesData() {
 	const cacheKey = cacheKeys.activeProperties();
 	const cached = cache.get<any[]>(cacheKey);
 	if (cached) {
-		console.log('🎯 CACHE HIT: Returning cached properties data');
+		console.log('CACHE HIT: Returning cached properties data');
 		return cached;
 	}
 
-	console.log('💾 CACHE MISS: Fetching properties from database');
-	const propertiesResult = await locals.supabase
-		.from('properties')
-		.select('id, name')
-		.eq('status', 'ACTIVE')
-		.order('name');
+	console.log('CACHE MISS: Fetching properties from database');
+	const propertiesData = await db
+		.select({ id: properties.id, name: properties.name })
+		.from(properties)
+		.where(eq(properties.status, 'ACTIVE'))
+		.orderBy(asc(properties.name));
 
-	const properties = propertiesResult.data || [];
+	cache.set(cacheKey, propertiesData, CACHE_TTL.LONG);
+	console.log('Cached properties data');
 
-	// Cache the data (10 minutes TTL)
-	cache.set(cacheKey, properties, CACHE_TTL.LONG);
-	console.log('✅ Cached properties data');
-
-	return properties;
+	return propertiesData;
 }
 
-// Base tenant insert type from database
+// Base tenant insert type
 type TenantInsertBase = {
 	name: string;
-	contact_number: string | null;
+	contactNumber: string | null;
 	email: string | null;
-    address: string | null;
-	tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
-	emergency_contact: EmergencyContact | null;
-    profile_picture_url?: string | null;
-    school_or_workplace: string | null;
-    facebook_name: string | null;
-    birthday: string | null;
+	address: string | null;
+	tenantStatus: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
+	emergencyContact: EmergencyContact | null;
+	profilePictureUrl?: string | null;
+	schoolOrWorkplace: string | null;
+	facebookName: string | null;
+	birthday: string | null;
 };
 
-// Types for database operations
-type TenantInsert = TenantInsertBase;
-type TenantUpdate = Partial<TenantInsertBase & { updated_at: string }>;
+type TenantUpdate = Partial<TenantInsertBase & { updatedAt: Date }>;
 
 export const actions: Actions = {
-	create: async ({ request, locals: { supabase } }: RequestEvent) => {
+	create: async ({ request }: RequestEvent) => {
 		const form = await superValidate(request, zod(tenantFormSchema));
 
 		if (!form.valid) {
@@ -180,89 +164,89 @@ export const actions: Actions = {
 			return fail(400, { form });
 		}
 
-		console.log('🔄 Create action - Received form data:', form.data);
+		console.log('Create action - Received form data:', form.data);
 
-		// Use the helper function to parse emergency contact
 		const parsedEmergencyContact = parseEmergencyContactFromForm(form.data);
-		console.log('🔍 Create - Parsed emergency contact:', parsedEmergencyContact);
 
 		// Check for duplicate email if provided (excluding soft-deleted tenants)
-		console.log('🔍 Email check - form.data.email:', form.data.email);
-		console.log('🔍 Email check - typeof:', typeof form.data.email);
-		console.log('🔍 Email check - length:', form.data.email?.length);
-		console.log('🔍 Email check - trimmed:', form.data.email?.trim());
-
 		if (form.data.email && form.data.email.trim() !== '') {
-			console.log('🔍 Email check - Checking for duplicates with email:', form.data.email);
+			const existingTenant = await db
+				.select({ id: tenants.id })
+				.from(tenants)
+				.where(
+					and(
+						eq(tenants.email, form.data.email.trim()),
+						isNull(tenants.deletedAt)
+					)
+				)
+				.limit(1);
 
-			const existingTenant = await supabase
-				.from('tenants')
-				.select('id')
-				.eq('email', form.data.email.trim())
-				.is('deleted_at', null)
-				.single();
-
-			console.log('🔍 Email check - Query result:', existingTenant);
-
-			if (existingTenant.data) {
-				console.log('🔍 Email check - Duplicate found!');
+			if (existingTenant.length > 0) {
 				form.errors.email = ['A tenant with this email already exists'];
 				return fail(400, {
 					form,
 					message: 'Duplicate email found: A tenant with this email already exists'
 				});
 			}
-		} else {
-			console.log('🔍 Email check - Skipping duplicate check (empty or null email)');
 		}
 
-		// Safeguard: prevent exact-name duplicates without distinct contact details (case-insensitive)
+		// Safeguard: prevent exact-name duplicates without distinct contact details
 		const normalizedName = form.data.name.trim();
 		const normalizedEmail = form.data.email?.trim().toLowerCase() || null;
 		const normalizedContact = form.data.contact_number?.trim() || null;
 
-		const possibleDuplicates = await supabase
-			.from('tenants')
-			.select('id, name, email, contact_number')
-			.ilike('name', normalizedName)
-			.is('deleted_at', null);
+		const possibleDuplicates = await db
+			.select({ id: tenants.id, name: tenants.name, email: tenants.email, contactNumber: tenants.contactNumber })
+			.from(tenants)
+			.where(
+				and(
+					ilike(tenants.name, normalizedName),
+					isNull(tenants.deletedAt)
+				)
+			);
 
-		if (possibleDuplicates.data && possibleDuplicates.data.length > 0) {
-			const conflict = possibleDuplicates.data.find((t) => {
+		if (possibleDuplicates.length > 0) {
+			const conflict = possibleDuplicates.find((t) => {
 				const tEmail = (t.email || '').trim().toLowerCase() || null;
-				const tContact = (t.contact_number || '').trim() || null;
-				const sameEmail = normalizedEmail && tEmail ? normalizedEmail === tEmail : !normalizedEmail && !tEmail;
-				const sameContact = normalizedContact && tContact ? normalizedContact === tContact : !normalizedContact && !tContact;
-				// Duplicate if name matches and there is no distinguishing contact detail
+				const tContact = (t.contactNumber || '').trim() || null;
+				const sameEmail =
+					normalizedEmail && tEmail
+						? normalizedEmail === tEmail
+						: !normalizedEmail && !tEmail;
+				const sameContact =
+					normalizedContact && tContact
+						? normalizedContact === tContact
+						: !normalizedContact && !tContact;
 				return sameEmail || sameContact;
 			});
 
 			if (conflict) {
-				form.errors.name = ['A tenant with this name already exists without distinct contact details'];
-				return fail(400, { form, message: 'Duplicate tenant: provide distinct email or contact number' });
+				form.errors.name = [
+					'A tenant with this name already exists without distinct contact details'
+				];
+				return fail(400, {
+					form,
+					message: 'Duplicate tenant: provide distinct email or contact number'
+				});
 			}
 		}
 
-		const insertData: TenantInsert = {
-			name: form.data.name,
-			contact_number: form.data.contact_number || null,
-			email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
-			address: form.data.address ?? null,
-			tenant_status: form.data.tenant_status || 'PENDING',
-			emergency_contact: parsedEmergencyContact,
-			profile_picture_url: form.data.profile_picture_url || null,
-			school_or_workplace: form.data.school_or_workplace ?? null,
-			facebook_name: form.data.facebook_name ?? null,
-			birthday: form.data.birthday ?? null
-		};
-
-		console.log('🔄 Create action - Sending to database:', insertData);
-
-		const { error: insertError } = await supabase.from('tenants').insert(insertData);
-
-		if (insertError) {
-			console.error('Failed to create tenant:', insertError);
-			if (insertError.message?.includes('Policy check failed')) {
+		try {
+			await db.insert(tenants).values({
+				name: form.data.name,
+				contactNumber: form.data.contact_number || null,
+				email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
+				address: form.data.address ?? null,
+				tenantStatus: form.data.tenant_status || 'PENDING',
+				emergencyContact: parsedEmergencyContact,
+				profilePictureUrl: form.data.profile_picture_url || null,
+				schoolOrWorkplace: form.data.school_or_workplace ?? null,
+				facebookName: form.data.facebook_name ?? null,
+				birthday: form.data.birthday ?? null
+			});
+		} catch (err: any) {
+			console.error('Failed to create tenant:', err);
+			if (err.message?.includes('Policy check failed')) {
 				form.errors._errors = ['You do not have permission to create tenants'];
 				return fail(403, { form });
 			}
@@ -270,129 +254,124 @@ export const actions: Actions = {
 			return fail(500, { form });
 		}
 
-		console.log('✅ Create action - Successfully created tenant');
+		console.log('Create action - Successfully created tenant');
 
-		// Invalidate tenants cache after create
 		cache.delete(cacheKeys.tenants());
-		console.log('🗑️ Invalidated tenants cache');
+		console.log('Invalidated tenants cache');
 
 		return { form };
 	},
 
-	update: async ({ request, locals: { supabase } }: RequestEvent) => {
+	update: async ({ request }: RequestEvent) => {
 		const form = await superValidate(request, zod(tenantFormSchema));
 		if (!form.valid) {
 			console.error('Form validation failed:', form.errors);
 			return fail(400, { form });
 		}
 
-		console.log('🔄 Update action - Received form data:', {
-			id: form.data.id,
-			name: form.data.name,
-			profile_picture_url: form.data.profile_picture_url,
-			formDataKeys: Object.keys(form.data)
-		});
-
-		// Use the helper function to parse emergency contact
 		const parsedEmergencyContact = parseEmergencyContactFromForm(form.data);
-		console.log('🔍 Update - Parsed emergency contact:', parsedEmergencyContact);
 
-		// Check for duplicate email, excluding current tenant and soft-deleted tenants
-		console.log('🔍 Update Email check - form.data.email:', form.data.email);
-		console.log('🔍 Update Email check - form.data.id:', form.data.id);
-
+		// Check for duplicate email, excluding current tenant
 		if (form.data.email && form.data.email.trim() !== '') {
-			console.log('🔍 Update Email check - Checking for duplicates with email:', form.data.email);
+			const existingTenant = await db
+				.select({ id: tenants.id })
+				.from(tenants)
+				.where(
+					and(
+						eq(tenants.email, form.data.email.trim()),
+						ne(tenants.id, form.data.id),
+						isNull(tenants.deletedAt)
+					)
+				)
+				.limit(1);
 
-			const existingTenant = await supabase
-				.from('tenants')
-				.select('id')
-				.eq('email', form.data.email.trim())
-				.neq('id', form.data.id)
-				.is('deleted_at', null)
-				.single();
-
-			console.log('🔍 Update Email check - Query result:', existingTenant);
-
-			if (existingTenant.data) {
-				console.error('Duplicate email found:', form.data.email);
+			if (existingTenant.length > 0) {
 				form.errors.email = ['A tenant with this email already exists'];
 				return fail(400, {
 					form,
 					message: 'Duplicate email found: A tenant with this email already exists'
 				});
 			}
-		} else {
-			console.log('🔍 Update Email check - Skipping duplicate check (empty or null email)');
 		}
 
-		// Safeguard: prevent exact-name duplicates without distinct contact details (exclude self, case-insensitive)
+		// Safeguard: prevent exact-name duplicates (exclude self)
 		const normalizedNameU = form.data.name.trim();
 		const normalizedEmailU = form.data.email?.trim().toLowerCase() || null;
 		const normalizedContactU = form.data.contact_number?.trim() || null;
 
-		const possibleDuplicatesU = await supabase
-			.from('tenants')
-			.select('id, name, email, contact_number')
-			.ilike('name', normalizedNameU)
-			.neq('id', form.data.id)
-			.is('deleted_at', null);
+		const possibleDuplicatesU = await db
+			.select({ id: tenants.id, name: tenants.name, email: tenants.email, contactNumber: tenants.contactNumber })
+			.from(tenants)
+			.where(
+				and(
+					ilike(tenants.name, normalizedNameU),
+					ne(tenants.id, form.data.id),
+					isNull(tenants.deletedAt)
+				)
+			);
 
-		if (possibleDuplicatesU.data && possibleDuplicatesU.data.length > 0) {
-			const conflict = possibleDuplicatesU.data.find((t) => {
+		if (possibleDuplicatesU.length > 0) {
+			const conflict = possibleDuplicatesU.find((t) => {
 				const tEmail = (t.email || '').trim().toLowerCase() || null;
-				const tContact = (t.contact_number || '').trim() || null;
-				const sameEmail = normalizedEmailU && tEmail ? normalizedEmailU === tEmail : !normalizedEmailU && !tEmail;
-				const sameContact = normalizedContactU && tContact ? normalizedContactU === tContact : !normalizedContactU && !tContact;
+				const tContact = (t.contactNumber || '').trim() || null;
+				const sameEmail =
+					normalizedEmailU && tEmail
+						? normalizedEmailU === tEmail
+						: !normalizedEmailU && !tEmail;
+				const sameContact =
+					normalizedContactU && tContact
+						? normalizedContactU === tContact
+						: !normalizedContactU && !tContact;
 				return sameEmail || sameContact;
 			});
 
 			if (conflict) {
-				form.errors.name = ['A tenant with this name already exists without distinct contact details'];
-				return fail(400, { form, message: 'Duplicate tenant: provide distinct email or contact number' });
+				form.errors.name = [
+					'A tenant with this name already exists without distinct contact details'
+				];
+				return fail(400, {
+					form,
+					message: 'Duplicate tenant: provide distinct email or contact number'
+				});
 			}
 		}
 
-		const updateData: TenantUpdate = {
-			name: form.data.name,
-			contact_number: form.data.contact_number || null,
-			email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
-			address: form.data.address ?? null,
-			tenant_status: form.data.tenant_status,
-			emergency_contact: parsedEmergencyContact,
-			updated_at: new Date().toISOString(),
-			profile_picture_url: form.data.profile_picture_url || null,
-			school_or_workplace: form.data.school_or_workplace ?? null,
-			facebook_name: form.data.facebook_name ?? null,
-			birthday: form.data.birthday ?? null
-		};
-
-		console.log('🔄 Update action - Sending to database:', updateData);
-
-		const { error: updateError } = await supabase
-			.from('tenants')
-			.update(updateData)
-			.eq('id', form.data.id);
-
-		if (updateError) {
-			console.error('Error updating tenant:', updateError);
-			if (updateError.message?.includes('Policy check failed')) {
+		try {
+			await db
+				.update(tenants)
+				.set({
+					name: form.data.name,
+					contactNumber: form.data.contact_number || null,
+					email:
+						form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
+					address: form.data.address ?? null,
+					tenantStatus: form.data.tenant_status,
+					emergencyContact: parsedEmergencyContact,
+					updatedAt: new Date(),
+					profilePictureUrl: form.data.profile_picture_url || null,
+					schoolOrWorkplace: form.data.school_or_workplace ?? null,
+					facebookName: form.data.facebook_name ?? null,
+					birthday: form.data.birthday ?? null
+				})
+				.where(eq(tenants.id, form.data.id));
+		} catch (err: any) {
+			console.error('Error updating tenant:', err);
+			if (err.message?.includes('Policy check failed')) {
 				form.errors._errors = ['You do not have permission to update tenants'];
 				return fail(403, { form });
 			}
 			return fail(500, { form, message: 'Failed to update tenant' });
 		}
 
-		console.log('✅ Update action - Successfully updated tenant');
+		console.log('Update action - Successfully updated tenant');
 
-		// Invalidate tenants cache after update
 		cache.delete(cacheKeys.tenants());
-		console.log('🗑️ Invalidated tenants cache');
+		console.log('Invalidated tenants cache');
 
 		return { form };
 	},
 
-	delete: async ({ request, locals: { supabase } }: RequestEvent) => {
+	delete: async ({ request }: RequestEvent) => {
 		const formData = await request.formData();
 		const id = formData.get('id');
 		const reason = formData.get('reason') || 'User initiated deletion';
@@ -407,37 +386,37 @@ export const actions: Actions = {
 		}
 
 		// Get tenant details for confirmation message
-		const { data: tenant, error: fetchError } = await supabase
-			.from('tenants')
-			.select('name, email, contact_number')
-			.eq('id', tenantId)
-			.is('deleted_at', null)
-			.single();
+		const tenantResult = await db
+			.select({ name: tenants.name, email: tenants.email, contactNumber: tenants.contactNumber })
+			.from(tenants)
+			.where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
+			.limit(1);
 
-		if (fetchError || !tenant) {
+		const tenant = tenantResult[0];
+
+		if (!tenant) {
 			return fail(404, { message: 'Tenant not found or already deleted' });
 		}
 
 		// Soft delete by setting deleted_at timestamp
-		const { error: deleteError } = await supabase
-			.from('tenants')
-			.update({
-				deleted_at: new Date().toISOString(),
-				updated_at: new Date().toISOString()
-			})
-			.eq('id', tenantId);
-
-		if (deleteError) {
-			console.error('Error soft deleting tenant:', deleteError);
-			if (deleteError.message?.includes('Policy check failed')) {
+		try {
+			await db
+				.update(tenants)
+				.set({
+					deletedAt: new Date(),
+					updatedAt: new Date()
+				})
+				.where(eq(tenants.id, tenantId));
+		} catch (err: any) {
+			console.error('Error soft deleting tenant:', err);
+			if (err.message?.includes('Policy check failed')) {
 				return fail(403, { message: 'You do not have permission to delete tenants' });
 			}
 			return fail(500, { message: 'Failed to delete tenant' });
 		}
 
-		// Invalidate tenants cache after delete
 		cache.delete(cacheKeys.tenants());
-		console.log('🗑️ Invalidated tenants cache');
+		console.log('Invalidated tenants cache');
 
 		return {
 			success: true,
