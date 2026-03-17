@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Homepage -->
+  <url>
+    <loc>https://arjostyle.midcodes.one/</loc>
+    <lastmod>2024-09-03</lastmod> <!-- Optional: Update with actual last modified date -->
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Contact Page -->
+  <url>
+    <loc>https://arjostyle.midcodes.one/contact</loc>
+    <lastmod>2024-09-03</lastmod> <!-- Optional: Update with actual last modified date -->
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Terms & Conditions Page -->
+  <url>
+    <loc>https://arjostyle.midcodes.one/terms</loc>
+    <lastmod>2024-09-03</lastmod> <!-- Optional: Update with actual last modified date -->
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <!-- Privacy Policy Page -->
+  <url>
+    <loc>https://arjostyle.midcodes.one/privacy</loc>
+    <lastmod>2024-09-03</lastmod> <!-- Optional: Update with actual last modified date -->
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <!-- Cookie Policy Page -->
+  <url>
+    <loc>https://arjostyle.midcodes.one/cookies</loc>
+    <lastmod>2024-09-03</lastmod> <!-- Optional: Update with actual last modified date -->
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <!-- Aftercare Page -->
+  <url>
+    <loc>https://arjostyle.midcodes.one/aftercare</loc>
+    <lastmod>2024-09-03</lastmod> <!-- Optional: Update with actual last modified date -->
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+</urlset>

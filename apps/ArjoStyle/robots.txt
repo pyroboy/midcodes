@@ -1,0 +1,41 @@
+# robots.txt for ArjoStyle Tattoo (https://arjostyle.midcodes.one/)
+
+User-agent: *
+
+# Allow crawling of public pages and root
+Allow: /$
+Allow: /contact$
+Allow: /terms$
+Allow: /privacy$
+Allow: /cookies$
+Allow: /aftercare$
+
+# Allow important static assets (favicons, manifests, social images)
+Allow: /favicon.
+Allow: /apple-touch-icon.png
+Allow: /web-app-manifest-
+Allow: /social-image.webp # Adjust if your social image has a different name/path
+Allow: /site.webmanifest
+
+# Disallow specific admin, debug, source, and development areas/files
+Disallow: /admin/
+Disallow: /debug/
+Disallow: /src/
+Disallow: /scripts/
+Disallow: /supabase/
+Disallow: /node_modules/
+Disallow: /dist/ # Common build output directory for Vite
+
+# Disallow specific potentially sensitive or unnecessary root files
+Disallow: /components.json
+Disallow: /eslint.config.js
+Disallow: /package.json
+Disallow: /package-lock.json
+Disallow: /postcss.config.js
+# Add others if they exist at the root and shouldn't be crawled:
+# Disallow: /vite.config.ts
+# Disallow: /tailwind.config.ts
+# Disallow: /tsconfig.json
+
+# Point search engines to the sitemap
+Sitemap: https://arjostyle.midcodes.one/sitemap.xml

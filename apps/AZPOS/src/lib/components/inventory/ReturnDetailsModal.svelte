@@ -1,0 +1,150 @@
+<script lang="ts">
+	import type { EnhancedReturnRecord } from '$lib/types/returns.schema';
+	import { useReturns } from '$lib/data/returns';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
+	import * as Table from '$lib/components/ui/table';
+	import { toast } from 'svelte-sonner';
+
+	// Get TanStack Query hook for updating returns
+	const { updateStatus, isUpdating } = useReturns();
+
+	let {
+		open = $bindable(false),
+		record,
+		onClose
+	}: {
+		open: boolean;
+		record: EnhancedReturnRecord | null;
+		onClose: () => void;
+	} = $props();
+
+	let rejectionNotes = $state('');
+
+	function approveReturn() {
+		if (!record) return;
+		updateStatus({ return_id: record.id, status: 'approved' });
+		toast.success(`Return ${record.id} has been approved.`);
+		onClose();
+	}
+
+	function rejectReturn() {
+		if (!record) return;
+		updateStatus({ return_id: record.id, status: 'rejected', admin_notes: rejectionNotes });
+		toast.error(`Return ${record.id} has been rejected.`);
+		rejectionNotes = '';
+		onClose();
+	}
+</script>
+
+<Dialog.Root bind:open onOpenChange={(isOpen) => !isOpen && onClose()}>
+	{#if record}
+		<Dialog.Content class="sm:max-w-2xl">
+			<Dialog.Header>
+				<Dialog.Title>Return Details: {record.id}</Dialog.Title>
+				<Dialog.Description>Review the details of the return and take action.</Dialog.Description>
+			</Dialog.Header>
+
+			<div class="grid grid-cols-3 gap-x-8 gap-y-4 my-4 text-sm">
+				<div>
+					<p class="text-muted-foreground">Customer</p>
+					<p class="font-medium">{record.customer_name}</p>
+				</div>
+				<div>
+					<p class="text-muted-foreground">Return Number</p>
+					<p class="font-medium">{record.return_number}</p>
+				</div>
+				<div>
+					<p class="text-muted-foreground">Return Date</p>
+					<p class="font-medium">{new Date(record.created_at).toLocaleDateString()}</p>
+				</div>
+				<div>
+					<p class="text-muted-foreground">Status</p>
+					<p>
+						<Badge
+							variant={{
+								pending: 'secondary',
+								approved: 'success',
+								rejected: 'destructive',
+								processed: 'default'
+							}[record.status] as 'secondary' | 'success' | 'destructive' | 'default'}
+						>
+							{record.status}
+						</Badge>
+					</p>
+				</div>
+				<div class="col-span-2">
+					<p class="text-muted-foreground">Reason for Return</p>
+					<p class="font-medium">{record.reason}</p>
+				</div>
+				{#if record.notes}
+					<div class="col-span-3">
+						<p class="text-muted-foreground">Notes</p>
+						<p class="font-medium whitespace-pre-wrap">{record.notes}</p>
+					</div>
+				{/if}
+			</div>
+
+			<h4 class="font-semibold mt-6 mb-2">Returned Items</h4>
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Product</Table.Head>
+						<Table.Head>Quantity</Table.Head>
+						<Table.Head class="text-right">Unit Price</Table.Head>
+						<Table.Head class="text-right">Total</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#if record.items}
+						{#each record.items as item}
+							<Table.Row>
+								<Table.Cell class="font-medium">{item.product_id}</Table.Cell>
+								<Table.Cell>{item.quantity}</Table.Cell>
+								<Table.Cell class="text-right">${item.unit_price.toFixed(2)}</Table.Cell>
+								<Table.Cell class="text-right">${(item.quantity * item.unit_price).toFixed(2)}</Table.Cell>
+							</Table.Row>
+						{/each}
+					{:else}
+						<Table.Row>
+							<Table.Cell colspan={4} class="text-center py-4">No items found</Table.Cell>
+						</Table.Row>
+					{/if}
+				</Table.Body>
+			</Table.Root>
+
+			{#if record.status === 'pending'}
+				<div class="mt-6 pt-6 border-t">
+					<h4 class="font-semibold mb-2">Actions</h4>
+					<div class="flex justify-end items-start gap-4">
+						<div class="flex-grow">
+							<label for="rejection-notes" class="text-sm font-medium">Notes (if rejecting)</label>
+							<textarea
+								id="rejection-notes"
+								bind:value={rejectionNotes}
+								class="mt-1 w-full h-20 p-2 border rounded-md text-sm"
+								placeholder="Provide a reason for rejection..."
+							></textarea>
+						</div>
+						<div class="flex flex-col gap-2 pt-6">
+							<Button onclick={approveReturn} variant="default" disabled={$isUpdating}
+								>Approve</Button
+							>
+							<Button
+								onclick={rejectReturn}
+								variant="destructive"
+								disabled={!rejectionNotes || $isUpdating}
+							>Reject</Button>
+							>
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<Dialog.Footer class="mt-6">
+				<Button variant="outline" onclick={onClose}>Close</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	{/if}
+</Dialog.Root>

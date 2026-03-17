@@ -1,0 +1,182 @@
+[
+  {
+    "name": "ENUM: alert_type",
+    "definition": "CREATE TYPE alert_type AS ENUM ('low_stock', 'out_of_stock', 'expired', 'expiring_soon', 'overstock');"
+  },
+  {
+    "name": "ENUM: count_status",
+    "definition": "CREATE TYPE count_status AS ENUM ('planned', 'in_progress', 'completed', 'cancelled');"
+  },
+  {
+    "name": "ENUM: movement_type",
+    "definition": "CREATE TYPE movement_type AS ENUM ('in', 'out', 'transfer', 'adjustment', 'count');"
+  },
+  {
+    "name": "ENUM: po_status",
+    "definition": "CREATE TYPE po_status AS ENUM ('draft', 'sent', 'confirmed', 'partially_received', 'received', 'cancelled');"
+  },
+  {
+    "name": "ENUM: receiving_status",
+    "definition": "CREATE TYPE receiving_status AS ENUM ('pending', 'in_progress', 'completed', 'discrepancy');"
+  },
+  {
+    "name": "ENUM: reference_type",
+    "definition": "CREATE TYPE reference_type AS ENUM ('order', 'return', 'purchase_order', 'adjustment', 'transfer', 'count');"
+  },
+  {
+    "name": "ENUM: return_reason",
+    "definition": "CREATE TYPE return_reason AS ENUM ('damaged', 'defective', 'wrong_item', 'expired', 'customer_request', 'other');"
+  },
+  {
+    "name": "ENUM: return_status",
+    "definition": "CREATE TYPE return_status AS ENUM ('pending', 'approved', 'rejected', 'processed');"
+  },
+  {
+    "name": "ENUM: transaction_type",
+    "definition": "CREATE TYPE transaction_type AS ENUM ('purchase', 'sale', 'return', 'adjustment', 'transfer', 'count', 'damage', 'expired');"
+  },
+  {
+    "name": "FUNCTION: check_stock_alerts",
+    "definition": "CREATE FUNCTION check_stock_alerts()\\nRETURNS trigger\\nLANGUAGE plpgsql\\nAS $$\\nCREATE OR REPLACE FUNCTION public.check_stock_alerts()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n    product_record RECORD;\nBEGIN\n    SELECT name, min_stock_level, max_stock_level\n    INTO product_record\n    FROM public.products\n    WHERE id = NEW.id;\n\n    UPDATE public.inventory_alerts\n    SET is_acknowledged = true, acknowledged_at = now(), message = message || ' (Auto-resolved)'\n    WHERE product_id = NEW.id AND is_acknowledged = false;\n\n    IF NEW.stock_quantity <= product_record.min_stock_level AND NEW.stock_quantity > 0 THEN\n        INSERT INTO public.inventory_alerts (product_id, alert_type, current_value, threshold_value, message)\n        VALUES (NEW.id, 'low_stock', NEW.stock_quantity, product_record.min_stock_level, 'Product ' || product_record.name || ' is running low on stock.');\n    END IF;\n    \n    IF NEW.stock_quantity <= 0 THEN\n        INSERT INTO public.inventory_alerts (product_id, alert_type, current_value, threshold_value, message)\n        VALUES (NEW.id, 'out_of_stock', 0, 0, 'Product ' || product_record.name || ' is out of stock.');\n    END IF;\n\n    IF product_record.max_stock_level IS NOT NULL AND NEW.stock_quantity > product_record.max_stock_level THEN\n        INSERT INTO public.inventory_alerts (product_id, alert_type, current_value, threshold_value, message)\n        VALUES (NEW.id, 'overstock', NEW.stock_quantity, product_record.max_stock_level, 'Product ' || product_record.name || ' is overstocked.');\n    END IF;\n    \n    RETURN NEW;\nEND;\n$function$\n\\n$$;"
+  },
+  {
+    "name": "FUNCTION: create_expiration_alerts",
+    "definition": "CREATE FUNCTION create_expiration_alerts()\\nRETURNS void\\nLANGUAGE plpgsql\\nAS $$\\nCREATE OR REPLACE FUNCTION public.create_expiration_alerts()\n RETURNS void\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    INSERT INTO public.inventory_alerts (product_id, alert_type, message, current_value)\n    SELECT \n        pb.product_id,\n        'expiring_soon',\n        'Batch ' || pb.batch_number || ' for product ' || p.name || ' is expiring on ' || to_char(pb.expiration_date, 'YYYY-MM-DD') || '.',\n        pb.quantity_on_hand\n    FROM public.product_batches pb\n    JOIN public.products p ON p.id = pb.product_id\n    WHERE pb.expiration_date BETWEEN now() AND now() + interval '30 days'\n      AND pb.quantity_on_hand > 0\n    ON CONFLICT (product_id, alert_type) WHERE is_acknowledged = false DO NOTHING;\n\n    INSERT INTO public.inventory_alerts (product_id, alert_type, message, current_value)\n    SELECT \n        pb.product_id,\n        'expired',\n        'Batch ' || pb.batch_number || ' for product ' || p.name || ' expired on ' || to_char(pb.expiration_date, 'YYYY-MM-DD') || '.',\n        pb.quantity_on_hand\n    FROM public.product_batches pb\n    JOIN public.products p ON p.id = pb.product_id\n    WHERE pb.expiration_date <= now()\n      AND pb.quantity_on_hand > 0\n    ON CONFLICT (product_id, alert_type) WHERE is_acknowledged = false DO NOTHING;\nEND;\n$function$\n\\n$$;"
+  },
+  {
+    "name": "FUNCTION: sync_product_stock",
+    "definition": "CREATE FUNCTION sync_product_stock()\\nRETURNS trigger\\nLANGUAGE plpgsql\\nAS $$\\nCREATE OR REPLACE FUNCTION public.sync_product_stock()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    -- Update product stock_quantity based on inventory_items\n    UPDATE products \n    SET stock_quantity = (\n        SELECT COALESCE(SUM(quantity_on_hand), 0)\n        FROM inventory_items \n        WHERE product_id = NEW.product_id\n    )\n    WHERE id = NEW.product_id;\n    \n    RETURN NEW;\nEND;\n$function$\n\\n$$;"
+  },
+  {
+    "name": "FUNCTION: update_updated_at_column",
+    "definition": "CREATE FUNCTION update_updated_at_column()\\nRETURNS trigger\\nLANGUAGE plpgsql\\nAS $$\\nCREATE OR REPLACE FUNCTION public.update_updated_at_column()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    NEW.updated_at = now();\n    RETURN NEW;\nEND;\n$function$\n\\n$$;"
+  },
+  {
+    "name": "TABLE: bundle_components",
+    "definition": "CREATE TABLE bundle_components (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    bundle_product_id uuid,\n    component_product_id uuid,\n    quantity integer NOT NULL DEFAULT 1,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE bundle_components ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON bundle_components\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: categories",
+    "definition": "CREATE TABLE categories (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    name character varying(255) NOT NULL,\n    code character varying(50),\n    description text,\n    parent_id uuid,\n    is_active boolean DEFAULT true,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE categories ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON categories\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER update_categories_updated_at\\n    BEFORE DELETE ON categories\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TABLE: inventory_alerts",
+    "definition": "CREATE TABLE inventory_alerts (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    product_id uuid,\n    alert_type alert_type NOT NULL,\n    threshold_value integer,\n    current_value integer NOT NULL,\n    message text NOT NULL,\n    is_acknowledged boolean DEFAULT false,\n    acknowledged_by uuid,\n    acknowledged_at timestamp with time zone,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE inventory_alerts ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON inventory_alerts\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: inventory_items",
+    "definition": "CREATE TABLE inventory_items (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    product_id uuid,\n    location_id uuid,\n    batch_id uuid,\n    quantity_on_hand integer NOT NULL DEFAULT 0,\n    quantity_reserved integer NOT NULL DEFAULT 0,\n    quantity_available integer DEFAULT (quantity_on_hand - quantity_reserved),\n    cost_per_unit numeric(10,2) NOT NULL DEFAULT 0,\n    last_counted_at timestamp with time zone,\n    last_movement_at timestamp with time zone DEFAULT now(),\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON inventory_items\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON inventory_items\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();\n\nCREATE TRIGGER sync_product_stock_after_change\\n    BEFORE INSERT,DELETE ON inventory_items\\n    FOR EACH ROW\\n    EXECUTE FUNCTION sync_product_stock();"
+  },
+  {
+    "name": "TABLE: inventory_locations",
+    "definition": "CREATE TABLE inventory_locations (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    name character varying(255) NOT NULL,\n    code character varying(50) NOT NULL,\n    description text,\n    address text,\n    is_active boolean DEFAULT true,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE inventory_locations ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON inventory_locations\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON inventory_locations\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TABLE: inventory_movements",
+    "definition": "CREATE TABLE inventory_movements (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    product_id uuid,\n    location_id uuid,\n    batch_id uuid,\n    movement_type movement_type NOT NULL,\n    transaction_type transaction_type NOT NULL,\n    quantity integer NOT NULL,\n    unit_cost numeric(10,2),\n    reference_id uuid,\n    reference_type reference_type,\n    notes text,\n    user_id uuid,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON inventory_movements\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: modifiers",
+    "definition": "CREATE TABLE modifiers (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    name character varying(255) NOT NULL,\n    description text,\n    price_adjustment numeric(10,2) DEFAULT 0,\n    is_active boolean DEFAULT true,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE modifiers ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON modifiers\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: product_batches",
+    "definition": "CREATE TABLE product_batches (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    product_id uuid,\n    batch_number character varying(100) NOT NULL,\n    expiration_date timestamp with time zone,\n    purchase_cost numeric(10,2) NOT NULL DEFAULT 0,\n    quantity_on_hand integer NOT NULL DEFAULT 0,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE product_batches ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON product_batches\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON product_batches\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TABLE: product_modifiers",
+    "definition": "CREATE TABLE product_modifiers (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    product_id uuid,\n    modifier_id uuid,\n    is_required boolean DEFAULT false,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE product_modifiers ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON product_modifiers\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: product_variants",
+    "definition": "CREATE TABLE product_variants (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    parent_product_id uuid,\n    variant_product_id uuid,\n    variant_type character varying(50) NOT NULL,\n    variant_value character varying(100) NOT NULL,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE product_variants ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON product_variants\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: products",
+    "definition": "CREATE TABLE products (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    name character varying(255) NOT NULL,\n    sku character varying(100) NOT NULL,\n    description text,\n    category_id uuid,\n    supplier_id uuid,\n    cost_price numeric(10,2) NOT NULL DEFAULT 0,\n    selling_price numeric(10,2) NOT NULL DEFAULT 0,\n    stock_quantity integer NOT NULL DEFAULT 0,\n    min_stock_level integer DEFAULT 0,\n    max_stock_level integer,\n    reorder_point integer DEFAULT 0,\n    barcode character varying(255),\n    image_url text,\n    is_active boolean DEFAULT true,\n    is_archived boolean DEFAULT false,\n    is_bundle boolean DEFAULT false,\n    tags text[],\n    weight numeric(8,3),\n    dimensions jsonb,\n    tax_rate numeric(5,4) DEFAULT 0,\n    discount_eligible boolean DEFAULT true,\n    track_inventory boolean DEFAULT true,\n    aisle_location character varying(50),\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now(),\n    created_by uuid,\n    updated_by uuid\n);\n\nALTER TABLE products ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON products\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON products\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();\n\nCREATE TRIGGER check_stock_alerts_after_update\\n    BEFORE DELETE ON products\\n    FOR EACH ROW\\n    EXECUTE FUNCTION check_stock_alerts();"
+  },
+  {
+    "name": "TABLE: purchase_order_items",
+    "definition": "CREATE TABLE purchase_order_items (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    purchase_order_id uuid,\n    product_id uuid,\n    quantity_ordered integer NOT NULL,\n    quantity_received integer DEFAULT 0,\n    unit_cost numeric(10,2) NOT NULL,\n    total_cost numeric(10,2) DEFAULT ((quantity_ordered)::numeric * unit_cost),\n    notes text,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE purchase_order_items ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON purchase_order_items\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: purchase_orders",
+    "definition": "CREATE TABLE purchase_orders (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    po_number character varying(100) NOT NULL,\n    supplier_id uuid,\n    status po_status DEFAULT 'draft'::po_status,\n    order_date timestamp with time zone DEFAULT now(),\n    expected_delivery_date timestamp with time zone,\n    total_amount numeric(10,2) DEFAULT 0,\n    tax_amount numeric(10,2) DEFAULT 0,\n    shipping_cost numeric(10,2) DEFAULT 0,\n    notes text,\n    created_by uuid,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON purchase_orders\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER update_purchase_orders_updated_at\\n    BEFORE DELETE ON purchase_orders\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TABLE: receiving_items",
+    "definition": "CREATE TABLE receiving_items (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    receiving_session_id uuid,\n    product_id uuid,\n    quantity_expected integer NOT NULL,\n    quantity_received integer NOT NULL,\n    variance integer DEFAULT (quantity_received - quantity_expected),\n    batch_number character varying(100),\n    expiration_date timestamp with time zone,\n    condition character varying(100),\n    notes text,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE receiving_items ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON receiving_items\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: receiving_sessions",
+    "definition": "CREATE TABLE receiving_sessions (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    purchase_order_id uuid,\n    status receiving_status DEFAULT 'pending'::receiving_status,\n    carrier character varying(255),\n    tracking_number character varying(255),\n    package_condition character varying(100),\n    photos text[],\n    received_by uuid,\n    received_at timestamp with time zone DEFAULT now(),\n    notes text,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE receiving_sessions ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON receiving_sessions\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER update_receiving_sessions_updated_at\\n    BEFORE DELETE ON receiving_sessions\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TABLE: return_items",
+    "definition": "CREATE TABLE return_items (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    return_id uuid,\n    product_id uuid,\n    quantity integer NOT NULL,\n    unit_price numeric(10,2) NOT NULL,\n    refund_amount numeric(10,2) DEFAULT ((quantity)::numeric * unit_price),\n    condition character varying(100),\n    notes text,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE return_items ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON return_items\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: returns",
+    "definition": "CREATE TABLE returns (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    return_number character varying(100) NOT NULL,\n    customer_name character varying(255),\n    customer_email character varying(255),\n    customer_phone character varying(50),\n    status return_status DEFAULT 'pending'::return_status,\n    reason return_reason NOT NULL,\n    description text,\n    total_refund_amount numeric(10,2) DEFAULT 0,\n    processed_by uuid,\n    processed_at timestamp with time zone,\n    notes text,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE returns ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON returns\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER update_returns_updated_at\\n    BEFORE DELETE ON returns\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TABLE: stock_count_items",
+    "definition": "CREATE TABLE stock_count_items (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    stock_count_id uuid,\n    product_id uuid,\n    expected_quantity integer NOT NULL,\n    counted_quantity integer NOT NULL,\n    variance integer DEFAULT (counted_quantity - expected_quantity),\n    notes text,\n    created_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE stock_count_items ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON stock_count_items\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\n"
+  },
+  {
+    "name": "TABLE: stock_counts",
+    "definition": "CREATE TABLE stock_counts (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    count_number character varying(100) NOT NULL,\n    location_id uuid,\n    status count_status DEFAULT 'planned'::count_status,\n    count_date timestamp with time zone DEFAULT now(),\n    counted_by uuid,\n    notes text,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE stock_counts ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON stock_counts\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON stock_counts\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TABLE: suppliers",
+    "definition": "CREATE TABLE suppliers (\n    id uuid NOT NULL DEFAULT uuid_generate_v4(),\n    name character varying(255) NOT NULL,\n    code character varying(50),\n    contact_person character varying(255),\n    email character varying(255),\n    phone character varying(50),\n    address text,\n    tax_id character varying(100),\n    payment_terms character varying(100),\n    lead_time_days integer DEFAULT 7,\n    is_active boolean DEFAULT true,\n    created_at timestamp with time zone DEFAULT now(),\n    updated_at timestamp with time zone DEFAULT now()\n);\n\nALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;\nCREATE POLICY \"Allow authenticated users full access\" ON suppliers\n    AS PERMISSIVE\n    FOR A\n    TO authenticated\n    USING (true)\n    WITH CHECK (true);\n\nCREATE TRIGGER update_suppliers_updated_at\\n    BEFORE DELETE ON suppliers\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: categories__update_categories_updated_at",
+    "definition": "CREATE TRIGGER update_categories_updated_at\\n    BEFORE DELETE ON categories\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: inventory_items__handle_updated_at",
+    "definition": "CREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON inventory_items\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: inventory_items__sync_product_stock_after_change",
+    "definition": "CREATE TRIGGER sync_product_stock_after_change\\n    BEFORE INSERT,DELETE ON inventory_items\\n    FOR EACH ROW\\n    EXECUTE FUNCTION sync_product_stock();"
+  },
+  {
+    "name": "TRIGGER: inventory_locations__handle_updated_at",
+    "definition": "CREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON inventory_locations\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: product_batches__handle_updated_at",
+    "definition": "CREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON product_batches\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: products__check_stock_alerts_after_update",
+    "definition": "CREATE TRIGGER check_stock_alerts_after_update\\n    BEFORE DELETE ON products\\n    FOR EACH ROW\\n    EXECUTE FUNCTION check_stock_alerts();"
+  },
+  {
+    "name": "TRIGGER: products__handle_updated_at",
+    "definition": "CREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON products\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: purchase_orders__update_purchase_orders_updated_at",
+    "definition": "CREATE TRIGGER update_purchase_orders_updated_at\\n    BEFORE DELETE ON purchase_orders\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: receiving_sessions__update_receiving_sessions_updated_at",
+    "definition": "CREATE TRIGGER update_receiving_sessions_updated_at\\n    BEFORE DELETE ON receiving_sessions\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: returns__update_returns_updated_at",
+    "definition": "CREATE TRIGGER update_returns_updated_at\\n    BEFORE DELETE ON returns\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: stock_counts__handle_updated_at",
+    "definition": "CREATE TRIGGER handle_updated_at\\n    BEFORE DELETE ON stock_counts\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  },
+  {
+    "name": "TRIGGER: suppliers__update_suppliers_updated_at",
+    "definition": "CREATE TRIGGER update_suppliers_updated_at\\n    BEFORE DELETE ON suppliers\\n    FOR EACH ROW\\n    EXECUTE FUNCTION update_updated_at_column();"
+  }
+]

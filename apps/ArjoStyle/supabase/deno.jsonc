@@ -1,0 +1,19 @@
+// tattoo-tide/deno.jsonc (or potentially supabase/deno.jsonc)
+{
+  "lint": {
+    "enabled": true,
+    "rules": { "tags": ["recommended"] }
+  },
+  "fmt": {
+    "enabled": true,
+    "options": {
+      "useTabs": false,
+      "lineWidth": 80,
+      "indentWidth": 2,
+      "singleQuote": true
+    }
+  },
+  "unstable": ["kv", "byonm"],
+  "nodeModulesDir": true // <-- This is essential
+  // ... other settings ...
+}

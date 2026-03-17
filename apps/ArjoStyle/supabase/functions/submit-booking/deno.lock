@@ -1,0 +1,28 @@
+{
+  "version": "4",
+  "specifiers": {
+    "npm:cloudinary@^2.6.0": "2.6.0"
+  },
+  "npm": {
+    "cloudinary@2.6.0": {
+      "integrity": "sha512-FIlny9RR5LPgkMioG4V7yUpC6ASyIFQMWfx4TgOi/xBeLxJTegbyQc3itiXL0b0lDlSaL0KyT2THEw6osrKqpQ==",
+      "dependencies": [
+        "lodash",
+        "q"
+      ]
+    },
+    "lodash@4.17.21": {
+      "integrity": "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg=="
+    },
+    "q@1.5.1": {
+      "integrity": "sha512-kV/CThkXo6xyFEZUugw/+pIOywXcDbFYgSct5cT3gqlbkBE1SJdwy6UQoZvodiWF/ckQLZyDE/Bu1M6gVu5lVw=="
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:cloudinary@^2.6.0"
+      ]
+    }
+  }
+}

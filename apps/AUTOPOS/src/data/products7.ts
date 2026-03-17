@@ -1,0 +1,210 @@
+import { Product } from "@/types/sales";
+
+
+// Products file 7: Interior accessories and electronics
+export const PRODUCTS_BATCH_7: Product[] = [
+  {
+    id: "p31",
+    name: "Floor Mat Set - All Weather",
+    description: "Heavy-duty rubber floor mats for complete coverage",
+    price: 2499.95,
+    category: "Accessories",
+    sku: "ACC-501",
+    imageUrl: "https://images.unsplash.com/photo-1558385605-c582023564be?q=80&w=500&auto=format",
+    stock: 18,
+    manufacturer: "WeatherGuard",
+    location: "H1-I4",
+    barcode: "7891234567831",
+    taxRate: 0.07,
+    discountable: true,
+    unitOfMeasure: "set",
+    minStockLevel: 5,
+    status: "active",
+    cost: 1699.95,
+    suppliers: [
+      {
+        id: "s008",
+        name: "Auto Accessories Wholesale",
+        contactPerson: "Daniel Kim",
+        phone: "555-111-2222",
+        email: "orders@autoaccessories.com",
+        leadTime: 2,
+        preferredSupplier: true,
+        rating: 3,
+        address: "300 Accessory Lane, Anytown, CA 90210",
+        lastOrder: "2023-10-01",
+        notes: "Primary supplier for interior accessories",
+        minOrderQuantity: 3,
+        status: "active",
+        code: "AAW",
+        category: "Accessories"
+      }
+    ],
+    vehicleCompatibility: [
+      {
+        year: "2018-2023",
+        make: ["Toyota"],
+        model: ["RAV4", "Camry", "Corolla"]
+      }
+    ],
+    partType: "aftermarket",
+    warranty: "Limited lifetime"
+  },
+  {
+    id: "p32",
+    name: "Dash Cam - HD 1080p",
+    description: "High-definition dash camera with night vision",
+    price: 3999.95,
+    category: "Electronics",
+    sku: "ELE-101",
+    imageUrl: "https://images.unsplash.com/photo-1545641203-7d072a14e3b2?q=80&w=500&auto=format",
+    stock: 10,
+    manufacturer: "VisionTech",
+    location: "L1-M3",
+    barcode: "7891234567832",
+    taxRate: 0.07,
+    discountable: true,
+    unitOfMeasure: "each",
+    minStockLevel: 3,
+    status: "active",
+    cost: 2999.95,
+    suppliers: [
+      {
+        id: "s014",
+        name: "Automotive Electronics Co",
+        contactPerson: "Linda Chen",
+        phone: "555-666-7777",
+        email: "sales@autoelectronics.com",
+        leadTime: 5,
+        preferredSupplier: true,
+        rating: 4,
+        address: "900 Electronics Blvd, Anytown, CA 90210",
+        lastOrder: "2023-09-15",
+        notes: "Primary supplier for automotive electronics",
+        minOrderQuantity: 3,
+        status: "active",
+        code: "AEC",
+        category: "Electronics"
+      }
+    ],
+    warranty: "1 year"
+  },
+  {
+    id: "p33",
+    name: "Bluetooth FM Transmitter",
+    description: "Wireless FM transmitter with USB charging ports",
+    price: 999.95,
+    category: "Electronics",
+    sku: "ELE-202",
+    imageUrl: "https://images.unsplash.com/photo-1492491253522-25195c717c22?q=80&w=500&auto=format",
+    stock: 25,
+    manufacturer: "ConnectPro",
+    location: "L2-M4",
+    barcode: "7891234567833",
+    taxRate: 0.07,
+    discountable: true,
+    unitOfMeasure: "each",
+    minStockLevel: 8,
+    status: "active",
+    cost: 599.95,
+    suppliers: [
+      {
+        id: "s014",
+        name: "Automotive Electronics Co",
+        contactPerson: "Linda Chen",
+        phone: "555-666-7777",
+        email: "sales@autoelectronics.com",
+        leadTime: 5,
+        preferredSupplier: true,
+        rating: 4,
+        address: "900 Electronics Blvd, Anytown, CA 90210",
+        lastOrder: "2023-09-20",
+        notes: "Primary supplier for automotive electronics",
+        minOrderQuantity: 6,
+        status: "active",
+        code: "AEC",
+        category: "Electronics"
+      }
+    ],
+    warranty: "90 days"
+  },
+  {
+    id: "p34",
+    name: "Seat Cover Set - Universal",
+    description: "Water-resistant seat covers with side airbag compatibility",
+    price: 1899.95,
+    category: "Accessories",
+    sku: "ACC-605",
+    imageUrl: "https://images.unsplash.com/photo-1570733577524-3a047079e80d?q=80&w=500&auto=format",
+    stock: 14,
+    manufacturer: "ComfortShield",
+    location: "H2-I5",
+    barcode: "7891234567834",
+    taxRate: 0.07,
+    discountable: true,
+    unitOfMeasure: "set",
+    minStockLevel: 4,
+    status: "active",
+    cost: 1199.95,
+    suppliers: [
+      {
+        id: "s008",
+        name: "Auto Accessories Wholesale",
+        contactPerson: "Daniel Kim",
+        phone: "555-111-2222",
+        email: "orders@autoaccessories.com",
+        leadTime: 2,
+        preferredSupplier: true,
+        rating: 3,
+        address: "300 Accessory Lane, Anytown, CA 90210",
+        lastOrder: "2023-09-25",
+        notes: "Primary supplier for interior accessories",
+        minOrderQuantity: 3,
+        status: "active",
+        code: "AAW",
+        category: "Accessories"
+      }
+    ],
+    partType: "aftermarket",
+    warranty: "1 year"
+  },
+  {
+    id: "p35",
+    name: "Steering Wheel Cover - Leather",
+    description: "Genuine leather steering wheel cover with comfort grip",
+    price: 899.95,
+    category: "Accessories",
+    sku: "ACC-710",
+    imageUrl: "https://images.unsplash.com/photo-1569240511288-810c6a688f76?q=80&w=500&auto=format",
+    stock: 22,
+    manufacturer: "ComfortShield",
+    location: "H3-I6",
+    barcode: "7891234567835",
+    taxRate: 0.07,
+    discountable: true,
+    unitOfMeasure: "each",
+    minStockLevel: 6,
+    status: "active",
+    cost: 599.95,
+    suppliers: [
+      {
+        id: "s008",
+        name: "Auto Accessories Wholesale",
+        contactPerson: "Daniel Kim",
+        phone: "555-111-2222",
+        email: "orders@autoaccessories.com",
+        leadTime: 2,
+        preferredSupplier: true,
+        rating: 3,
+        address: "300 Accessory Lane, Anytown, CA 90210",
+        lastOrder: "2023-10-05",
+        notes: "Primary supplier for interior accessories",
+        minOrderQuantity: 6,
+        status: "active",
+        code: "AAW",
+        category: "Accessories"
+      }
+    ],
+    warranty: "6 months"
+  }
+];

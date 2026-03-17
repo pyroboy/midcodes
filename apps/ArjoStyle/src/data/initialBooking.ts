@@ -1,0 +1,51 @@
+import { BookingFormData } from "../types/bookings";
+
+const initialFormData: BookingFormData = {
+  dateOfBirth: null,
+  name: null,
+  email: null,
+  phone: null,
+  preferredContactMethod: "sms",
+  referralSource: null,
+  size: null, // Start as null
+  isCoverUp: false,
+  isColor: false,
+  complexity: 1,
+  selectedCategory: null,
+  placementIndex: 0,
+  currentPlacement: null,
+  referenceImages: [],
+  creativeFreedom: 50,
+  specificRequirements: null,
+  mustHaveElements: null,
+  colorPreferences: null,
+  placementNotes: null,
+  appointmentDate: null,
+  appointmentTime: null,
+  urgencyLevel: null,
+  artistPreference: null,
+  carouselTouched: null,
+  termsAgreed: false,
+  medicalConfirmed: false,
+  ageConfirmed: false,
+  instagramHandle: null,
+  facebookProfile: null,
+  pricing: {
+    basePriceRaw: 0,
+    complexityPrice: 0,
+    placementPrice: 0,
+    colorPrice: 0,
+    coverUpPrice: 0,
+    total: 0,
+  },
+  estimatedDurationMinutes: undefined,
+  estimatedSessions: undefined,
+  primaryTattooStyle: null,
+  styleDescription: null,
+  placementSliderTouched: false,
+  sizeSliderTouched: false,
+  painLevel: undefined, // Default pain level (or use e.g., 4)
+  painReason: undefined,
+  visualComplexityScore: undefined, // Default visual complexity (or use e.g., 1)
+  // --------------------
+};

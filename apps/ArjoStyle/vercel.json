@@ -1,0 +1,11 @@
+{
+  "regions": ["sin1"],
+  
+  "rewrites": [
+    {
+      "source": "/((?!api/|_next/|assets/|favicon.|sitemap.xml|robots.txt|site.webmanifest).*)",
+      "destination": "/index.html"
+     
+    }
+  ]
+}
