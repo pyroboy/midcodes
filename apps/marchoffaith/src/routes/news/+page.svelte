@@ -68,6 +68,10 @@
 </section>
 
 <style>
+	:root {
+		--primary-color: #C1272D;
+	}
+
 	/* News Grid */
 	.news-grid-section {
 		padding: 4rem 0;

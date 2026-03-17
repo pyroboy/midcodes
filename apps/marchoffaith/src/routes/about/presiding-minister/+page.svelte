@@ -7,6 +7,11 @@
 <svelte:head>
 	<title>Presiding Minister - March of Faith Incorporated</title>
 	<meta name="description" content="Meet our current presiding minister who continues the legacy of spiritual leadership at March of Faith Incorporated" />
+	<meta property="og:title" content="Presiding Minister - March of Faith Incorporated" />
+	<meta property="og:description" content="Meet our current presiding minister who continues the legacy of spiritual leadership at March of Faith Incorporated" />
+	<meta property="og:image" content="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" />
+	<meta name="twitter:title" content="Presiding Minister - March of Faith Incorporated" />
+	<meta name="twitter:description" content="Meet our current presiding minister who continues the legacy of spiritual leadership at March of Faith Incorporated" />
 </svelte:head>
 
 <Hero subtitle="Continuing the legacy of faithful ministry and spiritual leadership">

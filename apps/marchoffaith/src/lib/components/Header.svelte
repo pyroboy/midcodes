@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	
-	let isMobileMenuOpen = false;
-	let scrollY = 0;
-	let isScrolled = false;
+
+	let isMobileMenuOpen = $state(false);
+	let scrollY = $state(0);
+	let isScrolled = $state(false);
 
 	// List of routes that should have a transparent header initially (Hero sections)
-	// Sub-routes are NOT automatically included unless specified or logic is adjusted.
-	// Currently, we check for exact matches or specific startsWith logic if needed.
 	const transparentRoutes = [
 		'/',
 		'/about',
@@ -19,33 +17,23 @@
 		'/contact'
 	];
 
-	// Check if current path is in the transparent list
-	// We also want to handle sub-routes of /about since they seem to have hero sections too based on file structure,
-	// but let's stick to the plan. The user's request implies "smart" behavior.
-	// Looking at the file structure, /about/history-purpose etc might have hero sections.
-	// Let's check if the pathname STARTS with any of these, but be careful.
-	// Actually, the plan said: "Define a list of routes... and any subpages found to have hero sections".
-	// I verified /about/history-purpose has a hero.
-	// Let's make it robust:
-	$: isTransparentPage = transparentRoutes.some(route => 
-		$page.url.pathname === route || 
-		($page.url.pathname.startsWith('/about/') && route === '/about') 
-	);
+	let isTransparentPage = $derived(transparentRoutes.some(route =>
+		$page.url.pathname === route ||
+		($page.url.pathname.startsWith('/about/') && route === '/about')
+	));
 
-	// If it's NOT a transparent page, it should be solid immediately.
-	// If it IS a transparent page, it becomes solid only after scrolling.
-	$: isSolid = !isTransparentPage || isScrolled;
+	let isSolid = $derived(!isTransparentPage || isScrolled);
 
 	function toggleMobileMenu() {
 		isMobileMenuOpen = !isMobileMenuOpen;
 		updateBodyScroll();
 	}
-	
+
 	function closeMobileMenu() {
 		isMobileMenuOpen = false;
 		updateBodyScroll();
 	}
-	
+
 	function updateBodyScroll() {
 		if (typeof document !== 'undefined') {
 			if (isMobileMenuOpen) {
@@ -58,14 +46,12 @@
 
 	function handleScroll() {
 		scrollY = window.scrollY;
-		// Trigger transition after 20px of scrolling
 		isScrolled = scrollY > 20;
 	}
-	
+
 	onMount(() => {
 		window.addEventListener('scroll', handleScroll);
-		
-		// Close menu when clicking outside
+
 		function handleClickOutside(event: MouseEvent) {
 			const header = document.querySelector('header');
 			if (header && !header.contains(event.target as Node) && isMobileMenuOpen) {
@@ -81,23 +67,15 @@
 	});
 </script>
 
-<!-- 
-	Header Classes:
-	- Default: Transparent background, White Text
-	- Scrolled: White background, Red Text
--->
 <header class:scrolled={isSolid} class:mobile-open={isMobileMenuOpen}>
 	<div class="header-container">
 		<div class="header-brand">
 			<a href="/" class="brand-link">
-				<!-- Logo Image -->
-				<img 
-					src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" 
-					alt="March of Faith Logo" 
+				<img
+					src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp"
+					alt="March of Faith Logo"
 					class="brand-logo"
 				/>
-				
-				<!-- Brand Text: Color transitions via CSS based on .scrolled class -->
 				<div class="brand-text">
 					<span class="brand-name">March of Faith Inc.</span>
 				</div>
@@ -134,7 +112,7 @@
 		</div>
 
 		<!-- Mobile Menu Toggle -->
-		<button class="mobile-menu-toggle" on:click|stopPropagation={toggleMobileMenu} aria-label="Toggle menu">
+		<button class="mobile-menu-toggle" onclick={(e) => { e.stopPropagation(); toggleMobileMenu(); }} aria-label="Toggle menu">
 			<div class="hamburger" class:open={isMobileMenuOpen}>
 				<span></span>
 				<span></span>
@@ -148,25 +126,25 @@
 		<div class="mobile-nav-content">
 			<ul>
 				<li aria-current={$page.url.pathname === '/' ? 'page' : undefined}>
-					<a href="/" on:click={closeMobileMenu}>Home</a>
+					<a href="/" onclick={closeMobileMenu}>Home</a>
 				</li>
 				<li aria-current={$page.url.pathname.startsWith('/about') ? 'page' : undefined}>
-					<a href="/about" on:click={closeMobileMenu}>About</a>
+					<a href="/about" onclick={closeMobileMenu}>About</a>
 				</li>
 				<li aria-current={$page.url.pathname === '/churches' ? 'page' : undefined}>
-					<a href="/churches" on:click={closeMobileMenu}>Churches</a>
+					<a href="/churches" onclick={closeMobileMenu}>Churches</a>
 				</li>
 				<li aria-current={$page.url.pathname === '/pastors' ? 'page' : undefined}>
-					<a href="/pastors" on:click={closeMobileMenu}>Pastors</a>
+					<a href="/pastors" onclick={closeMobileMenu}>Pastors</a>
 				</li>
 				<li aria-current={$page.url.pathname === '/docs' ? 'page' : undefined}>
-					<a href="/docs" on:click={closeMobileMenu}>Resources</a>
+					<a href="/docs" onclick={closeMobileMenu}>Resources</a>
 				</li>
 				<li aria-current={$page.url.pathname === '/news' ? 'page' : undefined}>
-					<a href="/news" on:click={closeMobileMenu}>News</a>
+					<a href="/news" onclick={closeMobileMenu}>News</a>
 				</li>
 				<li class="mobile-cta">
-					<a href="/contact" class="visit-btn-mobile" on:click={closeMobileMenu}>Visit Us</a>
+					<a href="/contact" class="visit-btn-mobile" onclick={closeMobileMenu}>Visit Us</a>
 				</li>
 			</ul>
 		</div>
@@ -239,7 +217,7 @@
 		text-transform: uppercase;
 		letter-spacing: 1px;
 		transition: color 0.3s ease, text-shadow 0.3s ease;
-		
+
 		/* Default State: White Text */
 		color: white;
 		text-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -270,7 +248,7 @@
 		position: relative;
 		padding: 0.5rem 0;
 		transition: color 0.3s ease, text-shadow 0.3s ease;
-		
+
 		/* Default: White Link */
 		color: rgba(255,255,255,0.9);
 		text-shadow: 0 1px 2px rgba(0,0,0,0.2);
@@ -298,7 +276,7 @@
 	.desktop-nav a:hover {
 		color: white;
 	}
-	
+
 	.desktop-nav a:hover::after,
 	.desktop-nav li[aria-current='page'] a::after {
 		width: 100%;
@@ -319,7 +297,7 @@
 		font-size: 0.85rem;
 		letter-spacing: 1px;
 		transition: all 0.3s ease;
-		
+
 		/* Default: White Button / Red Text */
 		background: white;
 		color: #981B1E;
@@ -457,7 +435,7 @@
 		.desktop-nav, .desktop-only { display: none; }
 		.mobile-menu-toggle { display: block; }
 		.header-container { padding: 0 1.5rem; }
-		
+
 		/* Ensure text color changes on mobile too if visible */
 		header.scrolled .brand-name { color: #981B1E; }
 	}

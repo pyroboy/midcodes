@@ -8,6 +8,7 @@
 		DialogDescription
 	} from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Input } from '$lib/components/ui/input';
 
 	import { Label } from '$lib/components/ui/label';
@@ -39,6 +40,11 @@
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let hasUnsavedChanges = $state(false);
+
+	// Unsaved changes confirmation dialog state
+	let showUnsavedDialog = $state(false);
+	let unsavedDialogAction = $state<'close' | 'changeYear'>('close');
+	let pendingYearOffset = $state(0);
 
 	// Fixed timezone-safe function
 	const getFirstDayOfMonth = (year: number, month: number) => {
@@ -240,10 +246,10 @@
 
 	const changeYear = (offset: number) => {
 		if (hasUnsavedChanges) {
-			const confirmed = confirm(
-				'You have unsaved changes. Are you sure you want to change the year?'
-			);
-			if (!confirmed) return;
+			pendingYearOffset = offset;
+			unsavedDialogAction = 'changeYear';
+			showUnsavedDialog = true;
+			return;
 		}
 		selectedYear += offset;
 		fetchBillingsForYear(selectedYear);
@@ -299,10 +305,22 @@
 	// Handle modal close with unsaved changes warning
 	const handleClose = () => {
 		if (hasUnsavedChanges) {
-			const confirmed = confirm('You have unsaved changes. Are you sure you want to close?');
-			if (!confirmed) return;
+			unsavedDialogAction = 'close';
+			showUnsavedDialog = true;
+			return;
 		}
 		onOpenChange(false);
+	};
+
+	const confirmUnsavedAction = () => {
+		showUnsavedDialog = false;
+		if (unsavedDialogAction === 'close') {
+			onOpenChange(false);
+		} else if (unsavedDialogAction === 'changeYear') {
+			selectedYear += pendingYearOffset;
+			fetchBillingsForYear(selectedYear);
+			pendingYearOffset = 0;
+		}
 	};
 </script>
 
@@ -410,3 +428,21 @@
 		</DialogFooter>
 	</DialogContent>
 </Dialog>
+
+<!-- Unsaved Changes Confirmation Dialog -->
+<AlertDialog.Root bind:open={showUnsavedDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Unsaved Changes</AlertDialog.Title>
+			<AlertDialog.Description>
+				{unsavedDialogAction === 'close'
+					? 'You have unsaved changes. Are you sure you want to close?'
+					: 'You have unsaved changes. Are you sure you want to change the year?'}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showUnsavedDialog = false; pendingYearOffset = 0; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmUnsavedAction}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

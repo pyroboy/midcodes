@@ -54,6 +54,46 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="{article.title} | March of Faith Inc." />
+    <meta property="og:description" content={article.description} />
+    {#if article.images.length > 0}
+    <meta property="og:image" content={article.images[0].url} />
+    {/if}
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{article.title} | March of Faith Inc." />
+    <meta name="twitter:description" content={article.description} />
+    {#if article.images.length > 0}
+    <meta name="twitter:image" content={article.images[0].url} />
+    {/if}
+
+    <!-- JSON-LD NewsArticle -->
+    {@html `<script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        "headline": "${article.title}",
+        "description": "${article.description}",
+        "datePublished": "${new Date(article.date).toISOString().split('T')[0]}",
+        "image": ${article.images.length > 0 ? `"${article.images[0].url}"` : '""'},
+        "author": {
+            "@type": "Organization",
+            "name": "March of Faith Incorporated"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "March of Faith Incorporated",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp"
+            }
+        }
+    }
+    </script>`}
 </svelte:head>
 
 <div class="page-wrapper">

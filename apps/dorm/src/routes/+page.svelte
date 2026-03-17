@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Building, Users, FileText, CreditCard, Loader2 } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
@@ -12,10 +13,28 @@
 	let preloadProgress = $state(0);
 	let totalPreloads = 5;
 
+	// Dashboard counts
+	let counts = $state<{ properties: number; tenants: number; activeLeases: number; payments: number } | null>(null);
+	let countsLoading = $state(true);
+
 	onMount(async () => {
 		if (!data.user || !data.preloadPromises) {
 			isPreloading = false;
+			countsLoading = false;
 			return;
+		}
+
+		// Load dashboard counts
+		if (data.dashboardCounts) {
+			try {
+				counts = await data.dashboardCounts;
+			} catch (error) {
+				console.error('Error loading dashboard counts:', error);
+			} finally {
+				countsLoading = false;
+			}
+		} else {
+			countsLoading = false;
 		}
 
 		// Progressive cache preloading
@@ -72,7 +91,11 @@
 					<Building class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">--</div>
+					{#if countsLoading}
+						<Skeleton class="h-8 w-12 mb-1" />
+					{:else}
+						<div class="text-2xl font-bold">{counts?.properties ?? 0}</div>
+					{/if}
 					<p class="text-xs text-muted-foreground">
 						<a href="/properties" class="text-primary hover:underline">Manage your properties</a>
 					</p>
@@ -85,7 +108,11 @@
 					<Users class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">--</div>
+					{#if countsLoading}
+						<Skeleton class="h-8 w-12 mb-1" />
+					{:else}
+						<div class="text-2xl font-bold">{counts?.tenants ?? 0}</div>
+					{/if}
 					<p class="text-xs text-muted-foreground">
 						<a href="/tenants" class="text-primary hover:underline">Manage tenants</a>
 					</p>
@@ -98,7 +125,11 @@
 					<FileText class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">--</div>
+					{#if countsLoading}
+						<Skeleton class="h-8 w-12 mb-1" />
+					{:else}
+						<div class="text-2xl font-bold">{counts?.activeLeases ?? 0}</div>
+					{/if}
 					<p class="text-xs text-muted-foreground">
 						<a href="/leases" class="text-primary hover:underline">View all leases</a>
 					</p>
@@ -111,7 +142,11 @@
 					<CreditCard class="h-4 w-4 text-muted-foreground" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">--</div>
+					{#if countsLoading}
+						<Skeleton class="h-8 w-12 mb-1" />
+					{:else}
+						<div class="text-2xl font-bold">{counts?.payments ?? 0}</div>
+					{/if}
 					<p class="text-xs text-muted-foreground">
 						<a href="/payments" class="text-primary hover:underline">Track payments</a>
 					</p>

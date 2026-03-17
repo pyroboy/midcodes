@@ -1,6 +1,7 @@
 <svelte:head>
 	<title>Church Locations Map - March of Faith Incorporated</title>
 	<meta name="description" content="Find March of Faith church locations across Bohol and Negros Oriental. Get directions to our headquarters in Tagbilaran City and satellite churches." />
+	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <div class="text-column">

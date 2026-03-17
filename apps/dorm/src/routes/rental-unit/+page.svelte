@@ -7,6 +7,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Accordion from '$lib/components/ui/accordion';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { superForm } from 'sveltekit-superforms/client';
@@ -29,6 +30,10 @@
 	let searchQuery = $state('');
 	let showModal = $state(false);
 	let editMode = $state(false);
+
+	// Delete confirmation dialog state
+	let showDeleteDialog = $state(false);
+	let rentalUnitToDelete = $state<RentalUnitResponse | null>(null);
 
 	// Load data lazily on mount
 	onMount(async () => {
@@ -126,14 +131,16 @@
 		showModal = true;
 	}
 
-	async function handleDeleteClick(rentalUnit: RentalUnitResponse) {
-		if (
-			!confirm(
-				`Are you sure you want to delete "${rentalUnit.name}"? This action cannot be undone.`
-			)
-		) {
-			return;
-		}
+	function handleDeleteClick(rentalUnit: RentalUnitResponse) {
+		rentalUnitToDelete = rentalUnit;
+		showDeleteDialog = true;
+	}
+
+	async function confirmDeleteRentalUnit() {
+		if (!rentalUnitToDelete) return;
+		const rentalUnit = rentalUnitToDelete;
+		showDeleteDialog = false;
+		rentalUnitToDelete = null;
 
 		const deleteData = new FormData();
 		deleteData.append('id', String(rentalUnit.id));
@@ -408,3 +415,19 @@
 		/>
 	</Dialog.Content>
 </Dialog.Root>
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Rental Unit</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete "{rentalUnitToDelete?.name}"? This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; rentalUnitToDelete = null; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDeleteRentalUnit}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

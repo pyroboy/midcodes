@@ -7,6 +7,11 @@
 <svelte:head>
 	<title>History & Purpose - March of Faith Incorporated</title>
 	<meta name="description" content="Learn about the rich history and divine purpose of March of Faith Incorporated since 1974" />
+	<meta property="og:title" content="History & Purpose - March of Faith Incorporated" />
+	<meta property="og:description" content="Learn about the rich history and divine purpose of March of Faith Incorporated since 1974" />
+	<meta property="og:image" content="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" />
+	<meta name="twitter:title" content="History & Purpose - March of Faith Incorporated" />
+	<meta name="twitter:description" content="Learn about the rich history and divine purpose of March of Faith Incorporated since 1974" />
 </svelte:head>
 
 <Hero subtitle="Five decades of faith, service, and spiritual growth in Bohol">

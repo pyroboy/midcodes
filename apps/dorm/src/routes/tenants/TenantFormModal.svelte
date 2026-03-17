@@ -7,6 +7,7 @@
 		DialogDescription
 	} from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
@@ -54,6 +55,9 @@
 		imageDisplayValue = profilePicturePreviewUrl || $form.profile_picture_url || null;
 		console.log('📸 Image display value updated:', imageDisplayValue?.substring(0, 50) + '...');
 	});
+
+	// Unsaved changes confirmation dialog state
+	let showUnsavedDialog = $state(false);
 
 	// Track form changes to prevent accidental exits
 	let initialFormData = $state<string>('');
@@ -327,11 +331,15 @@
 	// Handle modal close with unsaved changes check
 	function handleModalClose(shouldClose: boolean) {
 		if (shouldClose && hasUnsavedChanges) {
-			if (!confirm('You have unsaved changes. Are you sure you want to close without saving?')) {
-				return;
-			}
+			showUnsavedDialog = true;
+			return;
 		}
 		onOpenChange(shouldClose);
+	}
+
+	function confirmDiscardChanges() {
+		showUnsavedDialog = false;
+		onOpenChange(true);
 	}
 
 	// Reset form when modal opens/closes or tenant changes
@@ -871,3 +879,19 @@
 		</form>
 	</DialogContent>
 </Dialog>
+
+<!-- Unsaved Changes Confirmation Dialog -->
+<AlertDialog.Root bind:open={showUnsavedDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Unsaved Changes</AlertDialog.Title>
+			<AlertDialog.Description>
+				You have unsaved changes. Are you sure you want to close without saving?
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => (showUnsavedDialog = false)}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDiscardChanges}>Discard Changes</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

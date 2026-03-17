@@ -3,12 +3,14 @@
 	import LeaseFormModal from './LeaseFormModal.svelte';
 	import LeaseList from './LeaseList.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign } from 'lucide-svelte';
 	import type { z } from 'zod';
 	import { leaseSchema } from './formSchema';
 	import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
 	import { formatCurrency } from '$lib/utils/format';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
 	import { printAllLeases } from '$lib/utils/print';
 	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
@@ -26,6 +28,10 @@
 
 	// Add activeFilter state for summary card filtering
 	let activeFilter = $state<'all' | 'paid' | 'pending' | 'partial' | 'overdue'>('all');
+
+	// Delete confirmation dialog state
+	let showDeleteDialog = $state(false);
+	let leaseToDelete = $state<any>(null);
 
 	// Progressive loading: load core data first, then financial data
 	async function loadDataFromPromises() {
@@ -184,7 +190,7 @@
 		printAllLeases(filteredLeases);
 	}
 
-	async function handleDeleteLease(
+	function handleDeleteLease(
 		lease: FormType & {
 			billings?: { paid_amount: number }[];
 			balance?: number;
@@ -192,27 +198,15 @@
 			id?: number;
 		}
 	) {
-		// Enhanced confirmation dialog with detailed warning
-		const hasPayments = lease.billings?.some((b: { paid_amount: number }) => b.paid_amount > 0);
-		const totalBalance = lease.balance || 0;
+		leaseToDelete = lease;
+		showDeleteDialog = true;
+	}
 
-		let confirmMessage = `Are you sure you want to archive lease "${lease.name}"?\n\n`;
-		if (hasPayments) {
-			confirmMessage += `⚠️  WARNING: This lease has payment history that will be preserved for audit purposes.\n\n`;
-		}
-
-		if (totalBalance > 0) {
-			confirmMessage += `💰 Outstanding Balance: ₱${totalBalance.toLocaleString()}\n`;
-		}
-
-		confirmMessage += `\nThis action will:\n`;
-		confirmMessage += `• Archive the lease (soft delete)\n`;
-		confirmMessage += `• Preserve all payment and billing history\n`;
-		confirmMessage += `• Maintain audit compliance\n`;
-		confirmMessage += `• Remove from active lease list\n\n`;
-		confirmMessage += `This action cannot be undone. Continue?`;
-
-		if (!confirm(confirmMessage)) return;
+	async function confirmDeleteLease() {
+		if (!leaseToDelete) return;
+		const lease = leaseToDelete;
+		showDeleteDialog = false;
+		leaseToDelete = null;
 
 		const formData = new FormData();
 		formData.append('id', String(lease.id));
@@ -228,17 +222,16 @@
 			if (result.ok) {
 				// Refresh data to get latest state from server
 				await refreshData();
-				// Show success message
-				alert(
+				toast.success(
 					`Lease "${lease.name}" has been successfully archived. Payment history has been preserved.`
 				);
 			} else {
 				console.error('Delete failed:', response);
-				alert(response.error || response.message || 'Failed to delete lease');
+				toast.error(response.error || response.message || 'Failed to delete lease');
 			}
 		} catch (error) {
 			console.error('Error deleting lease:', error);
-			alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
 
@@ -286,14 +279,15 @@
 				<!-- All Leases Card -->
 				<button
 				onclick={() => (activeFilter = 'all')}
-				class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-blue-200 cursor-pointer {activeFilter === 'all' ? 'ring-2 ring-blue-500' : ''}"
+				aria-pressed={activeFilter === 'all'}
+				class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-blue-200 cursor-pointer {activeFilter === 'all' ? 'ring-2 ring-blue-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
 						<Skeleton class="h-3 w-10" />
 					{:else}
 						<div class="text-base sm:text-xl font-bold text-slate-800">{summaryMetrics.totalLeases}</div>
-						<div class="flex items-center gap-1 text-slate-600 text-[10px] sm:text-xs font-medium truncate">
+						<div class="flex items-center gap-1 text-slate-600 text-xs font-medium truncate">
 							<CircleDollarSign class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Total</span>
 						</div>
@@ -303,14 +297,15 @@
 				<!-- Paid in Full Card -->
 				<button
 					onclick={() => (activeFilter = 'paid')}
-					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-green-200 cursor-pointer {activeFilter === 'paid' ? 'ring-2 ring-green-500' : ''}"
+				aria-pressed={activeFilter === 'paid'}
+					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-green-200 cursor-pointer {activeFilter === 'paid' ? 'ring-2 ring-green-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
 						<Skeleton class="h-3 w-10" />
 					{:else}
 						<div class="text-base sm:text-xl font-bold text-green-600">{summaryMetrics.paidInFull}</div>
-						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-green-600 truncate">
+						<div class="flex items-center gap-1 text-xs font-medium text-green-600 truncate">
 							<Check class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Paid</span>
 						</div>
@@ -320,7 +315,8 @@
 				<!-- Pending Card -->
 				<button
 					onclick={() => (activeFilter = 'pending')}
-					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-yellow-200 cursor-pointer {activeFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}"
+				aria-pressed={activeFilter === 'pending'}
+					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-yellow-200 cursor-pointer {activeFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
@@ -328,18 +324,19 @@
 						<Skeleton class="h-3 w-10" />
 					{:else}
 						<div class="text-base sm:text-xl font-bold text-yellow-600">{summaryMetrics.pendingCount}</div>
-						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-yellow-600 truncate">
+						<div class="flex items-center gap-1 text-xs font-medium text-yellow-600 truncate">
 							<Clock class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Pending</span>
 						</div>
-						<span class="text-yellow-600 text-[9px] sm:text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPending)}</span>
+						<span class="text-yellow-600 text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPending)}</span>
 					{/if}
 				</button>
 
 				<!-- Partial Card -->
 				<button
 					onclick={() => (activeFilter = 'partial')}
-					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-amber-200 cursor-pointer {activeFilter === 'partial' ? 'ring-2 ring-amber-500' : ''}"
+				aria-pressed={activeFilter === 'partial'}
+					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-amber-200 cursor-pointer {activeFilter === 'partial' ? 'ring-2 ring-amber-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
@@ -347,18 +344,19 @@
 						<Skeleton class="h-3 w-10" />
 					{:else}
 						<div class="text-base sm:text-xl font-bold text-amber-600">{summaryMetrics.partialCount}</div>
-						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-amber-600 truncate">
+						<div class="flex items-center gap-1 text-xs font-medium text-amber-600 truncate">
 							<AlertTriangle class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Partial</span>
 						</div>
-						<span class="text-amber-600 text-[9px] sm:text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPartial)}</span>
+						<span class="text-amber-600 text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPartial)}</span>
 					{/if}
 				</button>
 
 				<!-- Overdue Card -->
 				<button
 					onclick={() => (activeFilter = 'overdue')}
-					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-red-200 cursor-pointer {activeFilter === 'overdue' ? 'ring-2 ring-red-500' : ''}"
+				aria-pressed={activeFilter === 'overdue'}
+					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-red-200 cursor-pointer {activeFilter === 'overdue' ? 'ring-2 ring-red-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
@@ -366,11 +364,11 @@
 						<Skeleton class="h-3 w-10" />
 					{:else}
 						<div class="text-base sm:text-xl font-bold text-red-600">{summaryMetrics.overdueCount}</div>
-						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-red-600 truncate">
+						<div class="flex items-center gap-1 text-xs font-medium text-red-600 truncate">
 							<AlertTriangle class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Overdue</span>
 						</div>
-						<span class="text-red-600 text-[9px] sm:text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalOverdue)}</span>
+						<span class="text-red-600 text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalOverdue)}</span>
 					{/if}
 				</button>
 			</div>
@@ -485,4 +483,32 @@
 	onOpenChange={handleModalClose}
 	onDataChange={refreshData}
 />
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Archive Lease</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if leaseToDelete}
+					Are you sure you want to archive lease "{leaseToDelete.name}"?
+
+					{#if leaseToDelete.billings?.some((b: { paid_amount: number }) => b.paid_amount > 0)}
+						Warning: This lease has payment history that will be preserved for audit purposes.
+					{/if}
+
+					{#if (leaseToDelete.balance || 0) > 0}
+						Outstanding Balance: {formatCurrency(leaseToDelete.balance)}
+					{/if}
+
+					This will archive the lease (soft delete), preserve all payment and billing history, maintain audit compliance, and remove from active lease list. This action cannot be undone.
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; leaseToDelete = null; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDeleteLease}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 

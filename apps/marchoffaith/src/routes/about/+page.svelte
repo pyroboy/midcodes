@@ -11,6 +11,7 @@
 	<meta property="og:description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs. Serving the community since 1974." />
 	<meta name="twitter:title" content="About Us - March of Faith Incorporated" />
 	<meta name="twitter:description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs." />
+	<meta property="og:image" content="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" />
 </svelte:head>
 
 <Hero subtitle="A community of believers dedicated to spreading God's love and serving the people of Bohol since 1974">

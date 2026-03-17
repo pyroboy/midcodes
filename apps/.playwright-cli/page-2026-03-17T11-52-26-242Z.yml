@@ -1,0 +1,29 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - img "Modern Apartment Building" [ref=e6]
+    - generic [ref=e8]:
+      - img [ref=e9]
+      - generic [ref=e10]: DormAdmin Suite
+    - blockquote [ref=e12]:
+      - paragraph [ref=e13]: “This platform has completely streamlined our property operations, from tenant onboarding to automated billing cycles. It's the standard for modern dormitory management.”
+      - contentinfo [ref=e14]: Sofia Davis, Senior Property Manager
+  - generic [ref=e16]:
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - heading "Forgot Password" [level=3] [ref=e20]
+        - paragraph [ref=e21]: Enter your email address and we'll send you a link to reset your password
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e25]: Email
+          - textbox "Email" [ref=e26]
+        - button "Send Reset Link" [ref=e27] [cursor=pointer]
+        - link "Back to Sign In" [ref=e29] [cursor=pointer]:
+          - /url: /auth
+    - paragraph [ref=e30]:
+      - text: By clicking continue, you agree to our
+      - link "Terms of Service" [ref=e31] [cursor=pointer]:
+        - /url: /terms
+      - text: and
+      - link "Privacy Policy" [ref=e32] [cursor=pointer]:
+        - /url: /privacy
+      - text: .

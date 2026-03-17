@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import PaymentForm from './PaymentForm.svelte';
-	import TransactionFormModal from '../transactions/TransactionFormModal.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -9,7 +8,6 @@
 	import type { PageData } from './$types';
 	import type { z } from 'zod';
 	import { paymentSchema } from './formSchema';
-	import { invalidateAll } from '$app/navigation';
 	import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
 
 	type Payment = z.infer<typeof paymentSchema> & {
@@ -43,7 +41,6 @@
 
 	let showForm = $state(false);
 	let selectedPayment: Payment | undefined = $state(undefined);
-	let showTransactionModal = $state(false);
 	let isLoading = $state(data.lazy === true);
 	let payments = $state<Payment[]>(data.payments || []);
 	let billings = $state(data.billings || []);
@@ -76,58 +73,9 @@
 		}
 	});
 
-	// Debug effect
-	$effect(() => {
-		console.log('Modal state changed:', { 
-			showTransactionModal, 
-			selectedPayment: selectedPayment?.id, 
-			shouldShow: showTransactionModal && selectedPayment 
-		});
-	});
-
-	function handlePaymentClick(payment: Payment) {
-		if (isAdminLevel || isAccountant || isFrontdesk) {
-			selectedPayment = payment;
-			showTransactionModal = true;
-		}
-	}
-
 	function handlePaymentAdded() {
 		showForm = false;
 		selectedPayment = undefined;
-	}
-
-	async function handleTransactionModalClose() {
-		console.log('🔒 MODAL CLOSE: Transaction modal closing, invalidating data...');
-		showTransactionModal = false;
-		selectedPayment = undefined;
-		
-		// Invalidate data to refresh the payments list
-		console.log('🔄 MODAL CLOSE: Calling invalidateAll to refresh data...');
-		await invalidateAll();
-		console.log('✅ MODAL CLOSE: Data invalidation complete');
-	}
-
-	async function revertPayment(paymentId: number) {
-		const reason = prompt('Enter a reason for reverting this payment (optional):') ?? '';
-		const confirmRevert = confirm('Are you sure you want to revert this payment? This will adjust affected billings.');
-		if (!confirmRevert) return;
-
-		const form = new FormData();
-		form.append('payment_id', String(paymentId));
-		form.append('reason', reason);
-
-		const res = await fetch('?/revert', {
-			method: 'POST',
-			body: form
-		});
-		if (res.ok) {
-			// Simple reload to reflect new states
-			location.reload();
-		} else {
-			const data = await res.json().catch(() => ({}));
-			alert(data?.error || 'Failed to revert payment');
-		}
 	}
 
 	function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
@@ -193,7 +141,7 @@
 		{:else if payments && payments.length > 0}
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each payments as payment}
-					<Card.Root class="cursor-pointer" onclick={() => handlePaymentClick(payment)}>
+					<Card.Root>
 						<Card.Header>
 							<Card.Title class="flex justify-between items-center">
 								{payment.billing?.lease?.name ?? 'Unknown'}
@@ -240,12 +188,6 @@
 								{/if}
 							</div>
 						</Card.Content>
-						{#if isAdminLevel || isAccountant}
-							<div class="flex gap-2 p-4 pt-0">
-								<Button variant="outline" onclick={(e) => { e.stopPropagation(); handlePaymentClick(payment); }}>Edit</Button>
-								<Button variant="destructive" onclick={(e) => { e.stopPropagation(); revertPayment(payment.id as unknown as number); }}>Revert</Button>
-							</div>
-						{/if}
 					</Card.Root>
 				{/each}
 			</div>
@@ -285,16 +227,3 @@
 	</div>
 {/if}
 
-<!-- Transaction Modal for Editing Payments -->
-{#if showTransactionModal && selectedPayment}
-	<!-- TODO: Fix TransactionFormModal data structure compatibility -->
-	<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-		<div class="bg-white p-6 rounded-lg max-w-md">
-			<h3 class="text-lg font-semibold mb-4">Edit Payment</h3>
-			<p class="text-gray-600 mb-4">Payment editing functionality is temporarily disabled due to schema incompatibility.</p>
-			<Button variant="outline" onclick={() => (showTransactionModal = false)}>
-				Close
-			</Button>
-		</div>
-	</div>
-{/if}

@@ -8,6 +8,7 @@
 		DialogDescription
 	} from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -35,6 +36,10 @@
 	let isLoading = $state(false);
 	let editingDeposit = $state<Partial<Billing> | null>(null);
 	let showAddForm = $state(false);
+
+	// Delete confirmation dialog state
+	let showDeleteConfirm = $state(false);
+	let billingToDeleteId = $state<number | null>(null);
 
 	// Initialize Superform with default form data
 	const initialFormData: SecurityDepositForm = {
@@ -141,20 +146,26 @@
 		showAddForm = true;
 	};
 
-	const deleteBilling = async (billingId: number) => {
-		if (!confirm('Are you sure you want to delete this security deposit billing?')) {
-			return;
-		}
+	const deleteBilling = (billingId: number) => {
+		billingToDeleteId = billingId;
+		showDeleteConfirm = true;
+	};
+
+	const confirmDeleteBilling = () => {
+		if (billingToDeleteId === null) return;
 
 		// Set form data for deletion
 		$form.action = 'delete';
-		$form.billing_id = billingId;
+		$form.billing_id = billingToDeleteId;
 		$form.lease_id = lease.id;
 		$form.type = 'SECURITY_DEPOSIT';
 		$form.amount = 0;
 		$form.due_date = '';
 		$form.billing_date = '';
 		$form.notes = '';
+
+		showDeleteConfirm = false;
+		billingToDeleteId = null;
 
 		// Submit the form
 		const formElement = document.getElementById('security-deposit-delete-form') as HTMLFormElement;
@@ -500,3 +511,19 @@
 		</div>
 	</DialogContent>
 </Dialog>
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteConfirm}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Security Deposit</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete this security deposit billing? This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteConfirm = false; billingToDeleteId = null; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDeleteBilling}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

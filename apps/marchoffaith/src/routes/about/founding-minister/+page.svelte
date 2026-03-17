@@ -7,6 +7,11 @@
 <svelte:head>
 	<title>Founding Minister - March of Faith Incorporated</title>
 	<meta name="description" content="Life and legacy of Rev. Rudy Salomon Trigo, D.D., founding minister of March of Faith Incorporated" />
+	<meta property="og:title" content="Founding Minister - March of Faith Incorporated" />
+	<meta property="og:description" content="Life and legacy of Rev. Rudy Salomon Trigo, D.D., founding minister of March of Faith Incorporated" />
+	<meta property="og:image" content="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png" />
+	<meta name="twitter:title" content="Founding Minister - March of Faith Incorporated" />
+	<meta name="twitter:description" content="Life and legacy of Rev. Rudy Salomon Trigo, D.D., founding minister of March of Faith Incorporated" />
 </svelte:head>
 
 <Hero subtitle="The visionary leader who established March of Faith Incorporated">

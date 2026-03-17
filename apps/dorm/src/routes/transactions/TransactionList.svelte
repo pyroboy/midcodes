@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Input } from '$lib/components/ui/input';
@@ -27,6 +28,10 @@
 	}
 
 	let { transactions = [] }: Props = $props();
+
+	// Delete confirmation dialog state
+	let showDeleteConfirm = $state(false);
+	let transactionToDeleteId = $state<number | null>(null);
 
 	// Event dispatcher
 	const dispatch = createEventDispatcher<{
@@ -158,9 +163,16 @@
 
 	// Handle delete transaction
 	function handleDeleteTransaction(id: number) {
-		if (confirm('Are you sure you want to delete this transaction?')) {
-			dispatch('delete', id);
+		transactionToDeleteId = id;
+		showDeleteConfirm = true;
+	}
+
+	function confirmDeleteTransaction() {
+		if (transactionToDeleteId !== null) {
+			dispatch('delete', transactionToDeleteId);
 		}
+		showDeleteConfirm = false;
+		transactionToDeleteId = null;
 	}
 
 	// Handle view transaction details
@@ -427,3 +439,19 @@
 		</CardContent>
 	</Card>
 </div>
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteConfirm}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Transaction</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete this transaction? This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteConfirm = false; transactionToDeleteId = null; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDeleteTransaction}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

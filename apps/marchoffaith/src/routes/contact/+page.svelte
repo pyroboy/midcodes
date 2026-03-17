@@ -1,5 +1,21 @@
-<script>
+<script lang="ts">
 	import Hero from '$lib/components/Hero.svelte';
+
+	let formSubmitted = $state(false);
+	let formSubmitting = $state(false);
+
+	function handleSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		formSubmitting = true;
+
+		// Simulate sending — replace with real endpoint when available
+		setTimeout(() => {
+			formSubmitting = false;
+			formSubmitted = true;
+			const form = e.target as HTMLFormElement;
+			form.reset();
+		}, 1000);
+	}
 </script>
 
 <svelte:head>
@@ -16,7 +32,7 @@
 </Hero>
 
 <!-- Contact Content -->
-<section class="contact-content" role="main" aria-labelledby="contact-main">
+<section class="contact-content" role="main" aria-label="Contact information and form">
 	<div class="container">
 		<div class="content-layout">
 			<div class="main-content">
@@ -25,7 +41,14 @@
 				<!-- Contact Form -->
 				<div class="contact-form-section" role="region" aria-labelledby="contact-form-title">
 					<h2 id="contact-form-title">Send Us a Message</h2>
-					<form class="contact-form">
+					{#if formSubmitted}
+					<div class="form-success">
+						<h3>Thank you for reaching out!</h3>
+						<p>We've received your message and will get back to you as soon as possible. God bless you!</p>
+						<button class="btn btn-primary submit-button" onclick={() => formSubmitted = false}>Send Another Message</button>
+					</div>
+				{:else}
+					<form class="contact-form" onsubmit={handleSubmit}>
 						<div class="form-row">
 							<div class="form-group">
 								<label for="name">Full Name *</label>
@@ -63,8 +86,11 @@
 							<textarea id="message" name="message" rows="6" required placeholder="Share your heart with us. Whether it's a question, prayer request, or just to say hello - we'd love to hear from you."></textarea>
 						</div>
 
-						<button type="submit" class="btn btn-primary submit-button">Send My Message</button>
+						<button type="submit" class="btn btn-primary submit-button" disabled={formSubmitting}>
+							{formSubmitting ? 'Sending...' : 'Send My Message'}
+						</button>
 					</form>
+				{/if}
 				</div>
 			</div>
 
@@ -77,7 +103,7 @@
 							<div class="service-day">Sunday</div>
 							<div class="service-details">
 								<div class="service-time">Morning Worship: 9:00 AM</div>
-								<div class="service-time">Evening Service: 6:00 PM</div>
+								<div class="service-time">Evening Service: 4:00 PM</div>
 							</div>
 						</div>
 						<div class="service-item">
@@ -224,6 +250,27 @@
 	.form-group textarea {
 		resize: vertical;
 		min-height: 120px;
+	}
+
+	/* Form Success State */
+	.form-success {
+		text-align: center;
+		padding: 3rem 2rem;
+	}
+
+	.form-success h3 {
+		font-family: 'Montserrat', sans-serif;
+		color: var(--deep-red);
+		font-size: 1.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.form-success p {
+		font-family: 'Montserrat', sans-serif;
+		color: #555;
+		font-size: 1.05rem;
+		line-height: 1.6;
+		margin-bottom: 2rem;
 	}
 
 	/* Brand Button Styles */

@@ -2,6 +2,7 @@
 	import { browser } from '$app/environment';
 	import { expenseSchema } from './schema';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { toast } from 'svelte-sonner';
 	import { superForm } from 'sveltekit-superforms/client';
 	import type { PageData } from './$types';
@@ -40,6 +41,10 @@
 	// State for managing the selected expense for editing
 	let selectedExpense = $state<Expense | null>(null);
 
+	// Delete confirmation dialog state
+	let showDeleteDialog = $state(false);
+	let expenseToDeleteId = $state<number | null>(null);
+
 	// Handle edit expense
 	function handleEditExpense(event: CustomEvent<Expense>) {
 		const expense = event.detail;
@@ -63,13 +68,16 @@
 	}
 
 	// Handle delete expense
-	async function handleDeleteExpense(event: CustomEvent<number>) {
-		const expenseId = event.detail;
-		console.log('Delete expense request for ID:', expenseId);
+	function handleDeleteExpense(event: CustomEvent<number>) {
+		expenseToDeleteId = event.detail;
+		showDeleteDialog = true;
+	}
 
-		if (!confirm('Are you sure you want to delete this expense?')) {
-			return;
-		}
+	async function confirmDeleteExpense() {
+		if (expenseToDeleteId === null) return;
+		const expenseId = expenseToDeleteId;
+		showDeleteDialog = false;
+		expenseToDeleteId = null;
 
 		try {
 			console.log('Sending delete request for expense ID:', expenseId);
@@ -179,6 +187,22 @@
 		on:refresh={handleRefresh}
 	/>
 </div>
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Expense</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete this expense? This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; expenseToDeleteId = null; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDeleteExpense}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
 {#if browser}
 	<SuperDebug data={$form} />

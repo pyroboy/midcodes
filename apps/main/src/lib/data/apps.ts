@@ -59,9 +59,9 @@ export const apps: App[] = [
 		packageName: 'events'
 	},
 	{
-		id: 'id-gen',
-		name: 'ID Generator',
-		displayName: 'Professional ID Card Generator',
+		id: 'kanaya',
+		name: 'Kanaya',
+		displayName: 'Kanaya Identity Solutions',
 		version: '2',
 		description: 'Professional ID card generation system with advanced UI components and multi-font support.',
 		category: 'core',
@@ -76,8 +76,8 @@ export const apps: App[] = [
 		],
 		status: 'active',
 		complexity: 'high',
-		path: '/apps/id-gen',
-		packageName: 'id-gen'
+		path: '/apps/kanaya',
+		packageName: 'kanaya'
 	},
 	{
 		id: 'marchoffaith',

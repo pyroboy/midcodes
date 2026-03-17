@@ -88,14 +88,14 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 	// SECURITY: Build Content Security Policy
 	const connectSrc = dev
-		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* ws://localhost:*"
+		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* ws://localhost:* ws://127.0.0.1:*"
 		: "connect-src 'self' https://*.neon.tech";
 
 	const cspDirectives = [
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-		"img-src 'self' data: blob: https://*.neon.tech",
+		"img-src 'self' data: blob: https://*.neon.tech https://images.unsplash.com",
 		connectSrc,
 		"worker-src 'self' blob:",
 		"frame-ancestors 'none'",
@@ -135,7 +135,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
 	// 2. Public vs Private routing
 	const isAuthRoute = path.startsWith('/auth') || path.startsWith('/api/auth');
-	const isPublicRoute = path.startsWith('/utility-input/');
+	const isPublicRoute =
+		path.startsWith('/utility-input/') || path === '/terms' || path === '/privacy';
 
 	if (isUserLoggedIn) {
 		// Redirect logged-in users away from auth pages (except signout)

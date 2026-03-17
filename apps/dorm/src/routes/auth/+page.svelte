@@ -48,14 +48,21 @@
 	});
 
 	const ALLOW_SIGNUP = true;
+
+	let activeTab = $state('login');
 </script>
 
 <div class="flex flex-col space-y-2 text-center">
-	<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
-	<p class="text-sm text-muted-foreground">Enter your credentials to manage your properties</p>
+	{#if activeTab === 'register'}
+		<h1 class="text-3xl font-bold tracking-tight">Create your account</h1>
+		<p class="text-sm text-muted-foreground">Get started with DormAdmin Suite</p>
+	{:else}
+		<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
+		<p class="text-sm text-muted-foreground">Enter your credentials to manage your properties</p>
+	{/if}
 </div>
 
-<Tabs value="login" class="w-full mt-6">
+<Tabs value={activeTab} onValueChange={(v) => (activeTab = v)} class="w-full mt-6">
 	<TabsList class="grid w-full {ALLOW_SIGNUP ? 'grid-cols-2' : 'grid-cols-1'} mb-6">
 		<TabsTrigger value="login">Login</TabsTrigger>
 		{#if ALLOW_SIGNUP}
@@ -129,8 +136,9 @@
 			<form method="POST" action="?/register" use:regEnhance class="space-y-4">
 				{#if $regMessage}
 					<div
-						class="p-3 rounded-md bg-destructive/15 text-destructive text-sm font-medium border border-destructive/20"
+						class="p-3 rounded-md bg-destructive/15 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2"
 					>
+						<span class="h-2 w-2 rounded-full bg-destructive"></span>
 						{$regMessage}
 					</div>
 				{/if}

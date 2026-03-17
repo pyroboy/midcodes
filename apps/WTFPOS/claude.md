@@ -101,6 +101,16 @@ Root layout (+layout.svelte):
 
 ---
 
+## Design System
+
+- **Theme**: Light — bg `#FFFFFF`, secondary `#F9FAFB`, accent `#EA580C` (orange-600)
+- **Fonts**: Inter (body/heading), JetBrains Mono (prices/timers)
+- **Border**: `#E5E7EB` | Status: green `#10B981`, yellow `#F59E0B`, red `#EF4444`, purple `#8B5CF6`, cyan `#06B6D4`
+- **Radii**: sm=6, md=8, lg=12, xl=16
+- **Design file**: `POS DESIGN.pen` — read with pencil MCP tools only
+
+---
+
 ## Development Rules
 
 ### Svelte 5

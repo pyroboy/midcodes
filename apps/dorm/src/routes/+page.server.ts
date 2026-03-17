@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import { properties, tenants, leases, leaseTenants, payments, rentalUnit } from '$lib/server/schema';
-import { eq, desc, asc, isNull } from 'drizzle-orm';
+import { eq, desc, asc, isNull, count, sql } from 'drizzle-orm';
 
 export const config = { runtime: 'nodejs20.x' };
 
@@ -16,6 +16,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Return promises for progressive cache preloading
 	return {
 		user,
+		// Dashboard metric counts
+		dashboardCounts: loadDashboardCounts(),
 		// Preload promises for key data
 		preloadPromises: {
 			properties: preloadProperties(),
@@ -26,6 +28,45 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	};
 };
+
+async function loadDashboardCounts() {
+	const cacheKey = 'dashboard:counts';
+	const cached = cache.get<{
+		properties: number;
+		tenants: number;
+		activeLeases: number;
+		payments: number;
+	}>(cacheKey);
+	if (cached) return cached;
+
+	try {
+		const [propertiesCount, tenantsCount, activeLeasesCount, paymentsCount] = await Promise.all([
+			db.select({ value: count() }).from(properties),
+			db
+				.select({ value: count() })
+				.from(tenants)
+				.where(isNull(tenants.deletedAt)),
+			db
+				.select({ value: count() })
+				.from(leases)
+				.where(sql`${leases.status} = 'ACTIVE' AND ${leases.deletedAt} IS NULL`),
+			db.select({ value: count() }).from(payments)
+		]);
+
+		const counts = {
+			properties: propertiesCount[0]?.value ?? 0,
+			tenants: tenantsCount[0]?.value ?? 0,
+			activeLeases: activeLeasesCount[0]?.value ?? 0,
+			payments: paymentsCount[0]?.value ?? 0
+		};
+
+		cache.set(cacheKey, counts, CACHE_TTL.SHORT);
+		return counts;
+	} catch (error) {
+		console.error('Error loading dashboard counts:', error);
+		return { properties: 0, tenants: 0, activeLeases: 0, payments: 0 };
+	}
+}
 
 // Preload functions that cache data
 async function preloadProperties() {

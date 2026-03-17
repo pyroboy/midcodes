@@ -2,6 +2,10 @@
 	import { browser } from '$app/environment';
 	import { transactionSchema } from './schema';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import { toast } from 'svelte-sonner';
 	import { superForm } from 'sveltekit-superforms/client';
 	import type { PageData } from './$types';
@@ -97,6 +101,11 @@
 	// State for managing the selected transaction
 	let selectedTransaction = $state<Transaction | null>(null);
 
+	// Delete confirmation dialog state
+	let showDeleteConfirm = $state(false);
+	let transactionToDeleteId = $state<number | null>(null);
+	let deleteReason = $state('');
+
 	// Handle edit transaction
 	function handleEditTransaction(event: CustomEvent<Transaction>) {
 		const transaction = event.detail;
@@ -150,13 +159,19 @@
 	}
 
 	// Handle delete transaction
-	async function handleDeleteTransaction(event: CustomEvent<number>) {
-		const transactionId = event.detail;
-		console.log('Delete transaction request for ID:', transactionId);
+	function handleDeleteTransaction(event: CustomEvent<number>) {
+		transactionToDeleteId = event.detail;
+		deleteReason = '';
+		showDeleteConfirm = true;
+	}
 
-		if (!confirm('Are you sure you want to delete (revert) this transaction? This will adjust related billings.')) {
-			return;
-		}
+	async function confirmDeleteTransaction() {
+		if (transactionToDeleteId === null) return;
+		const transactionId = transactionToDeleteId;
+		const reason = deleteReason;
+		showDeleteConfirm = false;
+		transactionToDeleteId = null;
+		deleteReason = '';
 
 		try {
 			console.log('Sending delete request for transaction ID:', transactionId);
@@ -164,7 +179,6 @@
 			// Use FormData instead of JSON
 			const formData = new FormData();
 			formData.append('id', transactionId.toString());
-			const reason = prompt('Enter a reason for reverting this transaction (optional):') ?? '';
 			formData.append('reason', reason);
 
 			const response = await fetch(`?/delete`, {
@@ -356,6 +370,28 @@
 		/>
 	{/if}
 </div>
+
+<!-- Delete/Revert Transaction Dialog (with reason input) -->
+<Dialog.Root bind:open={showDeleteConfirm}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Revert Transaction</Dialog.Title>
+			<Dialog.Description>
+				Are you sure you want to delete (revert) this transaction? This will adjust related billings.
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="grid gap-4 py-4">
+			<div class="grid gap-2">
+				<Label for="delete-reason">Reason for reverting (optional)</Label>
+				<Input id="delete-reason" bind:value={deleteReason} placeholder="Enter a reason..." />
+			</div>
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => { showDeleteConfirm = false; transactionToDeleteId = null; deleteReason = ''; }}>Cancel</Button>
+			<Button variant="destructive" onclick={confirmDeleteTransaction}>Revert Transaction</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
 
 {#if browser && import.meta.env.DEV}
 	<SuperDebug data={$form} />

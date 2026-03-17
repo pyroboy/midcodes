@@ -4,6 +4,7 @@
     import UnderConstruction from '$lib/components/UnderConstruction.svelte';
     import Header from '$lib/components/Header.svelte';
     import Footer from '$lib/components/Footer.svelte';
+    import AnnouncementBanner from '$lib/components/AnnouncementBanner.svelte';
     import { page } from '$app/stores';
 </script>
 
@@ -14,11 +15,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@700;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://marchoffaith.org{$page.url.pathname}" />
+    <link rel="canonical" href="https://www.marchoffaithinc.com{$page.url.pathname}" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://marchoffaith.org{$page.url.pathname}" />
+    <meta property="og:url" content="https://www.marchoffaithinc.com{$page.url.pathname}" />
     <meta property="og:site_name" content="March of Faith Incorporated" />
     <meta property="og:locale" content="en_PH" />
     <meta property="og:image" content="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" />
@@ -44,11 +45,11 @@
         "name": "March of Faith Incorporated",
         "alternateName": "MOFI",
         "description": "A Christian church organization headquartered in Tagbilaran City, Bohol, Philippines. Spreading God's love since 1974 with the vision: Every Creature is Reachable.",
-        "url": "https://marchoffaith.org",
+        "url": "https://www.marchoffaithinc.com",
         "logo": "https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp",
         "image": "https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp",
         "telephone": "+63-99-9953-6700",
-        "email": "marchoffaith@gmail.com",
+        "email": "marchoffaithincorporated@gmail.com",
         "foundingDate": "1974-11-19",
         "founder": {
             "@type": "Person",
@@ -90,6 +91,7 @@
     <UnderConstruction />
 {:else}
     <div class="app">
+        <AnnouncementBanner announcements={$page.data.announcements ?? []} />
         <Header />
         <main>
             <slot />

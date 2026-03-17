@@ -19,6 +19,7 @@
 	import type { PageData } from './$types';
 
 	import { Input } from '$lib/components/ui/input';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
@@ -39,6 +40,10 @@
 	let selectedStatus = $state('');
 	let viewMode = $state<'card' | 'list'>('card');
 	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('active');
+
+	// Delete confirmation dialog state
+	let showDeleteDialog = $state(false);
+	let tenantToDelete = $state<TenantResponse | null>(null);
 
 	// Load data lazily from server promises
 	async function loadDataFromPromises() {
@@ -141,27 +146,16 @@
 		}
 	}
 
-	async function handleDeleteTenant(tenant: TenantResponse) {
-		// Enhanced confirmation dialog with detailed warning
-		let confirmMessage = `Are you sure you want to archive tenant "${tenant.name}"?\n\n`;
+	function handleDeleteTenant(tenant: TenantResponse) {
+		tenantToDelete = tenant;
+		showDeleteDialog = true;
+	}
 
-		if (tenant.leases && tenant.leases.length > 0) {
-			const activeLeases = tenant.leases.filter(l => l.status === 'ACTIVE');
-			if (activeLeases.length > 0) {
-				confirmMessage += `⚠️  WARNING: This tenant has ${activeLeases.length} active lease${activeLeases.length > 1 ? 's' : ''} that will be preserved.\n\n`;
-			} else {
-				confirmMessage += `⚠️  WARNING: This tenant has ${tenant.leases.length} lease${tenant.leases.length > 1 ? 's' : ''} that will be preserved.\n\n`;
-			}
-		}
-
-		confirmMessage += `This action will:\n`;
-		confirmMessage += `• Archive the tenant (soft delete)\n`;
-		confirmMessage += `• Preserve all lease and payment history\n`;
-		confirmMessage += `• Maintain audit compliance\n`;
-		confirmMessage += `• Remove from active tenant list\n\n`;
-		confirmMessage += `This action cannot be undone. Continue?`;
-
-		if (!confirm(confirmMessage)) return;
+	async function confirmDeleteTenant() {
+		if (!tenantToDelete) return;
+		const tenant = tenantToDelete;
+		showDeleteDialog = false;
+		tenantToDelete = null;
 
 		const formData = new FormData();
 		formData.append('id', String(tenant.id));
@@ -219,6 +213,7 @@
 				<div class="flex items-center gap-3 text-xs sm:text-sm">
 					<button
 						onclick={() => handleFilterClick('active')}
+						aria-pressed={activeFilter === 'active'}
 						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter ===
 						'active'
 							? 'bg-green-100 ring-2 ring-green-500'
@@ -234,6 +229,7 @@
 
 					<button
 						onclick={() => handleFilterClick('all')}
+						aria-pressed={activeFilter === 'all'}
 						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
 						'all'
 							? 'bg-blue-100 ring-2 ring-blue-500'
@@ -249,6 +245,7 @@
 
 					<button
 						onclick={() => handleFilterClick('inactive')}
+						aria-pressed={activeFilter === 'inactive'}
 						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 {activeFilter ===
 						'inactive'
 							? 'bg-gray-100 ring-2 ring-gray-500'
@@ -264,6 +261,7 @@
 
 					<button
 						onclick={() => handleFilterClick('pending')}
+						aria-pressed={activeFilter === 'pending'}
 						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 {activeFilter ===
 						'pending'
 							? 'bg-yellow-100 ring-2 ring-yellow-500'
@@ -279,6 +277,7 @@
 
 					<button
 						onclick={() => handleFilterClick('blacklisted')}
+						aria-pressed={activeFilter === 'blacklisted'}
 						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter ===
 						'blacklisted'
 							? 'bg-red-100 ring-2 ring-red-500'
@@ -478,3 +477,32 @@
 	onOpenChange={handleModalClose}
 	onTenantUpdate={updateTenantInState}
 />
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Archive Tenant</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if tenantToDelete}
+					Are you sure you want to archive tenant "{tenantToDelete.name}"?
+
+					{#if tenantToDelete.leases && tenantToDelete.leases.length > 0}
+						{@const activeLeases = tenantToDelete.leases.filter(l => l.status === 'ACTIVE')}
+						{#if activeLeases.length > 0}
+							Warning: This tenant has {activeLeases.length} active lease{activeLeases.length > 1 ? 's' : ''} that will be preserved.
+						{:else}
+							Warning: This tenant has {tenantToDelete.leases.length} lease{tenantToDelete.leases.length > 1 ? 's' : ''} that will be preserved.
+						{/if}
+					{/if}
+
+					This will archive the tenant (soft delete), preserve all lease and payment history, maintain audit compliance, and remove from active tenant list. This action cannot be undone.
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; tenantToDelete = null; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDeleteTenant}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

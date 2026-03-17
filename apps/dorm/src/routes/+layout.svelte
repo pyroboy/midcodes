@@ -16,6 +16,7 @@
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
+	import * as Accordion from '$lib/components/ui/accordion';
 
 	// Import Lucide icons
 	import {
@@ -141,6 +142,15 @@
 			]
 		}
 	];
+
+	// Auto-expand the category containing the current page
+	let activeCategory = $derived.by(() => {
+		const pathname = $page.url.pathname;
+		const match = navigationLinks.find((group) =>
+			group.links.some((link) => pathname.startsWith(link.href))
+		);
+		return match?.category ?? navigationLinks[0].category;
+	});
 </script>
 
 {#if isAuthRoute}
@@ -149,11 +159,14 @@
 	{@render children()}
 {:else}
 	<!-- Regular app routes - full layout with sidebar -->
+	<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-white focus:text-black focus:shadow-lg focus:rounded">
+		Skip to content
+	</a>
 	<Toaster />
 	{#if ready}
 		{#if $page.url.pathname.startsWith('/utility-input')}
 			<!-- Utility Input Routes - No Sidebar, Full Width -->
-			<main class="w-full min-h-screen overflow-auto">
+			<main id="main-content" class="w-full min-h-screen overflow-auto">
 				<div class="w-full">
 					{#if !propertiesInitialized}
 						<!-- Loading state -->
@@ -180,32 +193,41 @@
 						</Sidebar.Header>
 
 						<Sidebar.Content>
-							{#each navigationLinks as group (group.category)}
-								<Sidebar.Group>
-									<Sidebar.GroupLabel onmouseover={() => onSectionHover(group.links)}>
-										{group.category}
-									</Sidebar.GroupLabel>
-									<Sidebar.GroupContent>
-										<Sidebar.Menu>
-											{#each group.links as link (link.href)}
-												<a
-													href={link.href}
-													class="block no-underline"
-													data-sveltekit-preload-data="hover"
-													data-sveltekit-preload-code="hover"
-												>
-													<Sidebar.MenuItem>
-														<Sidebar.MenuButton>
-															<link.icon class="h-5 w-5" />
-															<span>{link.label}</span>
-														</Sidebar.MenuButton>
-													</Sidebar.MenuItem>
-												</a>
-											{/each}
-										</Sidebar.Menu>
-									</Sidebar.GroupContent>
-								</Sidebar.Group>
-							{/each}
+							<Accordion.Root type="single" value={activeCategory} class="w-full">
+								{#each navigationLinks as group (group.category)}
+									<Accordion.Item value={group.category} class="border-b-0">
+										<Accordion.Trigger
+											class="px-4 py-2 text-xs font-semibold uppercase text-muted-foreground hover:no-underline hover:text-foreground"
+											onmouseover={() => onSectionHover(group.links)}
+										>
+											{group.category}
+										</Accordion.Trigger>
+										<Accordion.Content class="pb-1 pt-0">
+											<Sidebar.Menu>
+												{#each group.links as link (link.href)}
+													<a
+														href={link.href}
+														class="block no-underline"
+														data-sveltekit-preload-data="hover"
+														data-sveltekit-preload-code="hover"
+													>
+														<Sidebar.MenuItem>
+															<Sidebar.MenuButton
+																class={cn(
+																	$page.url.pathname.startsWith(link.href) && "bg-accent text-accent-foreground"
+																)}
+															>
+																<link.icon class="h-5 w-5" />
+																<span>{link.label}</span>
+															</Sidebar.MenuButton>
+														</Sidebar.MenuItem>
+													</a>
+												{/each}
+											</Sidebar.Menu>
+										</Accordion.Content>
+									</Accordion.Item>
+								{/each}
+							</Accordion.Root>
 						</Sidebar.Content>
 
 						<Sidebar.Footer>
@@ -278,7 +300,7 @@
 						<!-- Scrollable content area containing both Page and 3D Panel -->
 						<div class="flex flex-1 overflow-hidden">
 							<!-- Main Page Content -->
-							<main class="flex-1 overflow-y-auto p-4 md:p-6">
+							<main id="main-content" class="flex-1 overflow-y-auto p-4 md:p-6">
 								<div class="w-full max-w-[1600px] mx-auto">
 									{#if !propertiesInitialized}
 										<!-- Loading state -->

@@ -31,6 +31,7 @@
 	import BudgetFormModal from './BudgetFormModal.svelte';
 	import BudgetItemFormModal from './BudgetItemFormModal.svelte';
 	import BudgetDistributionCard from './BudgetDistributionCard.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { cn } from '$lib/utils';
 	import BudgetProjectCard from './BudgetProjectCard.svelte';
 	import {
@@ -45,6 +46,8 @@
 	let { data } = $props<{ data: PageData }>();
 
 	// State management for modals and UI
+	let showDeleteDialog = $state(false);
+	let budgetToDeleteId = $state<number | null>(null);
 	let showBudgetFormModal = $state(false);
 	let showItemFormModal = $state(false);
 	let editingBudget = $state(false);
@@ -222,10 +225,16 @@
 	}
 
 	// Handle delete budget
-	async function handleDeleteBudget(budgetId: number) {
-		if (!confirm('Are you sure you want to delete this budget?')) {
-			return;
-		}
+	function handleDeleteBudget(budgetId: number) {
+		budgetToDeleteId = budgetId;
+		showDeleteDialog = true;
+	}
+
+	async function confirmDeleteBudget() {
+		if (budgetToDeleteId === null) return;
+		const budgetId = budgetToDeleteId;
+		showDeleteDialog = false;
+		budgetToDeleteId = null;
 
 		try {
 			const formData = new FormData();
@@ -459,6 +468,22 @@
 		on:submit={handleItemSubmit}
 	/>
 {/if}
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Budget</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete this budget? This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; budgetToDeleteId = null; }}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDeleteBudget}>Continue</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
 {#if browser && import.meta.env.DEV}
 	<SuperDebug data={$form} />
