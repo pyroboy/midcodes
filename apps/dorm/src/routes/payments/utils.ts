@@ -129,7 +129,8 @@ export async function createPenaltyBilling(
 			status: 'PENDING',
 			dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
 			billingDate: new Date().toISOString().split('T')[0],
-			notes: `Late payment penalty for billing #${billing.id}`
+			notes: `Late payment penalty for billing #${billing.id}`,
+			updatedAt: new Date()
 		});
 
 		console.log('Successfully created penalty billing:', {

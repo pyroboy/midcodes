@@ -34,7 +34,8 @@ export const actions: Actions = {
 						description: expenseData.description,
 						type: expenseData.type as 'OPERATIONAL' | 'CAPITAL',
 						status: expenseData.expense_status,
-						expenseDate: expenseData.expense_date ? new Date(expenseData.expense_date) : null
+						expenseDate: expenseData.expense_date ? new Date(expenseData.expense_date) : null,
+					updatedAt: new Date()
 					})
 					.where(eq(expenses.id, id))
 					.returning();
@@ -51,7 +52,8 @@ export const actions: Actions = {
 						type: expenseData.type as 'OPERATIONAL' | 'CAPITAL',
 						status: expenseData.expense_status,
 						expenseDate: expenseData.expense_date ? new Date(expenseData.expense_date) : null,
-						createdBy: user.id
+						createdBy: user.id,
+						updatedAt: new Date()
 					})
 					.returning();
 

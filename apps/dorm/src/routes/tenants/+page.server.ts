@@ -117,7 +117,8 @@ export const actions: Actions = {
 				profilePictureUrl: form.data.profile_picture_url || null,
 				schoolOrWorkplace: form.data.school_or_workplace ?? null,
 				facebookName: form.data.facebook_name ?? null,
-				birthday: form.data.birthday ?? null
+				birthday: form.data.birthday ?? null,
+				updatedAt: new Date()
 			}).returning({ id: tenants.id });
 			newTenantId = inserted.id;
 		} catch (err: any) {

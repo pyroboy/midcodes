@@ -17,6 +17,7 @@
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
 	import { resyncCollection } from '$lib/db/replication';
+	import { toast } from 'svelte-sonner';
 
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const rentalUnitsStore = createRxStore<any>('rental_units',
@@ -101,8 +102,12 @@
 		validationMethod: 'oninput',
 		dataType: 'json',
 		resetForm: true,
+		onError: ({ result }) => {
+			toast.error('Error saving rental unit');
+		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				toast.success(editMode ? 'Rental unit updated' : 'Rental unit created');
 				showModal = false;
 				// Optimistic upsert — the server already persisted, push into RxDB
 				const d = $formData;
@@ -197,15 +202,17 @@
 
 			if (!result.ok) {
 				const resp = await result.json();
-				alert(resp.message || 'Failed to delete rental unit.');
+				toast.error(resp.message || 'Failed to delete rental unit');
 				// Resync to restore the original state
 				resyncCollection('rental_units').catch((err) =>
 					console.warn('[RentalUnit] Resync after failed delete:', err)
 				);
+			} else {
+				toast.success('Rental unit deleted');
 			}
 		} catch (error) {
 			console.error(error);
-			alert('An unexpected error occurred.');
+			toast.error('An unexpected error occurred');
 			// Resync to restore the original state on network error
 			resyncCollection('rental_units').catch((err) =>
 				console.warn('[RentalUnit] Resync after error:', err)

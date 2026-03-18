@@ -41,7 +41,8 @@ export const actions: Actions = {
 			initialReading: form.data.initial_reading,
 			status: form.data.status,
 			isActive: form.data.status === 'ACTIVE',
-			notes: form.data.notes
+			notes: form.data.notes,
+			updatedAt: new Date()
 		};
 
 		switch (location_type) {
@@ -181,7 +182,8 @@ export const actions: Actions = {
 			type: form.data.type,
 			status: form.data.status,
 			isActive: form.data.status === 'ACTIVE',
-			notes: form.data.notes
+			notes: form.data.notes,
+			updatedAt: new Date()
 		};
 
 		switch (location_type) {

@@ -16,6 +16,7 @@
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
 	import { resyncCollection } from '$lib/db/replication';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
 		rentalUnitForm: any;
@@ -102,8 +103,12 @@
 		validationMethod: 'oninput',
 		dataType: 'json',
 		resetForm: true,
+		onError: ({ result }) => {
+			toast.error('Error saving rental unit');
+		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				toast.success(editMode ? 'Rental unit updated' : 'Rental unit created');
 				showModal = false;
 				const d = $formData;
 				if (d.id) {
@@ -199,14 +204,16 @@
 
 			if (!result.ok) {
 				const resp = await result.json();
-				alert(resp.message || 'Failed to delete rental unit.');
+				toast.error(resp.message || 'Failed to delete rental unit');
 				resyncCollection('rental_units').catch((err) =>
 					console.warn('[RentalUnit] Resync after failed delete:', err)
 				);
+			} else {
+				toast.success('Rental unit deleted');
 			}
 		} catch (error) {
 			console.error(error);
-			alert('An unexpected error occurred.');
+			toast.error('An unexpected error occurred');
 			resyncCollection('rental_units').catch((err) =>
 				console.warn('[RentalUnit] Resync after error:', err)
 			);

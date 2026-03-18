@@ -33,9 +33,13 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 			replicationIdentifier: `dorm-neon-${name}`,
 			pull: {
 				async handler(checkpoint: any, batchSize: number) {
+					const cpUpdatedAt = checkpoint?.updated_at || '1970-01-01T00:00:00Z';
+					const cpId = String(checkpoint?.id || '0');
+					console.log(`[RxSync:${name}] Pull → checkpoint: {updated_at: "${cpUpdatedAt}", id: "${cpId}"}`);
+
 					const params = new URLSearchParams({
-						updatedAt: checkpoint?.updated_at || '1970-01-01T00:00:00Z',
-						id: String(checkpoint?.id || '0'),
+						updatedAt: cpUpdatedAt,
+						id: cpId,
 						limit: String(batchSize)
 					});
 
@@ -62,6 +66,15 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 					}
 
 					const data = await res.json();
+					const docCount = data.documents?.length || 0;
+					if (docCount > 0) {
+						const ids = data.documents.map((d: any) => d.id).join(', ');
+						console.log(`[RxSync:${name}] ← ${docCount} doc(s) from Neon [ids: ${ids}]`);
+						console.log(`[RxSync:${name}]   new checkpoint: {updated_at: "${data.checkpoint?.updated_at}", id: "${data.checkpoint?.id}"}`);
+						syncStatus.addLog(`Pull: ${name} ← ${docCount} doc(s) from Neon [${ids}]`, 'info');
+					} else {
+						console.log(`[RxSync:${name}] ← 0 docs (up to date)`);
+					}
 					return {
 						documents: data.documents,
 						checkpoint: data.checkpoint
@@ -110,9 +123,11 @@ export async function resyncCollection(name: string): Promise<void> {
 		console.warn(`[RxSync] No replication found for "${name}"`);
 		return;
 	}
+	console.log(`[RxSync:${name}] resyncCollection() called — triggering re-pull`);
 	syncStatus.markSyncing(name);
 	await repl.reSync();
 	await repl.awaitInSync();
+	console.log(`[RxSync:${name}] resyncCollection() complete — now in sync`);
 }
 
 /**

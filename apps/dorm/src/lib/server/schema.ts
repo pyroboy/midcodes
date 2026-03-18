@@ -233,7 +233,7 @@ export const organizations = pgTable('organizations', {
 	id: uuid('id').primaryKey().defaultRandom(),
 	name: text('name').notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow()
 });
 
 export const profiles = pgTable('profiles', {
@@ -243,7 +243,7 @@ export const profiles = pgTable('profiles', {
 	orgId: uuid('org_id').references(() => organizations.id),
 	context: jsonb('context').default({}),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow()
 });
 
 export const properties = pgTable('properties', {
@@ -253,7 +253,7 @@ export const properties = pgTable('properties', {
 	type: text('type').notNull(),
 	status: propertyStatusEnum('status').notNull().default('ACTIVE'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true })
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 });
 
 export const floors = pgTable('floors', {
@@ -265,7 +265,7 @@ export const floors = pgTable('floors', {
 	wing: text('wing'),
 	status: floorStatusEnum('status').notNull().default('ACTIVE'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true })
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 });
 
 export const rentalUnit = pgTable('rental_unit', {
@@ -275,7 +275,7 @@ export const rentalUnit = pgTable('rental_unit', {
 	rentalUnitStatus: locationStatusEnum('rental_unit_status').notNull().default('VACANT'),
 	baseRate: decimal('base_rate', { precision: 10, scale: 2 }).notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 	propertyId: integer('property_id')
 		.notNull()
 		.references(() => properties.id),
@@ -299,7 +299,7 @@ export const meters = pgTable('meters', {
 	status: meterStatusEnum('status').notNull().default('ACTIVE'),
 	notes: text('notes'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 	initialReading: decimal('initial_reading', { precision: 10, scale: 2 })
 });
 
@@ -311,7 +311,7 @@ export const readings = pgTable('readings', {
 	reading: decimal('reading', { precision: 10, scale: 2 }).notNull(),
 	readingDate: date('reading_date').notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow(),
 	meterName: text('meter_name'),
 	rateAtReading: decimal('rate_at_reading', { precision: 10, scale: 2 }),
 	previousReading: decimal('previous_reading', { precision: 10, scale: 2 }),
@@ -325,7 +325,7 @@ export const tenants = pgTable('tenants', {
 	contactNumber: text('contact_number'),
 	email: varchar('email', { length: 255 }),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 	authId: uuid('auth_id'),
 	emergencyContact: jsonb('emergency_contact'),
 	tenantStatus: tenantStatusEnum('tenant_status').notNull().default('PENDING'),
@@ -350,7 +350,7 @@ export const leases = pgTable('leases', {
 	securityDeposit: decimal('security_deposit', { precision: 10, scale: 2 }).notNull(),
 	notes: text('notes'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 	createdBy: uuid('created_by'),
 	termsMonth: integer('terms_month'),
 	status: leaseStatusEnum('status').notNull().default('ACTIVE'),
@@ -368,7 +368,7 @@ export const leaseTenants = pgTable('lease_tenants', {
 		.notNull()
 		.references(() => tenants.id),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow()
 });
 
 export const billings = pgTable('billings', {
@@ -387,7 +387,7 @@ export const billings = pgTable('billings', {
 	penaltyAmount: decimal('penalty_amount', { precision: 10, scale: 2 }).default('0'),
 	notes: text('notes'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 	meterId: integer('meter_id').references(() => meters.id)
 });
 
@@ -403,7 +403,7 @@ export const payments = pgTable('payments', {
 	receiptUrl: text('receipt_url'),
 	createdBy: uuid('created_by'),
 	updatedBy: uuid('updated_by'),
-	updatedAt: timestamp('updated_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 	billingIds: integer('billing_ids').array().notNull(),
 	billingId: integer('billing_id').references(() => billings.id),
 	revertedAt: timestamp('reverted_at', { withTimezone: true }),
@@ -417,7 +417,7 @@ export const paymentAllocations = pgTable('payment_allocations', {
 	billingId: integer('billing_id').references(() => billings.id),
 	amount: numeric('amount').notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow()
 });
 
 export const penaltyConfigs = pgTable('penalty_configs', {
@@ -428,7 +428,7 @@ export const penaltyConfigs = pgTable('penalty_configs', {
 	compoundPeriod: integer('compound_period'),
 	maxPenaltyPercentage: decimal('max_penalty_percentage', { precision: 5, scale: 2 }),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true })
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 });
 
 export const expenses = pgTable('expenses', {
@@ -440,7 +440,7 @@ export const expenses = pgTable('expenses', {
 	status: expenseStatusEnum('status').notNull().default('PENDING'),
 	createdBy: uuid('created_by'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 	expenseDate: timestamp('expense_date', { withTimezone: true })
 });
 
@@ -454,7 +454,7 @@ export const maintenance = pgTable('maintenance', {
 	status: maintenanceStatusEnum('status').default('PENDING'),
 	completedAt: timestamp('completed_at', { withTimezone: true }),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true })
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 });
 
 export const budgets = pgTable('budgets', {
@@ -474,7 +474,7 @@ export const budgets = pgTable('budgets', {
 		.references(() => properties.id),
 	createdBy: uuid('created_by'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow()
 });
 
 // --- EVENTS & ATTENDEES ---
@@ -488,7 +488,7 @@ export const events = pgTable('events', {
 	ticketingData: jsonb('ticketing_data').array().default([]),
 	isPublic: boolean('is_public').default(false),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow(),
 	createdBy: uuid('created_by').notNull(),
 	orgId: uuid('org_id')
 		.notNull()
@@ -511,7 +511,7 @@ export const attendees = pgTable('attendees', {
 	attendanceStatus: text('attendance_status').default('notRegistered'),
 	qrScanInfo: jsonb('qr_scan_info').array().default([]),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow(),
 	orgId: uuid('org_id')
 		.notNull()
 		.references(() => organizations.id)
@@ -527,7 +527,7 @@ export const templates = pgTable('templates', {
 	backBackground: text('back_background'),
 	orientation: text('orientation'),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow(),
 	templateElements: jsonb('template_elements').notNull(),
 	orgId: uuid('org_id').references(() => organizations.id)
 });
@@ -603,7 +603,7 @@ export const bookings = pgTable('bookings', {
 export const aiPrompts = pgTable('ai_prompts', {
 	promptId: text('prompt_id').primaryKey(),
 	promptText: text('prompt_text').notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().defaultNow()
 });
 
 // --- NOTIFICATIONS & AUTOMATION ---

@@ -60,7 +60,8 @@ export const actions: Actions = {
 			// Create lease-tenant relationships
 			const leaseTenantsToInsert = tenantIdsArray.map((tenant_id: number) => ({
 				leaseId: lease.id,
-				tenantId: tenant_id
+				tenantId: tenant_id,
+			updatedAt: new Date()
 			}));
 
 			try {
@@ -147,7 +148,8 @@ export const actions: Actions = {
 
 					const newRelationships = tenantIdsArray.map((tenant_id: number) => ({
 						leaseId: id,
-						tenantId: tenant_id
+						tenantId: tenant_id,
+						updatedAt: new Date()
 					}));
 
 					await db.insert(leaseTenants).values(newRelationships);
@@ -257,7 +259,7 @@ export const actions: Actions = {
 		try {
 			await db
 				.update(leases)
-				.set({ name: name as string })
+				.set({ name: name as string, updatedAt: new Date() })
 				.where(eq(leases.id, Number(id)));
 		} catch (err: any) {
 			return { success: false, message: err.message };
@@ -320,7 +322,8 @@ export const actions: Actions = {
 						status: 'PENDING',
 						dueDate: normalizedDueDate,
 						billingDate: `${year}-${String(rent.month).padStart(2, '0')}-01`,
-						notes: 'Monthly Rent'
+						notes: 'Monthly Rent',
+						updatedAt: new Date()
 					});
 					return;
 				}
@@ -337,7 +340,8 @@ export const actions: Actions = {
 							.set({
 								amount: String(rent.amount),
 								dueDate: normalizedDueDate,
-								balance: String(newBalance)
+								balance: String(newBalance),
+								updatedAt: new Date()
 							})
 							.where(eq(billings.id, existingBilling.id));
 					}
@@ -377,7 +381,7 @@ export const actions: Actions = {
 		try {
 			await db
 				.update(leases)
-				.set({ status: status as 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'TERMINATED' | 'PENDING' | 'ARCHIVED' })
+				.set({ status: status as 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'TERMINATED' | 'PENDING' | 'ARCHIVED', updatedAt: new Date() })
 				.where(eq(leases.id, Number(id)));
 
 			return { success: true, status: 200, data: { id, status } };
@@ -425,7 +429,8 @@ export const actions: Actions = {
 					dueDate,
 					billingDate,
 					notes,
-					penaltyAmount: String(0)
+					penaltyAmount: String(0),
+					updatedAt: new Date()
 				});
 
 				return { form, success: true, message: 'Security deposit billing created successfully' };
@@ -441,7 +446,8 @@ export const actions: Actions = {
 						balance: String(amount),
 						dueDate,
 						billingDate,
-						notes
+						notes,
+						updatedAt: new Date()
 					})
 					.where(eq(billings.id, billingId));
 

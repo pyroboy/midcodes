@@ -17,6 +17,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { propertySchema, type Property } from '../properties/formSchema';
+	import { toast } from 'svelte-sonner';
 	import { Search, Building2 } from 'lucide-svelte';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
@@ -65,16 +66,22 @@
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
+		onError: ({ result }) => {
+			toast.error('Error saving property');
+		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				const serverForm = (result as any).data?.form?.data;
+				const fd = serverForm ?? $formData;
+				toast.success(editMode ? 'Property updated' : 'Property created');
 				editMode = false;
 				showModal = false;
 				await optimisticUpsertProperty({
-					id: $formData.id,
-					name: $formData.name,
-					address: $formData.address,
-					type: $formData.type,
-					status: $formData.status
+					id: fd.id,
+					name: fd.name,
+					address: fd.address,
+					type: fd.type,
+					status: fd.status
 				});
 				reset();
 			}
@@ -144,9 +151,11 @@
 
 		if (!response.ok) {
 			const result = await response.json();
-			alert(`Failed to delete property: ${result.error || 'Unknown error'}`);
+			toast.error(`Failed to delete property: ${result.error || 'Unknown error'}`);
 			const { resyncCollection } = await import('$lib/db/replication');
 			resyncCollection('properties');
+		} else {
+			toast.success('Property deleted');
 		}
 	}
 

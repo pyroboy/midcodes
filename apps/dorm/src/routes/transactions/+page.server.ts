@@ -24,7 +24,8 @@ async function createPaymentManually(transactionData: any, userId: string, form:
 			notes: transactionData.notes,
 			receiptUrl: transactionData.receipt_url,
 			createdBy: userId,
-			billingIds: transactionData.billing_ids || []
+			billingIds: transactionData.billing_ids || [],
+			updatedAt: new Date()
 		})
 		.returning();
 

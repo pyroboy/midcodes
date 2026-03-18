@@ -50,7 +50,8 @@ export const actions = {
 				initialReading: form.data.initial_reading,
 				status: form.data.status,
 				isActive: form.data.status === 'ACTIVE',
-				notes: form.data.notes
+				notes: form.data.notes,
+				updatedAt: new Date()
 			};
 
 			// Set location IDs based on location_type
@@ -205,7 +206,8 @@ export const actions = {
 				type: form.data.type,
 				status: form.data.status,
 				isActive: form.data.status === 'ACTIVE',
-				notes: form.data.notes
+				notes: form.data.notes,
+				updatedAt: new Date()
 			};
 
 			// Set location IDs (same logic as create)

@@ -22,7 +22,11 @@ export const actions: Actions = {
 		const { id, created_at, updated_at, ...propertyData } = form.data;
 
 		try {
-			await db.insert(properties).values(propertyData);
+			const [inserted] = await db.insert(properties).values({
+				...propertyData,
+				updatedAt: new Date()
+			}).returning({ id: properties.id });
+			form.data.id = inserted.id;
 		} catch (err: any) {
 			if (err.message?.includes('Policy check failed')) {
 				return fail(403, { form, message: 'You do not have permission to create properties' });
@@ -47,7 +51,7 @@ export const actions: Actions = {
 		try {
 			await db
 				.update(properties)
-				.set(propertyData)
+				.set({ ...propertyData, updatedAt: new Date() })
 				.where(eq(properties.id, form.data.id!));
 		} catch (err: any) {
 			console.error('Error updating property:', err);
@@ -66,16 +70,17 @@ export const actions: Actions = {
 	delete: async ({ request }: RequestEvent) => {
 		const data = await request.formData();
 		const id = data.get('id');
+		const numId = Number(id);
 
-		if (!id) {
+		if (!id || Number.isNaN(numId)) {
 			return fail(400, {
 				form: null,
-				error: 'Property ID is required'
+				error: 'Valid property ID is required'
 			});
 		}
 
 		try {
-			await db.delete(properties).where(eq(properties.id, Number(id)));
+			await db.delete(properties).where(eq(properties.id, numId));
 
 			// Invalidate properties cache after delete
 			cache.deletePattern(/^properties:/);

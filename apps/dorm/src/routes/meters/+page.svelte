@@ -23,6 +23,7 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
+	import { toast } from 'svelte-sonner';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
 
@@ -304,20 +305,18 @@
 		taintedMessage: null,
 		resetForm: true,
 		onSubmit: () => {
-			console.log('Form submission started with data:', $form);
 			loading = true;
 		},
 		onError: ({ result }) => {
-			console.error('Form submission error:', result);
+			toast.error('Error saving meter');
 			error = result.error?.message || 'An error occurred during submission';
 			loading = false;
 		},
 		onResult: async ({ result }) => {
-			console.log('Form submission result:', result);
 			loading = false;
 
 			if (result.type === 'success') {
-				console.log('Operation successful!', result.data);
+				toast.success(editMode ? 'Meter updated' : 'Meter created');
 				error = null;
 
 				// Optimistic upsert into RxDB
@@ -342,8 +341,6 @@
 				selectedMeter = undefined;
 				showModal = false;
 				reset();
-			} else {
-				console.error('Operation failed:', result);
 			}
 		}
 	});

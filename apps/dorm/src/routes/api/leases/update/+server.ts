@@ -121,7 +121,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			// Create new relationships
 			const leaseTenantsToInsert = tenantIds.map((tenant_id) => ({
 				leaseId: leaseId,
-				tenantId: tenant_id
+				tenantId: tenant_id,
+				updatedAt: new Date()
 			}));
 
 			try {

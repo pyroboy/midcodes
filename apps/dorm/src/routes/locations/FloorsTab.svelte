@@ -14,6 +14,7 @@
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertFloor, optimisticDeleteFloor } from '$lib/db/optimistic-floors';
 	import { Search, Pencil, Trash2 } from 'lucide-svelte';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
 		floorForm: any;
@@ -95,9 +96,11 @@
 		resetForm: true,
 		onError: ({ result }) => {
 			console.error('Form submission error:', result);
+			toast.error('Error saving floor');
 		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				toast.success(editMode ? 'Floor updated' : 'Floor created');
 				showModal = false;
 				editMode = false;
 				const d = $formData;
@@ -188,9 +191,11 @@
 
 		if (!response.ok) {
 			console.error('Failed to delete floor.', response);
-			alert('Failed to delete floor.');
+			toast.error('Failed to delete floor');
 			const { resyncCollection } = await import('$lib/db/replication');
 			resyncCollection('floors');
+		} else {
+			toast.success('Floor deleted');
 		}
 
 		isDeleteDialogOpen = false;

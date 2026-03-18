@@ -15,6 +15,7 @@
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertFloor, optimisticDeleteFloor } from '$lib/db/optimistic-floors';
 	import { Layers, Plus, Search, Pencil, Trash2 } from 'lucide-svelte';
+	import { toast } from 'svelte-sonner';
 
 	let editMode = $state(false);
 	let showModal = $state(false);
@@ -93,12 +94,11 @@
 				error: result.error,
 				status: result.status
 			});
-			if (result.error) {
-				console.error('Server error:', result.error.message);
-			}
+			toast.error('Error saving floor');
 		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				toast.success(editMode ? 'Floor updated' : 'Floor created');
 				showModal = false;
 				editMode = false;
 				// Optimistic upsert into RxDB instead of invalidateAll
@@ -187,10 +187,12 @@
 
 		if (!response.ok) {
 			console.error('Failed to delete floor.', response);
-			alert('Failed to delete floor.');
+			toast.error('Failed to delete floor');
 			// Resync to restore the original state on error
 			const { resyncCollection } = await import('$lib/db/replication');
 			resyncCollection('floors');
+		} else {
+			toast.success('Floor deleted');
 		}
 
 		isDeleteDialogOpen = false;

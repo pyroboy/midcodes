@@ -40,7 +40,8 @@ export const actions: Actions = {
 				rentalUnitStatus: form.data.rental_unit_status,
 				propertyId: form.data.property_id!,
 				floorId: form.data.floor_id || 0,
-				amenities: form.data.amenities || []
+				amenities: form.data.amenities || [],
+				updatedAt: new Date()
 			});
 		} catch (err: any) {
 			console.error('Error creating rental unit:', err);

@@ -36,7 +36,8 @@ export async function createPaymentSchedules(
 			dueDate: startDate,
 			billingDate: today.toISOString().split('T')[0],
 			penaltyAmount: '0',
-			notes: 'Prorated rent billing'
+			notes: 'Prorated rent billing',
+			updatedAt: new Date()
 		});
 	}
 
@@ -69,7 +70,8 @@ export async function createPaymentSchedules(
 			dueDate: dueDate,
 			billingDate: today.toISOString().split('T')[0],
 			penaltyAmount: '0',
-			notes: 'Monthly rent billing'
+			notes: 'Monthly rent billing',
+			updatedAt: new Date()
 		});
 
 		currentDate.setMonth(currentDate.getMonth() + 1);

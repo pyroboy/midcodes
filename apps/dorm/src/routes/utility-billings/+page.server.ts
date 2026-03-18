@@ -29,7 +29,7 @@ export const actions: Actions = {
 		try {
 			await db
 				.update(readings)
-				.set({ reviewStatus: 'APPROVED' })
+				.set({ reviewStatus: 'APPROVED', updatedAt: new Date() })
 				.where(inArray(readings.id, ids));
 		} catch (err: any) {
 			return fail(500, { error: `Failed to approve readings: ${err.message}` });
@@ -55,7 +55,7 @@ export const actions: Actions = {
 		try {
 			await db
 				.update(readings)
-				.set({ reviewStatus: 'REJECTED' })
+				.set({ reviewStatus: 'REJECTED', updatedAt: new Date() })
 				.where(inArray(readings.id, ids));
 		} catch (err: any) {
 			return fail(500, { error: `Failed to reject readings: ${err.message}` });
@@ -99,7 +99,8 @@ export const actions: Actions = {
 					dueDate: dueDate.toISOString().split('T')[0],
 					billingDate: item.billing_date,
 					notes: item.notes,
-					meterId: item.meter_id
+					meterId: item.meter_id,
+					updatedAt: new Date()
 				};
 			});
 
@@ -220,7 +221,8 @@ export const actions: Actions = {
 						readingDate: r.reading_date,
 						meterName: meterNameMap[r.meter_id] || null,
 						rateAtReading: String(rate_at_reading),
-						backdatingEnabled: backdating_enabled || false
+						backdatingEnabled: backdating_enabled || false,
+					updatedAt: new Date()
 					};
 				});
 

@@ -18,6 +18,7 @@
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { propertySchema, type Property } from './formSchema';
+	import { toast } from 'svelte-sonner';
 	import { Plus, Search, Building2 } from 'lucide-svelte';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
@@ -60,20 +61,25 @@
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
+		onError: ({ result }) => {
+			toast.error('Error saving property');
+		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				const serverForm = (result as any).data?.form?.data;
+				const fd = serverForm ?? $formData;
 				const action = editMode ? 'updated' : 'created';
-				console.log(`[Properties] Server: property "${$formData.name}" ${action} on Neon ✓`);
-				syncStatus.addLog(`Server: property "${$formData.name}" ${action} on Neon ✓`, 'success');
+				toast.success(editMode ? 'Property updated' : 'Property created');
+				syncStatus.addLog(`Server: property "${fd.name}" ${action} on Neon ✓`, 'success');
 				editMode = false;
 				showModal = false;
 				// Optimistic upsert into RxDB — UI updates instantly
 				await optimisticUpsertProperty({
-					id: $formData.id!,
-					name: $formData.name,
-					address: $formData.address,
-					type: $formData.type,
-					status: $formData.status
+					id: fd.id!,
+					name: fd.name,
+					address: fd.address,
+					type: fd.type,
+					status: fd.status
 				});
 				reset();
 			} else if (result.type === 'failure') {
@@ -132,7 +138,6 @@
 		propertyToDelete = null;
 
 		// POST to server for actual deletion
-		console.log(`[Properties] Server: deleting property #${deletingId} "${deletingName}" → sending to Neon...`);
 		syncStatus.addLog(`Server: deleting property "${deletingName}" → sending to Neon...`, 'info');
 		const deleteFormData = new FormData();
 		deleteFormData.append('id', String(deletingId));
@@ -144,13 +149,13 @@
 			});
 
 			if (response.ok) {
-				console.log(`[Properties] Server: property #${deletingId} deleted on Neon ✓`);
+				toast.success('Property deleted');
 				syncStatus.addLog(`Server: property "${deletingName}" deleted on Neon ✓`, 'success');
 			} else {
 				const result = await response.json();
 				console.error(`[Properties] Server: delete rejected:`, result);
 				syncStatus.addLog(`Server: property delete rejected — ${result.error || 'Unknown'}`, 'error');
-				alert(`Failed to delete property: ${result.error || 'Unknown error'}`);
+				toast.error(`Failed to delete property: ${result.error || 'Unknown error'}`);
 				// Resync will restore the property if server delete failed
 				const { resyncCollection } = await import('$lib/db/replication');
 				resyncCollection('properties');
@@ -158,7 +163,7 @@
 		} catch (error) {
 			console.error(`[Properties] Server: delete network error:`, error);
 			syncStatus.addLog(`Server: property delete failed — ${error instanceof Error ? error.message : 'Network error'}`, 'error');
-			alert(`Failed to delete property: ${error instanceof Error ? error.message : 'Network error'}`);
+			toast.error(`Failed to delete property: ${error instanceof Error ? error.message : 'Network error'}`);
 			const { resyncCollection } = await import('$lib/db/replication');
 			resyncCollection('properties');
 		}

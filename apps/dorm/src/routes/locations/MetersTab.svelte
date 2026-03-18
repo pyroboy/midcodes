@@ -22,6 +22,7 @@
 	import MeterForm from '../meters/MeterForm.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { toast } from 'svelte-sonner';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
 
@@ -276,6 +277,7 @@
 			loading = true;
 		},
 		onError: ({ result }) => {
+			toast.error('Error saving meter');
 			error = result.error?.message || 'An error occurred during submission';
 			loading = false;
 		},
@@ -283,6 +285,7 @@
 			loading = false;
 
 			if (result.type === 'success') {
+				toast.success(editMode ? 'Meter updated' : 'Meter created');
 				error = null;
 				if ($form.id) {
 					await optimisticUpsertMeter({

@@ -43,7 +43,8 @@ export const actions: Actions = {
 				propertyId: form.data.property_id,
 				floorNumber: form.data.floor_number,
 				wing: form.data.wing || null,
-				status: form.data.status || 'ACTIVE'
+				status: form.data.status || 'ACTIVE',
+				updatedAt: new Date()
 			});
 		} catch (err: any) {
 			console.error('Error creating floor:', err);
@@ -89,7 +90,8 @@ export const actions: Actions = {
 					propertyId: form.data.property_id,
 					floorNumber: form.data.floor_number,
 					wing: form.data.wing || null,
-					status: form.data.status || 'ACTIVE'
+					status: form.data.status || 'ACTIVE',
+					updatedAt: new Date()
 				})
 				.where(eq(floors.id, form.data.id!));
 		} catch (err: any) {
@@ -111,8 +113,13 @@ export const actions: Actions = {
 			return fail(400, { message: 'No floor ID provided' });
 		}
 
+		const numericId = Number(id);
+		if (Number.isNaN(numericId)) {
+			return fail(400, { message: 'Invalid ID' });
+		}
+
 		try {
-			await db.delete(floors).where(eq(floors.id, Number(id)));
+			await db.delete(floors).where(eq(floors.id, numericId));
 		} catch (err: any) {
 			console.error('Error deleting floor:', err.message);
 			return fail(500, { message: 'Failed to delete floor' });
