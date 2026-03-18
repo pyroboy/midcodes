@@ -1,0 +1,14 @@
+{
+  "eval_id": 1,
+  "eval_name": "dorm-direct-audit",
+  "prompt": "audit the dorm app's RxDB implementation",
+  "assertions": [
+    {"text": "Report uses structured PASS/WARN/FAIL scoring"},
+    {"text": "All 9 audit categories are covered"},
+    {"text": "Cites specific file paths with line numbers"},
+    {"text": "Identifies dorm as pull-only (server-authoritative)"},
+    {"text": "Notes deleted_at vs _deleted soft-delete pattern"},
+    {"text": "Mentions timestamp precision handling"},
+    {"text": "Includes a summary table with counts"}
+  ]
+}

@@ -3,10 +3,17 @@ import type { RequestHandler } from './$types';
 import { sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ locals }) => {
+	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
+
 	const start = Date.now();
 	try {
-		await db.execute(sql`SELECT 1`);
+		await Promise.race([
+			db.execute(sql`SELECT 1`),
+			new Promise<never>((_, reject) =>
+				setTimeout(() => reject(new Error('Health check timeout (5s)')), 5000)
+			)
+		]);
 		return json({
 			neon: 'reachable',
 			latencyMs: Date.now() - start

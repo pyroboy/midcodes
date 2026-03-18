@@ -1,7 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { leases, leaseTenants } from '$lib/server/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, isNull, isNotNull } from 'drizzle-orm';
 
 type LeaseStatus = (typeof leases.status.enumValues)[number];
 
@@ -113,22 +113,73 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		// Update tenant relationships
+		// Update tenant relationships (soft-delete, no physical DELETE)
 		if (tenantIds && tenantIds.length > 0) {
-			// Delete existing relationships
-			await db.delete(leaseTenants).where(eq(leaseTenants.leaseId, leaseId));
+			const now = new Date();
 
-			// Create new relationships
-			const leaseTenantsToInsert = tenantIds.map((tenant_id) => ({
-				leaseId: leaseId,
-				tenantId: tenant_id,
-				updatedAt: new Date()
-			}));
+			// 1. Fetch all existing lease_tenants rows for this lease (active + soft-deleted)
+			const existingRows = await db
+				.select()
+				.from(leaseTenants)
+				.where(eq(leaseTenants.leaseId, leaseId));
+
+			const activeRows = existingRows.filter((r) => r.deletedAt === null);
+			const activeTenantIds = new Set(activeRows.map((r) => r.tenantId));
+			const incomingSet = new Set(tenantIds);
+
+			// 2. Compute diff
+			const toRemove = activeRows
+				.filter((r) => !incomingSet.has(r.tenantId))
+				.map((r) => r.tenantId);
+			const toAdd = tenantIds.filter((tid) => !activeTenantIds.has(tid));
 
 			try {
-				await db.insert(leaseTenants).values(leaseTenantsToInsert);
+				// 3. Soft-delete removed tenants
+				if (toRemove.length > 0) {
+					await db
+						.update(leaseTenants)
+						.set({ deletedAt: now, updatedAt: now })
+						.where(
+							and(
+								eq(leaseTenants.leaseId, leaseId),
+								inArray(leaseTenants.tenantId, toRemove),
+								isNull(leaseTenants.deletedAt)
+							)
+						);
+				}
+
+				// 4. For tenants being added, check for previously soft-deleted rows to re-activate
+				const softDeletedRows = existingRows.filter(
+					(r) => r.deletedAt !== null && incomingSet.has(r.tenantId)
+				);
+				const softDeletedTenantIds = new Set(softDeletedRows.map((r) => r.tenantId));
+
+				if (softDeletedTenantIds.size > 0) {
+					await db
+						.update(leaseTenants)
+						.set({ deletedAt: null, updatedAt: now })
+						.where(
+							and(
+								eq(leaseTenants.leaseId, leaseId),
+								inArray(leaseTenants.tenantId, [...softDeletedTenantIds]),
+								isNotNull(leaseTenants.deletedAt)
+							)
+						);
+				}
+
+				// 5. Insert genuinely new tenants (never had a row before)
+				const genuinelyNew = toAdd.filter((tid) => !softDeletedTenantIds.has(tid));
+				if (genuinelyNew.length > 0) {
+					await db.insert(leaseTenants).values(
+						genuinelyNew.map((tenantId) => ({
+							leaseId,
+							tenantId,
+							updatedAt: now
+						}))
+					);
+				}
 			} catch (relationError: any) {
-				console.error('Error creating tenant relationships:', relationError);
+				console.error('Error updating tenant relationships:', relationError);
 				return json(
 					{ success: false, error: 'Failed to update tenant relationships' },
 					{ status: 500 }

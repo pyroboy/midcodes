@@ -37,6 +37,12 @@
 				return 'Offline data status';
 		}
 	});
+
+	let showDataAge = $derived(
+		syncStatus.dataAge !== null &&
+		syncStatus.dataAge !== 'just now' &&
+		(syncStatus.phase === 'error' || syncStatus.hasErrors)
+	);
 </script>
 
 <button
@@ -53,6 +59,11 @@
 		<CheckCircle class="w-3.5 h-3.5 {indicatorColor}" />
 	{:else if syncStatus.hasErrors || syncStatus.phase === 'error'}
 		<AlertCircle class="w-3.5 h-3.5 {indicatorColor}" />
+		{#if showDataAge}
+			<span class="text-xs text-muted-foreground hidden sm:inline">
+				Last sync: {syncStatus.dataAge}
+			</span>
+		{/if}
 	{:else}
 		<Database class="w-3.5 h-3.5 {indicatorColor} {pulseClass}" />
 	{/if}

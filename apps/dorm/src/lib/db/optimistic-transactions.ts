@@ -1,5 +1,5 @@
 import { getDb } from '$lib/db';
-import { resyncCollection } from '$lib/db/replication';
+import { bgResync } from '$lib/db/optimistic-utils';
 import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 /**
@@ -8,21 +8,6 @@ import { syncStatus } from '$lib/stores/sync-status.svelte';
  * Pattern: patch RxDB immediately (UI updates in the same frame),
  * then fire a background resync to reconcile with Neon.
  */
-
-/** Background resync — fire and forget, never blocks UI. */
-function bgResync(collection: string) {
-	console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
-	syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
-	resyncCollection(collection)
-		.then(() => {
-			console.log(`[Optimistic] Resync "${collection}" complete ✓`);
-			syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
-		})
-		.catch((err) => {
-			console.warn(`[Optimistic] Resync "${collection}" failed:`, err);
-			syncStatus.addLog(`Resync: ${collection} failed — ${err?.message || err}`, 'error');
-		});
-}
 
 /**
  * Optimistically revert (soft-delete) a transaction by setting reverted_at.

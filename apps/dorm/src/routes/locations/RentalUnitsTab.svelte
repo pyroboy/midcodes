@@ -13,7 +13,11 @@
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from '../rental-unit/formSchema';
 	import { Pencil, Trash2, Users, Tag, List, Search, Home, Building2 } from 'lucide-svelte';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		rentalUnitsStore,
+		propertiesStore,
+		floorsStore
+	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
 	import { resyncCollection } from '$lib/db/replication';
 	import { toast } from 'svelte-sonner';
@@ -25,16 +29,7 @@
 
 	let { rentalUnitForm, triggerAdd = $bindable(false) }: Props = $props();
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
-	);
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find()
-	);
+	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
 	let rentalUnits = $derived(rentalUnitsStore.value.map((unit: any) => {
 		const property = propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id));
@@ -56,7 +51,11 @@
 		};
 	}));
 
-	let properties = $derived(propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name })));
+	let properties = $derived(
+		[...propertiesStore.value]
+			.sort((a: any, b: any) => a.name.localeCompare(b.name))
+			.map((p: any) => ({ id: Number(p.id), name: p.name }))
+	);
 	let floors = $derived(floorsStore.value.map((f: any) => ({
 		id: Number(f.id),
 		property_id: f.property_id,

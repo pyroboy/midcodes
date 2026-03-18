@@ -119,7 +119,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db.delete(floors).where(eq(floors.id, numericId));
+			await db.update(floors).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(floors.id, numericId));
 		} catch (err: any) {
 			console.error('Error deleting floor:', err.message);
 			return fail(500, { message: 'Failed to delete floor' });

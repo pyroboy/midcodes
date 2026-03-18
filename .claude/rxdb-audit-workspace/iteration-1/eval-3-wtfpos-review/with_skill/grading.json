@@ -1,0 +1,12 @@
+{
+  "eval_id": 3,
+  "config": "with_skill",
+  "expectations": [
+    {"text": "Report covers all 9 audit categories", "passed": true, "evidence": "Summary table has all 9 categories with PASS/WARN/FAIL/N/A counts"},
+    {"text": "Correctly identifies bidirectional/SSE topology", "passed": true, "evidence": "Context section: 'syncing bidirectionally via SSE + HTTP push/pull against the server's in-memory store'"},
+    {"text": "Evaluates the SSE multiplexing pattern", "passed": true, "evidence": "Passing item: 'SSE-based cross-device notifications: Single multiplexed SSE stream avoids 6-connection limit'"},
+    {"text": "Addresses LAN vs cloud replication distinction", "passed": true, "evidence": "Context: 'This is fundamentally different from the dorm app's Neon serverless model...the economic lens here is about reliability and data integrity, not cloud compute costs'"},
+    {"text": "Identifies dual storage (Dexie + Memory)", "passed": true, "evidence": "Passing item: 'Memory storage for thin clients' acknowledged; context mentions 'In-memory storage'"},
+    {"text": "Cites specific file paths", "passed": true, "evidence": "Extensive citations: 'src/lib/db/replication.ts:563', 'replication-store.ts:158', etc."}
+  ]
+}

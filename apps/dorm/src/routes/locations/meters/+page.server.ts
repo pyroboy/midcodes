@@ -324,7 +324,7 @@ export const actions: Actions = {
 				.where(eq(meters.id, meterId));
 			return { success: true, action: 'archived' };
 		} else {
-			await db.delete(meters).where(eq(meters.id, meterId));
+			await db.update(meters).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(meters.id, meterId));
 			return { success: true, action: 'deleted' };
 		}
 	}

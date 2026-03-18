@@ -1,0 +1,12 @@
+{
+  "eval_id": 3,
+  "config": "without_skill",
+  "expectations": [
+    {"text": "Report covers all 9 audit categories", "passed": false, "evidence": "Uses custom sections (Strengths/Issues/Schema/Protocol/Data Mode/Resilience) — not the 9-category framework"},
+    {"text": "Correctly identifies bidirectional/SSE topology", "passed": true, "evidence": "Section 1: 'Mac server holding the canonical IndexedDB...Thin clients replicate data via HTTP push/pull and a multiplexed SSE stream'"},
+    {"text": "Evaluates the SSE multiplexing pattern", "passed": true, "evidence": "Section 2.1: 'multiplexes all 15 collections over a single EventSource connection...avoids the browser's 6-connection-per-host HTTP/1.1 limit'"},
+    {"text": "Addresses LAN vs cloud replication distinction", "passed": true, "evidence": "Section 1: 'LAN-first (not internet-offline-first) architecture'"},
+    {"text": "Identifies dual storage (Dexie + Memory)", "passed": true, "evidence": "Section 2.3: 'Remote clients use getRxStorageMemory() instead of Dexie/IndexedDB'"},
+    {"text": "Cites specific file paths", "passed": true, "evidence": "Extensive citations with line numbers: 'src/lib/db/index.ts (lines 185-416)', full file review table in section 9"}
+  ]
+}

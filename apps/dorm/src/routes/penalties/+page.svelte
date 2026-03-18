@@ -6,7 +6,15 @@
 	import type { PenaltyBilling, PenaltyFilter } from './types';
 	import type { AnyZodObject } from 'zod/v3';
 	import { toast } from 'svelte-sonner';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		billingsStore,
+		leasesStore,
+		rentalUnitsStore,
+		floorsStore,
+		propertiesStore,
+		leaseTenantsStore,
+		tenantsStore
+	} from '$lib/stores/collections.svelte';
 	import { resyncCollection } from '$lib/db/replication';
 
 	// UI Components
@@ -46,28 +54,7 @@
 	// Utilities
 	import { formatCurrency } from '$lib/utils/format';
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const billingsStore = createRxStore<any>('billings',
-		(db) => db.billings.find()
-	);
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find()
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find()
-	);
-	const leaseTenantsStore = createRxStore<any>('lease_tenants',
-		(db) => db.lease_tenants.find()
-	);
-	const tenantsStore = createRxStore<any>('tenants',
-		(db) => db.tenants.find()
-	);
+	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
 	// ─── Derived penalty billings from RxDB ─────────────────────────────
 	let isLoading = $derived(!billingsStore.initialized);

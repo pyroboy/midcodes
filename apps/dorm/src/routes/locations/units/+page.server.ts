@@ -98,7 +98,7 @@ export const actions: Actions = {
 		if (isNaN(rentalUnitId)) return fail(400, { message: 'Invalid rental unit ID format' });
 
 		try {
-			await db.delete(rentalUnit).where(eq(rentalUnit.id, rentalUnitId));
+			await db.update(rentalUnit).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(rentalUnit.id, rentalUnitId));
 		} catch (err: any) {
 			console.error('Error deleting rental unit:', err);
 			if (err.message?.includes('Policy check failed')) {

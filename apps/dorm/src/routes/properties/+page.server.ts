@@ -80,7 +80,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db.delete(properties).where(eq(properties.id, numId));
+			await db.update(properties).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(properties.id, numId));
 
 			// Invalidate properties cache after delete
 			cache.deletePattern(/^properties:/);

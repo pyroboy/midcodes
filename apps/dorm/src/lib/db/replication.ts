@@ -10,27 +10,49 @@ const COLLECTIONS_TO_SYNC = [
 
 const replications = new Map<string, RxReplicationState<any, any>>();
 
+/** In-flight resync promises — prevents duplicate server queries for the same collection. */
+const inFlightResyncs = new Map<string, Promise<void>>();
+
 /** When true, all pulls are halted — Neon quota is exhausted or unreachable. */
 let neonDown = false;
 
 /**
  * Preflight: hit the health endpoint once before starting 14 replications.
  * Returns true if Neon is reachable, false if quota exceeded or down.
+ * D4: Also sets neon health directly on syncStatus (latency included) so the
+ * layout doesn't need to fire a separate checkNeonHealth() fetch.
  */
 async function checkNeonReachable(): Promise<boolean> {
+	const t0 = Date.now();
 	try {
 		const res = await fetch('/api/rxdb/health');
+		const latencyMs = Date.now() - t0;
 		if (!res.ok) {
 			console.warn(`[RxSync] Neon health check failed (${res.status}) — skipping replication`);
-			syncStatus.addLog(`Neon unreachable (${res.status}) — using cached data`, 'warn');
+			syncStatus.setNeonHealthDirect('error');
 			return false;
 		}
+		syncStatus.setNeonHealthDirect('ok', latencyMs);
 		return true;
 	} catch {
 		console.warn('[RxSync] Neon health check unreachable — skipping replication');
-		syncStatus.addLog('Neon unreachable — using cached data', 'warn');
+		syncStatus.setNeonHealthDirect('error');
 		return false;
 	}
+}
+
+// D6: When the tab becomes visible again after being hidden, re-check Neon
+// reachability. If Neon was previously down and is now reachable, resume replication.
+if (typeof document !== 'undefined') {
+	document.addEventListener('visibilitychange', async () => {
+		if (document.visibilityState === 'visible' && neonDown) {
+			const ok = await checkNeonReachable();
+			if (ok) {
+				neonDown = false;
+				syncStatus.addLog('Neon reconnected — replication resumed', 'success');
+			}
+		}
+	});
 }
 
 /**
@@ -92,6 +114,24 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 								detail = match?.[1]?.trim() || text.slice(0, 200);
 							}
 						} catch { /* ignore */ }
+
+						// DD3: Detect session expiry — halt replication instead of retrying forever
+						if (res.status === 401) {
+							console.error('[RxSync] Session expired — halting replication');
+							syncStatus.addLog('Session expired — please sign in again', 'error');
+							cancelAllReplications();
+							return { documents: [], checkpoint };
+						}
+
+						// DD4: Rate limit — retry after cooldown, don't permanently halt
+						if (res.status === 429) {
+							const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
+							const waitSec = isNaN(retryAfter) ? 60 : retryAfter;
+							console.warn(`[RxSync:${name}] Rate limited — retrying after ${waitSec}s`);
+							syncStatus.addLog(`Rate limited on ${name} — waiting ${waitSec}s`, 'warn');
+							await new Promise(r => setTimeout(r, waitSec * 1000));
+							throw new Error(`Rate limited on ${name}`); // RxDB will retry via retryTime
+						}
 
 						if (detail.includes('402') || detail.includes('exceeded the data transfer quota')) {
 							if (!neonDown) {
@@ -162,14 +202,28 @@ function cancelAllReplications() {
 /**
  * Force a single collection to re-pull from Neon.
  * Call this after a mutation (create/update/delete) to refresh local data.
+ * Deduplicates concurrent calls — if a resync is already in-flight for this
+ * collection, the existing promise is returned instead of firing a second pull.
  */
 export async function resyncCollection(name: string): Promise<void> {
 	if (neonDown) return;
 	const repl = replications.get(name);
 	if (!repl) return;
-	syncStatus.markSyncing(name);
-	await repl.reSync();
-	await repl.awaitInSync();
+
+	// Deduplicate: return existing in-flight promise if one exists
+	const existing = inFlightResyncs.get(name);
+	if (existing) return existing;
+
+	const promise = (async () => {
+		syncStatus.markSyncing(name);
+		await repl.reSync();
+		await repl.awaitInSync();
+	})().finally(() => {
+		inFlightResyncs.delete(name);
+	});
+
+	inFlightResyncs.set(name, promise);
+	return promise;
 }
 
 /**

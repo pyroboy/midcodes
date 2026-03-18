@@ -20,15 +20,17 @@
 	import { propertySchema, type Property } from './formSchema';
 	import { toast } from 'svelte-sonner';
 	import { Plus, Search, Building2 } from 'lucide-svelte';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { propertiesStore } from '$lib/stores/collections.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 	// ─── RxDB reactive store ───────────────────────────────────────────
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	// propertiesStore singleton is sorted by name asc in collections.svelte.ts
+	let properties = $derived(
+		[...propertiesStore.value]
+			.sort((a: any, b: any) => a.name.localeCompare(b.name))
+			.map((p: any) => ({ ...p, id: Number(p.id) }))
 	);
-	let properties = $derived(propertiesStore.value.map((p: any) => ({ ...p, id: Number(p.id) })));
 	let isLoading = $derived(!propertiesStore.initialized);
 
 	// ─── Search ────────────────────────────────────────────────────────

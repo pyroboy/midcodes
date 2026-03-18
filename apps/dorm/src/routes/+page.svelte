@@ -4,30 +4,23 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Building, Users, FileText, CreditCard } from 'lucide-svelte';
 	import type { PageData } from './$types';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		propertiesStore,
+		tenantsStore,
+		leasesStore,
+		paymentsStore
+	} from '$lib/stores/collections.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find()
-	);
-	const tenantsStore = createRxStore<any>('tenants',
-		(db) => db.tenants.find({ selector: { deleted_at: { $eq: null } } })
-	);
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find({ selector: { deleted_at: { $eq: null }, status: 'ACTIVE' } })
-	);
-	const paymentsStore = createRxStore<any>('payments',
-		(db) => db.payments.find()
-	);
+	let activeLeases = $derived(leasesStore.value.filter((l: any) => l.status === 'ACTIVE'));
 
 	let isLoading = $derived(!propertiesStore.initialized);
 
 	let counts = $derived({
 		properties: propertiesStore.value.length,
 		tenants: tenantsStore.value.length,
-		activeLeases: leasesStore.value.length,
+		activeLeases: activeLeases.length,
 		payments: paymentsStore.value.length
 	});
 </script>

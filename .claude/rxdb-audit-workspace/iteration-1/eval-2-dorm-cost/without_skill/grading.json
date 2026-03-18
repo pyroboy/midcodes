@@ -1,0 +1,11 @@
+{
+  "eval_id": 2,
+  "config": "without_skill",
+  "expectations": [
+    {"text": "Produces a structured audit (not just prose)", "passed": false, "evidence": "Uses numbered issue format with tables, but no PASS/WARN/FAIL scoring framework"},
+    {"text": "Addresses server cost specifically", "passed": true, "evidence": "Excellent Neon query count table per action, specific query counts (15 per startup, 4 per payment)"},
+    {"text": "Evaluates the per-mutation resync pattern", "passed": true, "evidence": "Issue 2: 'Double Resync After Optimistic Writes' — detailed per-page analysis with worst cases"},
+    {"text": "Mentions live:false or absence of live sync", "passed": true, "evidence": "Architecture Summary table: 'Polling: None (live: false)'"},
+    {"text": "Recommends specific optimizations", "passed": true, "evidence": "7 prioritized recommendations with High/Medium/Low tiers"}
+  ]
+}

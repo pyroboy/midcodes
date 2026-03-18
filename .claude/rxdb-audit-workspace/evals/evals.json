@@ -1,0 +1,23 @@
+{
+  "skill_name": "rxdb-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "audit the dorm app's RxDB implementation",
+      "expected_output": "Structured audit report with PASS/WARN/FAIL scores across 9 categories, citing specific files and line numbers from apps/dorm/src/lib/db/",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "is our dorm sync efficient? are we calling neon too much?",
+      "expected_output": "Cost-focused analysis of the dorm sync layer, identifying unnecessary server calls and recommending optimizations",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "review the offline-first setup for WTFPOS",
+      "expected_output": "Audit report covering WTFPOS bidirectional SSE replication, evaluating LAN sync patterns against best practices",
+      "files": []
+    }
+  ]
+}

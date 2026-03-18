@@ -5,7 +5,10 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		budgetsStore,
+		propertiesStore
+	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertBudget, optimisticDeleteBudget } from '$lib/db/optimistic-budgets';
 	import {
 		Card,
@@ -41,19 +44,21 @@
 	} from '$lib/components/ui/tooltip';
 
 	import { ChartBar, PieChart, AlertTriangle } from 'lucide-svelte';
-	// RxDB stores
-	const budgetsStore = createRxStore<any>('budgets',
-		(db) => db.budgets.find({ sort: [{ updated_at: 'desc' }] })
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	// RxDB stores (singletons from collections.svelte.ts)
+	let properties = $derived(
+		[...propertiesStore.value]
+			.sort((a: any, b: any) => a.name.localeCompare(b.name))
+			.map((p: any) => ({ id: Number(p.id), name: p.name }))
 	);
 
-	let properties = $derived(propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name })));
-
-	// Process budgets with enrichment (replaces server-side processing)
+	// Process budgets with enrichment (sorted by updated_at desc)
 	let budgets = $derived.by(() => {
-		return budgetsStore.value.map((budget: any) => {
+		const sortedBudgets = [...budgetsStore.value].sort((a: any, b: any) => {
+			const aMs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+			const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+			return bMs - aMs;
+		});
+		return sortedBudgets.map((budget: any) => {
 			const property = propertiesStore.value.find((p: any) => String(p.id) === String(budget.property_id));
 
 			let budgetItems: any[];

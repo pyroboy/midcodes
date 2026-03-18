@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "skill_name": "rxdb-audit",
+    "skill_path": ".claude/skills/rxdb-audit",
+    "executor_model": "claude-opus-4-6",
+    "analyzer_model": "claude-opus-4-6",
+    "timestamp": "2026-03-18T13:48:04Z",
+    "evals_run": ["dorm-direct-audit", "dorm-cost-review", "wtfpos-offline-review"],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_name": "dorm-direct-audit",
+      "config": "with_skill",
+      "pass_rate": 1.0,
+      "passed": 7,
+      "total": 7,
+      "time_seconds": 311.8,
+      "tokens": 70843,
+      "expectations": [
+        {"text": "Report uses structured PASS/WARN/FAIL scoring", "passed": true, "evidence": "Full summary table with counts per category"},
+        {"text": "All 9 audit categories covered", "passed": true, "evidence": "All 9 present in summary table"},
+        {"text": "Cites specific file paths with line numbers", "passed": true, "evidence": "Extensive citations throughout"},
+        {"text": "Identifies pull-only topology", "passed": true, "evidence": "Correctly identifies server-authoritative"},
+        {"text": "Notes soft-delete pattern", "passed": true, "evidence": "Findings 3.1 and 3.2 detail deleted_at gaps"},
+        {"text": "Mentions timestamp precision", "passed": true, "evidence": "Microsecond precision noted"},
+        {"text": "Includes summary table", "passed": true, "evidence": "Lines 9-20: 22/41 (54%)"}
+      ]
+    },
+    {
+      "eval_name": "dorm-direct-audit",
+      "config": "without_skill",
+      "pass_rate": 0.57,
+      "passed": 4,
+      "total": 7,
+      "time_seconds": 288.1,
+      "tokens": 76793,
+      "expectations": [
+        {"text": "Report uses structured PASS/WARN/FAIL scoring", "passed": false, "evidence": "Uses CRITICAL/MODERATE/MINOR, no PASS/WARN/FAIL grid"},
+        {"text": "All 9 audit categories covered", "passed": false, "evidence": "Custom grouping, not 9-category framework"},
+        {"text": "Cites specific file paths with line numbers", "passed": true, "evidence": "Excellent citations with line numbers"},
+        {"text": "Identifies pull-only topology", "passed": true, "evidence": "Correctly identifies pull-only pattern"},
+        {"text": "Notes soft-delete pattern", "passed": true, "evidence": "Detailed doc.remove() tombstone analysis"},
+        {"text": "Mentions timestamp precision", "passed": true, "evidence": "Section 5.1 covers microsecond precision"},
+        {"text": "Includes summary table", "passed": false, "evidence": "Issues table exists but no PASS/WARN/FAIL count grid"}
+      ]
+    },
+    {
+      "eval_name": "dorm-cost-review",
+      "config": "with_skill",
+      "pass_rate": 1.0,
+      "passed": 5,
+      "total": 5,
+      "time_seconds": 284.7,
+      "tokens": 67600,
+      "expectations": [
+        {"text": "Produces structured audit", "passed": true, "evidence": "Full 9-category PASS/WARN/FAIL table"},
+        {"text": "Addresses server cost", "passed": true, "evidence": "Server Cost Assessment section with 20-40% savings estimate"},
+        {"text": "Evaluates per-mutation resync", "passed": true, "evidence": "Finding 4a: triple Neon queries for utility billing"},
+        {"text": "Mentions live:false", "passed": true, "evidence": "Passing item: live:false correctly used"},
+        {"text": "Recommends specific optimizations", "passed": true, "evidence": "10 prioritized recommendations"}
+      ]
+    },
+    {
+      "eval_name": "dorm-cost-review",
+      "config": "without_skill",
+      "pass_rate": 0.80,
+      "passed": 4,
+      "total": 5,
+      "time_seconds": 175.5,
+      "tokens": 65801,
+      "expectations": [
+        {"text": "Produces structured audit", "passed": false, "evidence": "Numbered issues, no PASS/WARN/FAIL framework"},
+        {"text": "Addresses server cost", "passed": true, "evidence": "Excellent Neon query count table per action"},
+        {"text": "Evaluates per-mutation resync", "passed": true, "evidence": "Issue 2: Double Resync detailed analysis"},
+        {"text": "Mentions live:false", "passed": true, "evidence": "Architecture Summary: live: false"},
+        {"text": "Recommends specific optimizations", "passed": true, "evidence": "7 prioritized recommendations"}
+      ]
+    },
+    {
+      "eval_name": "wtfpos-offline-review",
+      "config": "with_skill",
+      "pass_rate": 1.0,
+      "passed": 6,
+      "total": 6,
+      "time_seconds": 358.2,
+      "tokens": 103700,
+      "expectations": [
+        {"text": "Covers all 9 audit categories", "passed": true, "evidence": "All 9 in summary table"},
+        {"text": "Identifies bidirectional SSE topology", "passed": true, "evidence": "Context section describes bidirectional SSE"},
+        {"text": "Evaluates SSE multiplexing", "passed": true, "evidence": "Passing item acknowledges multiplexed SSE"},
+        {"text": "Addresses LAN vs cloud distinction", "passed": true, "evidence": "Context: 'fundamentally different from Neon serverless model'"},
+        {"text": "Identifies dual storage", "passed": true, "evidence": "Notes Dexie + Memory storage"},
+        {"text": "Cites specific file paths", "passed": true, "evidence": "File:line citations throughout"}
+      ]
+    },
+    {
+      "eval_name": "wtfpos-offline-review",
+      "config": "without_skill",
+      "pass_rate": 0.83,
+      "passed": 5,
+      "total": 6,
+      "time_seconds": 347.4,
+      "tokens": 100734,
+      "expectations": [
+        {"text": "Covers all 9 audit categories", "passed": false, "evidence": "Custom sections, not 9-category framework"},
+        {"text": "Identifies bidirectional SSE topology", "passed": true, "evidence": "Section 1: LAN-first with SSE"},
+        {"text": "Evaluates SSE multiplexing", "passed": true, "evidence": "Section 2.1: detailed SSE analysis"},
+        {"text": "Addresses LAN vs cloud distinction", "passed": true, "evidence": "Section 1: 'LAN-first (not internet-offline-first)'"},
+        {"text": "Identifies dual storage", "passed": true, "evidence": "Section 2.3: Memory storage for thin clients"},
+        {"text": "Cites specific file paths", "passed": true, "evidence": "Full file review table in section 9"}
+      ]
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate_mean": 1.0,
+      "time_mean_seconds": 318.2,
+      "tokens_mean": 80714
+    },
+    "without_skill": {
+      "pass_rate_mean": 0.73,
+      "time_mean_seconds": 270.3,
+      "tokens_mean": 81109
+    },
+    "delta": {
+      "pass_rate": "+0.27",
+      "time_seconds": "+47.9",
+      "tokens": "-395"
+    }
+  },
+  "notes": [
+    "The skill consistently produces the 9-category structured framework — this is the primary differentiator. Without the skill, Claude produces excellent analysis but with ad-hoc structure.",
+    "The baseline (without skill) found unique issues the with-skill version missed: doc.remove() tombstone bug (eval 1), double-resync detail with query count table (eval 2), O(n) push guard scans (eval 3).",
+    "With-skill runs take ~18% longer on average due to reading the skill + reference doc. Token usage is similar.",
+    "Non-discriminating assertions: file path citations, topology identification, and technical accuracy pass regardless of skill. The skill's value is structural consistency, not raw analytical quality."
+  ]
+}

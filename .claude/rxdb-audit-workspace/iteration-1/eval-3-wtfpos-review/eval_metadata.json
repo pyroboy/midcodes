@@ -1,0 +1,13 @@
+{
+  "eval_id": 3,
+  "eval_name": "wtfpos-offline-review",
+  "prompt": "review the offline-first setup for WTFPOS",
+  "assertions": [
+    {"text": "Report covers all 9 audit categories"},
+    {"text": "Correctly identifies bidirectional/SSE topology"},
+    {"text": "Evaluates the SSE multiplexing pattern"},
+    {"text": "Addresses LAN vs cloud replication distinction"},
+    {"text": "Identifies dual storage (Dexie + Memory)"},
+    {"text": "Cites specific file paths"}
+  ]
+}

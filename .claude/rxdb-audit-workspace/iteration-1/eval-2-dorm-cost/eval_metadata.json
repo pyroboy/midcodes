@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "dorm-cost-review",
+  "prompt": "is our dorm sync efficient? are we calling neon too much?",
+  "assertions": [
+    {"text": "Produces a structured audit (not just prose)"},
+    {"text": "Addresses server cost specifically"},
+    {"text": "Evaluates the per-mutation resync pattern"},
+    {"text": "Mentions live:false or absence of live sync"},
+    {"text": "Recommends specific optimizations"}
+  ]
+}

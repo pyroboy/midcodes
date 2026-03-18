@@ -4,6 +4,7 @@ import { env } from '$lib/server/env';
 import { runOverdueCheck } from '$lib/server/automation/overdue';
 import { runPenaltyCalculation } from '$lib/server/automation/penalties';
 import { runPaymentReminders } from '$lib/server/automation/reminders';
+import { runTombstoneCleanup } from '$lib/server/automation/tombstone-cleanup';
 
 /**
  * POST /api/cron — Runs all automation jobs sequentially.
@@ -48,6 +49,14 @@ export const POST: RequestHandler = async ({ request }) => {
 	} catch (e) {
 		results.reminders = { error: e instanceof Error ? e.message : String(e) };
 		jobErrors.push(`reminders: ${e instanceof Error ? e.message : String(e)}`);
+	}
+
+	// 4. Tombstone cleanup (purge soft-deleted records older than 90 days)
+	try {
+		results.tombstoneCleanup = await runTombstoneCleanup();
+	} catch (e) {
+		results.tombstoneCleanup = { error: e instanceof Error ? e.message : String(e) };
+		jobErrors.push(`tombstoneCleanup: ${e instanceof Error ? e.message : String(e)}`);
 	}
 
 	return json({

@@ -23,7 +23,13 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { toast } from 'svelte-sonner';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		metersStore,
+		propertiesStore,
+		floorsStore,
+		rentalUnitsStore,
+		readingsStore
+	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
 
 	// Type definitions
@@ -95,22 +101,7 @@
 
 	let { meterForm, triggerAdd = $bindable(false) }: Props = $props();
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const metersStore = createRxStore<any>('meters',
-		(db) => db.meters.find({ sort: [{ name: 'asc' }] })
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
-	);
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const readingsStore = createRxStore<any>('readings',
-		(db) => db.readings.find()
-	);
+	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
 	let metersData = $derived.by(() => {
 		return metersStore.value.map((meter: any) => {
@@ -139,9 +130,11 @@
 		});
 	});
 
-	let propertiesData = $derived(propertiesStore.value.map((p: any) => ({
-		...p, id: Number(p.id)
-	})));
+	let propertiesData = $derived(
+		[...propertiesStore.value]
+			.sort((a: any, b: any) => a.name.localeCompare(b.name))
+			.map((p: any) => ({ ...p, id: Number(p.id) }))
+	);
 
 	let floorsData = $derived(floorsStore.value.map((f: any) => {
 		const property = propertiesStore.value.find((p: any) => String(p.id) === String(f.property_id));

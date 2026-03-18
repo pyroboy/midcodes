@@ -1,21 +1,6 @@
 import { getDb } from '$lib/db';
-import { resyncCollection } from '$lib/db/replication';
+import { bgResync } from '$lib/db/optimistic-utils';
 import { syncStatus } from '$lib/stores/sync-status.svelte';
-
-/** Background resync — fire and forget, never blocks UI. */
-function bgResync(collection: string) {
-	console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
-	syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
-	resyncCollection(collection)
-		.then(() => {
-			console.log(`[Optimistic] Resync "${collection}" complete ✓`);
-			syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
-		})
-		.catch((err) => {
-			console.warn(`[Optimistic] Resync "${collection}" failed:`, err);
-			syncStatus.addLog(`Resync: ${collection} failed — ${err?.message || err}`, 'error');
-		});
-}
 
 export async function optimisticUpsertBudget(data: {
 	id: number;
@@ -50,10 +35,11 @@ export async function optimisticUpsertBudget(data: {
 			status: data.status ?? null,
 			start_date: data.start_date ?? null,
 			end_date: data.end_date ?? null,
-			property_id: data.property_id,
+			property_id: String(data.property_id),
 			created_by: data.created_by ?? existing?.created_by ?? null,
 			created_at: existing ? existing.created_at : new Date().toISOString(),
-			updated_at: new Date().toISOString()
+			updated_at: new Date().toISOString(),
+			deleted_at: null
 		});
 		console.log(`[Optimistic] budget #${data.id} upsert complete ✓`);
 		syncStatus.addLog(`Optimistic: budget #${data.id} upserted ✓`, 'success');
@@ -65,16 +51,19 @@ export async function optimisticUpsertBudget(data: {
 }
 
 export async function optimisticDeleteBudget(budgetId: number) {
-	console.log(`[Optimistic] budget #${budgetId} → deleting from RxDB...`);
-	syncStatus.addLog(`Optimistic: budget #${budgetId} → deleting from RxDB...`, 'info');
+	console.log(`[Optimistic] budget #${budgetId} → soft-deleting in RxDB...`);
+	syncStatus.addLog(`Optimistic: budget #${budgetId} → soft-deleting in RxDB...`, 'info');
 	try {
 		const db = await getDb();
 		const doc = await db.budgets.findOne(String(budgetId)).exec();
 		if (doc) {
-			await doc.remove();
+			await doc.incrementalPatch({
+				deleted_at: new Date().toISOString(),
+				updated_at: new Date().toISOString()
+			});
 		}
-		console.log(`[Optimistic] budget #${budgetId} delete complete ✓`);
-		syncStatus.addLog(`Optimistic: budget #${budgetId} deleted ✓`, 'success');
+		console.log(`[Optimistic] budget #${budgetId} soft-deleted ✓`);
+		syncStatus.addLog(`Optimistic: budget #${budgetId} soft-deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Budget delete failed, falling back to resync:', err);
 		syncStatus.addLog(`Optimistic: budget #${budgetId} delete failed — ${(err as Error)?.message || err}`, 'error');

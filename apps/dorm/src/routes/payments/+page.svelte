@@ -7,7 +7,14 @@
 	import type { PageData } from './$types';
 	import type { z } from 'zod/v3';
 	import { paymentSchema } from './formSchema';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		paymentsStore,
+		billingsStore,
+		leasesStore,
+		rentalUnitsStore,
+		floorsStore,
+		propertiesStore
+	} from '$lib/stores/collections.svelte';
 
 	type Payment = z.infer<typeof paymentSchema> & {
 		billing?: {
@@ -39,29 +46,16 @@
 
 	let { data }: Props = $props();
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const paymentsStore = createRxStore<any>('payments',
-		(db) => db.payments.find({ sort: [{ updated_at: 'desc' }] })
-	);
-	const billingsStore = createRxStore<any>('billings',
-		(db) => db.billings.find()
-	);
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find()
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find()
-	);
+	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
-	// Enriched payments with billing info
+	// Enriched payments with billing info (sorted by updated_at desc)
 	let payments = $derived.by(() => {
-		return paymentsStore.value.map((payment: any) => {
+		const sortedPayments = [...paymentsStore.value].sort((a: any, b: any) => {
+			const aMs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+			const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+			return bMs - aMs;
+		});
+		return sortedPayments.map((payment: any) => {
 			const billingIds = Array.isArray(payment.billing_ids) ? payment.billing_ids : [];
 			const primaryBillingId = billingIds[0];
 			const primaryBilling = primaryBillingId

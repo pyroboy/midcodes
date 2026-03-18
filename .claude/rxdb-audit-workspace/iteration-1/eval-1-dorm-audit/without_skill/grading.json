@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "config": "without_skill",
+  "expectations": [
+    {"text": "Report uses structured PASS/WARN/FAIL scoring", "passed": false, "evidence": "Uses CRITICAL/MODERATE/MINOR severity levels, no PASS/WARN/FAIL grid"},
+    {"text": "All 9 audit categories are covered", "passed": false, "evidence": "Uses custom grouping (Critical/Moderate/Minor/Positive) — not the 9-category framework"},
+    {"text": "Cites specific file paths with line numbers", "passed": true, "evidence": "Excellent citations: 'src/lib/db/optimistic-properties.ts (line 73)', 'schemas.ts (lines 72-73)'"},
+    {"text": "Identifies dorm as pull-only (server-authoritative)", "passed": true, "evidence": "Section 1: 'pull-only replication pattern'"},
+    {"text": "Notes deleted_at vs _deleted soft-delete pattern", "passed": true, "evidence": "Finding 2.1: 'doc.remove() Creates Tombstones That Break Pull-Only Replication' — detailed analysis"},
+    {"text": "Mentions timestamp precision handling", "passed": true, "evidence": "Section 5.1: 'Microsecond-Precision Checkpoint Handling'"},
+    {"text": "Includes a summary table with counts", "passed": false, "evidence": "Has a summary table of issues (section 6) but no PASS/WARN/FAIL count grid"}
+  ]
+}

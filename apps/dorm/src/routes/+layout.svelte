@@ -11,7 +11,8 @@
 	import { contextualPreload, safePreloadData } from '$lib/utils/prefetch';
 	import { preloadHeavyComponents } from '$lib/utils/lazyLoad';
 	import SyncIndicator from '$lib/components/sync/SyncIndicator.svelte';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { browser } from '$app/environment';
+	import { propertiesStore } from '$lib/stores/collections.svelte';
 	import GlobalPropertyViewer from '$lib/components/3d/GlobalPropertyViewer.svelte';
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { Button } from '$lib/components/ui/button';
@@ -63,25 +64,74 @@
 		isAuthRoute = $page.url.pathname.startsWith('/auth');
 	});
 
+	// F8: URL escape hatch — ?reset-db=1 clears all IndexedDB databases and reloads
+	if (browser && new URL(location.href).searchParams.has('reset-db')) {
+		indexedDB.databases().then((dbs) => {
+			for (const d of dbs) { if (d.name) indexedDB.deleteDatabase(d.name); }
+			const url = new URL(location.href);
+			url.searchParams.delete('reset-db');
+			location.replace(url.toString());
+		});
+	}
+
+	// F5: Multi-tab reset coordination — if another tab clears IndexedDB, reload this one
+	const resetChannel = typeof BroadcastChannel !== 'undefined'
+		? new BroadcastChannel('dorm-db-reset')
+		: null;
+	if (resetChannel) {
+		resetChannel.onmessage = () => location.reload();
+	}
+
 	// Initialize RxDB reactively — triggers on login (including client-side goto from auth page)
 	// Using $effect instead of onMount so it fires when data.user changes from null → user
 	$effect(() => {
 		if (!data.user || rxdbInitialized) return;
 		rxdbInitialized = true;
 
+		// Persist IndexedDB storage to prevent browser eviction
+		navigator.storage?.persist?.().then((granted) => {
+			if (!granted) console.warn('[Storage] Persistent storage not granted — data may be evicted');
+		});
+
+		// D4: syncStatus.checkNeonHealth() removed — replication.ts calls
+		// syncStatus.setNeonHealthDirect() after its own preflight fetch, avoiding a duplicate round-trip.
 		import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 			syncStatus.setPhase('initializing');
-			syncStatus.checkNeonHealth();
 		});
 		import('$lib/db').then(({ getDb }) => {
 			import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 				syncStatus.setRxdbHealth('checking', 'Opening RxDB...');
 			});
-			return getDb().then((db) => {
+			// F4: Wrap getDb() with a 30-second timeout
+			return Promise.race([
+				getDb(),
+				new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error('RxDB init timeout (30s)')), 30_000)
+				)
+			]).then((db) => {
 				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 					syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
+					// F6: Clear reload-loop counter on successful init
+					sessionStorage.removeItem('__dorm_db_reset');
 				});
-				return import('$lib/db/replication').then(({ startSync }) => startSync(db));
+				return import('$lib/db/replication').then(({ startSync }) => startSync(db)).then(() => {
+					// Post-sync: prune old records and check storage usage
+					import('$lib/db/pruning').then(({ pruneOldRecords }) => {
+						pruneOldRecords().then((results) => {
+							if (results.length > 0) {
+								import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+									for (const r of results) {
+										syncStatus.addLog(`Pruned ${r.pruned} old ${r.collection} records`, 'info');
+									}
+								});
+							}
+						}).catch((err) => console.warn('[Pruning] Failed:', err));
+					});
+					// Use checkAndAutoPrune which handles toasts + log entries internally
+					import('$lib/db/storage-monitor').then(({ checkAndAutoPrune }) => {
+						checkAndAutoPrune().catch((err) => console.warn('[Storage] Monitor failed:', err));
+					});
+				});
 			});
 		}).catch(async (err) => {
 			console.error('[RxDB] Init failed:', err);
@@ -92,12 +142,23 @@
 				err?.message?.includes('Error code: DB6');
 
 			if (isSchemaError) {
+				// F6: Reload-loop guard — stop after 2 consecutive failed resets
+				const reloadCount = Number(sessionStorage.getItem('__dorm_db_reset') || '0');
+				if (reloadCount >= 2) {
+					syncStatus.addLog('Reload loop detected — manual recovery needed (?reset-db=1)', 'error');
+					syncStatus.setRxdbHealth('error', undefined, err);
+					return;
+				}
+				sessionStorage.setItem('__dorm_db_reset', String(reloadCount + 1));
+
 				syncStatus.addLog('Schema mismatch detected — auto-clearing IndexedDB...', 'warn');
 				try {
 					const dbs = await indexedDB.databases();
 					for (const d of dbs) {
 						if (d.name) indexedDB.deleteDatabase(d.name);
 					}
+					// F5: Notify other tabs that IndexedDB was cleared
+					resetChannel?.postMessage('db-cleared');
 					syncStatus.addLog('IndexedDB cleared — reloading...', 'info');
 					location.reload();
 					return;
@@ -118,13 +179,10 @@
 		// });
 	}
 
-	// Properties gate — RxDB is the source of truth (offline-first)
-	const rxProperties = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
-	);
-	let propertiesInitialized = $derived(rxProperties.initialized);
+	// F3: Properties gate — use singleton store so there is only one RxDB subscription
+	let propertiesInitialized = $derived(propertiesStore.initialized);
 	let resolvedProperties = $derived(
-		rxProperties.value.map((p: any) => ({ id: Number(p.id), name: p.name, address: p.address, type: p.type, status: p.status })) as Property[]
+		propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name, address: p.address, type: p.type, status: p.status })) as Property[]
 	);
 
 	// Sync propertyStore when RxDB properties change

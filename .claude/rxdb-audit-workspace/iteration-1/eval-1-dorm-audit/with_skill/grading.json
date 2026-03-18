@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "config": "with_skill",
+  "expectations": [
+    {"text": "Report uses structured PASS/WARN/FAIL scoring", "passed": true, "evidence": "Full summary table with PASS/WARN/FAIL/N/A counts per category (lines 9-20)"},
+    {"text": "All 9 audit categories are covered", "passed": true, "evidence": "All 9 categories present in summary table: Authority, Adoption, Patterns, Sync, Schema, Bootstrap, Storage, Security, Error Handling"},
+    {"text": "Cites specific file paths with line numbers", "passed": true, "evidence": "Extensive citations throughout, e.g. 'src/routes/leases/+page.server.ts:71', 'src/lib/db/replication.ts:126'"},
+    {"text": "Identifies dorm as pull-only (server-authoritative)", "passed": true, "evidence": "Lines 158-161: 'All 14 collections are server-authoritative with pull-only replication'"},
+    {"text": "Notes deleted_at vs _deleted soft-delete pattern", "passed": true, "evidence": "Findings 3.1 and 3.2 detail that only 2/14 tables have deleted_at, and physical DELETEs create ghost data"},
+    {"text": "Mentions timestamp precision handling", "passed": true, "evidence": "Line 165: 'to_char(...US...) to preserve PostgreSQL microsecond precision'"},
+    {"text": "Includes a summary table with counts", "passed": true, "evidence": "Lines 9-20: Full summary table with Pass/Warn/Fail/N/A per category, total 22/41 (54%)"}
+  ]
+}

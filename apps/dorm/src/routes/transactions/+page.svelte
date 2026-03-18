@@ -13,41 +13,29 @@
 	import TransactionFormModal from './TransactionFormModal.svelte';
 	import TransactionDetailsModal from './TransactionDetailsModal.svelte';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		paymentsStore,
+		billingsStore,
+		leasesStore,
+		rentalUnitsStore,
+		floorsStore,
+		leaseTenantsStore,
+		tenantsStore,
+		paymentAllocationsStore
+	} from '$lib/stores/collections.svelte';
 	import { resyncCollection } from '$lib/db/replication';
 
 	// ─── Form defaults (no server load, so we create client-side) ────
 	const formDefaults = { form: defaults(zod(transactionSchema)) };
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const paymentsStore = createRxStore<any>('payments',
-		(db) => db.payments.find({ sort: [{ updated_at: 'desc' }] })
-	);
-	const billingsStore = createRxStore<any>('billings',
-		(db) => db.billings.find()
-	);
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find()
-	);
-	const leaseTenantsStore = createRxStore<any>('lease_tenants',
-		(db) => db.lease_tenants.find()
-	);
-	const tenantsStore = createRxStore<any>('tenants',
-		(db) => db.tenants.find()
-	);
-	const paymentAllocationsStore = createRxStore<any>('payment_allocations',
-		(db) => db.payment_allocations.find()
-	);
-
 	// ─── Derive enriched transactions from RxDB stores ──────────────────
 	let transactions: Transaction[] = $derived.by(() => {
-		return paymentsStore.value
+		return [...paymentsStore.value]
+			.sort((a: any, b: any) => {
+				const aMs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+				const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+				return bMs - aMs;
+			})
 			.filter((p: any) => !p.reverted_at) // Exclude reverted by default
 			.map((payment: any) => {
 				const billingIds = Array.isArray(payment.billing_ids) ? payment.billing_ids : [];

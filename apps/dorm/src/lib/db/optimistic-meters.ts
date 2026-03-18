@@ -1,5 +1,5 @@
 import { getDb } from '$lib/db';
-import { resyncCollection } from '$lib/db/replication';
+import { bgResync } from '$lib/db/optimistic-utils';
 import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 /**
@@ -8,21 +8,6 @@ import { syncStatus } from '$lib/stores/sync-status.svelte';
  * Pattern: upsert into RxDB immediately (UI updates in the same frame),
  * then fire a background resync to reconcile with Neon.
  */
-
-/** Background resync — fire and forget, never blocks UI. */
-function bgResync(collection: string) {
-	console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
-	syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
-	resyncCollection(collection)
-		.then(() => {
-			console.log(`[Optimistic] Resync "${collection}" complete ✓`);
-			syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
-		})
-		.catch((err) => {
-			console.warn(`[Optimistic] Resync "${collection}" failed:`, err);
-			syncStatus.addLog(`Resync: ${collection} failed — ${err?.message || err}`, 'error');
-		});
-}
 
 /**
  * Optimistically insert or update a meter in RxDB.
@@ -51,16 +36,17 @@ export async function optimisticUpsertMeter(data: {
 			id: sid,
 			name: data.name,
 			location_type: data.location_type,
-			property_id: data.property_id ?? null,
-			floor_id: data.floor_id ?? null,
-			rental_unit_id: data.rental_unit_id ?? null,
+			property_id: data.property_id != null ? String(data.property_id) : null,
+			floor_id: data.floor_id != null ? String(data.floor_id) : null,
+			rental_unit_id: data.rental_unit_id != null ? String(data.rental_unit_id) : null,
 			type: data.type,
 			is_active: data.is_active ?? null,
 			status: data.status,
 			notes: data.notes ?? null,
 			initial_reading: data.initial_reading ?? null,
 			created_at: existing ? existing.created_at : new Date().toISOString(),
-			updated_at: new Date().toISOString()
+			updated_at: new Date().toISOString(),
+			deleted_at: null
 		});
 		console.log(`[Optimistic] meter #${data.id} upsert complete ✓`);
 		syncStatus.addLog(`Optimistic: meter #${data.id} upserted ✓`, 'success');
@@ -75,14 +61,19 @@ export async function optimisticUpsertMeter(data: {
  * Optimistically delete a meter from RxDB.
  */
 export async function optimisticDeleteMeter(meterId: number) {
-	console.log(`[Optimistic] meter #${meterId} → deleting from RxDB...`);
-	syncStatus.addLog(`Optimistic: meter #${meterId} → deleting from RxDB...`, 'info');
+	console.log(`[Optimistic] meter #${meterId} → soft-deleting in RxDB...`);
+	syncStatus.addLog(`Optimistic: meter #${meterId} → soft-deleting in RxDB...`, 'info');
 	try {
 		const db = await getDb();
 		const doc = await db.meters.findOne(String(meterId)).exec();
-		if (doc) await doc.remove();
-		console.log(`[Optimistic] meter #${meterId} delete complete ✓`);
-		syncStatus.addLog(`Optimistic: meter #${meterId} deleted ✓`, 'success');
+		if (doc) {
+			await doc.incrementalPatch({
+				deleted_at: new Date().toISOString(),
+				updated_at: new Date().toISOString()
+			});
+		}
+		console.log(`[Optimistic] meter #${meterId} soft-deleted ✓`);
+		syncStatus.addLog(`Optimistic: meter #${meterId} soft-deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Meter delete failed, falling back to resync:', err);
 		syncStatus.addLog(`Optimistic: meter #${meterId} delete failed — ${(err as Error)?.message || err}`, 'error');

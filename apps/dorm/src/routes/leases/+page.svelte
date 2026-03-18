@@ -11,41 +11,22 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
 	import { printAllLeases } from '$lib/utils/print';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		leasesStore,
+		tenantsStore,
+		rentalUnitsStore,
+		floorsStore,
+		propertiesStore,
+		leaseTenantsStore,
+		billingsStore,
+		paymentsStore,
+		paymentAllocationsStore
+	} from '$lib/stores/collections.svelte';
 	import { resyncCollection } from '$lib/db/replication';
 	import { optimisticDeleteLease } from '$lib/db/optimistic-leases';
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 	type FormType = z.infer<typeof leaseSchema>;
-
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find({ selector: { deleted_at: { $eq: null } }, sort: [{ updated_at: 'desc' }] })
-	);
-	const tenantsStore = createRxStore<any>('tenants',
-		(db) => db.tenants.find({ selector: { deleted_at: { $eq: null } }, sort: [{ name: 'asc' }] })
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find()
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find()
-	);
-	const leaseTenantsStore = createRxStore<any>('lease_tenants',
-		(db) => db.lease_tenants.find()
-	);
-	const billingsStore = createRxStore<any>('billings',
-		(db) => db.billings.find()
-	);
-	const paymentsStore = createRxStore<any>('payments',
-		(db) => db.payments.find()
-	);
-	const paymentAllocationsStore = createRxStore<any>('payment_allocations',
-		(db) => db.payment_allocations.find()
-	);
 
 	// ─── Derived data from RxDB stores (Map-based O(n) joins) ──────────
 
@@ -88,8 +69,13 @@
 			else billByLease.set(key, [b]);
 		}
 
-		// Single pass over leases with O(1) lookups
-		return leasesStore.value.map((lease: any) => {
+		// Single pass over leases with O(1) lookups — sorted by updated_at desc
+		const sortedLeases = [...leasesStore.value].sort((a: any, b: any) => {
+			const aMs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+			const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+			return bMs - aMs;
+		});
+		return sortedLeases.map((lease: any) => {
 			const leaseId = String(lease.id);
 			const unit = unitMap.get(String(lease.rental_unit_id));
 			const floor = unit ? floorMap.get(String(unit.floor_id)) ?? null : null;
@@ -186,7 +172,7 @@
 		});
 	});
 
-	let tenants = $derived(tenantsStore.value.map((t: any) => ({
+	let tenants = $derived([...tenantsStore.value].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((t: any) => ({
 		id: Number(t.id),
 		name: t.name,
 		email: t.email,

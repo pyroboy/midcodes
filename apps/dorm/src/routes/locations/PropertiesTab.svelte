@@ -19,7 +19,7 @@
 	import { propertySchema, type Property } from '../properties/formSchema';
 	import { toast } from 'svelte-sonner';
 	import { Search, Building2 } from 'lucide-svelte';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { propertiesStore } from '$lib/stores/collections.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
 
 	interface Props {
@@ -29,11 +29,12 @@
 
 	let { propertyForm, triggerAdd = $bindable(false) }: Props = $props();
 
-	// ─── RxDB reactive store ───────────────────────────────────────────
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	// ─── RxDB reactive store (singleton from collections.svelte.ts) ────
+	let properties = $derived(
+		[...propertiesStore.value]
+			.sort((a: any, b: any) => a.name.localeCompare(b.name))
+			.map((p: any) => ({ ...p, id: Number(p.id) }))
 	);
-	let properties = $derived(propertiesStore.value.map((p: any) => ({ ...p, id: Number(p.id) })));
 	let isLoading = $derived(!propertiesStore.initialized);
 
 	// ─── Search ────────────────────────────────────────────────────────

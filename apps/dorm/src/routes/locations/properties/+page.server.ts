@@ -60,7 +60,7 @@ export const actions: Actions = {
 		if (!id || Number.isNaN(numId)) return fail(400, { error: 'Valid property ID is required' });
 
 		try {
-			await db.delete(properties).where(eq(properties.id, numId));
+			await db.update(properties).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(properties.id, numId));
 			cache.deletePattern(/^properties:/);
 			return { success: true };
 		} catch (err: any) {

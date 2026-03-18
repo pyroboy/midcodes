@@ -19,12 +19,13 @@ export function createRxStore<T = any>(
 	let state = $state<T[]>([]);
 	let initialized = $state(false);
 	let error = $state<string | null>(null);
+	let subscription: any = null;
 
 	if (browser) {
 		getDb()
 			.then((db) => {
 				const query = queryFn(db);
-				query.$.subscribe((documents: any[]) => {
+				subscription = query.$.subscribe((documents: any[]) => {
 					state = documents.map((doc: any) => doc.toJSON());
 					initialized = true;
 				});
@@ -46,6 +47,10 @@ export function createRxStore<T = any>(
 		},
 		get error() {
 			return error;
+		},
+		unsubscribe() {
+			subscription?.unsubscribe();
+			subscription = null;
 		}
 	};
 }

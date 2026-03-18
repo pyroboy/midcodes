@@ -1,5 +1,5 @@
 import { getDb } from '$lib/db';
-import { resyncCollection } from '$lib/db/replication';
+import { bgResync } from '$lib/db/optimistic-utils';
 import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 /**
@@ -9,21 +9,6 @@ import { syncStatus } from '$lib/stores/sync-status.svelte';
  * No optimistic create/update needed since those go through form actions
  * — just resync after success.
  */
-
-/** Background resync — fire and forget, never blocks UI. Logs to sync modal. */
-function bgResync(collection: string) {
-	console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
-	syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
-	resyncCollection(collection)
-		.then(() => {
-			console.log(`[Optimistic] Resync "${collection}" complete ✓`);
-			syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
-		})
-		.catch((err) => {
-			console.warn(`[Optimistic] Resync "${collection}" failed:`, err);
-			syncStatus.addLog(`Resync: ${collection} failed — ${err?.message || err}`, 'error');
-		});
-}
 
 /**
  * Optimistically soft-delete a lease by setting deleted_at.

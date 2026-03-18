@@ -8,30 +8,33 @@
 	import type { Expense } from './types';
 	import ExpenseList from './ExpenseList.svelte';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		expensesStore,
+		propertiesStore
+	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertExpense, optimisticDeleteExpense } from '$lib/db/optimistic-expenses';
 
-	// ── RxDB reactive stores ──────────────────────────────────────────────
-	const expensesStore = createRxStore<any>('expenses',
-		(db) => db.expenses.find({ sort: [{ updated_at: 'desc' }] })
+	// Client-side join: enrich expenses with property name (sorted by updated_at desc)
+	let expenses = $derived(
+		[...expensesStore.value]
+			.sort((a: any, b: any) => {
+				const aMs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+				const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+				return bMs - aMs;
+			})
+			.map((e: any) => {
+			const property = propertiesStore.value.find((p: any) => String(p.id) === String(e.property_id));
+			return {
+				...e,
+				id: Number(e.id),
+				property_id: e.property_id ? Number(e.property_id) : null,
+				property: property ? { id: Number(property.id), name: property.name } : null,
+				expense_date: e.expense_date ? new Date(e.expense_date).toLocaleDateString('en-US', {
+					year: 'numeric', month: '2-digit', day: '2-digit'
+				}) : null
+			};
+		})
 	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find()
-	);
-
-	// Client-side join: enrich expenses with property name
-	let expenses = $derived(expensesStore.value.map((e: any) => {
-		const property = propertiesStore.value.find((p: any) => String(p.id) === String(e.property_id));
-		return {
-			...e,
-			id: Number(e.id),
-			property_id: e.property_id ? Number(e.property_id) : null,
-			property: property ? { id: Number(property.id), name: property.name } : null,
-			expense_date: e.expense_date ? new Date(e.expense_date).toLocaleDateString('en-US', {
-				year: 'numeric', month: '2-digit', day: '2-digit'
-			}) : null
-		};
-	}));
 
 	let properties = $derived(propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name })));
 	let isLoading = $derived(!expensesStore.initialized);

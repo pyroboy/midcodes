@@ -140,8 +140,13 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 
 	// Parse checkpoint params
 	const updatedAt = url.searchParams.get('updatedAt') || '1970-01-01T00:00:00Z';
-	const id = parseInt(url.searchParams.get('id') || '0', 10);
-	const limit = Math.min(parseInt(url.searchParams.get('limit') || '200', 10), 500);
+	const idRaw = parseInt(url.searchParams.get('id') || '0', 10);
+	const limitRaw = parseInt(url.searchParams.get('limit') || '200', 10);
+	if (isNaN(idRaw) || isNaN(limitRaw) || limitRaw < 1) {
+		throw error(400, 'Invalid query parameters');
+	}
+	const id = idRaw;
+	const limit = Math.min(limitRaw, 500);
 
 	const { table, transform, updatedAtCol, idCol } = config;
 

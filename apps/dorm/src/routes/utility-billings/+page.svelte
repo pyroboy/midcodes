@@ -39,34 +39,17 @@
 	import { processUtilityBillingsData } from './dataProcessor';
 
 	// RxDB local-first imports
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		propertiesStore,
+		metersStore,
+		readingsStore,
+		billingsStore,
+		leasesStore,
+		leaseTenantsStore,
+		tenantsStore,
+		rentalUnitsStore
+	} from '$lib/stores/collections.svelte';
 	import { resyncUtilityData } from '$lib/db/optimistic-utility-billings';
-
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
-	);
-	const metersStore = createRxStore<any>('meters',
-		(db) => db.meters.find()
-	);
-	const readingsStore = createRxStore<any>('readings',
-		(db) => db.readings.find({ sort: [{ reading_date: 'asc' }] })
-	);
-	const billingsStore = createRxStore<any>('billings',
-		(db) => db.billings.find()
-	);
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find()
-	);
-	const leaseTenantsStore = createRxStore<any>('lease_tenants',
-		(db) => db.lease_tenants.find()
-	);
-	const tenantsStore = createRxStore<any>('tenants',
-		(db) => db.tenants.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
 
 	// ─── Loading state from RxDB initialization ────────────────────────
 	let isLoading = $derived(
@@ -87,9 +70,9 @@
 		};
 
 		// Transform RxDB data to match the format expected by processUtilityBillingsData
-		const propertiesData = propertiesStore.value.map((p: any) => ({
-			id: Number(p.id), name: p.name
-		}));
+		const propertiesData = [...propertiesStore.value]
+			.sort((a: any, b: any) => a.name.localeCompare(b.name))
+			.map((p: any) => ({ id: Number(p.id), name: p.name }));
 
 		const metersData = metersStore.value.map((m: any) => ({
 			id: Number(m.id),
@@ -103,14 +86,16 @@
 			})() : null
 		}));
 
-		const readingsData = readingsStore.value.map((r: any) => ({
-			id: Number(r.id),
-			meter_id: Number(r.meter_id),
-			reading: r.reading,
-			reading_date: r.reading_date,
-			rate_at_reading: r.rate_at_reading,
-			review_status: r.review_status
-		}));
+		const readingsData = [...readingsStore.value]
+			.sort((a: any, b: any) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime())
+			.map((r: any) => ({
+				id: Number(r.id),
+				meter_id: Number(r.meter_id),
+				reading: r.reading,
+				reading_date: r.reading_date,
+				rate_at_reading: r.rate_at_reading,
+				review_status: r.review_status
+			}));
 
 		const utilityBillings = billingsStore.value
 			.filter((b: any) => b.type === 'UTILITY' && b.meter_id)

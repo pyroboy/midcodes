@@ -167,6 +167,15 @@ export function parseError(err: any): ParsedError {
 	};
 }
 
+function formatAge(date: Date | null): string | null {
+	if (!date) return null;
+	const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+	if (seconds < 60) return 'just now';
+	if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+	if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+	return `${Math.floor(seconds / 86400)}d ago`;
+}
+
 function createSyncStatusStore() {
 	let collections = $state<CollectionSyncState[]>(
 		COLLECTIONS.map((name) => ({
@@ -181,6 +190,7 @@ function createSyncStatusStore() {
 
 	let phase = $state<SyncPhase>('idle');
 	let startedAt = $state<number | null>(null);
+	let lastSuccessfulSyncAt = $state<Date | null>(null);
 
 	// Service health
 	let neonHealth = $state<ServiceHealth>('unknown');
@@ -222,13 +232,15 @@ function createSyncStatusStore() {
 	}
 
 	function markSynced(name: string, docCount: number) {
+		const now = new Date();
 		updateCollection(name, {
 			status: 'synced',
 			docCount,
-			lastSyncedAt: new Date().toISOString(),
+			lastSyncedAt: now.toISOString(),
 			error: null,
 			parsedError: null
 		});
+		lastSuccessfulSyncAt = now;
 		addLog(`${name} synced`, 'success');
 		// Check if all are synced — only log once
 		const allSynced = collections.every((c) => c.status === 'synced');
@@ -282,6 +294,24 @@ function createSyncStatusStore() {
 		}
 	}
 
+	/**
+	 * D4: Set Neon health state directly from replication.ts without making an
+	 * additional fetch call. Called immediately after the preflight health check
+	 * so the UI reflects the real reachability result with actual latency data.
+	 */
+	function setNeonHealthDirect(status: 'ok' | 'error', latencyMs?: number) {
+		neonHealth = status;
+		neonLatency = latencyMs ?? null;
+		if (status === 'ok') {
+			neonError = null;
+			const latencyStr = latencyMs !== undefined ? ` (${latencyMs}ms)` : '';
+			addLog(`Neon reachable${latencyStr}`, 'success');
+		} else {
+			neonError = 'Unreachable';
+			addLog('Neon unreachable — using cached data', 'error');
+		}
+	}
+
 	function setRxdbHealth(status: ServiceHealth, message?: string, rawError?: any) {
 		rxdbHealth = status;
 		if (status === 'error' && rawError) {
@@ -317,12 +347,15 @@ function createSyncStatusStore() {
 		get rxdbHealth() { return rxdbHealth; },
 		get rxdbError() { return rxdbError; },
 		get logs() { return logs; },
+		get lastSuccessfulSyncAt() { return lastSuccessfulSyncAt; },
+		get dataAge() { return formatAge(lastSuccessfulSyncAt); },
 		setPhase,
 		markSyncing,
 		markSynced,
 		markError,
 		updateCollection,
 		checkNeonHealth,
+		setNeonHealthDirect,
 		setRxdbHealth,
 		addLog
 	};

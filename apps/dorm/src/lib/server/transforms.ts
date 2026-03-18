@@ -40,7 +40,7 @@ export function transformTenant(row: any) {
 export function transformLease(row: any) {
 	return {
 		id: sid(row.id),
-		rental_unit_id: row.rentalUnitId,
+		rental_unit_id: sid(row.rentalUnitId),
 		name: row.name,
 		start_date: row.startDate,
 		end_date: row.endDate,
@@ -61,10 +61,11 @@ export function transformLease(row: any) {
 export function transformLeaseTenant(row: any) {
 	return {
 		id: sid(row.id),
-		lease_id: row.leaseId,
-		tenant_id: row.tenantId,
+		lease_id: sid(row.leaseId),
+		tenant_id: sid(row.tenantId),
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
@@ -77,11 +78,12 @@ export function transformRentalUnit(row: any) {
 		base_rate: row.baseRate,
 		created_at: ts(row.createdAt),
 		updated_at: ts(row.updatedAt),
-		property_id: row.propertyId,
-		floor_id: row.floorId,
+		property_id: sid(row.propertyId),
+		floor_id: sid(row.floorId),
 		type: row.type,
 		amenities: (row.amenities && (Array.isArray(row.amenities) ? row.amenities.length > 0 : Object.keys(row.amenities).length > 0)) ? row.amenities : null,
-		number: row.number
+		number: row.number,
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
@@ -93,19 +95,21 @@ export function transformProperty(row: any) {
 		type: row.type,
 		status: row.status,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
 export function transformFloor(row: any) {
 	return {
 		id: sid(row.id),
-		property_id: row.propertyId,
+		property_id: sid(row.propertyId),
 		floor_number: row.floorNumber,
 		wing: row.wing ?? null,
 		status: row.status,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
@@ -114,23 +118,24 @@ export function transformMeter(row: any) {
 		id: sid(row.id),
 		name: row.name,
 		location_type: row.locationType,
-		property_id: row.propertyId ?? null,
-		floor_id: row.floorId ?? null,
-		rental_unit_id: row.rentalUnitId ?? null,
+		property_id: row.propertyId != null ? sid(row.propertyId) : null,
+		floor_id: row.floorId != null ? sid(row.floorId) : null,
+		rental_unit_id: row.rentalUnitId != null ? sid(row.rentalUnitId) : null,
 		type: row.type,
 		is_active: row.isActive ?? null,
 		status: row.status,
 		notes: row.notes ?? null,
 		initial_reading: row.initialReading ?? null,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
 export function transformReading(row: any) {
 	return {
 		id: sid(row.id),
-		meter_id: row.meterId,
+		meter_id: sid(row.meterId),
 		reading: row.reading,
 		reading_date: row.readingDate,
 		meter_name: row.meterName ?? null,
@@ -139,14 +144,15 @@ export function transformReading(row: any) {
 		backdating_enabled: row.backdatingEnabled ?? null,
 		review_status: row.reviewStatus,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
 export function transformBilling(row: any) {
 	return {
 		id: sid(row.id),
-		lease_id: row.leaseId,
+		lease_id: sid(row.leaseId),
 		type: row.type,
 		utility_type: row.utilityType ?? null,
 		amount: row.amount,
@@ -157,9 +163,10 @@ export function transformBilling(row: any) {
 		billing_date: row.billingDate,
 		penalty_amount: row.penaltyAmount ?? null,
 		notes: row.notes ?? null,
-		meter_id: row.meterId ?? null,
+		meter_id: row.meterId != null ? sid(row.meterId) : null,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
@@ -175,31 +182,33 @@ export function transformPayment(row: any) {
 		receipt_url: row.receiptUrl ?? null,
 		created_by: row.createdBy ?? null,
 		updated_by: row.updatedBy ?? null,
-		billing_ids: row.billingIds ?? null,
-		billing_id: row.billingId ?? null,
+		billing_ids: row.billingIds != null ? row.billingIds.map((v: any) => sid(v)) : null,
+		billing_id: row.billingId != null ? sid(row.billingId) : null,
 		reverted_at: ts(row.revertedAt),
 		reverted_by: row.revertedBy ?? null,
 		revert_reason: row.revertReason ?? null,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
 export function transformPaymentAllocation(row: any) {
 	return {
 		id: sid(row.id),
-		payment_id: row.paymentId ?? null,
-		billing_id: row.billingId ?? null,
+		payment_id: row.paymentId != null ? sid(row.paymentId) : null,
+		billing_id: row.billingId != null ? sid(row.billingId) : null,
 		amount: row.amount,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
 export function transformExpense(row: any) {
 	return {
 		id: sid(row.id),
-		property_id: row.propertyId ?? null,
+		property_id: row.propertyId != null ? sid(row.propertyId) : null,
 		amount: row.amount,
 		description: row.description,
 		type: row.type,
@@ -207,7 +216,8 @@ export function transformExpense(row: any) {
 		created_by: row.createdBy ?? null,
 		expense_date: ts(row.expenseDate),
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
@@ -224,10 +234,11 @@ export function transformBudget(row: any) {
 		status: row.status ?? null,
 		start_date: ts(row.startDate),
 		end_date: ts(row.endDate),
-		property_id: row.propertyId,
+		property_id: sid(row.propertyId),
 		created_by: row.createdBy ?? null,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }
 
@@ -240,6 +251,7 @@ export function transformPenaltyConfig(row: any) {
 		compound_period: row.compoundPeriod ?? null,
 		max_penalty_percentage: row.maxPenaltyPercentage ?? null,
 		created_at: ts(row.createdAt),
-		updated_at: ts(row.updatedAt)
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt),
 	};
 }

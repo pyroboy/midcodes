@@ -11,7 +11,13 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { propertyStore } from '$lib/stores/property';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		floorsStore,
+		propertiesStore,
+		rentalUnitsStore,
+		leasesStore,
+		leaseTenantsStore
+	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertFloor, optimisticDeleteFloor } from '$lib/db/optimistic-floors';
 	import { Search, Pencil, Trash2 } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
@@ -29,25 +35,10 @@
 	let floorToDelete = $state<FloorWithProperty | null>(null);
 	let searchQuery = $state('');
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find({ sort: [{ floor_number: 'asc' }] })
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find()
-	);
-	const leaseTenantsStore = createRxStore<any>('lease_tenants',
-		(db) => db.lease_tenants.find()
-	);
+	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
 	let allFloors = $derived.by(() => {
-		return floorsStore.value.map((floor: any) => {
+		return [...floorsStore.value].sort((a: any, b: any) => a.floor_number - b.floor_number).map((floor: any) => {
 			const property = propertiesStore.value.find((p: any) => String(p.id) === String(floor.property_id));
 			const floorUnits = rentalUnitsStore.value
 				.filter((u: any) => String(u.floor_id) === String(floor.id))

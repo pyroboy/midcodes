@@ -2,6 +2,7 @@ import { createRxDatabase, addRxPlugin, type RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
+import { RxDBCleanupPlugin } from 'rxdb/plugins/cleanup';
 import {
 	tenantSchema,
 	leaseSchema,
@@ -21,11 +22,15 @@ import {
 
 import { dev } from '$app/environment';
 
+// v0→v1 migration: index-only change, no data transformation needed.
+const IDENTITY_MIGRATION = { 1: (doc: any) => doc };
+
 // Register plugins once — guard against duplicate registration
 let pluginsRegistered = false;
 if (!pluginsRegistered) {
 	addRxPlugin(RxDBUpdatePlugin);
 	addRxPlugin(RxDBQueryBuilderPlugin);
+	addRxPlugin(RxDBCleanupPlugin);
 	pluginsRegistered = true;
 }
 
@@ -40,20 +45,20 @@ if (dev) {
 }
 
 const COLLECTIONS = {
-	tenants: { schema: tenantSchema },
-	leases: { schema: leaseSchema },
-	lease_tenants: { schema: leaseTenantSchema },
-	rental_units: { schema: rentalUnitSchema },
-	properties: { schema: propertySchema },
-	floors: { schema: floorSchema },
-	meters: { schema: meterSchema },
-	readings: { schema: readingSchema },
-	billings: { schema: billingSchema },
-	payments: { schema: paymentSchema },
-	payment_allocations: { schema: paymentAllocationSchema },
-	expenses: { schema: expenseSchema },
-	budgets: { schema: budgetSchema },
-	penalty_configs: { schema: penaltyConfigSchema }
+	tenants: { schema: tenantSchema, migrationStrategies: IDENTITY_MIGRATION },
+	leases: { schema: leaseSchema, migrationStrategies: IDENTITY_MIGRATION },
+	lease_tenants: { schema: leaseTenantSchema, migrationStrategies: IDENTITY_MIGRATION },
+	rental_units: { schema: rentalUnitSchema, migrationStrategies: IDENTITY_MIGRATION },
+	properties: { schema: propertySchema, migrationStrategies: IDENTITY_MIGRATION },
+	floors: { schema: floorSchema, migrationStrategies: IDENTITY_MIGRATION },
+	meters: { schema: meterSchema, migrationStrategies: IDENTITY_MIGRATION },
+	readings: { schema: readingSchema, migrationStrategies: IDENTITY_MIGRATION },
+	billings: { schema: billingSchema, migrationStrategies: IDENTITY_MIGRATION },
+	payments: { schema: paymentSchema, migrationStrategies: IDENTITY_MIGRATION },
+	payment_allocations: { schema: paymentAllocationSchema, migrationStrategies: IDENTITY_MIGRATION },
+	expenses: { schema: expenseSchema, migrationStrategies: IDENTITY_MIGRATION },
+	budgets: { schema: budgetSchema, migrationStrategies: IDENTITY_MIGRATION },
+	penalty_configs: { schema: penaltyConfigSchema, migrationStrategies: IDENTITY_MIGRATION }
 };
 
 // Store the singleton on globalThis to survive Vite's production code-splitting

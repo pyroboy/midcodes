@@ -1,0 +1,11 @@
+{
+  "eval_id": 2,
+  "config": "with_skill",
+  "expectations": [
+    {"text": "Produces a structured audit (not just prose)", "passed": true, "evidence": "Full 9-category PASS/WARN/FAIL table, 26/44 score, categorized findings"},
+    {"text": "Addresses server cost specifically", "passed": true, "evidence": "Server Cost Assessment section with efficiency rating and per-fix savings estimates (20-40% reduction)"},
+    {"text": "Evaluates the per-mutation resync pattern", "passed": true, "evidence": "Finding 4a: 'resyncUtilityData() fires bgResync for 3 collections simultaneously'"},
+    {"text": "Mentions live:false or absence of live sync", "passed": true, "evidence": "Passing item 4: 'live: false used correctly at replication.ts:126'"},
+    {"text": "Recommends specific optimizations", "passed": true, "evidence": "10 prioritized recommendations including debouncing, auth removal of health endpoint, schema migration"}
+  ]
+}

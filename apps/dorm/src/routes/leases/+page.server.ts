@@ -144,7 +144,7 @@ export const actions: Actions = {
 				const tenantIdsArray = JSON.parse(tenantIdsStr);
 
 				if (tenantIdsArray && tenantIdsArray.length > 0) {
-					await db.delete(leaseTenants).where(eq(leaseTenants.leaseId, id));
+					await db.update(leaseTenants).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(leaseTenants.leaseId, id));
 
 					const newRelationships = tenantIdsArray.map((tenant_id: number) => ({
 						leaseId: id,
@@ -353,7 +353,7 @@ export const actions: Actions = {
 					if (Number(existingBilling.paidAmount) > 0) {
 						throw new Error(`Cannot delete billing for month ${rent.month} as it has payments.`);
 					}
-					await db.delete(billings).where(eq(billings.id, existingBilling.id));
+					await db.update(billings).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(billings.id, existingBilling.id));
 					return;
 				}
 			});
@@ -459,11 +459,12 @@ export const actions: Actions = {
 
 				// Delete payment allocations first
 				await db
-					.delete(paymentAllocations)
+					.update(paymentAllocations)
+					.set({ deletedAt: new Date(), updatedAt: new Date() })
 					.where(eq(paymentAllocations.billingId, billingId));
 
 				// Then delete the billing
-				await db.delete(billings).where(eq(billings.id, billingId));
+				await db.update(billings).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(billings.id, billingId));
 
 				return { form, success: true, message: 'Security deposit billing deleted successfully' };
 			} else {

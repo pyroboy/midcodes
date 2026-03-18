@@ -24,7 +24,13 @@
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { toast } from 'svelte-sonner';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		metersStore,
+		propertiesStore,
+		floorsStore,
+		rentalUnitsStore,
+		readingsStore
+	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
 
 	// Type definitions
@@ -97,22 +103,7 @@
 		meters: ExtendedMeterFormData[];
 	}
 
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const metersStore = createRxStore<any>('meters',
-		(db) => db.meters.find({ sort: [{ name: 'asc' }] })
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
-	);
-	const floorsStore = createRxStore<any>('floors',
-		(db) => db.floors.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const readingsStore = createRxStore<any>('readings',
-		(db) => db.readings.find()
-	);
+	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
 	// ─── Derived data from RxDB stores ──────────────────────────────────
 

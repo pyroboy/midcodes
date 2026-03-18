@@ -25,25 +25,14 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
-	import { createRxStore } from '$lib/stores/rx.svelte';
+	import {
+		tenantsStore,
+		leaseTenantsStore,
+		leasesStore,
+		rentalUnitsStore,
+		propertiesStore
+	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertTenant, optimisticDeleteTenant } from '$lib/db/optimistic';
-
-	// ─── RxDB reactive stores ───────────────────────────────────────────
-	const tenantsStore = createRxStore<any>('tenants',
-		(db) => db.tenants.find({ selector: { deleted_at: { $eq: null } }, sort: [{ name: 'asc' }] })
-	);
-	const leaseTenantsStore = createRxStore<any>('lease_tenants',
-		(db) => db.lease_tenants.find()
-	);
-	const leasesStore = createRxStore<any>('leases',
-		(db) => db.leases.find()
-	);
-	const rentalUnitsStore = createRxStore<any>('rental_units',
-		(db) => db.rental_units.find()
-	);
-	const propertiesStore = createRxStore<any>('properties',
-		(db) => db.properties.find()
-	);
 
 	// Enrich tenants with lease relationships using Map lookups (O(1) per join)
 	let tenants = $derived.by(() => {
@@ -66,7 +55,7 @@
 			else ltByTenant.set(tid, [lt]);
 		}
 
-		return tenantsStore.value.map((t: any) => {
+		return [...tenantsStore.value].sort((a: any, b: any) => a.name.localeCompare(b.name)).map((t: any) => {
 			const ltDocs = ltByTenant.get(String(t.id)) || [];
 			const tenantLeases: any[] = [];
 			for (const lt of ltDocs) {

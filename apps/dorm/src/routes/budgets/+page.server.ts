@@ -120,7 +120,8 @@ export const actions: Actions = {
 
 			console.log('Attempting to delete budget with ID:', id);
 			const result = await db
-				.delete(budgets)
+				.update(budgets)
+				.set({ deletedAt: new Date(), updatedAt: new Date() })
 				.where(eq(budgets.id, Number(id)))
 				.returning();
 
