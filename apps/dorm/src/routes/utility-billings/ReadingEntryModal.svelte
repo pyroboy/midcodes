@@ -44,7 +44,7 @@
 		form: formData
 	}: Props = $props();
 
-	let meterReadings = $state([...initialMeterReadings]);
+	let meterReadings = $state((() => [...initialMeterReadings])());
 
 	$effect(() => {
 		meterReadings = [...initialMeterReadings];
@@ -173,11 +173,11 @@
 
 	// Initialize superForm with comprehensive error handling
 // Initialize superForm with comprehensive error handling
-const { form, errors, enhance, submitting, message } = superForm(formData, {
+const { form, errors, enhance, submitting, message } = superForm((() => formData)(), {
     validators: zodClient(batchReadingsSchema),
     resetForm: false,
     taintedMessage: null,
-    id: `meter-reading-${property.id}-${utilityType}`,
+    id: `meter-reading-${(() => property.id)()}-${(() => utilityType)()}`,
     onUpdated: ({ form: f }) => {
         if (f.valid) {
             if (f.message) {

@@ -1,7 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import type { PageServerLoad } from './$types';
 import type { Actions } from './$types';
 import { batchReadingsSchema, meterReadingSchema } from './meterReadingSchema';
 import type { z } from 'zod/v3';
@@ -10,13 +9,6 @@ import { meters, readings, billings, profiles } from '$lib/server/schema';
 import { eq, desc, inArray } from 'drizzle-orm';
 
 // Use Node runtime
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { user } = locals;
-	if (!user) throw error(401, 'Unauthorized');
-	const form = await superValidate(zod(batchReadingsSchema));
-	return { form };
-};
 
 export const actions: Actions = {
 	approvePendingReadings: async ({ request, locals }) => {

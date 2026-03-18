@@ -1,5 +1,5 @@
-import { fail, error } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import { fail } from '@sveltejs/kit';
+import type { Actions } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
@@ -12,17 +12,6 @@ import { cache, cacheKeys } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import { tenants } from '$lib/server/schema';
 import { eq, and, ne, isNull, ilike } from 'drizzle-orm';
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { permissions } = locals;
-	if (!permissions?.includes('tenants.read')) throw error(401, 'Unauthorized');
-
-	// Data loading moved to RxDB client-side stores.
-	// Server only provides the superform for create/update actions.
-	return {
-		form: await superValidate(zod(tenantFormSchema))
-	};
-};
 
 // Base tenant insert type
 type TenantInsertBase = {

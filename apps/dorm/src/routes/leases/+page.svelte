@@ -17,8 +17,6 @@
 
 	type FormType = z.infer<typeof leaseSchema>;
 
-	let { data } = $props();
-
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const leasesStore = createRxStore<any>('leases',
 		(db) => db.leases.find({ selector: { deleted_at: { $eq: null } }, sort: [{ updated_at: 'desc' }] })
@@ -48,52 +46,115 @@
 		(db) => db.payment_allocations.find()
 	);
 
-	// ─── Derived data from RxDB stores ──────────────────────────────────
+	// ─── Derived data from RxDB stores (Map-based O(n) joins) ──────────
+
+	// Tenant name→tenant map for O(1) profile picture lookups in LeaseCard
+	let tenantNameMap = $derived.by(() => {
+		const m = new Map<string, any>();
+		for (const t of tenantsStore.value) m.set(t.name, t);
+		return m;
+	});
+
 	let leases = $derived.by(() => {
+		// Build lookup maps once — O(m) per collection
+		const unitMap = new Map<string, any>();
+		for (const u of rentalUnitsStore.value) unitMap.set(String(u.id), u);
+
+		const floorMap = new Map<string, any>();
+		for (const f of floorsStore.value) floorMap.set(String(f.id), f);
+
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+
+		const tenantMap = new Map<string, any>();
+		for (const t of tenantsStore.value) tenantMap.set(String(t.id), t);
+
+		// Group lease_tenants by lease_id
+		const ltByLease = new Map<string, any[]>();
+		for (const lt of leaseTenantsStore.value) {
+			const key = String(lt.lease_id);
+			const arr = ltByLease.get(key);
+			if (arr) arr.push(lt);
+			else ltByLease.set(key, [lt]);
+		}
+
+		// Group billings by lease_id
+		const billByLease = new Map<string, any[]>();
+		for (const b of billingsStore.value) {
+			const key = String(b.lease_id);
+			const arr = billByLease.get(key);
+			if (arr) arr.push(b);
+			else billByLease.set(key, [b]);
+		}
+
+		// Single pass over leases with O(1) lookups
 		return leasesStore.value.map((lease: any) => {
-			const unit = rentalUnitsStore.value.find((u: any) => String(u.id) === String(lease.rental_unit_id));
-			const floor = unit ? floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id)) : null;
-			const property = unit ? propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id)) : null;
+			const leaseId = String(lease.id);
+			const unit = unitMap.get(String(lease.rental_unit_id));
+			const floor = unit ? floorMap.get(String(unit.floor_id)) ?? null : null;
+			const property = unit ? propMap.get(String(unit.property_id)) ?? null : null;
 
-			// Lease tenants
-			const ltDocs = leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(lease.id));
-			const lease_tenants = ltDocs.map((lt: any) => {
-				const tenant = tenantsStore.value.find((t: any) => String(t.id) === String(lt.tenant_id));
-				return tenant ? {
-					tenant: {
-						name: tenant.name,
-						email: tenant.email,
-						contact_number: tenant.contact_number,
-						profile_picture_url: tenant.profile_picture_url
-					}
-				} : null;
-			}).filter(Boolean);
+			// Lease tenants via pre-grouped map
+			const ltDocs = ltByLease.get(leaseId) || [];
+			const lease_tenants = [];
+			const tenantNameParts: string[] = [];
+			for (const lt of ltDocs) {
+				const tenant = tenantMap.get(String(lt.tenant_id));
+				if (tenant) {
+					lease_tenants.push({
+						tenant: {
+							name: tenant.name,
+							email: tenant.email,
+							contact_number: tenant.contact_number,
+							profile_picture_url: tenant.profile_picture_url
+						}
+					});
+					if (tenant.name) tenantNameParts.push(tenant.name.toLowerCase());
+				}
+			}
 
-			// Billings for this lease
-			const leaseBillings = billingsStore.value
-				.filter((b: any) => String(b.lease_id) === String(lease.id))
-				.map((b: any) => ({
+			// Billings via pre-grouped map
+			const rawBillings = billByLease.get(leaseId) || [];
+			const leaseBillings = [];
+			let totalPaid = 0;
+			let totalBalance = 0;
+			for (const b of rawBillings) {
+				const paidAmt = parseFloat(b.paid_amount) || 0;
+				const bal = parseFloat(b.balance) || 0;
+				totalPaid += paidAmt;
+				totalBalance += bal;
+				leaseBillings.push({
 					id: Number(b.id),
 					type: b.type,
 					utility_type: b.utility_type,
 					amount: parseFloat(b.amount) || 0,
-					paid_amount: parseFloat(b.paid_amount) || 0,
-					balance: parseFloat(b.balance) || 0,
+					paid_amount: paidAmt,
+					balance: bal,
 					status: b.status,
 					due_date: b.due_date,
 					billing_date: b.billing_date,
 					penalty_amount: parseFloat(b.penalty_amount) || 0,
 					notes: b.notes
-				}));
+				});
+			}
 
-			// Calculate totals
-			const totalPaid = leaseBillings.reduce((sum: number, b: any) => sum + b.paid_amount, 0);
-			const totalBalance = leaseBillings.reduce((sum: number, b: any) => sum + b.balance, 0);
+			const leaseName = lease.name || `Lease #${lease.id}`;
+			const floorNum = floor?.floor_number || '';
+			const unitNum = unit?.rental_unit_number || '';
+			const propName = property?.name || '';
+
+			// Precompute search text + sort keys once (avoids per-keystroke recomputation)
+			const _searchText = `${leaseName} ${tenantNameParts.join(' ')} ${floorNum} ${unitNum} ${propName}`.toLowerCase();
+			const _sortName = leaseName.toLowerCase();
+			const _startMs = new Date(lease.start_date).getTime();
+			const _updatedMs = lease.updated_at ? new Date(lease.updated_at).getTime() : _startMs;
+			const _floorNum = parseInt(floorNum) || 0;
+			const _unitNum = unitNum;
 
 			return {
 				id: Number(lease.id),
 				rental_unit_id: lease.rental_unit_id,
-				name: lease.name,
+				name: leaseName,
 				start_date: lease.start_date,
 				end_date: lease.end_date,
 				rent_amount: parseFloat(lease.rent_amount) || 0,
@@ -102,16 +163,24 @@
 				terms_month: lease.terms_month,
 				status: lease.status,
 				created_at: lease.created_at,
+				updated_at: lease.updated_at,
 				rental_unit: unit ? {
 					...unit,
 					id: Number(unit.id),
-					floor: floor || null,
-					property: property || null
+					floor,
+					property
 				} : null,
 				lease_tenants,
 				billings: leaseBillings,
 				totalPaid,
-				balance: totalBalance
+				balance: totalBalance,
+				// Precomputed keys for fast search & sort (no allocation in hot paths)
+				_searchText,
+				_sortName,
+				_startMs,
+				_updatedMs,
+				_floorNum,
+				_unitNum,
 			} as any;
 		});
 	});
@@ -124,14 +193,18 @@
 		profile_picture_url: t.profile_picture_url
 	})));
 
-	let rentalUnits = $derived(rentalUnitsStore.value.map((u: any) => {
-		const property = propertiesStore.value.find((p: any) => String(p.id) === String(u.property_id));
-		return {
-			...u,
-			id: Number(u.id),
-			property: property ? { id: Number(property.id), name: property.name } : null
-		};
-	}));
+	let rentalUnits = $derived.by(() => {
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+		return rentalUnitsStore.value.map((u: any) => {
+			const property = propMap.get(String(u.property_id));
+			return {
+				...u,
+				id: Number(u.id),
+				property: property ? { id: Number(property.id), name: property.name } : null
+			};
+		});
+	});
 
 	let isLoading = $derived(!leasesStore.initialized);
 
@@ -146,54 +219,73 @@
 	let showDeleteDialog = $state(false);
 	let leaseToDelete = $state<any>(null);
 
-	// Svelte 5 runes for reactive calculations
-	let leasesWithStatus = $derived.by(() =>
-		leases.map((lease) => ({
-			...lease,
-			balanceStatus: calculateLeaseBalanceStatus(lease)
-		}))
-	);
+	// Single-pass: enrich with status + compute summary metrics together
+	let leasesAndMetrics = $derived.by(() => {
+		let paidInFull = 0;
+		let pendingCount = 0;
+		let partialCount = 0;
+		let overdueCount = 0;
+		let totalPending = 0;
+		let totalPartial = 0;
+		let totalOverdue = 0;
+		let totalBalance = 0;
 
-	// Calculate summary metrics using $derived
-	let summaryMetrics = $derived.by(() => ({
-		totalLeases: leasesWithStatus.length,
-		paidInFull: leasesWithStatus.filter(
-			(l) =>
-				!l.balanceStatus.hasOverdue && !l.balanceStatus.hasPending && !l.balanceStatus.hasPartial
-		).length,
-		pendingCount: leasesWithStatus.filter((l) => l.balanceStatus.hasPending).length,
-		partialCount: leasesWithStatus.filter((l) => l.balanceStatus.hasPartial).length,
-		overdueCount: leasesWithStatus.filter((l) => l.balanceStatus.hasOverdue).length,
-		totalPending: leasesWithStatus.reduce((sum, l) => sum + l.balanceStatus.pendingBalance, 0),
-		totalPartial: leasesWithStatus.reduce((sum, l) => sum + l.balanceStatus.partialBalance, 0),
-		totalOverdue: leasesWithStatus.reduce((sum, l) => sum + l.balanceStatus.overdueBalance, 0),
-		totalBalance: leasesWithStatus.reduce((sum, l) => sum + (l.balance || 0), 0)
-	}));
+		const enriched = leases.map((lease) => {
+			const balanceStatus = calculateLeaseBalanceStatus(lease);
+
+			// Accumulate metrics in the same pass
+			totalBalance += lease.balance || 0;
+			if (balanceStatus.hasOverdue) {
+				overdueCount++;
+				totalOverdue += balanceStatus.overdueBalance;
+			}
+			if (balanceStatus.hasPartial) {
+				partialCount++;
+				totalPartial += balanceStatus.partialBalance;
+			}
+			if (balanceStatus.hasPending) {
+				pendingCount++;
+				totalPending += balanceStatus.pendingBalance;
+			}
+			if (!balanceStatus.hasOverdue && !balanceStatus.hasPending && !balanceStatus.hasPartial) {
+				paidInFull++;
+			}
+
+			return { ...lease, balanceStatus };
+		});
+
+		return {
+			leasesWithStatus: enriched,
+			summaryMetrics: {
+				totalLeases: enriched.length,
+				paidInFull,
+				pendingCount,
+				partialCount,
+				overdueCount,
+				totalPending,
+				totalPartial,
+				totalOverdue,
+				totalBalance
+			}
+		};
+	});
+
+	let leasesWithStatus = $derived(leasesAndMetrics.leasesWithStatus);
+	let summaryMetrics = $derived(leasesAndMetrics.summaryMetrics);
 
 	// Filter leases based on activeFilter
 	let filteredLeases = $derived.by(() => {
-		if (activeFilter === 'all') {
-			return leasesWithStatus;
-		}
+		if (activeFilter === 'all') return leasesWithStatus;
 
 		return leasesWithStatus.filter((lease) => {
-			if (!lease.balanceStatus) return false;
-
+			const s = lease.balanceStatus;
+			if (!s) return false;
 			switch (activeFilter) {
-				case 'paid':
-					return (
-						!lease.balanceStatus.hasOverdue &&
-						!lease.balanceStatus.hasPending &&
-						!lease.balanceStatus.hasPartial
-					);
-				case 'pending':
-					return lease.balanceStatus.hasPending;
-				case 'partial':
-					return lease.balanceStatus.hasPartial;
-				case 'overdue':
-					return lease.balanceStatus.hasOverdue;
-				default:
-					return true;
+				case 'paid': return !s.hasOverdue && !s.hasPending && !s.hasPartial;
+				case 'pending': return s.hasPending;
+				case 'partial': return s.hasPartial;
+				case 'overdue': return s.hasOverdue;
+				default: return true;
 			}
 		});
 	});
@@ -508,6 +600,7 @@
 					leases={filteredLeases}
 					{tenants}
 					{rentalUnits}
+					{tenantNameMap}
 					on:edit={(event) => handleEdit(event.detail)}
 					on:delete={(event) => handleDeleteLease(event.detail)}
 					onStatusChange={handleStatusChange}

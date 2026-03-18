@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { defaults } from 'sveltekit-superforms';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 
 	import PropertyForm from './PropertyForm.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -17,12 +18,9 @@
 	} from '$lib/components/ui/dialog';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { propertySchema, type Property } from './formSchema';
-	import type { PageData } from './$types';
 	import { Plus, Search, Building2 } from 'lucide-svelte';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
-
-	let { data } = $props<{ data: PageData }>();
 
 	// ─── RxDB reactive store ───────────────────────────────────────────
 	const propertiesStore = createRxStore<any>('properties',
@@ -54,7 +52,7 @@
 		errors,
 		constraints,
 		reset
-	} = superForm(data.form, {
+	} = superForm(defaults(zod(propertySchema)), {
 		id: 'property-form',
 		validators: zodClient(propertySchema),
 		validationMethod: 'oninput',
@@ -67,7 +65,7 @@
 				showModal = false;
 				// Optimistic upsert into RxDB — UI updates instantly
 				await optimisticUpsertProperty({
-					id: $formData.id,
+					id: $formData.id!,
 					name: $formData.name,
 					address: $formData.address,
 					type: $formData.type,
@@ -274,7 +272,6 @@
 			</DialogDescription>
 		</DialogHeader>
 		<PropertyForm
-			{data}
 			{editMode}
 			form={formData}
 			{errors}

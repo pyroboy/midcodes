@@ -2,7 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { transactionSchema } from './schema';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 import { cache } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import {
@@ -91,16 +91,6 @@ async function createPaymentManually(transactionData: any, userId: string, form:
 		transaction: { ...payment, allocations: paymentAllocationsToInsert }
 	};
 }
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { user } = locals;
-	if (!user) {
-		throw error(401, 'Unauthorized');
-	}
-
-	const form = await superValidate(zod(transactionSchema));
-	return { form, user };
-};
 
 export const actions: Actions = {
 	upsert: async ({ request, locals }) => {

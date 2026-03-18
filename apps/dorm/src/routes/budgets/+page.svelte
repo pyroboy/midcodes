@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { budgetSchema } from './schema';
 	import { Button } from '$lib/components/ui/button';
 	import { toast } from 'svelte-sonner';
 	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { defaults } from 'sveltekit-superforms';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertBudget, optimisticDeleteBudget } from '$lib/db/optimistic-budgets';
 	import {
@@ -26,7 +26,6 @@
 		Info,
 		CalendarRange
 	} from 'lucide-svelte';
-	import type { PageData } from './$types';
 	import type { Budget, BudgetWithStats, BudgetItem } from './types';
 	import BudgetFormModal from './BudgetFormModal.svelte';
 	import BudgetItemFormModal from './BudgetItemFormModal.svelte';
@@ -42,9 +41,6 @@
 	} from '$lib/components/ui/tooltip';
 
 	import { ChartBar, PieChart, AlertTriangle } from 'lucide-svelte';
-	// Page data using Svelte 5 $props rune
-	let { data } = $props<{ data: PageData }>();
-
 	// RxDB stores
 	const budgetsStore = createRxStore<any>('budgets',
 		(db) => db.budgets.find({ sort: [{ updated_at: 'desc' }] })
@@ -160,7 +156,7 @@
 	}
 
 	// Setup superForm without the problematic transform property
-	const { form, errors, enhance, constraints, submitting, reset } = superForm(data.form, {
+	const { form, errors, enhance, constraints, submitting, reset } = superForm(defaults(zod(budgetSchema)), {
 		validators: zodClient(budgetSchema),
 		resetForm: true,
 		dataType: 'json',

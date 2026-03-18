@@ -1,21 +1,13 @@
-import { fail, error } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import { fail } from '@sveltejs/kit';
+import type { Actions } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { rental_unitSchema } from './formSchema';
-import { cache, cacheKeys } from '$lib/services/cache';
+import { cache } from '$lib/services/cache';
 import { db } from '$lib/server/db';
-import { rentalUnit, properties, floors } from '$lib/server/schema';
+import { rentalUnit } from '$lib/server/schema';
 import { eq, and } from 'drizzle-orm';
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { permissions } = locals;
-	const hasAccess = permissions?.includes('properties.create');
-	if (!hasAccess) throw error(401, 'Unauthorized');
-	const form = await superValidate(zod(rental_unitSchema));
-	return { form };
-};
 
 export const actions: Actions = {
 	create: async ({ request }: RequestEvent) => {

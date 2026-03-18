@@ -9,6 +9,21 @@ import { initializeEnv } from '$lib/server/env';
 
 let _envValidated = false;
 
+// ── Auth cache: avoids 2 Neon round-trips (profile + permissions) on every navigation ──
+// Keyed by userId, TTL 5 minutes. Invalidated on logout.
+const AUTH_CACHE_TTL = 5 * 60 * 1000;
+const authCache = new Map<string, { profile: any; permissions: string[]; effectiveRoles: string[]; org_id: string | undefined; ts: number }>();
+
+function getCachedAuth(userId: string) {
+	const entry = authCache.get(userId);
+	if (!entry) return null;
+	if (Date.now() - entry.ts > AUTH_CACHE_TTL) {
+		authCache.delete(userId);
+		return null;
+	}
+	return entry;
+}
+
 const betterAuthHandle: Handle = async ({ event, resolve }) => {
 	// ── Quick-access bypass (works in dev and production) ──
 	const roleParam = event.url.searchParams.get('dev_role');
@@ -60,14 +75,21 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 		_envValidated = true;
 	}
 
-	// Auth uses lightweight DB (schema-auth.ts) — fast on CF Workers
+	// ── Skip DB round-trip when there's no session cookie ──
+	// Better Auth's default cookie is "better-auth.session_token".
+	// If it's absent, the user is definitely unauthenticated — no need
+	// to make a cold HTTP call to Neon just to confirm that.
+	const hasSessionCookie = event.cookies.get('better-auth.session_token');
+
 	let result: any = null;
-	try {
-		result = await auth.api.getSession({
-			headers: event.request.headers
-		});
-	} catch (e) {
-		console.error('[AUTH] getSession FAILED:', e);
+	if (hasSessionCookie) {
+		try {
+			result = await auth.api.getSession({
+				headers: event.request.headers
+			});
+		} catch (e) {
+			console.error('[AUTH] getSession FAILED:', e);
+		}
 	}
 
 	event.locals.session = result?.session ?? null;
@@ -76,44 +98,64 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 	// Only lazy-load the heavy schema when we have an authenticated user
 	// and need profile/permissions (avoids loading 716-line schema on every request)
 	if (result?.user) {
-		const { db, dbQuery } = await import('$lib/server/db');
-		const { profiles } = await import('$lib/server/schema');
-		const { eq } = await import('drizzle-orm');
-		const { getUserPermissions } = await import('$lib/services/permissions');
+		// ── Check auth cache first (saves 2 Neon round-trips) ──
+		const cached = getCachedAuth(result.user.id);
+		if (cached) {
+			event.locals.org_id = cached.org_id;
+			event.locals.permissions = cached.permissions;
+			event.locals.effectiveRoles = cached.effectiveRoles;
+		} else {
+			const [{ db, dbQuery }, { profiles }, { eq }, { getUserPermissions }] = await Promise.all([
+				import('$lib/server/db'),
+				import('$lib/server/schema'),
+				import('drizzle-orm'),
+				import('$lib/services/permissions')
+			]);
 
-		let userProfile: any = null;
-		try {
-			const [profile] = await dbQuery(
-				() =>
-					db
-						.select()
-						.from(profiles)
-						.where(eq(profiles.id, result.user.id))
-						.limit(1),
-				5000
-			);
-			userProfile = profile;
-		} catch (e) {
-			console.error('[AUTH] Profile fetch FAILED:', e);
-		}
-
-		if (userProfile) {
-			const roles = userProfile.role ? [userProfile.role] : [];
-			const effectiveRoles = roles;
-
-			let permissions: string[] = [];
+			let userProfile: any = null;
 			try {
-				permissions = await dbQuery(
-					() => getUserPermissions(effectiveRoles, userProfile.id),
-					3000
+				const [profile] = await dbQuery(
+					() =>
+						db
+							.select()
+							.from(profiles)
+							.where(eq(profiles.id, result.user.id))
+							.limit(1),
+					5000
 				);
+				userProfile = profile;
 			} catch (e) {
-				console.error('[AUTH] Permissions fetch FAILED:', e);
+				console.error('[AUTH] Profile fetch FAILED:', e);
 			}
 
-			event.locals.org_id = userProfile.orgId ?? undefined;
-			event.locals.permissions = permissions;
-			event.locals.effectiveRoles = effectiveRoles;
+			if (userProfile) {
+				const roles = userProfile.role ? [userProfile.role] : [];
+				const effectiveRoles = roles;
+
+				// ── Run permissions fetch (profile is needed for roles first) ──
+				let permissions: string[] = [];
+				try {
+					permissions = await dbQuery(
+						() => getUserPermissions(effectiveRoles, userProfile.id),
+						3000
+					);
+				} catch (e) {
+					console.error('[AUTH] Permissions fetch FAILED:', e);
+				}
+
+				event.locals.org_id = userProfile.orgId ?? undefined;
+				event.locals.permissions = permissions;
+				event.locals.effectiveRoles = effectiveRoles;
+
+				// ── Cache for subsequent navigations ──
+				authCache.set(result.user.id, {
+					profile: userProfile,
+					permissions,
+					effectiveRoles,
+					org_id: userProfile.orgId ?? undefined,
+					ts: Date.now()
+				});
+			}
 		}
 	}
 
@@ -187,4 +229,27 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle = sequence(betterAuthHandle, securityHeadersHandle, authGuard);
+// ── Request timing logger (dev only) ──
+const timingHandle: Handle = async ({ event, resolve }) => {
+	if (!dev) return resolve(event);
+
+	const start = performance.now();
+	const method = event.request.method;
+	const path = event.url.pathname;
+
+	// Skip noisy requests (HMR, static assets, internal, rxdb replication)
+	if (path.startsWith('/__') || path.startsWith('/node_modules') || path.startsWith('/@') || path.startsWith('/api/rxdb/')) {
+		return resolve(event);
+	}
+
+	const response = await resolve(event);
+	const ms = (performance.now() - start).toFixed(1);
+	const status = response.status;
+	const user = event.locals.user?.email ?? 'anon';
+	const tag = status >= 300 && status < 400 ? '→' : status >= 400 ? '✗' : '•';
+
+	console.log(`  ${tag} ${method} ${path} — ${ms}ms [${status}] (${user})`);
+	return response;
+};
+
+export const handle = sequence(timingHandle, betterAuthHandle, securityHeadersHandle, authGuard);

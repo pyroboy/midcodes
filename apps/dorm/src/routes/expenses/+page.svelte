@@ -1,18 +1,15 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { expenseSchema } from './schema';
 	import { Button } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { toast } from 'svelte-sonner';
 	import { superForm } from 'sveltekit-superforms/client';
-	import type { PageData } from './$types';
+	import { defaults } from 'sveltekit-superforms';
 	import type { Expense } from './types';
 	import ExpenseList from './ExpenseList.svelte';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertExpense, optimisticDeleteExpense } from '$lib/db/optimistic-expenses';
-
-	let { data } = $props<{ data: PageData }>();
 
 	// ── RxDB reactive stores ──────────────────────────────────────────────
 	const expensesStore = createRxStore<any>('expenses',
@@ -40,7 +37,7 @@
 	let isLoading = $derived(!expensesStore.initialized);
 
 	// ── Form setup ────────────────────────────────────────────────────────
-	const { form, errors, enhance, constraints, submitting, reset } = superForm(data.form, {
+	const { form, errors, enhance, constraints, submitting, reset } = superForm(defaults(zod(expenseSchema)), {
 		validators: zodClient(expenseSchema),
 		resetForm: true,
 		onUpdate: ({ form }) => {

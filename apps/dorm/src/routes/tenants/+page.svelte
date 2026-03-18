@@ -16,7 +16,9 @@
 		ChevronRight
 	} from 'lucide-svelte';
 	import type { TenantResponse } from '$lib/types/tenant';
-	import type { PageData } from './$types';
+	import { defaults } from 'sveltekit-superforms';
+	import { zod } from 'sveltekit-superforms/adapters';
+	import { tenantFormSchema } from './formSchema';
 
 	import { Input } from '$lib/components/ui/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -25,8 +27,6 @@
 	import { toast } from 'svelte-sonner';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertTenant, optimisticDeleteTenant } from '$lib/db/optimistic';
-
-	let { data } = $props<{ data: PageData }>();
 
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const tenantsStore = createRxStore<any>('tenants',
@@ -564,7 +564,7 @@
 	open={showModal}
 	tenant={selectedTenant}
 	{editMode}
-	form={data.form}
+	form={defaults(zod(tenantFormSchema))}
 	onOpenChange={handleModalClose}
 	onTenantUpdate={updateTenantInState}
 />

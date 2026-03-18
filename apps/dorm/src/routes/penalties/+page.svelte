@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { defaults } from 'sveltekit-superforms';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { updatePenaltySchema } from './formSchema';
 	import type { PenaltyBilling, PenaltyFilter } from './types';
 	import type { AnyZodObject } from 'zod/v3';
-	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { resyncCollection } from '$lib/db/replication';
@@ -45,8 +45,6 @@
 
 	// Utilities
 	import { formatCurrency } from '$lib/utils/format';
-
-	let { data } = $props<{ data: PageData }>();
 
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const billingsStore = createRxStore<any>('billings',
@@ -217,7 +215,7 @@
 		});
 	});
 
-	const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
+	const { form, enhance, errors, constraints, submitting, reset } = superForm(defaults(zod(updatePenaltySchema)), {
 		id: 'penalty-form',
 		validators: zodClient(updatePenaltySchema as AnyZodObject),
 		validationMethod: 'oninput',

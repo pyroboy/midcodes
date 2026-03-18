@@ -2,7 +2,8 @@
 	import { run } from 'svelte/legacy';
 
 	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { defaults } from 'sveltekit-superforms';
+	import { zod, zodClient } from 'sveltekit-superforms/adapters';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
@@ -24,7 +25,7 @@
 	const dispatch = createEventDispatcher();
 	const rows = 3;
 
-	const { form, errors, enhance, submitting, reset } = superForm(data.form, {
+	const { form, errors, enhance, submitting, reset } = superForm(defaults(zod(paymentSchema)), {
 		id: 'paymentForm',
 		validators: zodClient(paymentSchema),
 		resetForm: true,

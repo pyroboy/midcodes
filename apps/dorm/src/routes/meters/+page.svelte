@@ -19,10 +19,10 @@
 		meterFormSchema
 	} from './formSchema';
 	import { Loader2, Plus, Gauge } from 'lucide-svelte';
-	import type { PageData } from './$types';
 	import MeterForm from './MeterForm.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { defaults } from 'sveltekit-superforms';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
 
@@ -95,9 +95,6 @@
 		name: string;
 		meters: ExtendedMeterFormData[];
 	}
-
-	// Component state with Svelte 5 reactive primitives
-	let { data } = $props<{ data: PageData }>();
 
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const metersStore = createRxStore<any>('meters',
@@ -299,7 +296,7 @@
 	let groupedMeters = $derived(groupMeters());
 
 	// Form handling
-	const { form, enhance, errors, constraints, submitting, reset, message } = superForm(data.form, {
+	const { form, enhance, errors, constraints, submitting, reset, message } = superForm(defaults(zod(meterFormSchema)), {
 		id: 'meter-form',
 		validators: zodClient(meterFormSchema),
 		validationMethod: 'oninput',
@@ -336,7 +333,7 @@
 						is_active: $form.status === 'ACTIVE',
 						status: $form.status,
 						notes: $form.notes,
-						initial_reading: $form.initial_reading
+						initial_reading: String($form.initial_reading)
 					});
 				}
 

@@ -2,20 +2,10 @@ import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { budgetSchema } from './schema';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 import { db } from '$lib/server/db';
 import { budgets } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-
-
-// Use Node runtime; avoid ISR on authed routes to prevent cache/redirect issues
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { user } = locals;
-	if (!user) throw error(401, 'Unauthorized');
-	const form = await superValidate(zod(budgetSchema));
-	return { form, user };
-};
 
 export const actions: Actions = {
 	upsert: async ({ request, locals }) => {

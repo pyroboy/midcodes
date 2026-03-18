@@ -1,19 +1,11 @@
-import { fail, error } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { updatePenaltySchema } from './formSchema';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 import { db } from '$lib/server/db';
 import { billings } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { user } = locals;
-	if (!user) throw error(401, 'Unauthorized');
-	return {
-		form: await superValidate(zod(updatePenaltySchema))
-	};
-};
 
 export const actions: Actions = {
 	updatePenalty: async ({ request, locals }) => {

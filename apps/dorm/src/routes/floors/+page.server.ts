@@ -1,23 +1,11 @@
-import { fail, error } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { floorSchema } from './formSchema';
-import type { Actions, PageServerLoad, RequestEvent } from './$types';
+import type { Actions, RequestEvent } from './$types';
 import { db } from '$lib/server/db';
-import { floors, properties } from '$lib/server/schema';
+import { floors } from '$lib/server/schema';
 import { eq, and, ne } from 'drizzle-orm';
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { permissions } = locals;
-	const hasAccess = permissions?.includes('properties.create');
-
-	if (!hasAccess) {
-		throw error(401, 'Unauthorized');
-	}
-
-	const form = await superValidate(zod(floorSchema));
-	return { form };
-};
 
 // Declare - Actions
 

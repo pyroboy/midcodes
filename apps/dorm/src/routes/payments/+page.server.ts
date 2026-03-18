@@ -18,35 +18,19 @@ import { payments, billings, profiles, leases, rentalUnit, floors, properties, u
 import { eq, desc, asc, inArray, isNull } from 'drizzle-orm';
 
 export const load = async ({ locals }) => {
-	const { user } = locals;
+	const { user, effectiveRoles } = locals;
 	if (!user) throw error(401, 'Unauthorized');
 
-	// Fetch user role - this must stay server-side
-	const profileResult = await db
-		.select({ role: profiles.role })
-		.from(profiles)
-		.where(eq(profiles.id, user.id))
-		.limit(1);
-	const userRole = profileResult[0];
-
-	const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
-	const isAccountant = userRole?.role === 'property_accountant';
-	const isUtility = userRole?.role === 'property_utility';
-	const isFrontdesk = userRole?.role === 'property_frontdesk';
-	const isResident = userRole?.role === 'property_tenant';
-
-	const form = await superValidate(zod(paymentSchema));
-	const transactionForm = await superValidate(zod(transactionSchema));
+	// Role flags derived from cached effectiveRoles (no DB call needed)
+	const role = effectiveRoles?.[0] || 'user';
 
 	return {
-		form,
-		transactionForm,
-		userRole: userRole?.role || 'user',
-		isAdminLevel,
-		isAccountant,
-		isUtility,
-		isFrontdesk,
-		isResident
+		userRole: role,
+		isAdminLevel: ['super_admin', 'property_admin'].includes(role),
+		isAccountant: role === 'property_accountant',
+		isUtility: role === 'property_utility',
+		isFrontdesk: role === 'property_frontdesk',
+		isResident: role === 'property_tenant'
 	};
 };
 

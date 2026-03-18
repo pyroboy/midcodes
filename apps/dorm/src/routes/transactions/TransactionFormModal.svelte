@@ -7,7 +7,6 @@
 	import { Label } from '$lib/components/ui/label';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import { Receipt, Wallet, DollarSign, X } from 'lucide-svelte';
-	import type { PageData } from './$types';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { z } from 'zod/v3';
 	import { transactionSchema, paymentMethodEnum } from './schema';
@@ -69,7 +68,7 @@
         onCancel
     } = $props<{
 		open?: boolean;
-		data: PageData;
+		data: { form: any };
 		editMode?: boolean;
         transaction?: Transaction | null;
         onClose?: () => void;
@@ -88,7 +87,7 @@
 		billing_ids: []
 	};
 	
-	const { form, errors, enhance, constraints, submitting } = superForm(data.form, {
+	const { form, errors, enhance, constraints, submitting } = superForm((() => data.form)(), {
 		validators: zodClient(transactionSchema),
 		resetForm: true,
 		onSubmit: ({ formData, cancel }) => {

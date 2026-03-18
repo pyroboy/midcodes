@@ -4,7 +4,8 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { defaults } from 'sveltekit-superforms';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { floorSchema } from './formSchema';
 	import * as Accordion from '$lib/components/ui/accordion';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -14,8 +15,6 @@
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertFloor, optimisticDeleteFloor } from '$lib/db/optimistic-floors';
 	import { Layers, Plus, Search, Pencil, Trash2 } from 'lucide-svelte';
-
-	let { data } = $props();
 
 	let editMode = $state(false);
 	let showModal = $state(false);
@@ -82,7 +81,7 @@
 		errors,
 		constraints,
 		reset
-	} = superForm(data.form, {
+	} = superForm(defaults(zod(floorSchema)), {
 		id: 'floor-form',
 		validators: zodClient(floorSchema),
 		validationMethod: 'oninput',
@@ -321,7 +320,6 @@
 			</Dialog.Description>
 		</Dialog.Header>
 		<FloorForm
-			{data}
 			{editMode}
 			form={formData}
 			{errors}

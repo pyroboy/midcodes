@@ -10,15 +10,13 @@
 	import * as Accordion from '$lib/components/ui/accordion';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { defaults } from 'sveltekit-superforms';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from './formSchema';
 	import { Pencil, Trash2, Users, Tag, List, Plus, Search, Home, Building2 } from 'lucide-svelte';
-	import type { PageData } from './$types';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
 	import { resyncCollection } from '$lib/db/replication';
-
-	let { data } = $props<{ data: PageData }>();
 
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const rentalUnitsStore = createRxStore<any>('rental_units',
@@ -88,7 +86,7 @@
 	);
 
 	// Build data object for the form component (it reads data.floors)
-	let formData_passthrough = $derived({ ...data, floors, properties });
+	let formData_passthrough = $derived({ floors, properties });
 
 	// Form Logic
 	const {
@@ -97,7 +95,7 @@
 		errors,
 		constraints,
 		reset
-	} = superForm(data.form, {
+	} = superForm(defaults(zod(rental_unitSchema)), {
 		id: 'rental-unit-form',
 		validators: zodClient(rental_unitSchema),
 		validationMethod: 'oninput',
@@ -116,8 +114,8 @@
 						capacity: d.capacity,
 						rental_unit_status: d.rental_unit_status,
 						base_rate: String(d.base_rate),
-						property_id: d.property_id,
-						floor_id: d.floor_id,
+						property_id: d.property_id ?? 0,
+						floor_id: d.floor_id ?? 0,
 						type: d.type,
 						amenities: d.amenities
 					});

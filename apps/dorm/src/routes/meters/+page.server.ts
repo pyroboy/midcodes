@@ -1,20 +1,10 @@
-import { error, fail } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { meterSchema } from './formSchema';
 import { db } from '$lib/server/db';
 import { meters, floors, rentalUnit, readings, profiles } from '$lib/server/schema';
 import { eq, and, ne } from 'drizzle-orm';
-
-export const load = async ({ locals }) => {
-	const { user } = locals;
-	if (!user) {
-		throw error(401, 'Unauthorized');
-	}
-
-	const form = await superValidate(zod(meterSchema));
-	return { form };
-};
 
 export const actions = {
 	create: async ({ request, locals }) => {

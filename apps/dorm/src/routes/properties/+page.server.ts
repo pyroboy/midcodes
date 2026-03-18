@@ -1,29 +1,12 @@
-import { fail, error } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
-import type { PageServerLoad, Actions, RequestEvent } from './$types';
+import type { Actions, RequestEvent } from './$types';
 import { zod } from 'sveltekit-superforms/adapters';
 import { propertySchema, preparePropertyData } from './formSchema';
 import { cache } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import { properties } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { permissions } = locals;
-
-	// Log the current user's permissions for this page load.
-	console.log('[Properties Page] Current user permissions:', permissions);
-
-	// Perform the page-specific permission check.
-	const hasAccess = permissions?.includes('properties.read');
-	if (!hasAccess) {
-		throw error(403, 'Forbidden: You do not have permission to view properties.');
-	}
-
-	return {
-		form: await superValidate(zod(propertySchema))
-	};
-};
 
 // --- ACTIONS ---
 

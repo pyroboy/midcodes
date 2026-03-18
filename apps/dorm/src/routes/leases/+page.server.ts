@@ -1,23 +1,15 @@
 import { fail, error } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { leaseSchema, deleteLeaseSchema, leaseSchemaWithValidation } from './formSchema';
+import { leaseSchemaWithValidation } from './formSchema';
 import { securityDepositSchema } from './securityDepositSchema';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 import { db } from '$lib/server/db';
 import {
-	leases, rentalUnit, floors, properties, leaseTenants, tenants,
-	billings, paymentAllocations, payments
+	leases, leaseTenants,
+	billings, paymentAllocations
 } from '$lib/server/schema';
-import { eq, and, desc, asc, isNull, inArray, gte, lte, sql, isNotNull } from 'drizzle-orm';
-
-export const load: PageServerLoad = async ({ locals }) => {
-	const { user } = locals;
-	if (!user) throw error(401, 'Unauthorized');
-	const form = await superValidate(zod(leaseSchema));
-	const deleteForm = await superValidate(zod(deleteLeaseSchema));
-	return { form, deleteForm };
-};
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {

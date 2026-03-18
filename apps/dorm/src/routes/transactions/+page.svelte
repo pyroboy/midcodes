@@ -7,16 +7,17 @@
 	import { Label } from '$lib/components/ui/label';
 	import { toast } from 'svelte-sonner';
 	import { superForm } from 'sveltekit-superforms/client';
-	import type { PageData } from './$types';
+	import { defaults } from 'sveltekit-superforms';
 	import type { Transaction } from './types';
 	import TransactionList from './TransactionList.svelte';
 	import TransactionFormModal from './TransactionFormModal.svelte';
 	import TransactionDetailsModal from './TransactionDetailsModal.svelte';
-	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { resyncCollection } from '$lib/db/replication';
 
-	let { data } = $props<{ data: PageData }>();
+	// ─── Form defaults (no server load, so we create client-side) ────
+	const formDefaults = { form: defaults(zod(transactionSchema)) };
 
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const paymentsStore = createRxStore<any>('payments',
@@ -121,7 +122,7 @@
 	let isLoading = $derived(!paymentsStore.initialized);
 
 	// Form for adding/editing transactions
-	const { form, errors, enhance, constraints, submitting, reset } = superForm(data.form, {
+	const { form, errors, enhance, constraints, submitting, reset } = superForm(defaults(zod(transactionSchema)), {
 		validators: zodClient(transactionSchema),
 		resetForm: true,
 		onUpdate: ({ form }) => {
@@ -387,7 +388,7 @@
 	{#if showFormModal}
 		<TransactionFormModal
 			open={showFormModal}
-			{data}
+			data={formDefaults}
 			editMode={!!selectedTransaction}
 			transaction={selectedTransaction}
 			onClose={handleCloseFormModal}

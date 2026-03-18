@@ -1,11 +1,12 @@
 <script lang="ts">
 	// Main page script for utility billings
 	import { superForm } from 'sveltekit-superforms/client';
+	import { defaults } from 'sveltekit-superforms';
+	import { zod } from 'sveltekit-superforms/adapters';
 	import { Button } from '$lib/components/ui/button';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Check, RefreshCw, Download, BarChart } from 'lucide-svelte';
 	import { tick } from 'svelte';
-	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
 
 	// Import components
@@ -40,9 +41,6 @@
 	// RxDB local-first imports
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { resyncUtilityData } from '$lib/db/optimistic-utility-billings';
-
-	// Props
-	let { data } = $props<{ data: PageData }>();
 
 	// ─── RxDB reactive stores ───────────────────────────────────────────
 	const propertiesStore = createRxStore<any>('properties',
@@ -182,7 +180,7 @@
 	});
 
 	// Form handling
-	const { form, errors, enhance, delayed, message } = superForm(data.form ?? {}, {
+	const { form, errors, enhance, delayed, message } = superForm(defaults(zod(batchReadingsSchema)), {
 		resetForm: true,
 		onResult: ({ result }) => {
 			if (result.type === 'success') {
@@ -241,9 +239,9 @@
 
 	// Initialize form data
 	$effect(() => {
-		$form.cost_per_unit = readingEntry.costPerUnit;
-		$form.property_id = selectedProperty?.id.toString();
-		$form.type = filters.type;
+		($form as any).cost_per_unit = readingEntry.costPerUnit;
+		($form as any).property_id = selectedProperty?.id.toString();
+		$form.type = filters.type as typeof $form.type;
 		$form.reading_date = readingEntry.readingDate;
 	});
 
@@ -409,9 +407,9 @@
 
 		// Update the form state with the latest data from the modal
 		$form.readings_json = JSON.stringify(readings);
-		$form.cost_per_unit = costPerUnit;
+		($form as any).cost_per_unit = costPerUnit;
 		$form.reading_date = readingDate;
-		$form.type = filters.type;
+		$form.type = filters.type as typeof $form.type;
 
 		console.log('Form data being submitted:', $form);
 		console.log('Form readings_json:', $form.readings_json);
@@ -438,7 +436,7 @@
 	}
 
 	// Get utility billing types from data
-	import { utilityBillingTypeEnum } from './meterReadingSchema';
+	import { utilityBillingTypeEnum, batchReadingsSchema } from './meterReadingSchema';
 </script>
 
 <div class="container mx-auto py-6">
@@ -521,7 +519,7 @@
 
 	<form method="POST" action="?/addBatchReadings" use:enhance>
 		<input type="hidden" name="type" bind:value={$form.type} />
-		<input type="hidden" name="cost_per_unit" bind:value={$form.cost_per_unit} />
+		<input type="hidden" name="cost_per_unit" bind:value={($form as any).cost_per_unit} />
 		<input type="hidden" name="reading_date" bind:value={$form.reading_date} />
 		<input type="hidden" name="readings_json" bind:value={$form.readings_json} />
 		{#if modals.reading && selectedProperty}
@@ -535,7 +533,7 @@
 				costPerUnit={readingEntry.costPerUnit}
 				onSave={handleSaveReadings}
 				close={() => (modals.reading = false)}
-				form={data.form}
+				form={defaults(zod(batchReadingsSchema))}
 			/>
 		{/if}
 	</form>
