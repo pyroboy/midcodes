@@ -5,6 +5,7 @@
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import { Loader2 } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
+	import { goto, invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -44,8 +45,10 @@
 			}
 
 			// Better Auth sets session cookie via Set-Cookie header automatically.
-			// Full page reload to pick up the new session in hooks.
-			window.location.href = '/';
+			// Invalidate all server data so hooks re-run with the new cookie,
+			// then navigate client-side (no full page reload needed).
+			await invalidateAll();
+			await goto('/');
 		} catch (err: any) {
 			loginError = err?.message || 'Something went wrong';
 			toast.error('Login Failed', { description: loginError });
@@ -102,19 +105,19 @@
 	<div class="mt-6 space-y-2">
 		<p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick Access</p>
 		<div class="grid grid-cols-2 gap-2">
-			<a href="/?dev_role=super_admin" class="rounded-lg border-2 border-red-200 bg-red-50 px-3 py-2 text-left hover:border-red-400 transition-colors">
+			<a href="/?dev_role=super_admin" data-sveltekit-reload class="rounded-lg border-2 border-red-200 bg-red-50 px-3 py-2 text-left hover:border-red-400 transition-colors">
 				<div class="font-semibold text-sm text-red-900">Super Admin</div>
 				<div class="text-xs text-red-600">Full access</div>
 			</a>
-			<a href="/?dev_role=property_admin" class="rounded-lg border-2 border-orange-200 bg-orange-50 px-3 py-2 text-left hover:border-orange-400 transition-colors">
+			<a href="/?dev_role=property_admin" data-sveltekit-reload class="rounded-lg border-2 border-orange-200 bg-orange-50 px-3 py-2 text-left hover:border-orange-400 transition-colors">
 				<div class="font-semibold text-sm text-orange-900">Property Admin</div>
 				<div class="text-xs text-orange-600">Manage all</div>
 			</a>
-			<a href="/?dev_role=property_manager" class="rounded-lg border-2 border-blue-200 bg-blue-50 px-3 py-2 text-left hover:border-blue-400 transition-colors">
+			<a href="/?dev_role=property_manager" data-sveltekit-reload class="rounded-lg border-2 border-blue-200 bg-blue-50 px-3 py-2 text-left hover:border-blue-400 transition-colors">
 				<div class="font-semibold text-sm text-blue-900">Manager</div>
 				<div class="text-xs text-blue-600">Operations</div>
 			</a>
-			<a href="/?dev_role=property_tenant" class="rounded-lg border-2 border-green-200 bg-green-50 px-3 py-2 text-left hover:border-green-400 transition-colors">
+			<a href="/?dev_role=property_tenant" data-sveltekit-reload class="rounded-lg border-2 border-green-200 bg-green-50 px-3 py-2 text-left hover:border-green-400 transition-colors">
 				<div class="font-semibold text-sm text-green-900">Tenant</div>
 				<div class="text-xs text-green-600">Read-only</div>
 			</a>

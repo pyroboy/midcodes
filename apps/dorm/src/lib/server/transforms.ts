@@ -80,7 +80,7 @@ export function transformRentalUnit(row: any) {
 		property_id: row.propertyId,
 		floor_id: row.floorId,
 		type: row.type,
-		amenities: row.amenities ?? null,
+		amenities: (row.amenities && (Array.isArray(row.amenities) ? row.amenities.length > 0 : Object.keys(row.amenities).length > 0)) ? row.amenities : null,
 		number: row.number
 	};
 }

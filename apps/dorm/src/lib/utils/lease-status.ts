@@ -38,60 +38,71 @@ export function calculateLeaseBalanceStatus(lease: Lease): LeaseBalanceStatus {
 		};
 	}
 
-	const today = new Date();
-	
-	// Separate regular billings from utility billings
-	const regularBillings = lease.billings.filter((b) => b.type !== 'UTILITY');
-	const utilityBillings = lease.billings.filter((b) => b.type === 'UTILITY');
-	
-	// Regular billings
-	const overdueBillings = regularBillings.filter(
-		(b) => b.status === 'OVERDUE' || b.status === 'PENALIZED'
-	);
-	const pendingBillings = regularBillings.filter((b) => b.status === 'PENDING');
-	const partialBillings = regularBillings.filter((b) => b.status === 'PARTIAL');
-	
-	// Utility billings
-	const utilityOverdueBillings = utilityBillings.filter(
-		(b) => b.status === 'OVERDUE' || b.status === 'PENALIZED'
-	);
-	const utilityPendingBillings = utilityBillings.filter((b) => b.status === 'PENDING');
-	const utilityPartialBillings = utilityBillings.filter((b) => b.status === 'PARTIAL');
+	const today = Date.now();
+	let overdueBalance = 0;
+	let pendingBalance = 0;
+	let partialBalance = 0;
+	let utilityOverdueBalance = 0;
+	let utilityPendingBalance = 0;
+	let utilityPartialBalance = 0;
+	let earliestPendingDueMs = Infinity;
+	let earliestPendingDue: string | null = null;
+	let oldestOverdueDueMs = Infinity;
 
-	// Calculate next due date from pending billings
-	const nextDueDate =
-		pendingBillings.length > 0
-			? pendingBillings.sort(
-					(a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
-				)[0].due_date
-			: null;
+	// Single pass over all billings
+	for (const b of lease.billings) {
+		const isUtility = b.type === 'UTILITY';
+		const isOverdue = b.status === 'OVERDUE' || b.status === 'PENALIZED';
+		const isPending = b.status === 'PENDING';
+		const isPartial = b.status === 'PARTIAL';
 
-	// Calculate days overdue
-	const oldestOverdue = overdueBillings.sort(
-		(a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
-	)[0];
-	const daysOverdue = oldestOverdue
-		? Math.floor(
-				(today.getTime() - new Date(oldestOverdue.due_date).getTime()) / (1000 * 60 * 60 * 24)
-			)
+		if (isOverdue) {
+			if (isUtility) {
+				utilityOverdueBalance += b.balance;
+			} else {
+				overdueBalance += b.balance;
+				const dueMs = new Date(b.due_date).getTime();
+				if (dueMs < oldestOverdueDueMs) oldestOverdueDueMs = dueMs;
+			}
+		} else if (isPending) {
+			if (isUtility) {
+				utilityPendingBalance += b.balance;
+			} else {
+				pendingBalance += b.balance;
+				const dueMs = new Date(b.due_date).getTime();
+				if (dueMs < earliestPendingDueMs) {
+					earliestPendingDueMs = dueMs;
+					earliestPendingDue = b.due_date;
+				}
+			}
+		} else if (isPartial) {
+			if (isUtility) {
+				utilityPartialBalance += b.balance;
+			} else {
+				partialBalance += b.balance;
+			}
+		}
+	}
+
+	const daysOverdue = oldestOverdueDueMs < Infinity
+		? Math.floor((today - oldestOverdueDueMs) / 86400000)
 		: 0;
 
 	return {
-		hasOverdue: overdueBillings.length > 0,
-		hasPending: pendingBillings.length > 0,
-		hasPartial: partialBillings.length > 0,
-		overdueBalance: overdueBillings.reduce((sum, b) => sum + b.balance, 0),
-		pendingBalance: pendingBillings.reduce((sum, b) => sum + b.balance, 0),
-		partialBalance: partialBillings.reduce((sum, b) => sum + b.balance, 0),
-		nextDueDate,
+		hasOverdue: overdueBalance > 0,
+		hasPending: pendingBalance > 0,
+		hasPartial: partialBalance > 0,
+		overdueBalance,
+		pendingBalance,
+		partialBalance,
+		nextDueDate: earliestPendingDue,
 		daysOverdue,
-		// Utility billing status
-		hasUtilityOverdue: utilityOverdueBillings.length > 0,
-		hasUtilityPending: utilityPendingBillings.length > 0,
-		hasUtilityPartial: utilityPartialBillings.length > 0,
-		utilityOverdueBalance: utilityOverdueBillings.reduce((sum, b) => sum + b.balance, 0),
-		utilityPendingBalance: utilityPendingBillings.reduce((sum, b) => sum + b.balance, 0),
-		utilityPartialBalance: utilityPartialBillings.reduce((sum, b) => sum + b.balance, 0)
+		hasUtilityOverdue: utilityOverdueBalance > 0,
+		hasUtilityPending: utilityPendingBalance > 0,
+		hasUtilityPartial: utilityPartialBalance > 0,
+		utilityOverdueBalance,
+		utilityPendingBalance,
+		utilityPartialBalance
 	};
 }
 

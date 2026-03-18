@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [sveltekit()],
   ssr: {
-    external: ['@supabase/postgrest-js', 'style-to-object', 'runed'], // exclude problematic packages from SSR
+    external: ['style-to-object', 'runed'],
     noExternal: []
   },
 	server: {
@@ -17,12 +17,10 @@ export default defineConfig({
 	},
 	optimizeDeps: {
 		exclude: [
-			'@supabase/supabase-js',
-			'lucide-svelte',
 			'svelte-sonner',
 			'mode-watcher'
 		],
-		include: ['style-to-object', '@supabase/postgrest-js'] // pre-bundle for the browser
+		include: ['style-to-object', 'lucide-svelte']
 	},
 	define: {
 		global: 'globalThis'

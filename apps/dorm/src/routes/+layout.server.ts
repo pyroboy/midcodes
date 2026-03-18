@@ -1,31 +1,25 @@
 // src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
-import { dev } from '$app/environment';
-import { isDbAvailable, DEV_PROPERTIES } from '$lib/server/dev-bypass';
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { session, user, permissions } = locals;
 
 	depends('app:cache');
 
-	// Dev bypass — no DB, return mock data
-	if (dev && !isDbAvailable()) {
-		return {
-			session,
-			user,
-			permissions,
-			properties: user ? DEV_PROPERTIES : []
-		};
+	// No user → skip all heavy imports (schema, db, drizzle, cache)
+	if (!user) {
+		return { session, user, permissions, properties: [] };
 	}
 
-	// Normal DB flow
-	const { cache, cacheKeys, CACHE_TTL } = await import('$lib/services/cache');
-	const { db } = await import('$lib/server/db');
-	const { properties } = await import('$lib/server/schema');
-	const { eq, asc } = await import('drizzle-orm');
+	// Normal DB flow (only for authenticated users) — parallel imports
+	const [{ cache, cacheKeys, CACHE_TTL }, { db }, { properties }, { eq, asc }] = await Promise.all([
+		import('$lib/services/cache'),
+		import('$lib/server/db'),
+		import('$lib/server/schema'),
+		import('drizzle-orm')
+	]);
 
 	const fetchProperties = async () => {
-		if (!user) return [];
 
 		const cacheKey = cacheKeys.activeProperties();
 		const cached = cache.get<any[]>(cacheKey);

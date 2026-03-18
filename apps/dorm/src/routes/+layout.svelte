@@ -40,7 +40,8 @@
 		Box,
 		X,
 		ChevronRight,
-		Lightbulb
+		Lightbulb,
+		MapPin
 	} from 'lucide-svelte';
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 
@@ -49,42 +50,63 @@
 	let ready = $state(false);
 	let isAuthRoute = $state(false);
 	let show3DModel = $state(false);
+	let rxdbInitialized = false;
 
 	onMount(() => {
 		ready = true;
+	});
+
+	// Track auth route reactively — $effect doesn't run during SSR,
+	// avoiding bits-ui Tabs setContext SSR crash on the auth page
+	$effect(() => {
 		isAuthRoute = $page.url.pathname.startsWith('/auth');
+	});
 
-		// Subscribe to page changes to update auth route status
-		const unsubscribe = page.subscribe(($page) => {
-			isAuthRoute = $page.url.pathname.startsWith('/auth');
+	// Initialize RxDB reactively — triggers on login (including client-side goto from auth page)
+	// Using $effect instead of onMount so it fires when data.user changes from null → user
+	$effect(() => {
+		if (!data.user || rxdbInitialized) return;
+		rxdbInitialized = true;
+
+		import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+			syncStatus.setPhase('initializing');
+			syncStatus.checkNeonHealth();
 		});
-
-		// Initialize RxDB for authenticated users (lazy import — never loaded on server or for guests)
-		if (data.user) {
+		import('$lib/db').then(({ getDb }) => {
 			import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-				syncStatus.setPhase('initializing');
-				// Kick off Neon health check in parallel
-				syncStatus.checkNeonHealth();
+				syncStatus.setRxdbHealth('checking', 'Opening RxDB...');
 			});
-			import('$lib/db').then(({ getDb }) => {
+			return getDb().then((db) => {
 				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-					syncStatus.setRxdbHealth('checking', 'Opening RxDB...');
+					syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
 				});
-				return getDb().then((db) => {
-					import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-						syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
-					});
-					return import('$lib/db/replication').then(({ startSync }) => startSync(db));
-				});
-			}).catch((err) => {
-				console.error('[RxDB] Init failed:', err);
-				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-					syncStatus.setRxdbHealth('error', undefined, err);
-				});
+				return import('$lib/db/replication').then(({ startSync }) => startSync(db));
 			});
-		}
+		}).catch(async (err) => {
+			console.error('[RxDB] Init failed:', err);
+			const { syncStatus } = await import('$lib/stores/sync-status.svelte');
 
-		return unsubscribe;
+			const isSchemaError = err?.code === 'DB6' ||
+				err?.message?.includes('different schema') ||
+				err?.message?.includes('Error code: DB6');
+
+			if (isSchemaError) {
+				syncStatus.addLog('Schema mismatch detected — auto-clearing IndexedDB...', 'warn');
+				try {
+					const dbs = await indexedDB.databases();
+					for (const d of dbs) {
+						if (d.name) indexedDB.deleteDatabase(d.name);
+					}
+					syncStatus.addLog('IndexedDB cleared — reloading...', 'info');
+					location.reload();
+					return;
+				} catch (clearErr) {
+					syncStatus.addLog(`Auto-clear failed: ${clearErr}`, 'error');
+				}
+			}
+
+			syncStatus.setRxdbHealth('error', undefined, err);
+		});
 	});
 
 	// Enhanced hover preloading for navigation sections
@@ -134,16 +156,14 @@
 		}
 	});
 
+	const locationLinks = [
+		{ href: '/locations/properties', label: 'Properties', icon: Building2 },
+		{ href: '/locations/units', label: 'Units', icon: Home },
+		{ href: '/locations/floors', label: 'Floors', icon: Layers },
+		{ href: '/locations/meters', label: 'Meters', icon: Gauge }
+	];
+
 	const navigationLinks = [
-		{
-			category: 'Locations',
-			links: [
-				{ href: '/properties', label: 'Properties', icon: Building2 },
-				{ href: '/rental-unit', label: 'Rental Units', icon: Home },
-				{ href: '/floors', label: 'Floors', icon: Layers },
-				{ href: '/meters', label: 'Meters', icon: Gauge }
-			]
-		},
 		{
 			category: 'Rent Management',
 			links: [
@@ -250,6 +270,62 @@
 								</a>
 							</Sidebar.Menu>
 
+							<!-- Locations section -->
+							<Sidebar.Menu class="px-2 mb-1">
+								<a
+									href="/locations"
+									class="block no-underline"
+									data-sveltekit-preload-data="hover"
+								>
+									<Sidebar.MenuItem>
+										<Sidebar.MenuButton
+											class={cn(
+												"transition-colors",
+												$page.url.pathname.startsWith('/locations')
+													? "bg-primary/10 text-primary font-medium"
+													: "hover:bg-muted"
+											)}
+										>
+											<MapPin class={cn(
+												"h-5 w-5",
+												$page.url.pathname.startsWith('/locations')
+													? "text-primary"
+													: "text-muted-foreground"
+											)} />
+											<span>Locations</span>
+										</Sidebar.MenuButton>
+									</Sidebar.MenuItem>
+								</a>
+								{#if $page.url.pathname.startsWith('/locations')}
+									{#each locationLinks as link (link.href)}
+										<a
+											href={link.href}
+											class="block no-underline"
+											data-sveltekit-preload-data="hover"
+										>
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton
+													class={cn(
+														"transition-colors pl-7",
+														$page.url.pathname.startsWith(link.href)
+															? "bg-primary/10 text-primary font-medium"
+															: "hover:bg-muted"
+													)}
+												>
+													<link.icon class={cn(
+														"h-4 w-4",
+														$page.url.pathname.startsWith(link.href)
+															? "text-primary"
+															: "text-muted-foreground"
+													)} />
+													<span>{link.label}</span>
+												</Sidebar.MenuButton>
+											</Sidebar.MenuItem>
+										</a>
+									{/each}
+								{/if}
+							</Sidebar.Menu>
+
 							<div class="px-4 mb-2">
 								<div class="border-t"></div>
 							</div>
@@ -317,6 +393,7 @@
 										href="/auth/signout"
 										class="flex items-center gap-2 rounded-lg px-2 py-2 mt-1 text-sm text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors group-data-[collapsible=icon]:justify-center"
 										data-sveltekit-preload-data="off"
+										data-sveltekit-reload
 									>
 										<LogOut class="h-4 w-4" />
 										<span class="group-data-[collapsible=icon]:hidden">Sign out</span>

@@ -39,6 +39,7 @@
 		lease: Lease & { balanceStatus?: any };
 		tenants?: any[];
 		rentalUnits?: any[];
+		tenantNameMap?: Map<string, any>;
 		onLeaseClick: (lease: Lease) => void;
 		onDelete: (event: Event, lease: Lease) => void;
 		onStatusChange: (id: string, status: string) => void;
@@ -49,6 +50,7 @@
 		lease,
 		tenants = [],
 		rentalUnits = [],
+		tenantNameMap = new Map(),
 		onLeaseClick,
 		onDelete,
 		onStatusChange,
@@ -66,30 +68,13 @@
 	let showActionsPopover = $state(false);
 	let isMobile = $state(false);
 
-	// Mobile detection and scroll handling
+	// Use matchMedia instead of N resize listeners — single shared query
 	onMount(() => {
-		const checkMobile = () => {
-			isMobile = window.innerWidth < 768;
-		};
-
-		checkMobile();
-		window.addEventListener('resize', checkMobile);
-
-		// Close popover on scroll when on mobile
-		const handleScroll = () => {
-			if (isMobile && showActionsPopover) {
-				showActionsPopover = false;
-			}
-		};
-
-		window.addEventListener('scroll', handleScroll, { passive: true });
-		document.addEventListener('scroll', handleScroll, { passive: true });
-
-		return () => {
-			window.removeEventListener('resize', checkMobile);
-			window.removeEventListener('scroll', handleScroll);
-			document.removeEventListener('scroll', handleScroll);
-		};
+		const mq = window.matchMedia('(max-width: 767px)');
+		isMobile = mq.matches;
+		const handler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
+		mq.addEventListener('change', handler);
+		return () => mq.removeEventListener('change', handler);
 	});
 
 	async function handlePaymentModalClose() {
@@ -137,28 +122,20 @@
 		);
 	});
 
-	// Get the most recent billing date when all billings are paid
+	// Get the most recent billing date when all billings are paid (single pass)
 	let lastPaidDate = $derived.by(() => {
-		if (!lease.billings || lease.billings.length === 0) return null;
+		const billings = lease.billings;
+		if (!billings || billings.length === 0) return null;
 
-		// Check if all billings are fully paid
-		const allPaid = lease.billings.every((b) => {
+		let latestMs = 0;
+		for (let i = 0; i < billings.length; i++) {
+			const b = billings[i];
 			const totalDue = b.amount + (b.penalty_amount || 0);
-			return b.paid_amount >= totalDue;
-		});
-
-		if (!allPaid) return null;
-
-		// Find the most recent billing date from fully paid billings
-		const paidBillings = lease.billings
-			.filter((b) => {
-				const totalDue = b.amount + (b.penalty_amount || 0);
-				return b.paid_amount >= totalDue;
-			})
-			.map((b) => new Date(b.billing_date))
-			.sort((a, b) => b.getTime() - a.getTime());
-
-		return paidBillings.length > 0 ? paidBillings[0] : null;
+			if (b.paid_amount < totalDue) return null; // Not all paid → early exit
+			const ms = new Date(b.billing_date).getTime();
+			if (ms > latestMs) latestMs = ms;
+		}
+		return latestMs > 0 ? new Date(latestMs) : null;
 	});
 
 	// Security deposit status with enhanced logic
@@ -303,7 +280,7 @@
 						<div class="flex items-center">
 							{#each lease.lease_tenants.slice(0, 3) as leaseTenant, index}
 								{@const tenantData = leaseTenant.tenant ?? leaseTenant}
-								{@const matchedTenant = tenants.find((t) => t.name === tenantData?.name)}
+								{@const matchedTenant = tenantNameMap.get(tenantData?.name)}
 								{@const profileUrl =
 									(tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 								<div
@@ -398,7 +375,7 @@
 					<div class="flex items-center">
 						{#each lease.lease_tenants.slice(0, 3) as leaseTenant, index}
 							{@const tenantData = leaseTenant.tenant ?? leaseTenant}
-							{@const matchedTenant = tenants.find((t) => t.name === tenantData?.name)}
+							{@const matchedTenant = tenantNameMap.get(tenantData?.name)}
 							{@const profileUrl =
 								(tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 							<div
@@ -838,13 +815,15 @@
 	</Card.Content>
 </Card.Root>
 
-<!-- Modals remain unchanged -->
+<!-- Modals — conditionally rendered to avoid N modal instances in DOM -->
+{#if showPaymentModal}
 <PaymentModal
 	lease={{ ...lease, id: lease.id.toString() }}
 	isOpen={showPaymentModal}
 	onOpenChange={handlePaymentModalClose}
 	{onDataChange}
 />
+{/if}
 
 {#if showRentManager}
 	<RentManagerModal {lease} open={showRentManager} onOpenChange={handleRentManagerClose} {onDataChange} />

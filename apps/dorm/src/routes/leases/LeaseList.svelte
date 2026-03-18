@@ -6,14 +6,15 @@
 	import type { Lease } from '$lib/types/lease';
 
 	interface Props {
-		leases?: (Lease & { balanceStatus?: any })[];
+		leases?: (Lease & { balanceStatus?: any; _searchText?: string; _sortName?: string; _startMs?: number; _updatedMs?: number; _floorNum?: number; _unitNum?: string })[];
 		tenants?: any[];
 		rentalUnits?: any[];
+		tenantNameMap?: Map<string, any>;
 		onStatusChange: (id: string, status: string) => void;
 		onDataChange?: () => Promise<void>;
 	}
 
-	let { leases = [], tenants = [], rentalUnits = [], onStatusChange, onDataChange }: Props = $props();
+	let { leases = [], tenants = [], rentalUnits = [], tenantNameMap = new Map(), onStatusChange, onDataChange }: Props = $props();
 
 	interface FilterState {
 		search: string;
@@ -22,6 +23,9 @@
 		sortBy: string;
 	}
 
+	const PAGE_SIZE = 20;
+	let currentPage = $state(1);
+
 	let filters = $state<FilterState>({
 		search: '',
 		status: '',
@@ -29,83 +33,63 @@
 		sortBy: 'name-az'
 	});
 
+	// Single-pass filter + sort using precomputed keys
 	let filteredLeases = $derived.by(() => {
-		let filtered = [...leases];
+		const searchTerm = filters.search ? filters.search.toLowerCase() : '';
+		const statusFilter = filters.status;
+		const yearFilter = filters.year;
+		const sortBy = filters.sortBy;
 
-		// Search filter
-		if (filters.search) {
-			const searchTerm = filters.search.toLowerCase();
-			filtered = filtered.filter((lease) => {
-				const leaseName = (lease.name || `Lease #${lease.id}`).toLowerCase();
-				const tenantNames =
-					lease.lease_tenants?.map((lt) => lt.name?.toLowerCase() || '').join(' ') || '';
-				const unitInfo =
-					`${lease.rental_unit?.floor?.floor_number || ''} ${lease.rental_unit?.rental_unit_number || ''}`.toLowerCase();
-				const propertyName = lease.rental_unit?.property?.name?.toLowerCase() || '';
+		// Single-pass filter (combines search + status + year)
+		let filtered: typeof leases;
+		if (!searchTerm && !statusFilter && !yearFilter) {
+			// Fast path: no filtering needed, just clone for sort
+			filtered = leases.slice();
+		} else {
+			filtered = [];
+			for (let i = 0; i < leases.length; i++) {
+				const lease = leases[i];
 
-				return (
-					leaseName.includes(searchTerm) ||
-					tenantNames.includes(searchTerm) ||
-					unitInfo.includes(searchTerm) ||
-					propertyName.includes(searchTerm)
-				);
-			});
+				// Search filter — uses precomputed _searchText
+				if (searchTerm && !(lease._searchText || '').includes(searchTerm)) continue;
+
+				// Status filter
+				if (statusFilter && lease.status !== statusFilter) continue;
+
+				// Year filter — uses precomputed _startMs (avoids new Date() per item)
+				if (yearFilter) {
+					const year = new Date(lease._startMs || 0).getFullYear().toString();
+					if (year !== yearFilter) continue;
+				}
+
+				filtered.push(lease);
+			}
 		}
 
-		// Status filter
-		if (filters.status) {
-			filtered = filtered.filter((lease) => lease.status === filters.status);
-		}
-
-		// Year filter
-		if (filters.year) {
-			filtered = filtered.filter((lease) => {
-				const startYear = new Date(lease.start_date).getFullYear().toString();
-				return startYear === filters.year;
-			});
-		}
-
-		// Sort
-		switch (filters.sortBy) {
+		// Sort using precomputed keys (no allocation in comparators)
+		switch (sortBy) {
 			case 'name-az':
-				filtered.sort((a, b) =>
-					(a.name || `Lease #${a.id}`).localeCompare(b.name || `Lease #${b.id}`)
-				);
+				filtered.sort((a, b) => (a._sortName || '').localeCompare(b._sortName || ''));
 				break;
 			case 'name-za':
-				filtered.sort((a, b) =>
-					(b.name || `Lease #${b.id}`).localeCompare(a.name || `Lease #${a.id}`)
-				);
+				filtered.sort((a, b) => (b._sortName || '').localeCompare(a._sortName || ''));
 				break;
 			case 'recent-edited':
-				filtered.sort(
-					(a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
-				);
+				filtered.sort((a, b) => (b._updatedMs || 0) - (a._updatedMs || 0));
 				break;
 			case 'oldest-edited':
-				filtered.sort(
-					(a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
-				);
+				filtered.sort((a, b) => (a._updatedMs || 0) - (b._updatedMs || 0));
 				break;
 			case 'floor-unit':
 				filtered.sort((a, b) => {
-					const aFloor = parseInt(a.rental_unit?.floor?.floor_number || '0');
-					const bFloor = parseInt(b.rental_unit?.floor?.floor_number || '0');
-					if (aFloor !== bFloor) return aFloor - bFloor;
-					return (a.rental_unit?.rental_unit_number || '').localeCompare(
-						b.rental_unit?.rental_unit_number || ''
-					);
+					const fd = (a._floorNum || 0) - (b._floorNum || 0);
+					return fd !== 0 ? fd : (a._unitNum || '').localeCompare(b._unitNum || '');
 				});
 				break;
 			case 'unit-floor':
 				filtered.sort((a, b) => {
-					const aUnit = a.rental_unit?.rental_unit_number || '';
-					const bUnit = b.rental_unit?.rental_unit_number || '';
-					if (aUnit !== bUnit) return aUnit.localeCompare(bUnit);
-					return (
-						parseInt(a.rental_unit?.floor?.floor_number || '0') -
-						parseInt(b.rental_unit?.floor?.floor_number || '0')
-					);
+					const ud = (a._unitNum || '').localeCompare(b._unitNum || '');
+					return ud !== 0 ? ud : (a._floorNum || 0) - (b._floorNum || 0);
 				});
 				break;
 			case 'balance-desc':
@@ -116,23 +100,28 @@
 				break;
 			case 'due-date':
 				filtered.sort((a, b) => {
-					const aDate = a.balanceStatus?.nextDueDate
-						? new Date(a.balanceStatus.nextDueDate)
-						: new Date('9999-12-31');
-					const bDate = b.balanceStatus?.nextDueDate
-						? new Date(b.balanceStatus.nextDueDate)
-						: new Date('9999-12-31');
-					return aDate.getTime() - bDate.getTime();
+					const aMs = a.balanceStatus?.nextDueDate ? new Date(a.balanceStatus.nextDueDate).getTime() : 2524608000000;
+					const bMs = b.balanceStatus?.nextDueDate ? new Date(b.balanceStatus.nextDueDate).getTime() : 2524608000000;
+					return aMs - bMs;
 				});
 				break;
 			case 'days-overdue':
-				filtered.sort(
-					(a, b) => (b.balanceStatus?.daysOverdue || 0) - (a.balanceStatus?.daysOverdue || 0)
-				);
+				filtered.sort((a, b) => (b.balanceStatus?.daysOverdue || 0) - (a.balanceStatus?.daysOverdue || 0));
 				break;
 		}
 
 		return filtered;
+	});
+
+	// Paginated slice of filtered leases
+	let paginatedLeases = $derived(filteredLeases.slice(0, currentPage * PAGE_SIZE));
+	let hasMore = $derived(paginatedLeases.length < filteredLeases.length);
+
+	// Reset page when filters change
+	$effect(() => {
+		// Access filter values to track them
+		filters.search; filters.status; filters.year; filters.sortBy;
+		currentPage = 1;
 	});
 
 	const dispatch = createEventDispatcher<{
@@ -173,11 +162,12 @@
 		</div>
 	{:else}
 		<div class="">
-			{#each filteredLeases as lease (lease.id)}
+			{#each paginatedLeases as lease (lease.id)}
 				<LeaseCard
 					{lease}
 					{tenants}
 					{rentalUnits}
+					{tenantNameMap}
 					onLeaseClick={handleLeaseClick}
 					onDelete={handleDelete}
 					{onStatusChange}
@@ -185,5 +175,15 @@
 				/>
 			{/each}
 		</div>
+		{#if hasMore}
+			<div class="flex justify-center py-4">
+				<button
+					onclick={() => currentPage++}
+					class="px-6 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+				>
+					Show More ({filteredLeases.length - paginatedLeases.length} remaining)
+				</button>
+			</div>
+		{/if}
 	{/if}
 </div>
