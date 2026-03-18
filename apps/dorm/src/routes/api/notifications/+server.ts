@@ -21,23 +21,32 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		conditions.push(eq(notifications.status, status as 'UNREAD' | 'READ' | 'DISMISSED'));
 	}
 
-	const rows = await db
-		.select()
-		.from(notifications)
-		.where(conditions.length > 0 ? and(...conditions) : undefined)
-		.orderBy(desc(notifications.createdAt))
-		.limit(limit);
+	try {
+		const rows = await db
+			.select()
+			.from(notifications)
+			.where(conditions.length > 0 ? and(...conditions) : undefined)
+			.orderBy(desc(notifications.createdAt))
+			.limit(limit);
 
-	// Count unread
-	const unreadRows = await db
-		.select({ id: notifications.id })
-		.from(notifications)
-		.where(eq(notifications.status, 'UNREAD'));
+		// Count unread
+		const unreadRows = await db
+			.select({ id: notifications.id })
+			.from(notifications)
+			.where(eq(notifications.status, 'UNREAD'));
 
-	return json({
-		notifications: rows,
-		unreadCount: unreadRows.length
-	});
+		return json({
+			notifications: rows,
+			unreadCount: unreadRows.length
+		});
+	} catch (err: any) {
+		const isQuota = err?.message?.includes('402') || err?.cause?.message?.includes('quota');
+		if (isQuota) {
+			console.warn('[Notifications] Neon quota exceeded — returning empty');
+			return json({ notifications: [], unreadCount: 0 });
+		}
+		throw err;
+	}
 };
 
 /**

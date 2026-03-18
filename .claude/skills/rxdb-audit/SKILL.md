@@ -79,6 +79,7 @@ Not every item applies to every topology. A pull-only app doesn't need conflict 
 - [ ] Primary keys are strings (Drizzle serial IDs coerced)
 - [ ] Decimal/monetary fields use correct types (strings for Drizzle decimal)
 - [ ] Sync payloads are lean (no binary data, large blobs separated)
+- [ ] Indexes only on non-nullable `required` fields (RxDB 16 + Dexie constraint: SC36/DXE1 — nullable fields like `deleted_at` CANNOT be indexed; string indexes need `maxLength`; number indexes need `minimum`/`maximum`/`multipleOf`)
 
 #### 6. Initial Sync
 - [ ] Bootstrap is paginated (not single mega-query)

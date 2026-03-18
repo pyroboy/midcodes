@@ -44,7 +44,7 @@ const RXDB_CODE_LABELS: Record<string, string> = {
 	DB9: 'Database already exists',
 	DB11: 'Database destroyed',
 	SC34: 'Schema key compression failed',
-	SC36: 'Schema version mismatch',
+	SC36: 'Indexed field has unsupported type (nullable fields cannot be indexed)',
 	SC38: 'Schema field type mismatch',
 	VD1: 'Validation: required field missing',
 	VD2: 'Validation: document data invalid',

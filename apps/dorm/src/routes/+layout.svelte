@@ -66,8 +66,17 @@
 
 	// F8: URL escape hatch — ?reset-db=1 clears all IndexedDB databases and reloads
 	if (browser && new URL(location.href).searchParams.has('reset-db')) {
-		indexedDB.databases().then((dbs) => {
-			for (const d of dbs) { if (d.name) indexedDB.deleteDatabase(d.name); }
+		indexedDB.databases().then(async (dbs) => {
+			// Await each deletion — deleteDatabase is async via IDBOpenDBRequest
+			await Promise.all(
+				dbs.filter((d) => d.name).map((d) => new Promise<void>((resolve) => {
+					const req = indexedDB.deleteDatabase(d.name!);
+					req.onsuccess = () => resolve();
+					req.onerror = () => resolve(); // proceed anyway
+					req.onblocked = () => resolve();
+				}))
+			);
+			sessionStorage.removeItem('__dorm_db_reset_v2');
 			const url = new URL(location.href);
 			url.searchParams.delete('reset-db');
 			location.replace(url.toString());
@@ -97,11 +106,15 @@
 		// syncStatus.setNeonHealthDirect() after its own preflight fetch, avoiding a duplicate round-trip.
 		import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 			syncStatus.setPhase('initializing');
+			syncStatus.addLog('Network: ' + (navigator.onLine ? 'online' : 'offline'), navigator.onLine ? 'info' : 'warn');
 		});
 		import('$lib/db').then(({ getDb }) => {
 			import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-				syncStatus.setRxdbHealth('checking', 'Opening RxDB...');
+				syncStatus.setRxdbHealth('checking', 'Opening RxDB (IndexedDB/Dexie)...');
+				syncStatus.addLog('Storage: IndexedDB via Dexie adapter', 'info');
+				syncStatus.addLog('Schemas: v1 (14 collections, indexed)', 'info');
 			});
+			const t0 = Date.now();
 			// F4: Wrap getDb() with a 30-second timeout
 			return Promise.race([
 				getDb(),
@@ -109,12 +122,24 @@
 					setTimeout(() => reject(new Error('RxDB init timeout (30s)')), 30_000)
 				)
 			]).then((db) => {
+				const initMs = Date.now() - t0;
 				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 					syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
+					syncStatus.addLog(`RxDB opened in ${initMs}ms — ${Object.keys(db.collections).length} collections`, 'success');
 					// F6: Clear reload-loop counter on successful init
-					sessionStorage.removeItem('__dorm_db_reset');
+					sessionStorage.removeItem('__dorm_db_reset_v2');
+
+					// Log storage persistence status
+					navigator.storage?.persisted?.().then((persisted) => {
+						syncStatus.addLog(`Storage persistence: ${persisted ? 'granted' : 'not granted (data may be evicted)'}`, persisted ? 'info' : 'warn');
+					});
 				});
+				const t1 = Date.now();
 				return import('$lib/db/replication').then(({ startSync }) => startSync(db)).then(() => {
+					const syncMs = Date.now() - t1;
+					import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+						syncStatus.addLog(`Initial sync completed in ${syncMs}ms`, 'success');
+					});
 					// Post-sync: prune old records and check storage usage
 					import('$lib/db/pruning').then(({ pruneOldRecords }) => {
 						pruneOldRecords().then((results) => {
@@ -124,12 +149,26 @@
 										syncStatus.addLog(`Pruned ${r.pruned} old ${r.collection} records`, 'info');
 									}
 								});
+							} else {
+								import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+									syncStatus.addLog('Pruning: no stale records found', 'info');
+								});
 							}
-						}).catch((err) => console.warn('[Pruning] Failed:', err));
+						}).catch((err) => {
+							console.warn('[Pruning] Failed:', err);
+							import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+								syncStatus.addLog(`Pruning failed: ${err?.message || err}`, 'warn');
+							});
+						});
 					});
 					// Use checkAndAutoPrune which handles toasts + log entries internally
 					import('$lib/db/storage-monitor').then(({ checkAndAutoPrune }) => {
-						checkAndAutoPrune().catch((err) => console.warn('[Storage] Monitor failed:', err));
+						checkAndAutoPrune().catch((err) => {
+							console.warn('[Storage] Monitor failed:', err);
+							import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+								syncStatus.addLog(`Storage monitor failed: ${err?.message || err}`, 'warn');
+							});
+						});
 					});
 				});
 			});
@@ -137,26 +176,49 @@
 			console.error('[RxDB] Init failed:', err);
 			const { syncStatus } = await import('$lib/stores/sync-status.svelte');
 
-			const isSchemaError = err?.code === 'DB6' ||
+			const isTimeout = err?.message?.includes('timeout');
+			const isSchemaError = err?.code === 'DB6' || err?.code === 'SC36' ||
 				err?.message?.includes('different schema') ||
-				err?.message?.includes('Error code: DB6');
+				err?.message?.includes('Error code: DB6') ||
+				err?.message?.includes('Error code: SC36');
+
+			if (isTimeout) {
+				syncStatus.addLog('RxDB init timed out after 30s — IndexedDB may be corrupted or locked', 'error');
+				syncStatus.addLog('Recovery: try ?reset-db=1 or close other tabs', 'warn');
+				syncStatus.setRxdbHealth('error', 'Init timeout (30s) — storage may be locked', err);
+				return;
+			}
 
 			if (isSchemaError) {
 				// F6: Reload-loop guard — stop after 2 consecutive failed resets
-				const reloadCount = Number(sessionStorage.getItem('__dorm_db_reset') || '0');
+				const reloadCount = Number(sessionStorage.getItem('__dorm_db_reset_v2') || '0');
+				syncStatus.addLog(`Schema error: ${err?.code || 'unknown'} — auto-clear attempt ${reloadCount + 1}/2`, 'warn');
 				if (reloadCount >= 2) {
 					syncStatus.addLog('Reload loop detected — manual recovery needed (?reset-db=1)', 'error');
+					syncStatus.addLog('The auto-clear failed 2 times. Click "Clear Data" below or append ?reset-db=1 to URL.', 'error');
 					syncStatus.setRxdbHealth('error', undefined, err);
 					return;
 				}
-				sessionStorage.setItem('__dorm_db_reset', String(reloadCount + 1));
+				sessionStorage.setItem('__dorm_db_reset_v2', String(reloadCount + 1));
 
 				syncStatus.addLog('Schema mismatch detected — auto-clearing IndexedDB...', 'warn');
 				try {
 					const dbs = await indexedDB.databases();
-					for (const d of dbs) {
-						if (d.name) indexedDB.deleteDatabase(d.name);
-					}
+					syncStatus.addLog(`Found ${dbs.length} IndexedDB database(s) to clear`, 'info');
+					// Must await each deleteDatabase — it's async via IDBOpenDBRequest
+					await Promise.all(
+						dbs
+							.filter((d) => d.name)
+							.map((d) => new Promise<void>((resolve, reject) => {
+								const req = indexedDB.deleteDatabase(d.name!);
+								req.onsuccess = () => resolve();
+								req.onerror = () => reject(req.error);
+								req.onblocked = () => {
+									console.warn(`[RxDB] deleteDatabase("${d.name}") blocked — another tab may have it open`);
+									resolve(); // proceed anyway, reload will retry
+								};
+							}))
+					);
 					// F5: Notify other tabs that IndexedDB was cleared
 					resetChannel?.postMessage('db-cleared');
 					syncStatus.addLog('IndexedDB cleared — reloading...', 'info');
@@ -164,7 +226,10 @@
 					return;
 				} catch (clearErr) {
 					syncStatus.addLog(`Auto-clear failed: ${clearErr}`, 'error');
+					syncStatus.addLog('Manual recovery: append ?reset-db=1 to URL', 'error');
 				}
+			} else {
+				syncStatus.addLog(`Unexpected init error: ${err?.code || ''} ${err?.message?.slice(0, 150) || err}`, 'error');
 			}
 
 			syncStatus.setRxdbHealth('error', undefined, err);

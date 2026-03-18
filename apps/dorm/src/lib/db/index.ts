@@ -3,6 +3,7 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
 import { RxDBCleanupPlugin } from 'rxdb/plugins/cleanup';
+import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import {
 	tenantSchema,
 	leaseSchema,
@@ -31,6 +32,7 @@ if (!pluginsRegistered) {
 	addRxPlugin(RxDBUpdatePlugin);
 	addRxPlugin(RxDBQueryBuilderPlugin);
 	addRxPlugin(RxDBCleanupPlugin);
+	addRxPlugin(RxDBMigrationSchemaPlugin);
 	pluginsRegistered = true;
 }
 
