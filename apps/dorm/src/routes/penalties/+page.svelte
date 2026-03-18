@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { invalidate } from '$app/navigation';
 	import { updatePenaltySchema } from './formSchema';
 	import type { PenaltyBilling, PenaltyFilter } from './types';
-	import type { AnyZodObject } from 'zod';
+	import type { AnyZodObject } from 'zod/v3';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
-	import { onMount } from 'svelte';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { resyncCollection } from '$lib/db/replication';
 
 	// UI Components
 	import {
@@ -47,37 +47,104 @@
 	import { formatCurrency } from '$lib/utils/format';
 
 	let { data } = $props<{ data: PageData }>();
-	let penaltyBillings = $state<PenaltyBilling[]>(data.penaltyBillings);
+
+	// ─── RxDB reactive stores ───────────────────────────────────────────
+	const billingsStore = createRxStore<any>('billings',
+		(db) => db.billings.find()
+	);
+	const leasesStore = createRxStore<any>('leases',
+		(db) => db.leases.find()
+	);
+	const rentalUnitsStore = createRxStore<any>('rental_units',
+		(db) => db.rental_units.find()
+	);
+	const floorsStore = createRxStore<any>('floors',
+		(db) => db.floors.find()
+	);
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find()
+	);
+	const leaseTenantsStore = createRxStore<any>('lease_tenants',
+		(db) => db.lease_tenants.find()
+	);
+	const tenantsStore = createRxStore<any>('tenants',
+		(db) => db.tenants.find()
+	);
+
+	// ─── Derived penalty billings from RxDB ─────────────────────────────
+	let isLoading = $derived(!billingsStore.initialized);
+
+	let penaltyBillings = $derived.by(() => {
+		const now = new Date();
+		const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+		return billingsStore.value
+			.filter((b: any) => {
+				const penaltyAmount = parseFloat(b.penalty_amount) || 0;
+				const balance = parseFloat(b.balance) || 0;
+				const dueDate = new Date(b.due_date);
+				return (
+					penaltyAmount > 0 ||
+					(dueDate < now && balance > 0) ||
+					(dueDate > now && dueDate < threeDaysFromNow)
+				);
+			})
+			.map((billing: any) => {
+				const lease = leasesStore.value.find((l: any) => String(l.id) === String(billing.lease_id));
+				const unit = lease ? rentalUnitsStore.value.find((u: any) => String(u.id) === String(lease.rental_unit_id)) : null;
+				const floor = unit ? floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id)) : null;
+				const property = unit ? propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id)) : null;
+
+				// Lease tenants
+				const ltDocs = lease ? leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(lease.id)) : [];
+				const lease_tenants = ltDocs.map((lt: any) => {
+					const tenant = tenantsStore.value.find((t: any) => String(t.id) === String(lt.tenant_id));
+					return tenant ? {
+						tenants: {
+							id: Number(tenant.id),
+							name: tenant.name,
+							email: tenant.email,
+							contact_number: tenant.contact_number
+						}
+					} : null;
+				}).filter(Boolean);
+
+				return {
+					id: Number(billing.id),
+					type: billing.type,
+					utility_type: billing.utility_type,
+					amount: parseFloat(billing.amount) || 0,
+					paid_amount: parseFloat(billing.paid_amount) || 0,
+					balance: parseFloat(billing.balance) || 0,
+					status: billing.status,
+					due_date: billing.due_date,
+					billing_date: billing.billing_date,
+					penalty_amount: parseFloat(billing.penalty_amount) || 0,
+					notes: billing.notes,
+					lease: lease ? {
+						id: Number(lease.id),
+						name: lease.name,
+						rental_unit: unit ? {
+							name: unit.name,
+							number: unit.number,
+							floors: floor ? { floor_number: floor.floor_number, wing: floor.wing } : null,
+							properties: property ? { name: property.name } : null
+						} : null,
+						lease_tenants
+					} : null
+				} as any;
+			})
+			.sort((a: any, b: any) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime());
+	});
+
+	// ─── UI state ───────────────────────────────────────────────────────
 	let selectedPenalty: PenaltyBilling | undefined = $state();
 	let showPenaltyDetails = $state(false);
 	let showPenaltyModal = $state(false);
-	let isFilterOpen = $state(false); // Changed to false by default for cleaner UI
+	let isFilterOpen = $state(false);
 	let showRulesModal = $state(false);
-	let isLoading = $state(data.lazy === true); // Loading state for skeletons
-	let viewMode = $state<'card' | 'list'>('list'); // Toggle between card and list view
-	let activeFilter = $state<'all' | 'pending' | 'overdue' | 'penalized'>('all'); // Filter for stats
-
-	// Load data lazily on mount
-	onMount(async () => {
-		if (data.lazy && data.penaltyBillingsPromise) {
-			try {
-				const loadedBillings = await data.penaltyBillingsPromise;
-				penaltyBillings = loadedBillings;
-				isLoading = false;
-			} catch (error) {
-				console.error('Error loading penalty data:', error);
-				toast.error('Failed to load penalty data');
-				isLoading = false;
-			}
-		}
-	});
-
-	// Update local state when data changes (after invalidateAll())
-	$effect(() => {
-		if (!isLoading && !data.lazy) {
-			penaltyBillings = data.penaltyBillings;
-		}
-	});
+	let viewMode = $state<'card' | 'list'>('list');
+	let activeFilter = $state<'all' | 'pending' | 'overdue' | 'penalized'>('all');
 
 	// Filter state
 	let filter: PenaltyFilter = $state({
@@ -167,7 +234,7 @@
 				toast.success('Penalty Updated', {
 					description: `The penalty for ${selectedPenalty?.lease?.name} has been successfully updated.`
 				});
-				await invalidate('app:penalties');
+				await resyncCollection('billings');
 				reset();
 			}
 			if (result.type === 'failure') {
@@ -219,10 +286,6 @@
 			searchTerm: searchTerm
 		};
 
-		// In a real implementation, you'd fetch from server with these filters
-		// For now, we'll simulate filtering client-side
-
-		// This will trigger a notification to the user that filtering is working
 		const successMessage = document.getElementById('filter-success');
 		if (successMessage) {
 			successMessage.classList.remove('hidden');
@@ -239,8 +302,6 @@
 		searchTerm = '';
 		filter = {};
 
-		// This would typically refresh all data from the server
-		// For now, just show the success message
 		const successMessage = document.getElementById('filter-success');
 		if (successMessage) {
 			successMessage.classList.remove('hidden');
@@ -251,10 +312,7 @@
 	}
 
 	function handleSaveRules(rules: any) {
-		// Here you would typically save the rules to your backend
 		showRulesModal = false;
-
-		// For demo purposes, show a success message
 		toast.success('Penalty Rules Saved', {
 			description: 'Penalty rules have been saved successfully.'
 		});
@@ -262,16 +320,14 @@
 
 	function handleFilterClick(filter: 'all' | 'pending' | 'overdue' | 'penalized') {
 		activeFilter = filter;
-		// Clear the select dropdown when using the mini stats filters
 		if (filter !== 'all') {
 			statusFilter = '';
 		}
 	}
 
 	async function handleRefresh() {
-		isLoading = true;
 		try {
-			await invalidate('app:penalties');
+			await resyncCollection('billings');
 			toast.success('Data Refreshed', {
 				description: 'Penalty data has been refreshed successfully.'
 			});
@@ -279,8 +335,6 @@
 			toast.error('Refresh Failed', {
 				description: 'Failed to refresh penalty data.'
 			});
-		} finally {
-			isLoading = false;
 		}
 	}
 </script>

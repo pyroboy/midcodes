@@ -3,10 +3,10 @@ import { superValidate } from 'sveltekit-superforms/server';
 import type { PageServerLoad, Actions, RequestEvent } from './$types';
 import { zod } from 'sveltekit-superforms/adapters';
 import { propertySchema, preparePropertyData } from './formSchema';
-import { cache, cacheKeys } from '$lib/services/cache';
+import { cache } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import { properties } from '$lib/server/schema';
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { permissions } = locals;
@@ -20,28 +20,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw error(403, 'Forbidden: You do not have permission to view properties.');
 	}
 
-	try {
-		// Fetch ALL properties, ordered by name
-		const propertiesData = await db
-			.select()
-			.from(properties)
-			.orderBy(asc(properties.name));
-
-		// Prepare the form for the page.
-		const form = await superValidate(zod(propertySchema));
-
-		return {
-			form,
-			properties: propertiesData ?? []
-		};
-	} catch (err) {
-		console.error('Error loading properties:', err);
-		// Return a valid state for the page to render, even on error.
-		return {
-			form: await superValidate(zod(propertySchema)),
-			properties: []
-		};
-	}
+	return {
+		form: await superValidate(zod(propertySchema))
+	};
 };
 
 // --- ACTIONS ---
@@ -84,7 +65,7 @@ export const actions: Actions = {
 			await db
 				.update(properties)
 				.set(propertyData)
-				.where(eq(properties.id, form.data.id));
+				.where(eq(properties.id, form.data.id!));
 		} catch (err: any) {
 			console.error('Error updating property:', err);
 			return fail(500, {

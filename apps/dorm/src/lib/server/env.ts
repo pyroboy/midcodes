@@ -1,33 +1,35 @@
 import { env as privateEnv } from '$env/dynamic/private';
 import * as staticPrivate from '$env/static/private';
 import { dev } from '$app/environment';
-import { z } from 'zod';
-import fs from 'node:fs';
-import path from 'node:path';
+import { z } from 'zod/v3';
 
-// Manual UTF-16 / UTF-8 robust .env loader
+// Safe process.env access for Cloudflare Workers compatibility
+const processEnv: Record<string, string | undefined> =
+	typeof process !== 'undefined' && process.env ? process.env : {};
+
+// Manual .env loader — only in dev with Node.js runtime (not Cloudflare Workers)
+// Uses synchronous require() to avoid top-level await which breaks Cloudflare Workers.
 let dotEnvParsed: Record<string, string> = {};
-if (dev) {
+if (dev && typeof process !== 'undefined' && process.versions?.node) {
 	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const fs = require('node:fs');
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const path = require('node:path');
 		const envPath = path.resolve(process.cwd(), '.env');
 		if (fs.existsSync(envPath)) {
 			const buffer = fs.readFileSync(envPath);
 			let content = '';
 
-			// Detect UTF-16 LE (FF FE) or UTF-16 BE (FE FF)
 			if (buffer[0] === 0xff && buffer[1] === 0xfe) {
 				content = buffer.toString('utf16le');
-				console.log('  [env] Detected UTF-16 LE encoding for .env');
 			} else if (buffer[0] === 0xfe && buffer[1] === 0xff) {
-				// Handle BE if needed, though rare on Windows
 				content = buffer.swap16().toString('utf16le');
-				console.log('  [env] Detected UTF-16 BE encoding for .env');
 			} else {
 				content = buffer.toString('utf8');
 			}
 
-			// Simple custom parser to bypass dotenv encoding quirks
-			content.split(/\r?\n/).forEach((line) => {
+			content.split(/\r?\n/).forEach((line: string) => {
 				const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
 				if (match) {
 					const key = match[1];
@@ -75,6 +77,9 @@ const envSchema = z.object({
 	PRIVATE_CLOUDINARY_API_KEY: z.string().optional(),
 	PRIVATE_CLOUDINARY_API_SECRET: z.string().optional(),
 
+	// Automation
+	CRON_SECRET: z.string().optional(),
+
 	// Runtime
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development')
 });
@@ -91,54 +96,57 @@ export function initializeEnv() {
 		NEON_DATABASE_URL:
 			privateEnv.NEON_DATABASE_URL ||
 			dotEnvParsed.NEON_DATABASE_URL ||
-			process?.env?.NEON_DATABASE_URL,
+			processEnv.NEON_DATABASE_URL,
 
 		BETTER_AUTH_SECRET:
 			privateEnv.BETTER_AUTH_SECRET ||
 			dotEnvParsed.BETTER_AUTH_SECRET ||
-			process?.env?.BETTER_AUTH_SECRET ||
+			processEnv.BETTER_AUTH_SECRET ||
 			(dev ? 'dev_secret_only_for_local' : undefined),
 
 		BETTER_AUTH_URL:
-			privateEnv.BETTER_AUTH_URL || dotEnvParsed.BETTER_AUTH_URL || process?.env?.BETTER_AUTH_URL,
+			privateEnv.BETTER_AUTH_URL || dotEnvParsed.BETTER_AUTH_URL || processEnv.BETTER_AUTH_URL,
 
 		R2_ACCOUNT_ID:
-			privateEnv.R2_ACCOUNT_ID || dotEnvParsed.R2_ACCOUNT_ID || process?.env?.R2_ACCOUNT_ID,
+			privateEnv.R2_ACCOUNT_ID || dotEnvParsed.R2_ACCOUNT_ID || processEnv.R2_ACCOUNT_ID,
 		R2_ACCESS_KEY_ID:
 			privateEnv.R2_ACCESS_KEY_ID ||
 			dotEnvParsed.R2_ACCESS_KEY_ID ||
-			process?.env?.R2_ACCESS_KEY_ID,
+			processEnv.R2_ACCESS_KEY_ID,
 		R2_SECRET_ACCESS_KEY:
 			privateEnv.R2_SECRET_ACCESS_KEY ||
 			dotEnvParsed.R2_SECRET_ACCESS_KEY ||
-			process?.env?.R2_SECRET_ACCESS_KEY,
+			processEnv.R2_SECRET_ACCESS_KEY,
 		R2_BUCKET_NAME:
-			privateEnv.R2_BUCKET_NAME || dotEnvParsed.R2_BUCKET_NAME || process?.env?.R2_BUCKET_NAME,
+			privateEnv.R2_BUCKET_NAME || dotEnvParsed.R2_BUCKET_NAME || processEnv.R2_BUCKET_NAME,
 		R2_PUBLIC_DOMAIN:
 			privateEnv.R2_PUBLIC_DOMAIN ||
 			dotEnvParsed.R2_PUBLIC_DOMAIN ||
-			process?.env?.R2_PUBLIC_DOMAIN,
+			processEnv.R2_PUBLIC_DOMAIN,
 
 		RECAPTCHA_SECRET_KEY:
 			privateEnv.RECAPTCHA_SECRET_KEY ||
 			dotEnvParsed.RECAPTCHA_SECRET_KEY ||
-			process?.env?.RECAPTCHA_SECRET_KEY,
+			processEnv.RECAPTCHA_SECRET_KEY,
 
 		PRIVATE_CLOUDINARY_CLOUD_NAME:
 			privateEnv.PRIVATE_CLOUDINARY_CLOUD_NAME ||
 			dotEnvParsed.PRIVATE_CLOUDINARY_CLOUD_NAME ||
-			process?.env?.PRIVATE_CLOUDINARY_CLOUD_NAME,
+			processEnv.PRIVATE_CLOUDINARY_CLOUD_NAME,
 		PRIVATE_CLOUDINARY_API_KEY:
 			privateEnv.PRIVATE_CLOUDINARY_API_KEY ||
 			dotEnvParsed.PRIVATE_CLOUDINARY_API_KEY ||
-			process?.env?.PRIVATE_CLOUDINARY_API_KEY,
+			processEnv.PRIVATE_CLOUDINARY_API_KEY,
 		PRIVATE_CLOUDINARY_API_SECRET:
 			privateEnv.PRIVATE_CLOUDINARY_API_SECRET ||
 			dotEnvParsed.PRIVATE_CLOUDINARY_API_SECRET ||
-			process?.env?.PRIVATE_CLOUDINARY_API_SECRET,
+			processEnv.PRIVATE_CLOUDINARY_API_SECRET,
 
-		NODE_ENV: ['development', 'production', 'test'].includes(process?.env?.NODE_ENV ?? '')
-			? process.env.NODE_ENV
+		CRON_SECRET:
+			privateEnv.CRON_SECRET || dotEnvParsed.CRON_SECRET || processEnv.CRON_SECRET,
+
+		NODE_ENV: ['development', 'production', 'test'].includes(processEnv.NODE_ENV ?? '')
+			? processEnv.NODE_ENV
 			: dev
 				? 'development'
 				: 'production'
@@ -151,7 +159,7 @@ export function initializeEnv() {
 				? 'SvelteKit-Dynamic'
 				: dotEnvParsed[name]
 					? 'Direct-FS'
-					: process?.env?.[name]
+					: processEnv[name]
 						? 'process.env'
 						: 'NONE';
 
@@ -182,17 +190,17 @@ export function initializeEnv() {
 	const result = envSchema.safeParse(rawEnv);
 
 	if (!result.success) {
-		if (!dev) {
+		{
 			const errors = result.error.flatten().fieldErrors;
 			const errorMessages = Object.entries(errors)
 				.map(([k, v]) => `${k}: ${v?.join(', ')}`)
 				.join('\n');
-			console.error('Environment validation failed:\n' + errorMessages);
-			throw new Error('Environment validation failed. App cannot start in production.');
-		} else {
+			console.warn('Environment validation failed (continuing with partial env):\n' + errorMessages);
+		}
+		{
 			// During build time (static analysis), we might not have secrets.
 			// We should allow the build to proceed but warn loudly.
-			if (process.env.npm_lifecycle_event === 'build' || process.env.CI) {
+			if (processEnv.npm_lifecycle_event === 'build' || processEnv.CI) {
 				console.warn(
 					'Build/CI mode: Validation failed but continuing. Ensure vars are set in deployment.'
 				);

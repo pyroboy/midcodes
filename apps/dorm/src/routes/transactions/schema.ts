@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // Define payment method enum (matching DORMSCHEMA.md database enum)
 export const paymentMethodEnum = z.enum([

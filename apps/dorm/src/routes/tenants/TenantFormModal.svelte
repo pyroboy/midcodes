@@ -18,10 +18,11 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { tenantFormSchema, TenantStatusEnum, defaultEmergencyContact } from './formSchema';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import ImageUploadWithCrop from '$lib/components/ui/ImageUploadWithCrop.svelte';
 	import BirthdayInput from '$lib/components/ui/birthday-input.svelte';
+	import { optimisticUpsertTenant } from '$lib/db/optimistic';
 
 	type FormType = z.infer<typeof tenantFormSchema>;
 
@@ -131,7 +132,28 @@
 			const result = await response.text();
 			
 			if (response.ok) {
-				// Handle success
+				// Optimistic write — update RxDB immediately so UI is instant
+				try {
+					const json = JSON.parse(result);
+					// For create: server returns tenantId in the response data
+					const tenantId = editMode ? $form.id : json?.data?.tenantId ?? json?.tenantId;
+					if (tenantId) {
+						await optimisticUpsertTenant({
+							id: Number(tenantId),
+							name: $form.name,
+							email: $form.email || null,
+							contact_number: $form.contact_number || null,
+							tenant_status: $form.tenant_status || 'PENDING',
+							emergency_contact: $form.emergency_contact || null,
+							profile_picture_url: $form.profile_picture_url || null,
+							address: $form.address || null,
+							school_or_workplace: $form.school_or_workplace || null,
+							facebook_name: $form.facebook_name || null,
+							birthday: $form.birthday || null
+						});
+					}
+				} catch { /* non-critical — background resync will fix it */ }
+
 				if (editMode && onTenantUpdate && tenant) {
 					const updatedTenant = {
 						...tenant,
@@ -149,7 +171,7 @@
 				profilePictureFile = null;
 				profilePicturePreviewUrl = null;
 				hasSelectedNewImage = false;
-				
+
 				toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
 				onOpenChange(false);
 			} else {
@@ -172,6 +194,24 @@
 		invalidateAll: false,
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				// Optimistic write — update RxDB immediately so UI is instant
+				const tenantId = editMode ? $form.id : (result.data as any)?.tenantId;
+				if (tenantId) {
+					await optimisticUpsertTenant({
+						id: Number(tenantId),
+						name: $form.name,
+						email: $form.email || null,
+						contact_number: $form.contact_number || null,
+						tenant_status: $form.tenant_status || 'PENDING',
+						emergency_contact: $form.emergency_contact || null,
+						profile_picture_url: $form.profile_picture_url || null,
+						address: $form.address || null,
+						school_or_workplace: $form.school_or_workplace || null,
+						facebook_name: $form.facebook_name || null,
+						birthday: $form.birthday || null
+					});
+				}
+
 				if (editMode && onTenantUpdate && tenant) {
 					const updatedTenant = {
 						...tenant,
@@ -189,7 +229,7 @@
 				profilePictureFile = null;
 				profilePicturePreviewUrl = null;
 				hasSelectedNewImage = false;
-				
+
 				toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
 				onOpenChange(false);
 			} else if (result.type === 'failure') {

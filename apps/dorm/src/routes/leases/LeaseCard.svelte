@@ -302,8 +302,8 @@
 					{#if lease.lease_tenants && lease.lease_tenants.length > 0}
 						<div class="flex items-center">
 							{#each lease.lease_tenants.slice(0, 3) as leaseTenant, index}
-								{@const tenantData = leaseTenant}
-								{@const matchedTenant = tenants.find((t) => t.name === tenantData.name)}
+								{@const tenantData = leaseTenant.tenant ?? leaseTenant}
+								{@const matchedTenant = tenants.find((t) => t.name === tenantData?.name)}
 								{@const profileUrl =
 									(tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 								<div
@@ -313,7 +313,7 @@
 									{#if profileUrl}
 										<img
 											src={profileUrl}
-											alt="{tenantData.name}'s profile picture"
+											alt="{tenantData?.name ?? 'Tenant'}'s profile picture"
 											class="w-full h-full rounded-full object-cover"
 										/>
 									{:else}
@@ -321,9 +321,9 @@
 											class="w-full h-full bg-slate-100 rounded-full flex items-center justify-center"
 										>
 											<span class="text-slate-600 font-medium text-xs">
-												{tenantData.name
+												{(tenantData?.name ?? '')
 													.split(' ')
-													.map((n) => n[0])
+													.map((n: string) => n[0])
 													.join('')
 													.toUpperCase()}
 											</span>
@@ -397,8 +397,8 @@
 				{#if lease.lease_tenants && lease.lease_tenants.length > 0}
 					<div class="flex items-center">
 						{#each lease.lease_tenants.slice(0, 3) as leaseTenant, index}
-							{@const tenantData = leaseTenant}
-							{@const matchedTenant = tenants.find((t) => t.name === tenantData.name)}
+							{@const tenantData = leaseTenant.tenant ?? leaseTenant}
+							{@const matchedTenant = tenants.find((t) => t.name === tenantData?.name)}
 							{@const profileUrl =
 								(tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 							<div
@@ -408,7 +408,7 @@
 								{#if profileUrl}
 									<img
 										src={profileUrl}
-										alt="{tenantData.name}'s profile picture"
+										alt="{tenantData?.name ?? 'Tenant'}'s profile picture"
 										class="w-full h-full rounded-full object-cover"
 									/>
 								{:else}
@@ -416,9 +416,9 @@
 										class="w-full h-full bg-slate-100 rounded-full flex items-center justify-center"
 									>
 										<span class="text-slate-600 font-medium text-xs">
-											{tenantData.name
+											{(tenantData?.name ?? '')
 												.split(' ')
-												.map((n) => n[0])
+												.map((n: string) => n[0])
 												.join('')
 												.toUpperCase()}
 										</span>

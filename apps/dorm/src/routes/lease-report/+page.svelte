@@ -91,7 +91,7 @@
 
 		<!-- Filter Section -->
 		<div class="no-print">
-			<ReportFilter formData={data.filterForm} properties={data.properties} />
+			<ReportFilter formData={data.filterForm} properties={data.properties as any} />
 		</div>
 
 		<!-- Report Table -->

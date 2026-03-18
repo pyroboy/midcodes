@@ -4,168 +4,17 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { budgetSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { budgets, properties } from '$lib/server/schema';
-import { eq, desc, asc } from 'drizzle-orm';
+import { budgets } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
+
 
 // Use Node runtime; avoid ISR on authed routes to prevent cache/redirect issues
-export const config = { runtime: 'nodejs20.x' };
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { user, session } = locals;
-	if (!user) {
-		throw error(401, 'Unauthorized');
-	}
-
-	try {
-		// Fetch budgets and properties in parallel
-		const [budgetsRaw, propertiesData] = await Promise.all([
-			db
-				.select({
-					id: budgets.id,
-					propertyId: budgets.propertyId,
-					projectName: budgets.projectName,
-					projectDescription: budgets.projectDescription,
-					projectCategory: budgets.projectCategory,
-					plannedAmount: budgets.plannedAmount,
-					pendingAmount: budgets.pendingAmount,
-					actualAmount: budgets.actualAmount,
-					budgetItems: budgets.budgetItems,
-					status: budgets.status,
-					startDate: budgets.startDate,
-					endDate: budgets.endDate,
-					createdBy: budgets.createdBy,
-					createdAt: budgets.createdAt,
-					updatedAt: budgets.updatedAt,
-					propertyName: properties.name,
-					propertyDbId: properties.id
-				})
-				.from(budgets)
-				.leftJoin(properties, eq(budgets.propertyId, properties.id))
-				.orderBy(desc(budgets.createdAt)),
-
-			db
-				.select({ id: properties.id, name: properties.name })
-				.from(properties)
-				.orderBy(asc(properties.name))
-		]);
-
-		let activeProperties = propertiesData || [];
-
-		// Process budget data to include additional stats
-		const processedBudgets =
-			budgetsRaw?.map((budget) => {
-				let budgetItems;
-				try {
-					if (typeof budget.budgetItems === 'string') {
-						budgetItems = JSON.parse(budget.budgetItems);
-					}
-					budgetItems = Array.isArray(budget.budgetItems)
-						? budget.budgetItems
-						: Array.isArray(budgetItems)
-							? budgetItems
-							: [];
-				} catch (e) {
-					console.error('Error parsing budget_items:', e);
-					budgetItems = [];
-				}
-
-				const allocatedAmount = budgetItems.reduce((total: number, item: any) => {
-					const cost = typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0;
-					const quantity =
-						typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0;
-					return total + cost * quantity;
-				}, 0);
-
-				const plannedAmount =
-					typeof budget.plannedAmount === 'number' && !isNaN(budget.plannedAmount)
-						? budget.plannedAmount
-						: 0;
-
-				return {
-					...budget,
-					property: budget.propertyDbId ? { id: budget.propertyDbId, name: budget.propertyName } : null,
-					planned_amount: plannedAmount,
-					allocatedAmount,
-					remainingAmount: plannedAmount - allocatedAmount,
-					isExpanded: false,
-					budget_items: budgetItems.map((item: any) => ({
-						id: item.id || null,
-						name: item.name || '',
-						type: item.type || 'OTHER',
-						cost: typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0,
-						quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
-					})),
-					start_date: budget.startDate
-						? new Date(budget.startDate).toLocaleDateString('en-US', {
-								year: 'numeric',
-								month: '2-digit',
-								day: '2-digit'
-							})
-						: null,
-					end_date: budget.endDate
-						? new Date(budget.endDate).toLocaleDateString('en-US', {
-								year: 'numeric',
-								month: '2-digit',
-								day: '2-digit'
-							})
-						: null
-				};
-			}) || [];
-
-		// If no properties found, try without filter
-		if (activeProperties.length === 0) {
-			console.log('No properties found, trying without any filter');
-			activeProperties = await db
-				.select({ id: properties.id, name: properties.name })
-				.from(properties)
-				.orderBy(asc(properties.name));
-		}
-
-		// Calculate statistics
-		const statistics = processedBudgets.reduce(
-			(stats: any, budget) => {
-				const plannedAmount =
-					typeof budget.planned_amount === 'number' && !isNaN(budget.planned_amount)
-						? budget.planned_amount
-						: 0;
-				const allocatedBudget =
-					typeof budget.allocatedAmount === 'number' && !isNaN(budget.allocatedAmount)
-						? budget.allocatedAmount
-						: 0;
-
-				stats.totalPlannedBudget += plannedAmount;
-				stats.totalAllocatedBudget += allocatedBudget;
-
-				if (budget.status === 'COMPLETED') stats.completedProjects += 1;
-				else if (budget.status === 'ONGOING') stats.ongoingProjects += 1;
-
-				return stats;
-			},
-			{
-				totalPlannedBudget: 0,
-				totalAllocatedBudget: 0,
-				totalRemainingBudget: 0,
-				completedProjects: 0,
-				ongoingProjects: 0
-			}
-		);
-
-		statistics.totalRemainingBudget =
-			statistics.totalPlannedBudget - statistics.totalAllocatedBudget;
-
-		const form = await superValidate(zod(budgetSchema));
-
-		return {
-			form,
-			budgets: processedBudgets,
-			properties: activeProperties,
-			statistics,
-			user
-		};
-	} catch (err) {
-		console.error('Error in load function:', err);
-		throw error(500, 'Failed to load data');
-	}
+	const { user } = locals;
+	if (!user) throw error(401, 'Unauthorized');
+	const form = await superValidate(zod(budgetSchema));
+	return { form, user };
 };
 
 export const actions: Actions = {
@@ -214,17 +63,18 @@ export const actions: Actions = {
 				const result = await db
 					.update(budgets)
 					.set({
+						id: Date.now(),
 						propertyId: formattedData.property_id,
 						projectName: formattedData.project_name,
 						projectDescription: formattedData.project_description,
 						projectCategory: formattedData.project_category,
-						plannedAmount: formattedData.planned_amount,
-						pendingAmount: formattedData.pending_amount,
-						actualAmount: formattedData.actual_amount,
+						plannedAmount: String(formattedData.planned_amount),
+						pendingAmount: String(formattedData.pending_amount),
+						actualAmount: String(formattedData.actual_amount),
 						budgetItems: formattedData.budget_items,
 						status: formattedData.status,
-						startDate: formattedData.start_date,
-						endDate: formattedData.end_date,
+						startDate: formattedData.start_date ? new Date(formattedData.start_date) : null,
+						endDate: formattedData.end_date ? new Date(formattedData.end_date) : null,
 						updatedAt: new Date()
 					})
 					.where(eq(budgets.id, id))
@@ -235,17 +85,18 @@ export const actions: Actions = {
 				const result = await db
 					.insert(budgets)
 					.values({
+						id: Date.now(),
 						propertyId: formattedData.property_id,
 						projectName: formattedData.project_name,
 						projectDescription: formattedData.project_description,
 						projectCategory: formattedData.project_category,
-						plannedAmount: formattedData.planned_amount,
-						pendingAmount: formattedData.pending_amount || 0,
-						actualAmount: formattedData.actual_amount || 0,
+						plannedAmount: String(formattedData.planned_amount),
+						pendingAmount: String(formattedData.pending_amount || 0),
+						actualAmount: String(formattedData.actual_amount || 0),
 						budgetItems: formattedData.budget_items,
 						status: formattedData.status,
-						startDate: formattedData.start_date,
-						endDate: formattedData.end_date,
+						startDate: formattedData.start_date ? new Date(formattedData.start_date) : null,
+						endDate: formattedData.end_date ? new Date(formattedData.end_date) : null,
 						createdBy: user.id,
 						createdAt: new Date(),
 						updatedAt: new Date()

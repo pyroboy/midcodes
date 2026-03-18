@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { expenseTypeEnum, expenseStatusEnum, months } from './schema';
 
 // Define the expense item schema

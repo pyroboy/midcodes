@@ -1,9 +1,5 @@
-import { fail, redirect } from '@sveltejs/kit';
-import { superValidate } from 'sveltekit-superforms/server';
-import { zod } from 'sveltekit-superforms/adapters';
-import { loginSchema, registerSchema } from './schema';
-import type { PageServerLoad, Actions } from './$types';
-import { auth } from '$lib/server/auth';
+import { redirect } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	// If already logged in, redirect
@@ -12,73 +8,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		throw redirect(303, returnTo);
 	}
 
-	// Initialize both forms
-	const loginForm = await superValidate(zod(loginSchema));
-	const registerForm = await superValidate(zod(registerSchema));
-
-	return { loginForm, registerForm };
-};
-
-export const actions: Actions = {
-	login: async ({ request }) => {
-		const form = await superValidate(request, zod(loginSchema));
-
-		if (!form.valid) {
-			return fail(400, { form });
-		}
-
-		const { email, password } = form.data;
-
-		try {
-			const result = await auth.api.signInEmailAndPassword({
-				body: { email, password }
-			});
-
-			if (!result) {
-				return fail(400, {
-					form,
-					message: 'Invalid email or password'
-				});
-			}
-		} catch (e: any) {
-			const message = e?.message || 'Invalid email or password';
-			return fail(400, {
-				form,
-				message
-			});
-		}
-
-		throw redirect(303, '/');
-	},
-
-	register: async ({ request }) => {
-		const form = await superValidate(request, zod(registerSchema));
-
-		if (!form.valid) {
-			return fail(400, { form });
-		}
-
-		const { email, password } = form.data;
-
-		try {
-			await auth.api.signUpEmail({
-				body: {
-					email,
-					password,
-					name: email.split('@')[0] // Default name from email prefix
-				}
-			});
-		} catch (e: any) {
-			return fail(500, {
-				form,
-				message: e?.message || 'Registration failed. Please try again.'
-			});
-		}
-
-		return {
-			form,
-			success: true,
-			message: 'Registration successful! You can now log in.'
-		};
-	}
+	// Always show quick-access cards alongside the login form.
+	// Quick-access bypasses Better Auth entirely (no bcrypt, no DB session).
+	// Real login also works (schema split keeps CF Workers under CPU limit).
+	return {
+		devBypass: true
+	};
 };

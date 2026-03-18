@@ -5,8 +5,8 @@
 	import { toast } from 'svelte-sonner';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { invalidate, invalidateAll } from '$app/navigation';
-	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { optimisticUpsertBudget, optimisticDeleteBudget } from '$lib/db/optimistic-budgets';
 	import {
 		Card,
 		CardContent,
@@ -44,6 +44,89 @@
 	import { ChartBar, PieChart, AlertTriangle } from 'lucide-svelte';
 	// Page data using Svelte 5 $props rune
 	let { data } = $props<{ data: PageData }>();
+
+	// RxDB stores
+	const budgetsStore = createRxStore<any>('budgets',
+		(db) => db.budgets.find({ sort: [{ updated_at: 'desc' }] })
+	);
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	);
+
+	let properties = $derived(propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name })));
+
+	// Process budgets with enrichment (replaces server-side processing)
+	let budgets = $derived.by(() => {
+		return budgetsStore.value.map((budget: any) => {
+			const property = propertiesStore.value.find((p: any) => String(p.id) === String(budget.property_id));
+
+			let budgetItems: any[];
+			try {
+				if (typeof budget.budget_items === 'string') {
+					budgetItems = JSON.parse(budget.budget_items);
+				} else {
+					budgetItems = Array.isArray(budget.budget_items) ? budget.budget_items : [];
+				}
+			} catch {
+				budgetItems = [];
+			}
+
+			const allocatedAmount = budgetItems.reduce((total: number, item: any) => {
+				const cost = typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0;
+				const quantity = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0;
+				return total + cost * quantity;
+			}, 0);
+
+			const plannedAmount = parseFloat(budget.planned_amount) || 0;
+
+			return {
+				...budget,
+				id: Number(budget.id),
+				property_id: budget.property_id ? Number(budget.property_id) : null,
+				property: property ? { id: Number(property.id), name: property.name } : null,
+				planned_amount: plannedAmount,
+				pending_amount: parseFloat(budget.pending_amount) || 0,
+				actual_amount: parseFloat(budget.actual_amount) || 0,
+				allocatedAmount,
+				remainingAmount: plannedAmount - allocatedAmount,
+				isExpanded: false,
+				budget_items: budgetItems.map((item: any) => ({
+					id: item.id || null,
+					name: item.name || '',
+					type: item.type || 'OTHER',
+					cost: typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0,
+					quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
+				})),
+				start_date: budget.start_date ? new Date(budget.start_date).toLocaleDateString('en-US', {
+					year: 'numeric', month: '2-digit', day: '2-digit'
+				}) : null,
+				end_date: budget.end_date ? new Date(budget.end_date).toLocaleDateString('en-US', {
+					year: 'numeric', month: '2-digit', day: '2-digit'
+				}) : null
+			};
+		});
+	});
+
+	// Compute statistics client-side
+	let statistics = $derived.by(() => {
+		const stats = budgets.reduce((acc: any, budget: any) => {
+			acc.totalPlannedBudget += budget.planned_amount;
+			acc.totalAllocatedBudget += budget.allocatedAmount;
+			if (budget.status === 'COMPLETED') acc.completedProjects += 1;
+			else if (budget.status === 'ONGOING') acc.ongoingProjects += 1;
+			return acc;
+		}, {
+			totalPlannedBudget: 0,
+			totalAllocatedBudget: 0,
+			totalRemainingBudget: 0,
+			completedProjects: 0,
+			ongoingProjects: 0
+		});
+		stats.totalRemainingBudget = stats.totalPlannedBudget - stats.totalAllocatedBudget;
+		return stats;
+	});
+
+	let isLoading = $derived(!budgetsStore.initialized);
 
 	// State management for modals and UI
 	let showDeleteDialog = $state(false);
@@ -92,7 +175,11 @@
 			if (result.type === 'success') {
 				toast.success(selectedBudget ? 'Budget updated' : 'Budget added');
 				selectedBudget = null;
-				invalidateAll();
+				// Optimistic upsert after server confirms
+				const resultData = (result as any).data;
+				if (resultData?.budget) {
+					optimisticUpsertBudget(resultData.budget);
+				}
 			}
 		}
 	});
@@ -181,8 +268,8 @@
 
 		if (!itemBudgetId) return;
 
-		// Find the budget
-		const budget = data.budgets.find((b: Budget) => b.id === itemBudgetId);
+		// Find the budget from local RxDB data
+		const budget = budgets.find((b: any) => b.id === itemBudgetId);
 		if (!budget) return;
 
 		// Ensure the new item has a string ID
@@ -247,7 +334,7 @@
 
 			if (response.ok) {
 				toast.success('Budget deleted');
-				invalidateAll();
+				optimisticDeleteBudget(budgetId);
 			} else {
 				toast.error('Error deleting budget');
 			}
@@ -259,7 +346,8 @@
 
 	// Refresh data
 	async function refreshData() {
-		await invalidate('budgets:refresh');
+		const { resyncCollection } = await import('$lib/db/replication');
+		await Promise.all([resyncCollection('budgets'), resyncCollection('properties')]);
 		toast.success('Data refreshed');
 	}
 </script>
@@ -293,7 +381,7 @@
 				</div>
 				<div>
 					<div class="text-sm font-medium text-gray-500 mb-0.5">Total Budget</div>
-					<div class="text-xl font-bold">{formatCurrency(data.statistics.totalPlannedBudget)}</div>
+					<div class="text-xl font-bold">{formatCurrency(statistics.totalPlannedBudget)}</div>
 				</div>
 			</div>
 
@@ -304,10 +392,10 @@
 						<PieChart class="h-4 w-4 text-blue-600 mr-1.5" />
 						<span class="text-sm font-medium text-gray-500">Distribution</span>
 					</div>
-					{#if data.statistics.totalPlannedBudget > 0}
+					{#if statistics.totalPlannedBudget > 0}
 						{@const allocatedPercentage = Math.min(
 							Math.round(
-								(data.statistics.totalAllocatedBudget / data.statistics.totalPlannedBudget) * 100
+								(statistics.totalAllocatedBudget / statistics.totalPlannedBudget) * 100
 							),
 							100
 						)}
@@ -317,10 +405,10 @@
 					{/if}
 				</div>
 
-				{#if data.statistics.totalPlannedBudget > 0}
+				{#if statistics.totalPlannedBudget > 0}
 					{@const allocatedPercentage = Math.min(
 						Math.round(
-							(data.statistics.totalAllocatedBudget / data.statistics.totalPlannedBudget) * 100
+							(statistics.totalAllocatedBudget / statistics.totalPlannedBudget) * 100
 						),
 						100
 					)}
@@ -337,16 +425,16 @@
 					/>
 
 					<div class="flex justify-between items-center text-xs">
-						<span>{formatCurrency(data.statistics.totalAllocatedBudget)}</span>
+						<span>{formatCurrency(statistics.totalAllocatedBudget)}</span>
 						<span
 							class={cn(
 								'font-medium',
-								data.statistics.totalRemainingBudget >= 0 ? 'text-green-600' : 'text-red-600'
+								statistics.totalRemainingBudget >= 0 ? 'text-green-600' : 'text-red-600'
 							)}
 						>
-							{data.statistics.totalRemainingBudget >= 0
-								? formatCurrency(data.statistics.totalRemainingBudget) + ' left'
-								: 'Over by ' + formatCurrency(Math.abs(data.statistics.totalRemainingBudget))}
+							{statistics.totalRemainingBudget >= 0
+								? formatCurrency(statistics.totalRemainingBudget) + ' left'
+								: 'Over by ' + formatCurrency(Math.abs(statistics.totalRemainingBudget))}
 						</span>
 					</div>
 				{:else}
@@ -366,7 +454,7 @@
 						<span class="h-5 w-5 rounded-full bg-green-100 mr-1.5 flex items-center justify-center">
 							<CheckCircle class="h-3 w-3 text-green-600" />
 						</span>
-						<span class="text-sm font-semibold">{data.statistics.completedProjects}</span>
+						<span class="text-sm font-semibold">{statistics.completedProjects}</span>
 					</div>
 					<div class="flex items-center">
 						<span
@@ -374,14 +462,14 @@
 						>
 							<Clock class="h-3 w-3 text-yellow-600" />
 						</span>
-						<span class="text-sm font-semibold">{data.statistics.ongoingProjects}</span>
+						<span class="text-sm font-semibold">{statistics.ongoingProjects}</span>
 					</div>
 				</div>
 
-				{#if data.statistics.completedProjects + data.statistics.ongoingProjects > 0}
+				{#if statistics.completedProjects + statistics.ongoingProjects > 0}
 					{@const completionPercentage = Math.round(
-						(data.statistics.completedProjects /
-							(data.statistics.completedProjects + data.statistics.ongoingProjects)) *
+						(statistics.completedProjects /
+							(statistics.completedProjects + statistics.ongoingProjects)) *
 							100
 					)}
 					<div class="flex items-center gap-2">
@@ -419,7 +507,12 @@
 
 	<!-- Projects List -->
 	<div class="mb-6">
-		{#if data.budgets.length === 0}
+		{#if isLoading}
+			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
+				<RefreshCw class="h-12 w-12 mx-auto text-gray-400 animate-spin" />
+				<h3 class="mt-2 text-lg font-medium text-gray-900">Loading budgets...</h3>
+			</div>
+		{:else if budgets.length === 0}
 			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
 				<DollarSign class="h-12 w-12 mx-auto text-gray-400" />
 				<h3 class="mt-2 text-lg font-medium text-gray-900">No budget projects</h3>
@@ -433,7 +526,7 @@
 			</div>
 		{:else}
 			<div class="grid grid-cols-1 gap-6">
-				{#each data.budgets as budget (budget.id)}
+				{#each budgets as budget (budget.id)}
 					<BudgetProjectCard
 						{budget}
 						{formatCurrency}
@@ -452,7 +545,7 @@
 {#if showBudgetFormModal}
 	<BudgetFormModal
 		budget={selectedBudget}
-		properties={data.properties}
+		{properties}
 		editMode={editingBudget}
 		on:close={() => (showBudgetFormModal = false)}
 		on:submit={handleBudgetSubmit}
@@ -484,7 +577,3 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
-
-{#if browser && import.meta.env.DEV}
-	<SuperDebug data={$form} />
-{/if}

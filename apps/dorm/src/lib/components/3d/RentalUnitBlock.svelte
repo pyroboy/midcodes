@@ -3,7 +3,7 @@
 	import { Edges, HTML } from '@threlte/extras';
 	import TenantAvatar from './TenantAvatar.svelte';
 
-	let { unit, position = [0, 0, 0], size = [3, 1.5, 3] } = $props();
+	let { unit, position = [0, 0, 0] as [number, number, number], size = [3, 1.5, 3] as [number, number, number] } = $props();
 
 	// Flatten active tenants from the processed API data
 	let activeTenants = $derived(

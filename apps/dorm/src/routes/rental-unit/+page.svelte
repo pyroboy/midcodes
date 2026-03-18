@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { propertyStore } from '$lib/stores/property';
 	import RentalUnitForm from './Rental_UnitForm.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -13,18 +12,56 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from './formSchema';
-	import { invalidateAll } from '$app/navigation';
 	import { Pencil, Trash2, Users, Tag, List, Plus, Search, Home, Building2 } from 'lucide-svelte';
-	import type { RentalUnitResponse } from './+page.server';
 	import type { PageData } from './$types';
-	import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
+	import { resyncCollection } from '$lib/db/replication';
 
 	let { data } = $props<{ data: PageData }>();
 
-	let isLoading = $state(data.lazy === true);
-	let rentalUnits = $state<RentalUnitResponse[]>(data.rentalUnits || []);
-	let properties = $state(data.properties || []);
-	let floors = $state(data.floors || []);
+	// ─── RxDB reactive stores ───────────────────────────────────────────
+	const rentalUnitsStore = createRxStore<any>('rental_units',
+		(db) => db.rental_units.find()
+	);
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	);
+	const floorsStore = createRxStore<any>('floors',
+		(db) => db.floors.find()
+	);
+
+	// Enrich rental units with property and floor relationships
+	let rentalUnits = $derived(rentalUnitsStore.value.map((unit: any) => {
+		const property = propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id));
+		const floor = floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id));
+		return {
+			...unit,
+			id: Number(unit.id),
+			property_id: Number(unit.property_id),
+			floor_id: Number(unit.floor_id),
+			base_rate: unit.base_rate,
+			amenities: Array.isArray(unit.amenities) ? unit.amenities : [],
+			property: property ? { id: Number(property.id), name: property.name } : null,
+			floor: floor ? {
+				id: Number(floor.id),
+				property_id: floor.property_id,
+				floor_number: floor.floor_number,
+				wing: floor.wing
+			} : null
+		};
+	}));
+
+	let properties = $derived(propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name })));
+	let floors = $derived(floorsStore.value.map((f: any) => ({
+		id: Number(f.id),
+		property_id: f.property_id,
+		floor_number: f.floor_number,
+		wing: f.wing,
+		status: f.status
+	})));
+
+	let isLoading = $derived(!rentalUnitsStore.initialized);
 
 	// UI States
 	let searchQuery = $state('');
@@ -33,24 +70,7 @@
 
 	// Delete confirmation dialog state
 	let showDeleteDialog = $state(false);
-	let rentalUnitToDelete = $state<RentalUnitResponse | null>(null);
-
-	// Load data lazily on mount
-	onMount(async () => {
-		if (data.lazy && data.rentalUnitsPromise) {
-			try {
-				const loadedData = await data.rentalUnitsPromise;
-				rentalUnits = loadedData.rentalUnits;
-				properties = loadedData.properties;
-				floors = loadedData.floors;
-				isLoading = false;
-				cache.set(cacheKeys.rentalUnits(), loadedData, CACHE_TTL.MEDIUM);
-			} catch (error) {
-				console.error('Error loading rental units data:', error);
-				isLoading = false;
-			}
-		}
-	});
+	let rentalUnitToDelete = $state<any>(null);
 
 	// Derived states
 	let selectedProperty = $derived($propertyStore.selectedProperty);
@@ -58,14 +78,17 @@
 	let filteredRentalUnits = $derived(
 		selectedProperty && rentalUnits
 			? rentalUnits.filter(
-					(unit: RentalUnitResponse) =>
-						unit.property_id === selectedProperty!.id &&
+					(unit: any) =>
+						unit.property_id == selectedProperty!.id &&
 						(searchQuery === '' ||
 							unit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
 							unit.number.toString().includes(searchQuery))
 				)
 			: []
 	);
+
+	// Build data object for the form component (it reads data.floors)
+	let formData_passthrough = $derived({ ...data, floors, properties });
 
 	// Form Logic
 	const {
@@ -83,7 +106,27 @@
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
 				showModal = false;
-				await invalidateAll();
+				// Optimistic upsert — the server already persisted, push into RxDB
+				const d = $formData;
+				if (d.id) {
+					await optimisticUpsertRentalUnit({
+						id: d.id,
+						name: d.name,
+						number: d.number,
+						capacity: d.capacity,
+						rental_unit_status: d.rental_unit_status,
+						base_rate: String(d.base_rate),
+						property_id: d.property_id,
+						floor_id: d.floor_id,
+						type: d.type,
+						amenities: d.amenities
+					});
+				} else {
+					// For create, we don't have the new ID — resync to pick it up
+					resyncCollection('rental_units').catch((err) =>
+						console.warn('[RentalUnit] Background resync failed:', err)
+					);
+				}
 			}
 		}
 	});
@@ -100,7 +143,7 @@
 		showModal = true;
 	}
 
-	function handleEditClick(rentalUnit: RentalUnitResponse) {
+	function handleEditClick(rentalUnit: any) {
 		editMode = true;
 		reset({
 			data: {
@@ -131,7 +174,7 @@
 		showModal = true;
 	}
 
-	function handleDeleteClick(rentalUnit: RentalUnitResponse) {
+	function handleDeleteClick(rentalUnit: any) {
 		rentalUnitToDelete = rentalUnit;
 		showDeleteDialog = true;
 	}
@@ -142,6 +185,9 @@
 		showDeleteDialog = false;
 		rentalUnitToDelete = null;
 
+		// Optimistic: remove from RxDB immediately
+		await optimisticDeleteRentalUnit(rentalUnit.id);
+
 		const deleteData = new FormData();
 		deleteData.append('id', String(rentalUnit.id));
 
@@ -151,15 +197,21 @@
 				body: deleteData
 			});
 
-			if (result.ok) {
-				await invalidateAll();
-			} else {
+			if (!result.ok) {
 				const resp = await result.json();
 				alert(resp.message || 'Failed to delete rental unit.');
+				// Resync to restore the original state
+				resyncCollection('rental_units').catch((err) =>
+					console.warn('[RentalUnit] Resync after failed delete:', err)
+				);
 			}
 		} catch (error) {
 			console.error(error);
 			alert('An unexpected error occurred.');
+			// Resync to restore the original state on network error
+			resyncCollection('rental_units').catch((err) =>
+				console.warn('[RentalUnit] Resync after error:', err)
+			);
 		}
 	}
 
@@ -185,30 +237,26 @@
 	}
 </script>
 
-<div class="w-full min-h-screen bg-gray-50/50">
-	<!-- Modern Header -->
-	<div class="bg-white border-b border-gray-200 sticky top-0 z-10">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-			<div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-				<div class="flex items-center gap-3">
-					<div class="p-2 bg-blue-50 rounded-lg">
-						<Home class="w-6 h-6 text-blue-600" />
-					</div>
-					<div>
-						<h1 class="text-2xl font-bold text-gray-900">Rental Units</h1>
-						<p class="text-sm text-muted-foreground">Manage rooms, beds, and occupancy</p>
-					</div>
-				</div>
-
-				<Button onclick={handleAddClick} class="shadow-sm">
-					<Plus class="w-4 h-4 mr-2" />
-					Add Unit
-				</Button>
+<div class="space-y-6">
+	<!-- Header -->
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+		<div class="flex items-center gap-3">
+			<div class="p-2 bg-blue-50 rounded-lg">
+				<Home class="w-6 h-6 text-blue-600" />
+			</div>
+			<div>
+				<h1 class="text-2xl font-bold tracking-tight">Rental Units</h1>
+				<p class="text-sm text-muted-foreground">Manage rooms, beds, and occupancy</p>
 			</div>
 		</div>
+
+		<Button onclick={handleAddClick} class="shadow-sm">
+			<Plus class="w-4 h-4 mr-2" />
+			Add Unit
+		</Button>
 	</div>
 
-	<div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+	<div>
 		<!-- Search & Filter Bar -->
 		<div class="mb-6">
 			<div class="relative max-w-md">
@@ -405,7 +453,7 @@
 		</Dialog.Header>
 
 		<RentalUnitForm
-			{data}
+			data={formData_passthrough}
 			{editMode}
 			form={formData}
 			{errors}

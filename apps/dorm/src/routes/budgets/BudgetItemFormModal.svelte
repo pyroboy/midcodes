@@ -279,5 +279,3 @@
 		</Dialog.Content>
 	</Dialog.Portal>
 </Dialog.Root>
-
-export default BudgetItemFormModal;

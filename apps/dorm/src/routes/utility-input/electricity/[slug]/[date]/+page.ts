@@ -6,7 +6,6 @@ export interface PageData {
 	property: {
 		id: number;
 		name: string;
-		slug: string;
 	} | null;
 	date: string;
 	errors: string[];

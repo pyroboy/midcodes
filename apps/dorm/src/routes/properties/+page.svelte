@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { browser } from '$app/environment';
-	import { invalidateAll, invalidate } from '$app/navigation';
-	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
 	import PropertyForm from './PropertyForm.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
 	import * as Card from '$lib/components/ui/card';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import {
@@ -17,12 +15,32 @@
 		DialogTitle,
 		DialogDescription
 	} from '$lib/components/ui/dialog';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { propertySchema, type Property } from './formSchema';
 	import type { PageData } from './$types';
-	import { Plus } from 'lucide-svelte';
+	import { Plus, Search, Building2 } from 'lucide-svelte';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
 
 	let { data } = $props<{ data: PageData }>();
-	let { properties, form } = $derived(data);
+
+	// ─── RxDB reactive store ───────────────────────────────────────────
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	);
+	let properties = $derived(propertiesStore.value.map((p: any) => ({ ...p, id: Number(p.id) })));
+	let isLoading = $derived(!propertiesStore.initialized);
+
+	// ─── Search ────────────────────────────────────────────────────────
+	let searchQuery = $state('');
+	let filteredProperties = $derived(
+		searchQuery === ''
+			? properties
+			: properties.filter((p: Property) =>
+					p.name.toLowerCase().includes(searchQuery.toLowerCase())
+				)
+	);
+
 	let editMode = $state(false);
 	let showModal = $state(false);
 
@@ -47,7 +65,14 @@
 			if (result.type === 'success') {
 				editMode = false;
 				showModal = false;
-				await invalidateAll();
+				// Optimistic upsert into RxDB — UI updates instantly
+				await optimisticUpsertProperty({
+					id: $formData.id,
+					name: $formData.name,
+					address: $formData.address,
+					type: $formData.type,
+					status: $formData.status
+				});
 				reset();
 			}
 		}
@@ -92,23 +117,30 @@
 	async function confirmDeleteProperty() {
 		if (!propertyToDelete) return;
 
+		const deletingId = propertyToDelete.id;
+
+		// Optimistic delete — UI updates instantly
+		await optimisticDeleteProperty(deletingId);
+
+		showDeleteDialog = false;
+		propertyToDelete = null;
+
+		// POST to server for actual deletion
 		const deleteFormData = new FormData();
-		deleteFormData.append('id', String(propertyToDelete.id));
+		deleteFormData.append('id', String(deletingId));
 
 		const response = await fetch('?/delete', {
 			method: 'POST',
 			body: deleteFormData
 		});
 
-		if (response.ok) {
-			await invalidateAll();
-		} else {
+		if (!response.ok) {
 			const result = await response.json();
 			alert(`Failed to delete property: ${result.error || 'Unknown error'}`);
+			// Resync will restore the property if server delete failed
+			const { resyncCollection } = await import('$lib/db/replication');
+			resyncCollection('properties');
 		}
-
-		showDeleteDialog = false;
-		propertyToDelete = null;
 	}
 
 	function handleCancel() {
@@ -118,56 +150,87 @@
 	}
 </script>
 
-<div class="w-full">
-	<Card.Root>
-		<Card.Header class="px-7">
-			<div class="flex items-center justify-between">
-				<div>
-					<Card.Title>Properties</Card.Title>
-					<Card.Description>Manage your properties here.</Card.Description>
-				</div>
-				<Button onclick={handleAddProperty} class="flex items-center gap-2">
-					<Plus class="w-4 h-4" />
-					Add Property
-				</Button>
+<div class="space-y-6">
+	<!-- Header -->
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+		<div class="flex items-center gap-3">
+			<div class="p-2 bg-orange-50 rounded-lg">
+				<Building2 class="w-6 h-6 text-orange-600" />
 			</div>
-		</Card.Header>
-		<Card.Content>
+			<div>
+				<h1 class="text-2xl font-bold tracking-tight">Properties</h1>
+				<p class="text-sm text-muted-foreground">Manage your properties here.</p>
+			</div>
+		</div>
+		<Button onclick={handleAddProperty} class="shadow-sm">
+			<Plus class="w-4 h-4 mr-2" />
+			Add Property
+		</Button>
+	</div>
+
+	<!-- Search Bar -->
+	<div class="relative max-w-md">
+		<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+		<Input
+			placeholder="Search properties by name..."
+			class="pl-9"
+			bind:value={searchQuery}
+		/>
+	</div>
+
+	<!-- Content Table -->
+	<Card.Root class="overflow-hidden">
+		<Card.Content class="p-0">
 			<table class="w-full text-sm text-left">
-				<thead class="text-xs text-muted-foreground uppercase bg-muted/50">
+				<thead>
 					<tr>
-						<th class="p-4">Name</th>
-						<th class="p-4">Address</th>
-						<th class="p-4">Type</th>
-						<th class="p-4">Status</th>
-						<th class="p-4 text-right">Actions</th>
+						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
+						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</th>
+						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
+						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Actions</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#if properties?.length > 0}
-						{#each properties as property (property.id)}
-							<tr class="border-b hover:bg-muted/50">
-								<td class="p-4 font-medium">{property.name}</td>
-								<td class="p-4">{property.address}</td>
-								<td class="p-4">{property.type}</td>
-								<td class="p-4">
+					{#if isLoading}
+						{#each Array(3) as _, i (i)}
+							<tr class="border-b">
+								<td class="px-6 py-4"><Skeleton class="h-4 w-32" /></td>
+								<td class="px-6 py-4"><Skeleton class="h-4 w-48" /></td>
+								<td class="px-6 py-4"><Skeleton class="h-4 w-20" /></td>
+								<td class="px-6 py-4"><Skeleton class="h-5 w-16 rounded-full" /></td>
+								<td class="px-6 py-4">
+									<div class="flex items-center justify-end gap-2">
+										<Skeleton class="h-8 w-14" />
+										<Skeleton class="h-8 w-16" />
+									</div>
+								</td>
+							</tr>
+						{/each}
+					{:else if filteredProperties?.length > 0}
+						{#each filteredProperties as property (property.id)}
+							<tr class="border-b hover:bg-muted/50 transition-colors cursor-pointer" onclick={() => handlePropertyClick(property)}>
+								<td class="px-6 py-4 font-medium">{property.name}</td>
+								<td class="px-6 py-4">{property.address}</td>
+								<td class="px-6 py-4">{property.type}</td>
+								<td class="px-6 py-4">
 									<Badge variant={getStatusVariant(property.status)}>
 										{property.status}
 									</Badge>
 								</td>
-								<td class="p-4">
+								<td class="px-6 py-4">
 									<div class="flex items-center justify-end gap-2">
 										<Button
 											size="sm"
 											variant="outline"
-											onclick={() => handlePropertyClick(property)}
+											onclick={(e) => { e.stopPropagation(); handlePropertyClick(property); }}
 										>
 											Edit
 										</Button>
 										<Button
 											size="sm"
 											variant="destructive"
-											onclick={() => handleDeleteProperty(property)}
+											onclick={(e) => { e.stopPropagation(); handleDeleteProperty(property); }}
 										>
 											Delete
 										</Button>
@@ -177,8 +240,21 @@
 						{/each}
 					{:else}
 						<tr>
-							<td colspan="5" class="p-4 text-center text-muted-foreground">
-								No properties found
+							<td colspan="5" class="px-6 py-16 text-center">
+								<div class="flex flex-col items-center">
+									<div class="bg-gray-100 p-4 rounded-full mb-4">
+										<Building2 class="w-8 h-8 text-gray-400" />
+									</div>
+									<h3 class="text-lg font-semibold text-gray-900">No Properties Found</h3>
+									<p class="text-muted-foreground max-w-sm mt-2">
+										{searchQuery
+											? 'No properties match your search criteria.'
+											: 'Get started by adding your first property.'}
+									</p>
+									{#if !searchQuery}
+										<Button variant="outline" class="mt-4" onclick={handleAddProperty}>Add Property</Button>
+									{/if}
+								</div>
 							</td>
 						</tr>
 					{/if}
@@ -208,7 +284,6 @@
 			on:propertyAdded={async () => {
 				editMode = false;
 				showModal = false;
-				await invalidate('app:properties');
 			}}
 		/>
 	</DialogContent>
@@ -229,7 +304,3 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
-
-{#if browser}
-	<SuperDebug data={$formData} />
-{/if}

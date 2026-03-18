@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // Enum for tenant status matching the PostgreSQL enum
 export const TenantStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'PENDING', 'BLACKLISTED']);

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // Base schema for individual readings
 export const singleReadingSchema = z.object({

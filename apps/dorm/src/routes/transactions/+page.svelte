@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { transactionSchema } from './schema';
 	import { Button } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -14,64 +13,112 @@
 	import TransactionFormModal from './TransactionFormModal.svelte';
 	import TransactionDetailsModal from './TransactionDetailsModal.svelte';
 	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { invalidate, invalidateAll } from '$app/navigation';
-	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-	import { onMount } from 'svelte';
-	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { resyncCollection } from '$lib/db/replication';
 
 	let { data } = $props<{ data: PageData }>();
 
-	// Server-side caching for DB queries, client-side cache for debug panel visibility
-	let transactions = $state<Transaction[]>(data.transactions);
-	let billingsById = $state(data.billingsById);
-	let isLoading = $state(data.lazy === true);
+	// ─── RxDB reactive stores ───────────────────────────────────────────
+	const paymentsStore = createRxStore<any>('payments',
+		(db) => db.payments.find({ sort: [{ updated_at: 'desc' }] })
+	);
+	const billingsStore = createRxStore<any>('billings',
+		(db) => db.billings.find()
+	);
+	const leasesStore = createRxStore<any>('leases',
+		(db) => db.leases.find()
+	);
+	const rentalUnitsStore = createRxStore<any>('rental_units',
+		(db) => db.rental_units.find()
+	);
+	const floorsStore = createRxStore<any>('floors',
+		(db) => db.floors.find()
+	);
+	const leaseTenantsStore = createRxStore<any>('lease_tenants',
+		(db) => db.lease_tenants.find()
+	);
+	const tenantsStore = createRxStore<any>('tenants',
+		(db) => db.tenants.find()
+	);
+	const paymentAllocationsStore = createRxStore<any>('payment_allocations',
+		(db) => db.payment_allocations.find()
+	);
 
-	// Debug logging
-	console.log('Page data:', data);
+	// ─── Derive enriched transactions from RxDB stores ──────────────────
+	let transactions: Transaction[] = $derived.by(() => {
+		return paymentsStore.value
+			.filter((p: any) => !p.reverted_at) // Exclude reverted by default
+			.map((payment: any) => {
+				const billingIds = Array.isArray(payment.billing_ids) ? payment.billing_ids : [];
 
-	// Load data lazily from server promises
-	async function loadDataFromPromises() {
-		if (data.transactionsPromise) {
-			try {
-				const loadedData = await data.transactionsPromise;
-				transactions = loadedData.transactions;
-				billingsById = loadedData.billingsById;
-				isLoading = false;
+				// Find allocations for this payment
+				const allocations = paymentAllocationsStore.value
+					.filter((a: any) => String(a.payment_id) === String(payment.id))
+					.map((a: any) => ({ billing_id: Number(a.billing_id), amount: parseFloat(a.amount) || 0 }));
 
-				// Mirror server cache to client-side for debug panel visibility
-				cache.set(cacheKeys.transactions('default'), {
-					transactions: loadedData.transactions,
-					billingsById: loadedData.billingsById
-				}, CACHE_TTL.SHORT);
-			} catch (error) {
-				console.error('Error loading transactions data:', error);
-				isLoading = false;
-			}
-		}
-	}
+				// Build billing details with lease info
+				let leaseName: string | null = null;
+				const leaseDetails = billingIds.map((billingId: number) => {
+					const billing = billingsStore.value.find((b: any) => String(b.id) === String(billingId));
+					if (!billing) return null;
+					const lease = leasesStore.value.find((l: any) => String(l.id) === String(billing.lease_id));
+					if (lease && !leaseName) leaseName = lease.name;
+					const unit = lease ? rentalUnitsStore.value.find((u: any) => String(u.id) === String(lease.rental_unit_id)) : null;
+					const floor = unit ? floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id)) : null;
+					const allocation = allocations.find((a: any) => a.billing_id === Number(billing.id));
 
-	// Load data lazily on mount
-	onMount(async () => {
-		if (data.lazy) {
-			await loadDataFromPromises();
-		}
+					// Lease tenants
+					const ltDocs = lease ? leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(lease.id)) : [];
+					const tenantsList = ltDocs.map((lt: any) => {
+						const tenant = tenantsStore.value.find((t: any) => String(t.id) === String(lt.tenant_id));
+						return tenant ? { id: Number(tenant.id), name: tenant.name, email: tenant.email, phone: tenant.contact_number } : null;
+					}).filter(Boolean);
+
+					return {
+						billing_id: Number(billing.id),
+						billing_type: billing.type,
+						utility_type: billing.utility_type,
+						billing_amount: parseFloat(billing.amount) || 0,
+						allocated_amount: allocation?.amount || 0,
+						due_date: billing.due_date,
+						lease: lease ? {
+							id: Number(lease.id),
+							name: lease.name,
+							start_date: lease.start_date,
+							end_date: lease.end_date,
+							rent_amount: lease.rent_amount,
+							security_deposit: lease.security_deposit,
+							status: lease.status,
+							rental_unit: unit ? {
+								id: Number(unit.id),
+								number: unit.number,
+								floors: floor ? { floor_number: floor.floor_number, wing: floor.wing } : undefined
+							} : undefined,
+							lease_tenants: tenantsList.map((t: any) => ({ tenant: t }))
+						} : null
+					};
+				}).filter(Boolean);
+
+				// Unique leases
+				const leaseMap = new Map();
+				leaseDetails.forEach((d: any) => {
+					if (d?.lease?.id && !leaseMap.has(d.lease.id)) leaseMap.set(d.lease.id, d.lease);
+				});
+
+				return {
+					...payment,
+					id: Number(payment.id),
+					amount: parseFloat(payment.amount) || 0,
+					billing_ids: billingIds,
+					lease_name: leaseName,
+					allocations,
+					lease_details: leaseDetails,
+					unique_leases: Array.from(leaseMap.values())
+				};
+			});
 	});
 
-	// Update when data changes from server (after mutations)
-	$effect(() => {
-		if (!data.lazy) {
-			transactions = data.transactions;
-			billingsById = data.billingsById;
-
-			// Mirror to client-side cache for debug panel
-			if (transactions.length > 0) {
-				cache.set(cacheKeys.transactions('default'), {
-					transactions,
-					billingsById
-				}, CACHE_TTL.SHORT);
-			}
-		}
-	});
+	let isLoading = $derived(!paymentsStore.initialized);
 
 	// Form for adding/editing transactions
 	const { form, errors, enhance, constraints, submitting, reset } = superForm(data.form, {
@@ -89,7 +136,8 @@
 				toast.success(selectedTransaction ? 'Transaction updated' : 'Transaction added');
 				selectedTransaction = null;
 				showFormModal = false;
-				invalidateAll();
+				resyncCollection('payments');
+				resyncCollection('billings');
 			}
 		}
 	});
@@ -203,7 +251,8 @@
 
 			if (response.ok) {
 				toast.success('Transaction deleted');
-				invalidateAll();
+				resyncCollection('payments');
+				resyncCollection('billings');
 			} else {
 				toast.error(`Error deleting transaction: ${responseData.message || 'Unknown error'}`);
 			}
@@ -285,24 +334,9 @@
 
 	// Handle refresh event
 	async function handleRefresh(event: CustomEvent) {
-		const filters = event.detail;
-		console.log('Refreshing with filters:', filters);
-
-		// Create query params from filters
-		const params = new URLSearchParams();
-		if (filters.method) params.set('method', filters.method);
-		if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
-		if (filters.dateTo) params.set('dateTo', filters.dateTo);
-		if (filters.searchTerm) params.set('searchTerm', filters.searchTerm);
-
-		// Invalidate and navigate
-		await invalidate('transactions:refresh');
-
-		// Only update URL if we have filters
-		if (params.toString()) {
-			const url = `?${params.toString()}`;
-			history.pushState(null, '', url);
-		}
+		console.log('Refreshing transactions via RxDB resync');
+		await resyncCollection('payments');
+		await resyncCollection('billings');
 	}
 
 	// Handle close modals
@@ -393,6 +427,3 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-{#if browser && import.meta.env.DEV}
-	<SuperDebug data={$form} />
-{/if}

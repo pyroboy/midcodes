@@ -19,7 +19,7 @@
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { z } from 'zod';
+	import { z } from 'zod/v3';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import { securityDepositSchema } from './securityDepositSchema';
 

@@ -9,7 +9,7 @@
 	import { Receipt, Wallet, DollarSign, X } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import { transactionSchema, paymentMethodEnum } from './schema';
 	import type { Transaction } from './types';
 	import { superForm } from 'sveltekit-superforms/client';

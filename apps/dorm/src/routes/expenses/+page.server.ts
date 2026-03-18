@@ -4,80 +4,14 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { expenseSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { expenses, properties } from '$lib/server/schema';
-import { eq, desc, asc } from 'drizzle-orm';
+import { expenses } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { user, session } = locals;
-	if (!user) {
-		throw error(401, 'Unauthorized');
-	}
-
-	try {
-		// Fetch expenses and properties in parallel
-		const [expensesData, propertiesData] = await Promise.all([
-			db
-				.select({
-					id: expenses.id,
-					propertyId: expenses.propertyId,
-					amount: expenses.amount,
-					description: expenses.description,
-					type: expenses.type,
-					status: expenses.status,
-					expenseDate: expenses.expenseDate,
-					createdBy: expenses.createdBy,
-					createdAt: expenses.createdAt,
-					propertyName: properties.name,
-					propertyDbId: properties.id
-				})
-				.from(expenses)
-				.leftJoin(properties, eq(expenses.propertyId, properties.id))
-				.orderBy(desc(expenses.expenseDate)),
-
-			db
-				.select({ id: properties.id, name: properties.name })
-				.from(properties)
-				.orderBy(asc(properties.name))
-		]);
-
-		// Format expenses to match original structure
-		const formattedExpenses = expensesData.map((expense) => ({
-			...expense,
-			property: expense.propertyDbId ? { id: expense.propertyDbId, name: expense.propertyName } : null,
-			expense_date: new Date(expense.expenseDate).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: '2-digit',
-				day: '2-digit'
-			})
-		}));
-
-		let activeProperties = propertiesData || [];
-
-		// If no properties found, try without status filter
-		if (activeProperties.length === 0) {
-			console.log('No properties found, trying without any filter');
-			activeProperties = await db
-				.select({ id: properties.id, name: properties.name })
-				.from(properties)
-				.orderBy(asc(properties.name));
-		}
-
-		console.log(
-			`Loaded ${formattedExpenses.length || 0} expenses and ${activeProperties.length || 0} properties`
-		);
-
-		const form = await superValidate(zod(expenseSchema));
-
-		return {
-			form,
-			expenses: formattedExpenses,
-			properties: activeProperties,
-			user
-		};
-	} catch (err) {
-		console.error('Error in load function:', err);
-		throw error(500, 'Failed to load data');
-	}
+	const { user } = locals;
+	if (!user) throw error(401, 'Unauthorized');
+	const form = await superValidate(zod(expenseSchema));
+	return { form, user };
 };
 
 export const actions: Actions = {
@@ -103,11 +37,11 @@ export const actions: Actions = {
 					.update(expenses)
 					.set({
 						propertyId: expenseData.property_id,
-						amount: expenseData.amount,
+						amount: String(expenseData.amount),
 						description: expenseData.description,
-						type: expenseData.type,
+						type: expenseData.type as 'OPERATIONAL' | 'CAPITAL',
 						status: expenseData.expense_status,
-						expenseDate: expenseData.expense_date
+						expenseDate: expenseData.expense_date ? new Date(expenseData.expense_date) : null
 					})
 					.where(eq(expenses.id, id))
 					.returning();
@@ -119,11 +53,11 @@ export const actions: Actions = {
 					.insert(expenses)
 					.values({
 						propertyId: expenseData.property_id,
-						amount: expenseData.amount,
+						amount: String(expenseData.amount),
 						description: expenseData.description,
-						type: expenseData.type,
+						type: expenseData.type as 'OPERATIONAL' | 'CAPITAL',
 						status: expenseData.expense_status,
-						expenseDate: expenseData.expense_date,
+						expenseDate: expenseData.expense_date ? new Date(expenseData.expense_date) : null,
 						createdBy: user.id
 					})
 					.returning();

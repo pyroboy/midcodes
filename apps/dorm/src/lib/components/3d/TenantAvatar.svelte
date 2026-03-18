@@ -3,7 +3,7 @@
 	import { HTML, useTexture } from '@threlte/extras';
 	import { DoubleSide, CircleGeometry, MeshBasicMaterial } from 'three';
 
-	let { imageUrl, position = [0, 0, 0], name } = $props();
+	let { imageUrl, position = [0, 0, 0] as [number, number, number], name } = $props();
 
 	// Use a default avatar generator if no image provided
 	const avatarUrl =
@@ -17,7 +17,7 @@
 	<T.Mesh rotation={[0, 0, 0]} position={[0, 0.5, 0]}>
 		<T.CircleGeometry args={[0.3, 32]} />
 		{#await texture then value}
-			<T.MeshBasicMaterial map={value} side={DoubleSide} />
+			<T.MeshBasicMaterial map={value as any} side={DoubleSide} />
 		{:catch}
 			<T.MeshStandardMaterial color="gray" />
 		{/await}

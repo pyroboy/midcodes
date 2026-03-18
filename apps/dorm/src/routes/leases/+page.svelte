@@ -1,30 +1,143 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
 	import LeaseFormModal from './LeaseFormModal.svelte';
 	import LeaseList from './LeaseList.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign } from 'lucide-svelte';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import { leaseSchema } from './formSchema';
 	import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
 	import { formatCurrency } from '$lib/utils/format';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
-	import { onMount } from 'svelte';
 	import { printAllLeases } from '$lib/utils/print';
-	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { resyncCollection } from '$lib/db/replication';
+	import { optimisticDeleteLease } from '$lib/db/optimistic-leases';
 
 	type FormType = z.infer<typeof leaseSchema>;
 
 	let { data } = $props();
-	let leases = $state<any[]>(data.leases);
-	let tenants = $state(data.tenants);
-	let rentalUnits = $state(data.rental_units);
+
+	// ─── RxDB reactive stores ───────────────────────────────────────────
+	const leasesStore = createRxStore<any>('leases',
+		(db) => db.leases.find({ selector: { deleted_at: { $eq: null } }, sort: [{ updated_at: 'desc' }] })
+	);
+	const tenantsStore = createRxStore<any>('tenants',
+		(db) => db.tenants.find({ selector: { deleted_at: { $eq: null } }, sort: [{ name: 'asc' }] })
+	);
+	const rentalUnitsStore = createRxStore<any>('rental_units',
+		(db) => db.rental_units.find()
+	);
+	const floorsStore = createRxStore<any>('floors',
+		(db) => db.floors.find()
+	);
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find()
+	);
+	const leaseTenantsStore = createRxStore<any>('lease_tenants',
+		(db) => db.lease_tenants.find()
+	);
+	const billingsStore = createRxStore<any>('billings',
+		(db) => db.billings.find()
+	);
+	const paymentsStore = createRxStore<any>('payments',
+		(db) => db.payments.find()
+	);
+	const paymentAllocationsStore = createRxStore<any>('payment_allocations',
+		(db) => db.payment_allocations.find()
+	);
+
+	// ─── Derived data from RxDB stores ──────────────────────────────────
+	let leases = $derived.by(() => {
+		return leasesStore.value.map((lease: any) => {
+			const unit = rentalUnitsStore.value.find((u: any) => String(u.id) === String(lease.rental_unit_id));
+			const floor = unit ? floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id)) : null;
+			const property = unit ? propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id)) : null;
+
+			// Lease tenants
+			const ltDocs = leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(lease.id));
+			const lease_tenants = ltDocs.map((lt: any) => {
+				const tenant = tenantsStore.value.find((t: any) => String(t.id) === String(lt.tenant_id));
+				return tenant ? {
+					tenant: {
+						name: tenant.name,
+						email: tenant.email,
+						contact_number: tenant.contact_number,
+						profile_picture_url: tenant.profile_picture_url
+					}
+				} : null;
+			}).filter(Boolean);
+
+			// Billings for this lease
+			const leaseBillings = billingsStore.value
+				.filter((b: any) => String(b.lease_id) === String(lease.id))
+				.map((b: any) => ({
+					id: Number(b.id),
+					type: b.type,
+					utility_type: b.utility_type,
+					amount: parseFloat(b.amount) || 0,
+					paid_amount: parseFloat(b.paid_amount) || 0,
+					balance: parseFloat(b.balance) || 0,
+					status: b.status,
+					due_date: b.due_date,
+					billing_date: b.billing_date,
+					penalty_amount: parseFloat(b.penalty_amount) || 0,
+					notes: b.notes
+				}));
+
+			// Calculate totals
+			const totalPaid = leaseBillings.reduce((sum: number, b: any) => sum + b.paid_amount, 0);
+			const totalBalance = leaseBillings.reduce((sum: number, b: any) => sum + b.balance, 0);
+
+			return {
+				id: Number(lease.id),
+				rental_unit_id: lease.rental_unit_id,
+				name: lease.name,
+				start_date: lease.start_date,
+				end_date: lease.end_date,
+				rent_amount: parseFloat(lease.rent_amount) || 0,
+				security_deposit: parseFloat(lease.security_deposit) || 0,
+				notes: lease.notes,
+				terms_month: lease.terms_month,
+				status: lease.status,
+				created_at: lease.created_at,
+				rental_unit: unit ? {
+					...unit,
+					id: Number(unit.id),
+					floor: floor || null,
+					property: property || null
+				} : null,
+				lease_tenants,
+				billings: leaseBillings,
+				totalPaid,
+				balance: totalBalance
+			} as any;
+		});
+	});
+
+	let tenants = $derived(tenantsStore.value.map((t: any) => ({
+		id: Number(t.id),
+		name: t.name,
+		email: t.email,
+		contact_number: t.contact_number,
+		profile_picture_url: t.profile_picture_url
+	})));
+
+	let rentalUnits = $derived(rentalUnitsStore.value.map((u: any) => {
+		const property = propertiesStore.value.find((p: any) => String(p.id) === String(u.property_id));
+		return {
+			...u,
+			id: Number(u.id),
+			property: property ? { id: Number(property.id), name: property.name } : null
+		};
+	}));
+
+	let isLoading = $derived(!leasesStore.initialized);
+
 	let showModal = $state(false);
 	let selectedLease: FormType | undefined = $state();
 	let editMode = $state(false);
-	let isLoading = $state(data.lazy === true);
 
 	// Add activeFilter state for summary card filtering
 	let activeFilter = $state<'all' | 'paid' | 'pending' | 'partial' | 'overdue'>('all');
@@ -32,90 +145,6 @@
 	// Delete confirmation dialog state
 	let showDeleteDialog = $state(false);
 	let leaseToDelete = $state<any>(null);
-
-	// Progressive loading: load core data first, then financial data
-	async function loadDataFromPromises() {
-		if (data.coreLeasesPromise && data.tenantsPromise && data.rentalUnitsPromise && data.financialLeasesPromise) {
-			try {
-				// Load core data first for fast initial render
-				const [coreLeases, loadedTenants, loadedRentalUnits] = await Promise.all([
-					data.coreLeasesPromise,
-					data.tenantsPromise,
-					data.rentalUnitsPromise
-				]);
-
-				// Set core data immediately (without financial calculations)
-				leases = coreLeases;
-				tenants = loadedTenants;
-				rentalUnits = loadedRentalUnits;
-				isLoading = false;
-
-				// Mirror server cache to client-side for debug panel visibility
-				cache.set(cacheKeys.leasesCore(), coreLeases, CACHE_TTL.SHORT);
-				cache.set(cacheKeys.tenants(), loadedTenants, CACHE_TTL.MEDIUM);
-				cache.set(cacheKeys.rentalUnits(), loadedRentalUnits, CACHE_TTL.MEDIUM);
-
-				// Load enhanced financial data in background (non-blocking)
-				try {
-					const enhancedLeases = await data.financialLeasesPromise;
-					leases = enhancedLeases;
-					// Update cache with enhanced data
-					cache.set(cacheKeys.leasesCore(), enhancedLeases, CACHE_TTL.SHORT);
-				} catch (financialError) {
-					console.error('Error loading financial data (continuing with core data):', financialError);
-					// Continue with core data if financial data fails
-				}
-			} catch (error) {
-				console.error('Error loading lease data:', error);
-				isLoading = false;
-			}
-		}
-	}
-
-	// Function to refresh data after server actions
-	async function refreshData() {
-		isLoading = true;
-		try {
-			// Invalidate all dependencies to get fresh data
-			await invalidateAll();
-
-			// After invalidation, the data object should have new promises
-			// We need to wait for the next tick to ensure data is updated
-			await new Promise(resolve => setTimeout(resolve, 0));
-
-			// Reload data from new promises (now using progressive loading)
-			await loadDataFromPromises();
-		} catch (error) {
-			console.error('Error refreshing data:', error);
-			isLoading = false;
-		}
-	}
-
-	// Load data lazily on mount
-	onMount(async () => {
-		if (data.lazy) {
-			await loadDataFromPromises();
-		}
-	});
-
-	$effect(() => {
-		if (!data.lazy) {
-			leases = data.leases;
-			tenants = data.tenants;
-			rentalUnits = data.rental_units;
-
-			// Mirror to client-side cache for debug panel
-			if (leases.length > 0) {
-				cache.set(cacheKeys.leasesCore(), leases, CACHE_TTL.SHORT);
-			}
-			if (tenants.length > 0) {
-				cache.set(cacheKeys.tenants(), tenants, CACHE_TTL.MEDIUM);
-			}
-			if (rentalUnits.length > 0) {
-				cache.set(cacheKeys.rentalUnits(), rentalUnits, CACHE_TTL.MEDIUM);
-			}
-		}
-	});
 
 	// Svelte 5 runes for reactive calculations
 	let leasesWithStatus = $derived.by(() =>
@@ -169,6 +198,17 @@
 		});
 	});
 
+	// Resync relevant collections after server actions
+	async function refreshData() {
+		await Promise.all([
+			resyncCollection('leases'),
+			resyncCollection('lease_tenants'),
+			resyncCollection('billings'),
+			resyncCollection('payments'),
+			resyncCollection('payment_allocations')
+		]).catch((err) => console.warn('[Leases] refreshData resync failed:', err));
+	}
+
 	function handleAddLease() {
 		selectedLease = undefined;
 		editMode = false;
@@ -208,6 +248,9 @@
 		showDeleteDialog = false;
 		leaseToDelete = null;
 
+		// Optimistic: remove from UI immediately
+		await optimisticDeleteLease(lease.id);
+
 		const formData = new FormData();
 		formData.append('id', String(lease.id));
 		formData.append('reason', 'User initiated deletion');
@@ -220,18 +263,20 @@
 			const response = await result.json();
 
 			if (result.ok) {
-				// Refresh data to get latest state from server
-				await refreshData();
 				toast.success(
 					`Lease "${lease.name}" has been successfully archived. Payment history has been preserved.`
 				);
 			} else {
 				console.error('Delete failed:', response);
 				toast.error(response.error || response.message || 'Failed to delete lease');
+				// Resync to restore the original state
+				resyncCollection('leases');
 			}
 		} catch (error) {
 			console.error('Error deleting lease:', error);
 			toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			// Resync to restore the original state on network error
+			resyncCollection('leases');
 		}
 	}
 
@@ -242,7 +287,7 @@
 	}
 
 	function handleStatusChange(id: string, status: string) {
-		leases = leases.map((lease) => (lease.id === id ? { ...lease, status } : lease));
+		// RxDB store will auto-update after resync; this is a no-op now
 	}
 </script>
 
@@ -373,7 +418,7 @@
 				</button>
 			</div>
 
-	
+
 		</div>
 	</div>
 
@@ -511,4 +556,3 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
-

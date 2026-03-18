@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const paymentStatusEnum = z.enum(['PENDING', 'PARTIAL', 'PAID', 'OVERDUE']);
 

@@ -74,7 +74,7 @@
 					{:else if derivedFloors.length === 0}
 						No floors available
 					{:else}
-						{derivedFloors.find((f) => f.value === getSelectValue($form.floor_id))?.label ||
+						{derivedFloors.find((f: any) => f.value === getSelectValue($form.floor_id))?.label ||
 							'Select a floor'}
 					{/if}
 				</Select.Trigger>

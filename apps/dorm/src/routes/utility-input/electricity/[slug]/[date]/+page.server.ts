@@ -32,9 +32,9 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		console.log(`Looking for property with slug: "${propertySlug}"`);
 
 		const propertyResult = await db
-			.select({ id: properties.id, name: properties.name, slug: properties.slug, status: properties.status })
+			.select({ id: properties.id, name: properties.name, status: properties.status })
 			.from(properties)
-			.where(eq(properties.slug, propertySlug))
+			.where(eq(properties.name, propertySlug))
 			.limit(1);
 
 		const propertyData = propertyResult[0];
@@ -44,7 +44,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		} else if (propertyData.status !== 'ACTIVE') {
 			errorDetails.push(`Property is not active`);
 		} else {
-			console.log(`Property found: ${propertyData.name} (${propertyData.slug})`);
+			console.log(`Property found: ${propertyData.name}`);
 			property = propertyData;
 		}
 	}
@@ -112,7 +112,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 			existingReadingsCount = validReadings.length;
 
 			if (existingReadingsCount > 0) {
-				const futureDateLinks = generateFutureDateLinks(property.slug!, date);
+				const futureDateLinks = generateFutureDateLinks(property.name, date);
 				const displayDate = new Date(date).toLocaleDateString('en-US', {
 					weekday: 'long',
 					year: 'numeric',
@@ -190,7 +190,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		readingsResult.forEach((reading: any) => {
 			if (!latestReadings[reading.meterId]) {
 				latestReadings[reading.meterId] = {
-					value: reading.reading,
+					value: Number(reading.reading),
 					date: reading.readingDate
 				};
 			}
@@ -344,10 +344,10 @@ export const actions: Actions = {
 
 			const previousReadingMap: Record<number, number> = {};
 			for (const r of previousReadings) {
-				if (previousReadingMap[r.meterId] === undefined) previousReadingMap[r.meterId] = r.reading;
+				if (previousReadingMap[r.meterId] === undefined) previousReadingMap[r.meterId] = Number(r.reading);
 			}
 			const initialReadingMap: Record<number, number> = Object.fromEntries(
-				metersData.map((m) => [m.id, m.initialReading ?? 0])
+				metersData.map((m) => [m.id, Number(m.initialReading ?? 0)])
 			);
 			const meterNameMap: Record<number, string> = Object.fromEntries(
 				metersData.map((m) => [m.id, m.name])
@@ -374,7 +374,7 @@ export const actions: Actions = {
 						}
 						return {
 							meterId: r.meter_id,
-							reading: current,
+							reading: String(current),
 							readingDate: r.reading_date,
 							reviewStatus: 'PENDING_REVIEW'
 						};
@@ -402,7 +402,7 @@ export const actions: Actions = {
 
 				return {
 					meterId: r.meter_id,
-					reading: current,
+					reading: String(current),
 					readingDate: r.reading_date,
 					reviewStatus: 'PENDING_REVIEW'
 				};

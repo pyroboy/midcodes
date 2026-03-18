@@ -1,68 +1,133 @@
 <script lang="ts">
-	import { superForm } from 'sveltekit-superforms/client';
-	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { loginSchema, registerSchema } from './schema';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { Separator } from '$lib/components/ui/separator';
 	import { Loader2 } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { PageData } from './$types';
 
-	let { data } = $props<{ data: PageData }>();
+	let { data }: { data: PageData } = $props();
 
-	// Login Form Logic
-	const {
-		form: loginFormData,
-		errors: loginErrors,
-		submitting: loginSubmitting,
-		enhance: loginEnhance,
-		message: loginMessage
-	} = superForm(data.loginForm, {
-		validators: zodClient(loginSchema),
-		onResult: ({ result }) => {
-			if (result.type === 'failure') {
-				toast.error('Login Failed', { description: result.data?.message });
-			}
-		}
-	});
+	// Login state
+	let loginEmail = $state('');
+	let loginPassword = $state('');
+	let loginLoading = $state(false);
+	let loginError = $state('');
 
-	// Register Form Logic
-	const {
-		form: regFormData,
-		errors: regErrors,
-		submitting: regSubmitting,
-		enhance: regEnhance,
-		message: regMessage
-	} = superForm(data.registerForm, {
-		validators: zodClient(registerSchema),
-		onResult: ({ result }) => {
-			if (result.type === 'success') {
-				toast.success('Account Created', { description: result.data?.message });
-			} else if (result.type === 'failure') {
-				toast.error('Registration Failed', { description: result.data?.message });
-			}
-		}
-	});
+	// Register state
+	let regEmail = $state('');
+	let regPassword = $state('');
+	let regConfirmPassword = $state('');
+	let regLoading = $state(false);
 
 	const ALLOW_SIGNUP = true;
-
 	let activeTab = $state('login');
+
+	async function handleLogin(e: Event) {
+		e.preventDefault();
+		loginError = '';
+		loginLoading = true;
+
+		try {
+			const res = await fetch('/api/auth/sign-in/email', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email: loginEmail, password: loginPassword })
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				loginError = body?.message || 'Invalid email or password';
+				toast.error('Login Failed', { description: loginError });
+				return;
+			}
+
+			// Better Auth sets session cookie via Set-Cookie header automatically.
+			// Full page reload to pick up the new session in hooks.
+			window.location.href = '/';
+		} catch (err: any) {
+			loginError = err?.message || 'Something went wrong';
+			toast.error('Login Failed', { description: loginError });
+		} finally {
+			loginLoading = false;
+		}
+	}
+
+	async function handleRegister(e: Event) {
+		e.preventDefault();
+
+		if (regPassword !== regConfirmPassword) {
+			toast.error("Passwords don't match");
+			return;
+		}
+
+		regLoading = true;
+
+		try {
+			const res = await fetch('/api/auth/sign-up/email', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					email: regEmail,
+					password: regPassword,
+					name: regEmail.split('@')[0]
+				})
+			});
+
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				toast.error('Registration Failed', { description: body?.message || 'Please try again.' });
+				return;
+			}
+
+			toast.success('Account Created', { description: 'You can now log in.' });
+			activeTab = 'login';
+			loginEmail = regEmail;
+		} catch (err: any) {
+			toast.error('Registration Failed', { description: err?.message || 'Something went wrong' });
+		} finally {
+			regLoading = false;
+		}
+	}
 </script>
 
 <div class="flex flex-col space-y-2 text-center">
-	{#if activeTab === 'register'}
-		<h1 class="text-3xl font-bold tracking-tight">Create your account</h1>
-		<p class="text-sm text-muted-foreground">Get started with DormAdmin Suite</p>
-	{:else}
-		<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
-		<p class="text-sm text-muted-foreground">Enter your credentials to manage your properties</p>
-	{/if}
+	<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
+	<p class="text-sm text-muted-foreground">Enter your credentials or use quick access</p>
 </div>
 
-<Tabs value={activeTab} onValueChange={(v) => (activeTab = v)} class="w-full mt-6">
+<!-- Quick Access Cards -->
+{#if data.devBypass}
+	<div class="mt-6 space-y-2">
+		<p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick Access</p>
+		<div class="grid grid-cols-2 gap-2">
+			<a href="/?dev_role=super_admin" class="rounded-lg border-2 border-red-200 bg-red-50 px-3 py-2 text-left hover:border-red-400 transition-colors">
+				<div class="font-semibold text-sm text-red-900">Super Admin</div>
+				<div class="text-xs text-red-600">Full access</div>
+			</a>
+			<a href="/?dev_role=property_admin" class="rounded-lg border-2 border-orange-200 bg-orange-50 px-3 py-2 text-left hover:border-orange-400 transition-colors">
+				<div class="font-semibold text-sm text-orange-900">Property Admin</div>
+				<div class="text-xs text-orange-600">Manage all</div>
+			</a>
+			<a href="/?dev_role=property_manager" class="rounded-lg border-2 border-blue-200 bg-blue-50 px-3 py-2 text-left hover:border-blue-400 transition-colors">
+				<div class="font-semibold text-sm text-blue-900">Manager</div>
+				<div class="text-xs text-blue-600">Operations</div>
+			</a>
+			<a href="/?dev_role=property_tenant" class="rounded-lg border-2 border-green-200 bg-green-50 px-3 py-2 text-left hover:border-green-400 transition-colors">
+				<div class="font-semibold text-sm text-green-900">Tenant</div>
+				<div class="text-xs text-green-600">Read-only</div>
+			</a>
+		</div>
+		<div class="relative my-4">
+			<div class="absolute inset-0 flex items-center"><span class="w-full border-t"></span></div>
+			<div class="relative flex justify-center text-xs uppercase"><span class="bg-background px-2 text-muted-foreground">or sign in</span></div>
+		</div>
+	</div>
+{/if}
+
+<!-- Login / Register Form -->
+<Tabs value={activeTab} onValueChange={(v) => (activeTab = v)} class="w-full">
 	<TabsList class="grid w-full {ALLOW_SIGNUP ? 'grid-cols-2' : 'grid-cols-1'} mb-6">
 		<TabsTrigger value="login">Login</TabsTrigger>
 		{#if ALLOW_SIGNUP}
@@ -72,13 +137,11 @@
 
 	<!-- LOGIN TAB -->
 	<TabsContent value="login">
-		<form method="POST" action="?/login" use:loginEnhance class="space-y-4">
-			{#if $loginMessage}
-				<div
-					class="p-3 rounded-md bg-destructive/15 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2"
-				>
+		<form onsubmit={handleLogin} class="space-y-4">
+			{#if loginError}
+				<div class="p-3 rounded-md bg-destructive/15 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2">
 					<span class="h-2 w-2 rounded-full bg-destructive"></span>
-					{$loginMessage}
+					{loginError}
 				</div>
 			{/if}
 
@@ -89,13 +152,10 @@
 					name="email"
 					type="email"
 					placeholder="name@company.com"
-					bind:value={$loginFormData.email}
-					disabled={$loginSubmitting}
+					bind:value={loginEmail}
+					disabled={loginLoading}
 					class="bg-background"
 				/>
-				{#if $loginErrors.email}<span class="text-xs text-destructive text-left"
-						>{$loginErrors.email}</span
-					>{/if}
 			</div>
 
 			<div class="grid gap-2">
@@ -110,17 +170,14 @@
 					name="password"
 					type="password"
 					placeholder="••••••••"
-					bind:value={$loginFormData.password}
-					disabled={$loginSubmitting}
+					bind:value={loginPassword}
+					disabled={loginLoading}
 					class="bg-background"
 				/>
-				{#if $loginErrors.password}<span class="text-xs text-destructive text-left"
-						>{$loginErrors.password}</span
-					>{/if}
 			</div>
 
-			<Button type="submit" class="w-full mt-2" disabled={$loginSubmitting}>
-				{#if $loginSubmitting}
+			<Button type="submit" class="w-full mt-2" disabled={loginLoading}>
+				{#if loginLoading}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 					Signing in...
 				{:else}
@@ -133,16 +190,7 @@
 	<!-- REGISTER TAB -->
 	{#if ALLOW_SIGNUP}
 		<TabsContent value="register">
-			<form method="POST" action="?/register" use:regEnhance class="space-y-4">
-				{#if $regMessage}
-					<div
-						class="p-3 rounded-md bg-destructive/15 text-destructive text-sm font-medium border border-destructive/20 flex items-center gap-2"
-					>
-						<span class="h-2 w-2 rounded-full bg-destructive"></span>
-						{$regMessage}
-					</div>
-				{/if}
-
+			<form onsubmit={handleRegister} class="space-y-4">
 				<div class="grid gap-2">
 					<Label for="reg-email" class="text-left">Email Address</Label>
 					<Input
@@ -150,13 +198,10 @@
 						name="email"
 						type="email"
 						placeholder="name@company.com"
-						bind:value={$regFormData.email}
-						disabled={$regSubmitting}
+						bind:value={regEmail}
+						disabled={regLoading}
 						class="bg-background"
 					/>
-					{#if $regErrors.email}<span class="text-xs text-destructive text-left"
-							>{$regErrors.email}</span
-						>{/if}
 				</div>
 
 				<div class="grid gap-2">
@@ -166,13 +211,10 @@
 						name="password"
 						type="password"
 						placeholder="Create a password"
-						bind:value={$regFormData.password}
-						disabled={$regSubmitting}
+						bind:value={regPassword}
+						disabled={regLoading}
 						class="bg-background"
 					/>
-					{#if $regErrors.password}<span class="text-xs text-destructive text-left"
-							>{$regErrors.password}</span
-						>{/if}
 				</div>
 
 				<div class="grid gap-2">
@@ -182,17 +224,14 @@
 						name="confirmPassword"
 						type="password"
 						placeholder="Confirm your password"
-						bind:value={$regFormData.confirmPassword}
-						disabled={$regSubmitting}
+						bind:value={regConfirmPassword}
+						disabled={regLoading}
 						class="bg-background"
 					/>
-					{#if $regErrors.confirmPassword}<span class="text-xs text-destructive text-left"
-							>{$regErrors.confirmPassword}</span
-						>{/if}
 				</div>
 
-				<Button type="submit" class="w-full mt-2" disabled={$regSubmitting}>
-					{#if $regSubmitting}
+				<Button type="submit" class="w-full mt-2" disabled={regLoading}>
+					{#if regLoading}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 						Creating Account...
 					{:else}

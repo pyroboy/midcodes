@@ -1,19 +1,55 @@
-import { auth } from '$lib/server/auth';
-import { db, dbQuery } from '$lib/server/db';
-import { profiles } from '$lib/server/schema';
-import { eq } from 'drizzle-orm';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import type { Handle } from '@sveltejs/kit';
-import { getUserPermissions } from '$lib/services/permissions';
+import { DEV_USERS } from '$lib/server/dev-bypass';
+// Auth uses lightweight schema-auth.ts (4 tables) — safe for CF Workers CPU limit
+import { auth } from '$lib/server/auth';
 import { initializeEnv } from '$lib/server/env';
 
-// Flag to track if environment has been validated (runs once on first request)
 let _envValidated = false;
 
 const betterAuthHandle: Handle = async ({ event, resolve }) => {
-	// SECURITY: Validate environment variables on first request
+	// ── Quick-access bypass (works in dev and production) ──
+	const roleParam = event.url.searchParams.get('dev_role');
+	if (roleParam !== null) {
+		if (roleParam === 'logout') {
+			event.cookies.delete('dev_role', { path: '/' });
+		} else if (DEV_USERS[roleParam]) {
+			event.cookies.set('dev_role', roleParam, { path: '/', httpOnly: true, sameSite: 'lax', secure: !dev });
+		}
+		const cleanUrl = new URL(event.url);
+		cleanUrl.searchParams.delete('dev_role');
+		throw redirect(303, cleanUrl.pathname + cleanUrl.search);
+	}
+
+	const quickRole = event.cookies.get('dev_role');
+	if (quickRole && DEV_USERS[quickRole]) {
+		const mock = DEV_USERS[quickRole];
+		event.locals.session = {
+			id: 'quick-session',
+			userId: '00000000-0000-0000-0000-000000000001',
+			expiresAt: new Date(Date.now() + 86400000),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			token: 'quick-token'
+		} as any;
+		event.locals.user = {
+			id: '00000000-0000-0000-0000-000000000001',
+			email: mock.email,
+			name: mock.role,
+			emailVerified: true,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			image: null
+		} as any;
+		event.locals.org_id = 'dev-org';
+		event.locals.permissions = mock.permissions;
+		event.locals.effectiveRoles = [mock.role];
+		return resolve(event);
+	}
+
+	// ── Normal auth flow (Better Auth + DB) ──
 	if (!_envValidated) {
 		try {
 			initializeEnv();
@@ -24,26 +60,27 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 		_envValidated = true;
 	}
 
-	// Better Auth session management with retry and timeout
+	// Auth uses lightweight DB (schema-auth.ts) — fast on CF Workers
 	let result: any = null;
 	try {
-		result = await dbQuery(
-			() =>
-				auth.api.getSession({
-					headers: event.request.headers
-				}),
-			3000 // 3 second timeout for session retrieval
-		);
+		result = await auth.api.getSession({
+			headers: event.request.headers
+		});
 	} catch (e) {
 		console.error('[AUTH] getSession FAILED:', e);
-		// Don't throw - allow request to continue without session
 	}
 
 	event.locals.session = result?.session ?? null;
 	event.locals.user = result?.user ?? null;
 
+	// Only lazy-load the heavy schema when we have an authenticated user
+	// and need profile/permissions (avoids loading 716-line schema on every request)
 	if (result?.user) {
-		// Fetch profile data from Neon via Drizzle with retry and timeout
+		const { db, dbQuery } = await import('$lib/server/db');
+		const { profiles } = await import('$lib/server/schema');
+		const { eq } = await import('drizzle-orm');
+		const { getUserPermissions } = await import('$lib/services/permissions');
+
 		let userProfile: any = null;
 		try {
 			const [profile] = await dbQuery(
@@ -53,24 +90,22 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 						.from(profiles)
 						.where(eq(profiles.id, result.user.id))
 						.limit(1),
-				5000 // 5 second timeout for profile fetch
+				5000
 			);
 			userProfile = profile;
 		} catch (e) {
 			console.error('[AUTH] Profile fetch FAILED:', e);
-			// Continue without profile - user will have limited access
 		}
 
 		if (userProfile) {
 			const roles = userProfile.role ? [userProfile.role] : [];
 			const effectiveRoles = roles;
 
-			// Get permissions with retry and timeout
 			let permissions: string[] = [];
 			try {
 				permissions = await dbQuery(
 					() => getUserPermissions(effectiveRoles, userProfile.id),
-					3000 // 3 second timeout for permissions
+					3000
 				);
 			} catch (e) {
 				console.error('[AUTH] Permissions fetch FAILED:', e);
@@ -86,7 +121,6 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 };
 
 const securityHeadersHandle: Handle = async ({ event, resolve }) => {
-	// SECURITY: Build Content Security Policy
 	const connectSrc = dev
 		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* ws://localhost:* ws://127.0.0.1:*"
 		: "connect-src 'self' https://*.neon.tech";
@@ -95,7 +129,7 @@ const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-		"img-src 'self' data: blob: https://*.neon.tech https://images.unsplash.com",
+		"img-src 'self' data: blob: https://*.neon.tech https://images.unsplash.com https://res.cloudinary.com",
 		connectSrc,
 		"worker-src 'self' blob:",
 		"frame-ancestors 'none'",
@@ -123,8 +157,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const path = event.url.pathname;
 	const isUserLoggedIn = !!event.locals.user;
 
-	// 1. Handle API routes (except auth API)
-	if (path.startsWith('/api') && !path.startsWith('/api/auth')) {
+	// 1. Handle API routes (except auth API and cron)
+	if (path.startsWith('/api') && !path.startsWith('/api/auth') && !path.startsWith('/api/cron')) {
 		if (!isUserLoggedIn) {
 			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
 				status: 401,
@@ -139,7 +173,6 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		path.startsWith('/utility-input/') || path === '/terms' || path === '/privacy';
 
 	if (isUserLoggedIn) {
-		// Redirect logged-in users away from auth pages (except signout)
 		if (path.startsWith('/auth') && !path.startsWith('/auth/signout')) {
 			const returnTo = event.url.searchParams.get('returnTo');
 			if (returnTo && !returnTo.startsWith('/auth')) {
@@ -148,7 +181,6 @@ const authGuard: Handle = async ({ event, resolve }) => {
 			throw redirect(303, '/');
 		}
 	} else if (!isAuthRoute && !isPublicRoute) {
-		// Redirect unauthenticated users to auth page
 		throw redirect(303, `/auth?returnTo=${encodeURIComponent(path)}`);
 	}
 

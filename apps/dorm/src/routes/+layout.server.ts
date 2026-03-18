@@ -1,54 +1,35 @@
 // src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
-import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
-import { db } from '$lib/server/db';
-import { properties } from '$lib/server/schema';
-import { eq, asc } from 'drizzle-orm';
-
-// Note: Cache debug panel now reads cache directly client-side for real-time updates.
-// Removed server-side cacheStatus as it was a static snapshot that became stale.
+import { dev } from '$app/environment';
+import { isDbAvailable, DEV_PROPERTIES } from '$lib/server/dev-bypass';
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const { session, user, permissions } = locals;
 
-	// Set up dependency for cache status updates
 	depends('app:cache');
 
-	// Debug logging for troubleshooting
-	if (process.env.NODE_ENV === 'development') {
-		console.log('[Layout Server] Load function called');
-		console.log('[Layout Server] Session exists:', !!session);
-		console.log('[Layout Server] User exists:', !!user);
-		if (user) {
-			console.log('[Layout Server] User ID:', user.id);
-			console.log('[Layout Server] User Email:', user.email);
-			console.log('[Layout Server] Permissions:', permissions?.length || 0, 'found');
-		}
+	// Dev bypass — no DB, return mock data
+	if (dev && !isDbAvailable()) {
+		return {
+			session,
+			user,
+			permissions,
+			properties: user ? DEV_PROPERTIES : []
+		};
 	}
 
-	// This function fetches the properties with caching
-	const fetchProperties = async () => {
-		if (!user) {
-			// Return empty array instead of null for better handling
-			if (process.env.NODE_ENV === 'development') {
-				console.log('[Layout] No user found, returning empty properties array');
-			}
-			return [];
-		}
+	// Normal DB flow
+	const { cache, cacheKeys, CACHE_TTL } = await import('$lib/services/cache');
+	const { db } = await import('$lib/server/db');
+	const { properties } = await import('$lib/server/schema');
+	const { eq, asc } = await import('drizzle-orm');
 
-		// Check cache first
+	const fetchProperties = async () => {
+		if (!user) return [];
+
 		const cacheKey = cacheKeys.activeProperties();
 		const cached = cache.get<any[]>(cacheKey);
-		if (cached) {
-			if (process.env.NODE_ENV === 'development') {
-				console.log('[Layout] Returning cached properties');
-			}
-			return cached;
-		}
-
-		if (process.env.NODE_ENV === 'development') {
-			console.log('[Layout] Cache miss - fetching properties from database');
-		}
+		if (cached) return cached;
 
 		try {
 			const activeProperties = await db
@@ -65,16 +46,7 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				.where(eq(properties.status, 'ACTIVE'))
 				.orderBy(asc(properties.name));
 
-			if (process.env.NODE_ENV === 'development') {
-				console.log(`[Layout] Found ${activeProperties.length} active properties`);
-			}
-
-			// If no active properties, try without status filter
 			if (activeProperties.length === 0) {
-				if (process.env.NODE_ENV === 'development') {
-					console.log('[Layout] No active properties found, trying without status filter...');
-				}
-
 				const allProperties = await db
 					.select({
 						id: properties.id,
@@ -88,16 +60,10 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 					.from(properties)
 					.orderBy(asc(properties.name));
 
-				if (process.env.NODE_ENV === 'development') {
-					console.log(`[Layout] Found ${allProperties.length} total properties`);
-				}
-
-				// Cache the result with 10 minute TTL
 				cache.set(cacheKey, allProperties, CACHE_TTL.LONG);
 				return allProperties;
 			}
 
-			// Cache the result with 10 minute TTL
 			cache.set(cacheKey, activeProperties, CACHE_TTL.LONG);
 			return activeProperties;
 		} catch (error) {
@@ -110,7 +76,6 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		session,
 		user,
 		permissions,
-		// Return the promise for properties. SvelteKit will handle streaming.
 		properties: fetchProperties()
 	};
 };

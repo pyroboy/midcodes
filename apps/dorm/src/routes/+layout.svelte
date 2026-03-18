@@ -10,8 +10,7 @@
 	import { page } from '$app/stores';
 	import { contextualPreload, safePreloadData } from '$lib/utils/prefetch';
 	import { preloadHeavyComponents } from '$lib/utils/lazyLoad';
-	import CacheDebugPanel from '$lib/components/debug/CacheDebugPanel.svelte';
-	import { dev } from '$app/environment';
+	import SyncIndicator from '$lib/components/sync/SyncIndicator.svelte';
 	import GlobalPropertyViewer from '$lib/components/3d/GlobalPropertyViewer.svelte';
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { Button } from '$lib/components/ui/button';
@@ -21,18 +20,29 @@
 	// Import Lucide icons
 	import {
 		Building,
+		Building2,
 		Home,
 		Layers,
 		Gauge,
 		Users,
 		FileText,
 		CreditCard,
-		List,
+		AlertTriangle,
+		Zap,
+		ArrowLeftRight,
+		Receipt,
+		PiggyBank,
+		BarChart3,
+		ClipboardList,
+		LayoutDashboard,
 		LogOut,
 		User,
 		Box,
-		X
+		X,
+		ChevronRight,
+		Lightbulb
 	} from 'lucide-svelte';
+	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 
 	let { data, children }: { data: PageData; children: any } = $props();
 
@@ -49,13 +59,30 @@
 			isAuthRoute = $page.url.pathname.startsWith('/auth');
 		});
 
-		// Preloading disabled due to SSR issues
-		// TODO: Re-enable when SSR is working properly
-		// if (data.user) {
-		//   const userRoles = data.user.user_metadata?.roles || [];
-		//   contextualPreload($page.url.pathname, userRoles);
-		// }
-		// preloadHeavyComponents();
+		// Initialize RxDB for authenticated users (lazy import — never loaded on server or for guests)
+		if (data.user) {
+			import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+				syncStatus.setPhase('initializing');
+				// Kick off Neon health check in parallel
+				syncStatus.checkNeonHealth();
+			});
+			import('$lib/db').then(({ getDb }) => {
+				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+					syncStatus.setRxdbHealth('checking', 'Opening RxDB...');
+				});
+				return getDb().then((db) => {
+					import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+						syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
+					});
+					return import('$lib/db/replication').then(({ startSync }) => startSync(db));
+				});
+			}).catch((err) => {
+				console.error('[RxDB] Init failed:', err);
+				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+					syncStatus.setRxdbHealth('error', undefined, err);
+				});
+			});
+		}
 
 		return unsubscribe;
 	});
@@ -93,7 +120,7 @@
 					});
 			} else {
 				// Properties already resolved
-				const props = (data.properties as Property[]) || [];
+				const props = (data.properties as unknown as Property[]) || [];
 				resolvedProperties = props;
 				propertiesInitialized = true;
 				if (props.length > 0) {
@@ -111,7 +138,7 @@
 		{
 			category: 'Locations',
 			links: [
-				{ href: '/properties', label: 'Properties', icon: Building },
+				{ href: '/properties', label: 'Properties', icon: Building2 },
 				{ href: '/rental-unit', label: 'Rental Units', icon: Home },
 				{ href: '/floors', label: 'Floors', icon: Layers },
 				{ href: '/meters', label: 'Meters', icon: Gauge }
@@ -122,23 +149,24 @@
 			links: [
 				{ href: '/tenants', label: 'Tenants', icon: Users },
 				{ href: '/leases', label: 'Leases', icon: FileText },
-				{ href: '/utility-billings', label: 'Utilities', icon: CreditCard },
-				{ href: '/penalties', label: 'Penalties', icon: List }
+				{ href: '/utility-billings', label: 'Utilities', icon: Zap },
+				{ href: '/penalties', label: 'Penalties', icon: AlertTriangle }
 			]
 		},
 		{
 			category: 'Finance',
 			links: [
-				{ href: '/transactions', label: 'Transactions', icon: CreditCard },
-				{ href: '/expenses', label: 'Expenses', icon: FileText },
-				{ href: '/budgets', label: 'Budgets', icon: FileText }
+				{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+				{ href: '/expenses', label: 'Expenses', icon: Receipt },
+				{ href: '/budgets', label: 'Budgets', icon: PiggyBank }
 			]
 		},
 		{
 			category: 'Reports',
 			links: [
-				{ href: '/reports', label: 'Monthly Reports', icon: CreditCard },
-				{ href: '/lease-report', label: 'Lease Reports', icon: CreditCard }
+				{ href: '/insights', label: 'Insights', icon: Lightbulb },
+				{ href: '/reports', label: 'Monthly Reports', icon: BarChart3 },
+				{ href: '/lease-report', label: 'Lease Reports', icon: ClipboardList }
 			]
 		}
 	];
@@ -146,10 +174,11 @@
 	// Auto-expand the category containing the current page
 	let activeCategory = $derived.by(() => {
 		const pathname = $page.url.pathname;
+		if (pathname === '/') return ''; // Dashboard — don't expand any category
 		const match = navigationLinks.find((group) =>
 			group.links.some((link) => pathname.startsWith(link.href))
 		);
-		return match?.category ?? navigationLinks[0].category;
+		return match?.category ?? '';
 	});
 </script>
 
@@ -189,21 +218,53 @@
 					<!-- Sidebar -->
 					<Sidebar.Root collapsible="icon" class="shrink-0 z-20">
 						<Sidebar.Header>
-							<div class="p-4 font-bold text-lg">Dorm Management</div>
+							<div class="px-4 py-5 flex items-center gap-3">
+								<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+									<Building class="h-4 w-4" />
+								</div>
+								<div class="flex flex-col group-data-[collapsible=icon]:hidden">
+									<span class="font-semibold text-sm leading-tight">Dorm</span>
+									<span class="text-xs text-muted-foreground leading-tight">Management</span>
+								</div>
+							</div>
 						</Sidebar.Header>
 
 						<Sidebar.Content>
+							<!-- Dashboard link (always visible, outside accordion) -->
+							<Sidebar.Menu class="px-2 mb-1">
+								<a
+									href="/"
+									class="block no-underline"
+									data-sveltekit-preload-data="hover"
+								>
+									<Sidebar.MenuItem>
+										<Sidebar.MenuButton
+											class={cn(
+												$page.url.pathname === '/' && "bg-accent text-accent-foreground"
+											)}
+										>
+											<LayoutDashboard class="h-5 w-5" />
+											<span>Dashboard</span>
+										</Sidebar.MenuButton>
+									</Sidebar.MenuItem>
+								</a>
+							</Sidebar.Menu>
+
+							<div class="px-4 mb-2">
+								<div class="border-t"></div>
+							</div>
+
 							<Accordion.Root type="single" value={activeCategory} class="w-full">
 								{#each navigationLinks as group (group.category)}
 									<Accordion.Item value={group.category} class="border-b-0">
 										<Accordion.Trigger
-											class="px-4 py-2 text-xs font-semibold uppercase text-muted-foreground hover:no-underline hover:text-foreground"
+											class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:no-underline hover:text-foreground transition-colors"
 											onmouseover={() => onSectionHover(group.links)}
 										>
 											{group.category}
 										</Accordion.Trigger>
-										<Accordion.Content class="pb-1 pt-0">
-											<Sidebar.Menu>
+										<Accordion.Content class="pb-2 pt-0">
+											<Sidebar.Menu class="px-2">
 												{#each group.links as link (link.href)}
 													<a
 														href={link.href}
@@ -214,10 +275,18 @@
 														<Sidebar.MenuItem>
 															<Sidebar.MenuButton
 																class={cn(
-																	$page.url.pathname.startsWith(link.href) && "bg-accent text-accent-foreground"
+																	"transition-colors",
+																	$page.url.pathname.startsWith(link.href)
+																		? "bg-primary/10 text-primary font-medium"
+																		: "hover:bg-muted"
 																)}
 															>
-																<link.icon class="h-5 w-5" />
+																<link.icon class={cn(
+																	"h-4 w-4",
+																	$page.url.pathname.startsWith(link.href)
+																		? "text-primary"
+																		: "text-muted-foreground"
+																)} />
 																<span>{link.label}</span>
 															</Sidebar.MenuButton>
 														</Sidebar.MenuItem>
@@ -231,30 +300,35 @@
 						</Sidebar.Content>
 
 						<Sidebar.Footer>
-							<div class="p-4 border-t">
+							<div class="border-t p-3">
 								{#if data.session}
-									<div class="flex flex-col space-y-3">
-										<div class="flex items-center space-x-2 text-sm">
-											<User class="w-4 h-4 text-muted-foreground" />
-											<span class="truncate">{data.user?.email || 'Logged in'}</span>
+									<div class="flex items-center gap-3 rounded-lg p-2 hover:bg-muted transition-colors group/user">
+										<div class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground shrink-0">
+											<User class="h-4 w-4" />
 										</div>
-										<a
-											href="/auth/signout"
-											class="flex items-center space-x-2 text-sm text-red-600 hover:text-red-800"
-											data-sveltekit-preload-data="off"
-										>
-											<LogOut class="w-4 h-4" />
-											<span>Sign out</span>
-										</a>
+										<div class="flex flex-col min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+											<span class="text-sm font-medium truncate">{data.user?.email || 'Logged in'}</span>
+											<div class="flex items-center gap-2">
+												<SyncIndicator />
+											</div>
+										</div>
 									</div>
+									<a
+										href="/auth/signout"
+										class="flex items-center gap-2 rounded-lg px-2 py-2 mt-1 text-sm text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors group-data-[collapsible=icon]:justify-center"
+										data-sveltekit-preload-data="off"
+									>
+										<LogOut class="h-4 w-4" />
+										<span class="group-data-[collapsible=icon]:hidden">Sign out</span>
+									</a>
 								{:else}
 									<a
 										href="/auth"
-										class="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
+										class="flex items-center gap-2 rounded-lg p-2 text-sm text-primary hover:bg-primary/10 transition-colors"
 										data-sveltekit-preload-data="off"
 									>
-										<User class="w-4 h-4" />
-										<span>Sign in</span>
+										<User class="h-4 w-4" />
+										<span class="group-data-[collapsible=icon]:hidden">Sign in</span>
 									</a>
 								{/if}
 							</div>
@@ -274,6 +348,7 @@
 								{#if data.user}
 									<div class="flex items-center gap-2">
 										<PropertySelector />
+										<NotificationBell />
 
 										<!-- 3D Toggle Button moved here -->
 										{#if $featureFlags.enable3DView}
@@ -351,9 +426,5 @@
 			</Sidebar.Provider>
 		{/if}
 
-		<!-- Cache Debug Panel (Development Only) - Visible on all non-auth routes except utility-input -->
-		{#if dev && !isAuthRoute && !$page.url.pathname.startsWith('/utility-input')}
-			<CacheDebugPanel />
-		{/if}
 	{/if}
 {/if}

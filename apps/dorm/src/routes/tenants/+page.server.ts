@@ -5,139 +5,24 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import {
 	tenantFormSchema,
-	tenantResponseSchema,
 	type EmergencyContact,
 	parseEmergencyContactFromForm
 } from './formSchema';
-import type { TenantResponse } from '$lib/types/tenant';
-import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+import { cache, cacheKeys } from '$lib/services/cache';
 import { db } from '$lib/server/db';
-import { tenants, leaseTenants, leases, rentalUnit, properties } from '$lib/server/schema';
-import { eq, and, asc, ne, isNull, ilike, sql } from 'drizzle-orm';
+import { tenants } from '$lib/server/schema';
+import { eq, and, ne, isNull, ilike } from 'drizzle-orm';
 
-export const load: PageServerLoad = async ({ locals, depends }) => {
-	const { user, permissions } = locals;
-	if (!permissions.includes('tenants.read')) throw error(401, 'Unauthorized');
+export const load: PageServerLoad = async ({ locals }) => {
+	const { permissions } = locals;
+	if (!permissions?.includes('tenants.read')) throw error(401, 'Unauthorized');
 
-	// Set up dependencies for invalidation
-	depends('app:tenants');
-
-	// Return minimal data for instant navigation
+	// Data loading moved to RxDB client-side stores.
+	// Server only provides the superform for create/update actions.
 	return {
-		tenants: [],
-		properties: [],
-		form: await superValidate(zod(tenantFormSchema)),
-		lazy: true,
-		tenantsPromise: loadTenantsData(),
-		propertiesPromise: loadPropertiesData()
+		form: await superValidate(zod(tenantFormSchema))
 	};
 };
-
-async function loadTenantsData() {
-	const cacheKey = cacheKeys.tenants();
-	const cached = cache.get<TenantResponse[]>(cacheKey);
-	if (cached) {
-		console.log('CACHE HIT: Returning cached tenants data');
-		return cached;
-	}
-
-	console.log('CACHE MISS: Fetching tenants from database');
-
-	// Fetch all non-deleted tenants
-	const tenantsData = await db
-		.select()
-		.from(tenants)
-		.where(isNull(tenants.deletedAt))
-		.orderBy(asc(tenants.name));
-
-	// Fetch lease-tenant relationships with lease and rental unit data
-	const leaseTenantsData = await db
-		.select({
-			tenantId: leaseTenants.tenantId,
-			leaseId: leases.id,
-			leaseName: leases.name,
-			leaseStartDate: leases.startDate,
-			leaseEndDate: leases.endDate,
-			leaseStatus: leases.status,
-			unitId: rentalUnit.id,
-			unitName: rentalUnit.name,
-			unitNumber: rentalUnit.number,
-			unitBaseRate: rentalUnit.baseRate,
-			propertyId: properties.id,
-			propertyName: properties.name
-		})
-		.from(leaseTenants)
-		.innerJoin(leases, eq(leaseTenants.leaseId, leases.id))
-		.leftJoin(rentalUnit, eq(leases.rentalUnitId, rentalUnit.id))
-		.leftJoin(properties, eq(rentalUnit.propertyId, properties.id));
-
-	// Build tenant -> leases map
-	const tenantLeasesMap = new Map<number, any[]>();
-	for (const lt of leaseTenantsData) {
-		if (!tenantLeasesMap.has(lt.tenantId)) tenantLeasesMap.set(lt.tenantId, []);
-		tenantLeasesMap.get(lt.tenantId)!.push({
-			id: lt.leaseId,
-			name: lt.leaseName,
-			start_date: lt.leaseStartDate,
-			end_date: lt.leaseEndDate,
-			status: lt.leaseStatus,
-			rental_unit: lt.unitId
-				? {
-						id: lt.unitId,
-						name: lt.unitName,
-						number: lt.unitNumber,
-						property: lt.propertyId ? { id: lt.propertyId, name: lt.propertyName } : null
-					}
-				: null
-		});
-	}
-
-	// Process tenants with lease info
-	const processedTenants = tenantsData.map((tenant) => {
-		const tenantLeases = tenantLeasesMap.get(tenant.id) || [];
-		const primaryLease =
-			tenantLeases.find((l: any) => l.status === 'ACTIVE') || tenantLeases[0] || null;
-
-		return {
-			...tenant,
-			leases: tenantLeases,
-			lease: primaryLease
-		};
-	}) as TenantResponse[];
-
-	console.log(`Processed ${processedTenants.length} tenants with status breakdown:`, {
-		active: processedTenants.filter((t) => t.tenant_status === 'ACTIVE').length,
-		inactive: processedTenants.filter((t) => t.tenant_status === 'INACTIVE').length,
-		pending: processedTenants.filter((t) => t.tenant_status === 'PENDING').length,
-		blacklisted: processedTenants.filter((t) => t.tenant_status === 'BLACKLISTED').length
-	});
-
-	cache.set(cacheKey, processedTenants, CACHE_TTL.MEDIUM);
-	console.log('Cached tenants data');
-
-	return processedTenants;
-}
-
-async function loadPropertiesData() {
-	const cacheKey = cacheKeys.activeProperties();
-	const cached = cache.get<any[]>(cacheKey);
-	if (cached) {
-		console.log('CACHE HIT: Returning cached properties data');
-		return cached;
-	}
-
-	console.log('CACHE MISS: Fetching properties from database');
-	const propertiesData = await db
-		.select({ id: properties.id, name: properties.name })
-		.from(properties)
-		.where(eq(properties.status, 'ACTIVE'))
-		.orderBy(asc(properties.name));
-
-	cache.set(cacheKey, propertiesData, CACHE_TTL.LONG);
-	console.log('Cached properties data');
-
-	return propertiesData;
-}
 
 // Base tenant insert type
 type TenantInsertBase = {
@@ -231,8 +116,9 @@ export const actions: Actions = {
 			}
 		}
 
+		let newTenantId: number;
 		try {
-			await db.insert(tenants).values({
+			const [inserted] = await db.insert(tenants).values({
 				name: form.data.name,
 				contactNumber: form.data.contact_number || null,
 				email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
@@ -243,7 +129,8 @@ export const actions: Actions = {
 				schoolOrWorkplace: form.data.school_or_workplace ?? null,
 				facebookName: form.data.facebook_name ?? null,
 				birthday: form.data.birthday ?? null
-			});
+			}).returning({ id: tenants.id });
+			newTenantId = inserted.id;
 		} catch (err: any) {
 			console.error('Failed to create tenant:', err);
 			if (err.message?.includes('Policy check failed')) {
@@ -254,12 +141,11 @@ export const actions: Actions = {
 			return fail(500, { form });
 		}
 
-		console.log('Create action - Successfully created tenant');
+		console.log('Create action - Successfully created tenant, id:', newTenantId);
 
 		cache.delete(cacheKeys.tenants());
-		console.log('Invalidated tenants cache');
 
-		return { form };
+		return { form, tenantId: newTenantId };
 	},
 
 	update: async ({ request }: RequestEvent) => {
@@ -279,7 +165,7 @@ export const actions: Actions = {
 				.where(
 					and(
 						eq(tenants.email, form.data.email.trim()),
-						ne(tenants.id, form.data.id),
+						ne(tenants.id, form.data.id!),
 						isNull(tenants.deletedAt)
 					)
 				)
@@ -305,7 +191,7 @@ export const actions: Actions = {
 			.where(
 				and(
 					ilike(tenants.name, normalizedNameU),
-					ne(tenants.id, form.data.id),
+					ne(tenants.id, form.data.id!),
 					isNull(tenants.deletedAt)
 				)
 			);
@@ -353,7 +239,7 @@ export const actions: Actions = {
 					facebookName: form.data.facebook_name ?? null,
 					birthday: form.data.birthday ?? null
 				})
-				.where(eq(tenants.id, form.data.id));
+				.where(eq(tenants.id, form.data.id!));
 		} catch (err: any) {
 			console.error('Error updating tenant:', err);
 			if (err.message?.includes('Policy check failed')) {

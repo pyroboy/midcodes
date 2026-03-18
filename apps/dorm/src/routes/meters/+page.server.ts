@@ -1,138 +1,19 @@
-import { fail } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { meterSchema } from './formSchema';
-import type { Reading } from './types';
 import { db } from '$lib/server/db';
-import { meters, properties, floors, rentalUnit, readings, profiles } from '$lib/server/schema';
-import { eq, and, ne, asc, desc, inArray } from 'drizzle-orm';
-
-interface LatestReading {
-	value: number;
-	date: string;
-}
-
-interface MeterWithReading extends Record<string, any> {
-	latest_reading?: LatestReading;
-}
+import { meters, floors, rentalUnit, readings, profiles } from '$lib/server/schema';
+import { eq, and, ne } from 'drizzle-orm';
 
 export const load = async ({ locals }) => {
 	const { user } = locals;
 	if (!user) {
-		return fail(401, { message: 'Unauthorized' });
+		throw error(401, 'Unauthorized');
 	}
-
-	// Fetch all required data in parallel
-	const [metersData, propertiesData, floorsData, rentalUnitData, readingsData] =
-		await Promise.all([
-			db.select().from(meters).orderBy(asc(meters.name)),
-
-			db.select().from(properties).orderBy(asc(properties.name)),
-
-			db
-				.select({
-					id: floors.id,
-					propertyId: floors.propertyId,
-					floorNumber: floors.floorNumber,
-					wing: floors.wing,
-					status: floors.status,
-					propertyName: properties.name,
-					propertyDbId: properties.id
-				})
-				.from(floors)
-				.leftJoin(properties, eq(floors.propertyId, properties.id))
-				.orderBy(asc(floors.floorNumber)),
-
-			db
-				.select({
-					id: rentalUnit.id,
-					name: rentalUnit.name,
-					number: rentalUnit.number,
-					type: rentalUnit.type,
-					floorId: rentalUnit.floorId,
-					propertyId: rentalUnit.propertyId,
-					rentalUnitStatus: rentalUnit.rentalUnitStatus,
-					floorDbId: floors.id,
-					floorNumber: floors.floorNumber,
-					floorWing: floors.wing,
-					floorPropertyId: floors.propertyId,
-					floorPropertyName: properties.name,
-					floorPropertyDbId: properties.id
-				})
-				.from(rentalUnit)
-				.leftJoin(floors, eq(rentalUnit.floorId, floors.id))
-				.leftJoin(properties, eq(floors.propertyId, properties.id))
-				.where(inArray(rentalUnit.rentalUnitStatus, ['VACANT', 'OCCUPIED']))
-				.orderBy(asc(rentalUnit.number)),
-
-			db.select().from(readings).orderBy(desc(readings.readingDate))
-		]);
-
-	// Group latest readings by meter_id
-	const latestReadings: Record<number, Reading> = {};
-	if (readingsData) {
-		readingsData.forEach((reading: any) => {
-			if (
-				!latestReadings[reading.meterId] ||
-				new Date(reading.readingDate) > new Date(latestReadings[reading.meterId].reading_date)
-			) {
-				latestReadings[reading.meterId] = {
-					...reading,
-					meter_id: reading.meterId,
-					reading_date: reading.readingDate,
-					rate_at_reading: reading.rateAtReading
-				};
-			}
-		});
-	}
-
-	// Attach readings to meters
-	const metersWithReadings: MeterWithReading[] = metersData
-		? metersData.map((meter: any) => {
-				const reading = meter.id ? latestReadings[meter.id] : undefined;
-				if (reading) {
-					return {
-						...meter,
-						latest_reading: {
-							value: reading.reading,
-							date: reading.reading_date
-						}
-					};
-				}
-				return meter;
-			})
-		: [];
-
-	// Format floors to match original structure
-	const formattedFloors = floorsData.map((f) => ({
-		...f,
-		property: f.propertyDbId ? { id: f.propertyDbId, name: f.propertyName } : null
-	}));
-
-	// Format rental units to match original structure
-	const formattedRentalUnits = rentalUnitData.map((u) => ({
-		...u,
-		floor: u.floorDbId
-			? {
-					id: u.floorDbId,
-					floor_number: u.floorNumber,
-					wing: u.floorWing,
-					property: u.floorPropertyDbId
-						? { id: u.floorPropertyDbId, name: u.floorPropertyName }
-						: null
-				}
-			: null
-	}));
 
 	const form = await superValidate(zod(meterSchema));
-
-	return {
-		form,
-		meters: metersWithReadings || [],
-		properties: propertiesData || [],
-		floors: formattedFloors || [],
-		rental_unit: formattedRentalUnits || []
-	};
+	return { form };
 };
 
 export const actions = {

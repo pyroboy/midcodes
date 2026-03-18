@@ -1,12 +1,10 @@
 <script lang="ts">
 	// Main page script for utility billings
 	import { superForm } from 'sveltekit-superforms/client';
-	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Alert from '$lib/components/ui/alert';
 	import { Check, RefreshCw, Download, BarChart } from 'lucide-svelte';
-	import { invalidateAll } from '$app/navigation';
-	import { tick, onMount } from 'svelte';
+	import { tick } from 'svelte';
 	import type { PageData } from './$types';
 	import { toast } from 'svelte-sonner';
 
@@ -38,35 +36,160 @@
 
 	// Import processing function
 	import { processUtilityBillingsData } from './dataProcessor';
-	import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
+
+	// RxDB local-first imports
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { resyncUtilityData } from '$lib/db/optimistic-utility-billings';
 
 	// Props
 	let { data } = $props<{ data: PageData }>();
 
-	// Loading state
-	let isLoading = $state(data.lazy === true);
+	// ─── RxDB reactive stores ───────────────────────────────────────────
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	);
+	const metersStore = createRxStore<any>('meters',
+		(db) => db.meters.find()
+	);
+	const readingsStore = createRxStore<any>('readings',
+		(db) => db.readings.find({ sort: [{ reading_date: 'asc' }] })
+	);
+	const billingsStore = createRxStore<any>('billings',
+		(db) => db.billings.find()
+	);
+	const leasesStore = createRxStore<any>('leases',
+		(db) => db.leases.find()
+	);
+	const leaseTenantsStore = createRxStore<any>('lease_tenants',
+		(db) => db.lease_tenants.find()
+	);
+	const tenantsStore = createRxStore<any>('tenants',
+		(db) => db.tenants.find()
+	);
+	const rentalUnitsStore = createRxStore<any>('rental_units',
+		(db) => db.rental_units.find()
+	);
 
-	// Initialize with empty data that will be populated lazily
-	let processedData = $state({
-		properties: data.properties || [],
-		meters: data.meters || [],
-		readings: data.readings || [],
-		availableReadingDates: data.availableReadingDates || [],
-		rental_unitTenantCounts: data.rental_unitTenantCounts || {},
-		leases: data.leases || [],
-		meterLastBilledDates: data.meterLastBilledDates || {},
-		leaseMeterBilledDates: data.leaseMeterBilledDates || {},
-		actualBilledDates: data.actualBilledDates || {},
-		previousReadingGroups: data.previousReadingGroups || []
+	// ─── Loading state from RxDB initialization ────────────────────────
+	let isLoading = $derived(
+		!metersStore.initialized || !readingsStore.initialized ||
+		!billingsStore.initialized || !leasesStore.initialized ||
+		!propertiesStore.initialized || !rentalUnitsStore.initialized ||
+		!leaseTenantsStore.initialized || !tenantsStore.initialized
+	);
+
+	// ─── Process data from RxDB stores using the existing dataProcessor ─
+	let processedData = $derived.by(() => {
+		if (isLoading) return {
+			properties: [], meters: [], readings: [], allReadings: [],
+			availableReadingDates: [], rental_unitTenantCounts: {},
+			leases: [], meterLastBilledDates: {},
+			leaseMeterBilledDates: {}, actualBilledDates: {},
+			previousReadingGroups: []
+		};
+
+		// Transform RxDB data to match the format expected by processUtilityBillingsData
+		const propertiesData = propertiesStore.value.map((p: any) => ({
+			id: Number(p.id), name: p.name
+		}));
+
+		const metersData = metersStore.value.map((m: any) => ({
+			id: Number(m.id),
+			name: m.name,
+			type: m.type,
+			propertyId: m.property_id ? Number(m.property_id) : null,
+			initialReading: m.initial_reading,
+			rental_unit: m.rental_unit_id ? (() => {
+				const unit = rentalUnitsStore.value.find((u: any) => String(u.id) === String(m.rental_unit_id));
+				return unit ? { id: Number(unit.id), name: unit.name, number: unit.number } : null;
+			})() : null
+		}));
+
+		const readingsData = readingsStore.value.map((r: any) => ({
+			id: Number(r.id),
+			meter_id: Number(r.meter_id),
+			reading: r.reading,
+			reading_date: r.reading_date,
+			rate_at_reading: r.rate_at_reading,
+			review_status: r.review_status
+		}));
+
+		const utilityBillings = billingsStore.value
+			.filter((b: any) => b.type === 'UTILITY' && b.meter_id)
+			.map((b: any) => ({
+				meter_id: Number(b.meter_id),
+				lease_id: Number(b.lease_id),
+				billing_date: b.billing_date,
+				amount: b.amount
+			}));
+
+		const availableReadingDates = readingsStore.value.map((r: any) => ({
+			reading_date: r.reading_date
+		}));
+
+		// Tenant counts from active leases
+		const tenantCounts = leasesStore.value
+			.filter((l: any) => l.status === 'ACTIVE')
+			.flatMap((l: any) => {
+				const lts = leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(l.id));
+				return lts.map((lt: any) => ({
+					rental_unit_id: l.rental_unit_id,
+					tenants: [{ id: Number(lt.tenant_id) }]
+				}));
+			});
+
+		// Leases with rental unit and tenant info
+		const leasesData = leasesStore.value.map((l: any) => {
+			const unit = rentalUnitsStore.value.find((u: any) => String(u.id) === String(l.rental_unit_id));
+			const ltDocs = leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(l.id));
+			const lease_tenants_list = ltDocs.map((lt: any) => {
+				const tenant = tenantsStore.value.find((t: any) => String(t.id) === String(lt.tenant_id));
+				return tenant ? {
+					tenants: { id: Number(tenant.id), full_name: tenant.name, tenant_status: tenant.tenant_status }
+				} : null;
+			}).filter(Boolean);
+
+			return {
+				...l,
+				id: Number(l.id),
+				rentalUnitId: l.rental_unit_id,
+				rental_unit: unit ? {
+					id: Number(unit.id), name: unit.name, number: unit.number,
+					type: unit.type, floor_id: unit.floor_id, property_id: unit.property_id
+				} : null,
+				lease_tenants: lease_tenants_list
+			};
+		});
+
+		// All readings with meter info (for pending review)
+		const allReadingsData = readingsStore.value.map((r: any) => {
+			const meter = metersStore.value.find((m: any) => String(m.id) === String(r.meter_id));
+			return {
+				id: Number(r.id),
+				meter_id: Number(r.meter_id),
+				reading: r.reading,
+				reading_date: r.reading_date,
+				rate_at_reading: r.rate_at_reading,
+				review_status: r.review_status,
+				meters: meter ? { id: Number(meter.id), name: meter.name, type: meter.type, property_id: meter.property_id ? Number(meter.property_id) : null } : null
+			};
+		});
+
+		return processUtilityBillingsData(
+			propertiesData, metersData, readingsData, utilityBillings,
+			availableReadingDates, tenantCounts, leasesData, allReadingsData
+		);
 	});
 
-	// Form handling - safely access form data with optional chaining
+	// Form handling
 	const { form, errors, enhance, delayed, message } = superForm(data.form ?? {}, {
 		resetForm: true,
 		onResult: ({ result }) => {
 			if (result.type === 'success') {
 				modals.reading = false; // Close modal on success
 				showSuccessMessage = true;
+				// Resync readings and meters after successful batch add
+				resyncUtilityData();
 				setTimeout(() => {
 					showSuccessMessage = false;
 				}, 3000);
@@ -122,61 +245,6 @@
 		$form.property_id = selectedProperty?.id.toString();
 		$form.type = filters.type;
 		$form.reading_date = readingEntry.readingDate;
-	});
-
-	// Load data lazily on mount
-	onMount(async () => {
-		if (data.lazy && data.propertiesPromise) {
-			try {
-				console.log('Loading utility billings data lazily...');
-
-				const [
-					loadedProperties,
-					loadedMeters,
-					loadedReadings,
-					loadedBillings,
-					loadedAvailableReadingDates,
-					loadedTenantCounts,
-					loadedLeases,
-					loadedAllReadings
-				] = await Promise.all([
-					data.propertiesPromise,
-					data.metersPromise,
-					data.readingsPromise,
-					data.billingsPromise,
-					data.availableReadingDatesPromise,
-					data.tenantCountsPromise,
-					data.leasesPromise,
-					data.allReadingsPromise
-				]);
-
-				// Process the loaded data
-				const processed = processUtilityBillingsData(
-					loadedProperties,
-					loadedMeters,
-					loadedReadings,
-					loadedBillings,
-					loadedAvailableReadingDates,
-					loadedTenantCounts,
-					loadedLeases,
-					loadedAllReadings
-				);
-
-				// Update the processed data
-				processedData = processed;
-				isLoading = false;
-
-				// Mirror to client cache for debug panel
-				cache.set(cacheKeys.meters(), loadedMeters, CACHE_TTL.MEDIUM);
-				cache.set(cacheKeys.readings(), loadedReadings, CACHE_TTL.SHORT);
-				cache.set(cacheKeys.utilityBillings(), loadedBillings, CACHE_TTL.SHORT);
-
-				console.log('Utility billings data loaded successfully');
-			} catch (error) {
-				console.error('Error loading utility billings data:', error);
-				isLoading = false;
-			}
-		}
 	});
 
 	// Data sources - use processed data
@@ -236,7 +304,7 @@
 				throw new Error(data?.error || 'Failed to approve readings');
 			}
 			toast.success('Readings approved');
-			await invalidateAll();
+			resyncUtilityData();
 		} catch (e: any) {
 			toast.error(e?.message || 'Failed to approve readings');
 		}
@@ -252,7 +320,7 @@
 				throw new Error(data?.error || 'Failed to reject readings');
 			}
 			toast.success('Readings rejected');
-			await invalidateAll();
+			resyncUtilityData();
 		} catch (e: any) {
 			toast.error(e?.message || 'Failed to reject readings');
 		}
@@ -542,9 +610,5 @@
 	<!-- Summary Statistics -->
 	{#if !isLoading}
 		<SummaryStatistics readings={displayReadings} meters={allMeters} readingDates={availableDates} />
-	{/if}
-
-	{#if import.meta.env.DEV}
-		<SuperDebug data={$form} />
 	{/if}
 </div>

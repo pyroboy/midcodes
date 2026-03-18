@@ -40,7 +40,7 @@
 	}
 
 	// Form data
-	let formData = $state<Budget>({
+	let formData = $state({
 		id: budget?.id || undefined,
 		project_name: budget?.project_name || '',
 		project_description: budget?.project_description || '',
@@ -56,14 +56,13 @@
 		created_by: budget?.created_by || null,
 		created_at: budget?.created_at || new Date().toISOString(),
 		updated_at: budget?.updated_at || new Date().toISOString()
-	});
+	} as Budget);
 
 	// Handle form submission
 	function handleSubmit() {
-		dispatch('submit', formData);
+		dispatch('submit', formData as Budget);
 	}
 
-	// Handle input changes
 	function handleChange(field: keyof Budget, value: any) {
 		formData = {
 			...formData,

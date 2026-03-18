@@ -9,16 +9,37 @@
 	import type { Expense } from './types';
 	import ExpenseList from './ExpenseList.svelte';
 	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { invalidate, invalidateAll } from '$app/navigation';
-	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { optimisticUpsertExpense, optimisticDeleteExpense } from '$lib/db/optimistic-expenses';
 
 	let { data } = $props<{ data: PageData }>();
 
-	// Debug logging
-	console.log('Page data:', data);
-	console.log('Properties from page data:', data.properties);
+	// ── RxDB reactive stores ──────────────────────────────────────────────
+	const expensesStore = createRxStore<any>('expenses',
+		(db) => db.expenses.find({ sort: [{ updated_at: 'desc' }] })
+	);
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find()
+	);
 
-	// Form for adding/editing expenses
+	// Client-side join: enrich expenses with property name
+	let expenses = $derived(expensesStore.value.map((e: any) => {
+		const property = propertiesStore.value.find((p: any) => String(p.id) === String(e.property_id));
+		return {
+			...e,
+			id: Number(e.id),
+			property_id: e.property_id ? Number(e.property_id) : null,
+			property: property ? { id: Number(property.id), name: property.name } : null,
+			expense_date: e.expense_date ? new Date(e.expense_date).toLocaleDateString('en-US', {
+				year: 'numeric', month: '2-digit', day: '2-digit'
+			}) : null
+		};
+	}));
+
+	let properties = $derived(propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name })));
+	let isLoading = $derived(!expensesStore.initialized);
+
+	// ── Form setup ────────────────────────────────────────────────────────
 	const { form, errors, enhance, constraints, submitting, reset } = superForm(data.form, {
 		validators: zodClient(expenseSchema),
 		resetForm: true,
@@ -31,9 +52,24 @@
 		},
 		onResult: ({ result }) => {
 			if (result.type === 'success') {
+				const resultData = (result as any).data;
 				toast.success(selectedExpense ? 'Expense updated' : 'Expense added');
 				selectedExpense = null;
-				invalidateAll();
+
+				// Optimistic upsert into RxDB then background resync
+				if (resultData?.expense) {
+					const exp = resultData.expense;
+					optimisticUpsertExpense({
+						id: exp.id,
+						property_id: exp.propertyId ?? null,
+						amount: String(exp.amount),
+						description: exp.description,
+						type: exp.type,
+						status: exp.status,
+						expense_date: exp.expenseDate ?? null,
+						created_by: exp.createdBy ?? null
+					});
+				}
 			}
 		}
 	});
@@ -50,7 +86,6 @@
 		const expense = event.detail;
 		selectedExpense = expense;
 
-		// Reset the form with the expense data
 		reset({
 			data: {
 				id: expense.id,
@@ -62,9 +97,6 @@
 				expense_date: expense.expense_date
 			}
 		});
-
-		// Instead of showing modal, we'll submit the form when we finish editing
-		// This would be handled by the direct editing in the list
 	}
 
 	// Handle delete expense
@@ -79,10 +111,10 @@
 		showDeleteDialog = false;
 		expenseToDeleteId = null;
 
-		try {
-			console.log('Sending delete request for expense ID:', expenseId);
+		// Optimistic delete from RxDB first
+		optimisticDeleteExpense(expenseId);
 
-			// Use FormData instead of JSON
+		try {
 			const formData = new FormData();
 			formData.append('id', expenseId.toString());
 
@@ -91,39 +123,32 @@
 				body: formData
 			});
 
-			console.log('Delete response status:', response.status);
-
-			// Carefully parse the response - it might not always be JSON
-			let responseData;
-			try {
-				const text = await response.text();
-				console.log('Delete response raw text:', text);
-				responseData = text ? JSON.parse(text) : {};
-			} catch (parseError) {
-				console.error('Error parsing response:', parseError);
-				responseData = {};
-			}
-
-			console.log('Delete response data:', responseData);
-
 			if (response.ok) {
 				toast.success('Expense deleted');
-				invalidateAll();
 			} else {
+				let responseData: any = {};
+				try {
+					const text = await response.text();
+					responseData = text ? JSON.parse(text) : {};
+				} catch { /* ignore parse errors */ }
 				toast.error(`Error deleting expense: ${responseData.message || 'Unknown error'}`);
+				// Resync to restore state on error
+				const { resyncCollection } = await import('$lib/db/replication');
+				resyncCollection('expenses').catch(() => {});
 			}
 		} catch (error) {
 			console.error('Error deleting expense', error);
 			toast.error('Error deleting expense');
+			// Resync to restore state on error
+			const { resyncCollection } = await import('$lib/db/replication');
+			resyncCollection('expenses').catch(() => {});
 		}
 	}
 
 	// Handle add new expense
 	function handleAddExpense(event: CustomEvent<Partial<Expense>>) {
 		const newExpense = event.detail;
-		console.log('Page received new expense:', newExpense);
 
-		// Set form data based on the new expense
 		reset({
 			data: {
 				property_id: newExpense.property_id,
@@ -133,15 +158,6 @@
 				expense_status: newExpense.expense_status,
 				expense_date: newExpense.expense_date
 			}
-		});
-
-		console.log('Form reset with data:', {
-			property_id: newExpense.property_id,
-			amount: newExpense.amount,
-			description: newExpense.description,
-			type: newExpense.type,
-			expense_status: newExpense.expense_status,
-			expense_date: newExpense.expense_date
 		});
 
 		// Submit the form
@@ -155,10 +171,10 @@
 		}, 0);
 	}
 
-	// Handle refresh event
+	// Handle refresh event — resync from Neon
 	async function handleRefresh() {
-		// For SvelteKit, simply invalidate the parent data to trigger a reload
-		await invalidate('expenses:refresh');
+		const { resyncCollection } = await import('$lib/db/replication');
+		await resyncCollection('expenses');
 	}
 </script>
 
@@ -178,14 +194,32 @@
 		<input type="hidden" name="expense_date" value={$form.expense_date} />
 	</form>
 
-	<ExpenseList
-		expenses={data.expenses}
-		properties={data.properties}
-		on:edit={handleEditExpense}
-		on:delete={handleDeleteExpense}
-		on:add={handleAddExpense}
-		on:refresh={handleRefresh}
-	/>
+	{#if isLoading}
+		<div class="space-y-2">
+			{#each Array(5) as _, i (i)}
+				<div class="border border-slate-200 rounded-lg p-4 animate-pulse">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-3 flex-1">
+							<div class="w-10 h-10 rounded-full bg-slate-200"></div>
+							<div class="space-y-2">
+								<div class="h-4 w-32 bg-slate-200 rounded"></div>
+								<div class="h-3 w-48 bg-slate-200 rounded"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			{/each}
+		</div>
+	{:else}
+		<ExpenseList
+			expenses={expenses}
+			properties={properties}
+			on:edit={handleEditExpense}
+			on:delete={handleDeleteExpense}
+			on:add={handleAddExpense}
+			on:refresh={handleRefresh}
+		/>
+	{/if}
 </div>
 
 <!-- Delete Confirmation Dialog -->
@@ -203,7 +237,3 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
-
-{#if browser}
-	<SuperDebug data={$form} />
-{/if}

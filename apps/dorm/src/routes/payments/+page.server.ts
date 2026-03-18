@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { paymentSchema, type UserRole } from './formSchema';
@@ -14,189 +14,26 @@ import {
 	logAuditEvent
 } from './utils';
 import { db } from '$lib/server/db';
-import { payments, billings, profiles, leases, rentalUnit, floors, properties } from '$lib/server/schema';
+import { payments, billings, profiles, leases, rentalUnit, floors, properties, user as userTable } from '$lib/server/schema';
 import { eq, desc, asc, inArray, isNull } from 'drizzle-orm';
 
-// Separate async function for loading payments data with caching
-async function loadPaymentsData(locals: any) {
+export const load = async ({ locals }) => {
 	const { user } = locals;
-	if (!user) {
-		return {
-			payments: [],
-			billings: [],
-			userRole: 'user',
-			isAdminLevel: false,
-			isAccountant: false,
-			isUtility: false,
-			isFrontdesk: false,
-			isResident: false
-		};
-	}
+	if (!user) throw error(401, 'Unauthorized');
 
-	// Check cache first
-	const cacheKey = cacheKeys.payments();
-	const cached = cache.get<any>(cacheKey);
-	if (cached) {
-		console.log('CACHE HIT: Returning cached payments data');
-		return cached;
-	}
-
-	console.log('CACHE MISS: Fetching payments from database');
-
-	// Fetch user role
-	const userRoleResult = await db
+	// Fetch user role - this must stay server-side
+	const profileResult = await db
 		.select({ role: profiles.role })
 		.from(profiles)
 		.where(eq(profiles.id, user.id))
 		.limit(1);
-	const userRole = userRoleResult[0];
-
-	// Fetch all payments
-	const paymentsData = await db
-		.select()
-		.from(payments)
-		.orderBy(desc(payments.paidAt));
-
-	// Fetch unpaid billings with lease info
-	const unpaidBillings = await db
-		.select({
-			id: billings.id,
-			type: billings.type,
-			utilityType: billings.utilityType,
-			amount: billings.amount,
-			paidAmount: billings.paidAmount,
-			balance: billings.balance,
-			status: billings.status,
-			dueDate: billings.dueDate,
-			leaseId: leases.id,
-			leaseName: leases.name,
-			unitId: rentalUnit.id,
-			unitNumber: rentalUnit.number,
-			floorNumber: floors.floorNumber,
-			floorWing: floors.wing,
-			propertyName: properties.name
-		})
-		.from(billings)
-		.leftJoin(leases, eq(billings.leaseId, leases.id))
-		.leftJoin(rentalUnit, eq(leases.rentalUnitId, rentalUnit.id))
-		.leftJoin(floors, eq(rentalUnit.floorId, floors.id))
-		.leftJoin(properties, eq(floors.propertyId, properties.id))
-		.where(inArray(billings.status, ['PENDING', 'PARTIAL', 'OVERDUE']))
-		.orderBy(asc(billings.dueDate));
-
-	// Fetch all billings for payment display
-	const allBillings = await db
-		.select({
-			id: billings.id,
-			type: billings.type,
-			utilityType: billings.utilityType,
-			amount: billings.amount,
-			paidAmount: billings.paidAmount,
-			balance: billings.balance,
-			status: billings.status,
-			dueDate: billings.dueDate,
-			leaseId: leases.id,
-			leaseName: leases.name,
-			unitId: rentalUnit.id,
-			unitNumber: rentalUnit.number,
-			floorNumber: floors.floorNumber,
-			floorWing: floors.wing,
-			propertyName: properties.name
-		})
-		.from(billings)
-		.leftJoin(leases, eq(billings.leaseId, leases.id))
-		.leftJoin(rentalUnit, eq(leases.rentalUnitId, rentalUnit.id))
-		.leftJoin(floors, eq(rentalUnit.floorId, floors.id))
-		.leftJoin(properties, eq(floors.propertyId, properties.id))
-		.orderBy(asc(billings.dueDate));
-
-	// Create billing lookup map
-	const billingsMap = new Map<number, any>();
-	for (const billing of allBillings) {
-		billingsMap.set(billing.id, {
-			...billing,
-			lease: billing.leaseId
-				? {
-						id: billing.leaseId,
-						name: billing.leaseName,
-						rental_unit: {
-							id: billing.unitId,
-							rental_unit_number: billing.unitNumber,
-							floor: {
-								floor_number: billing.floorNumber,
-								wing: billing.floorWing,
-								property: { name: billing.propertyName }
-							}
-						}
-					}
-				: null
-		});
-	}
-
-	// Enrich payments with billing info
-	const enrichedPayments =
-		paymentsData?.map((payment: any) => {
-			const primaryBilling =
-				payment.billingIds && payment.billingIds.length > 0
-					? billingsMap.get(payment.billingIds[0])
-					: null;
-
-			return {
-				...payment,
-				billing: primaryBilling
-			};
-		}) || [];
-
-	// Format unpaid billings to match original structure
-	const formattedUnpaidBillings = unpaidBillings.map((b) => ({
-		...b,
-		lease: b.leaseId
-			? {
-					id: b.leaseId,
-					name: b.leaseName,
-					rental_unit: {
-						id: b.unitId,
-						rental_unit_number: b.unitNumber,
-						floor: {
-							floor_number: b.floorNumber,
-							wing: b.floorWing,
-							property: { name: b.propertyName }
-						}
-					}
-				}
-			: null
-	}));
+	const userRole = profileResult[0];
 
 	const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
 	const isAccountant = userRole?.role === 'property_accountant';
 	const isUtility = userRole?.role === 'property_utility';
 	const isFrontdesk = userRole?.role === 'property_frontdesk';
-	const isResident = userRole?.role === 'property_resident';
-
-	const result = {
-		payments: enrichedPayments,
-		billings: formattedUnpaidBillings,
-		userRole: userRole?.role || 'user',
-		isAdminLevel,
-		isAccountant,
-		isUtility,
-		isFrontdesk,
-		isResident
-	};
-
-	cache.set(cacheKey, result, CACHE_TTL.SHORT);
-	console.log('Cached payments data');
-
-	return result;
-}
-
-export const load = async ({ locals, depends }) => {
-	depends('app:payments');
-
-	const { user } = locals;
-	if (!user) {
-		return fail(401, { message: 'Unauthorized' });
-	}
+	const isResident = userRole?.role === 'property_tenant';
 
 	const form = await superValidate(zod(paymentSchema));
 	const transactionForm = await superValidate(zod(transactionSchema));
@@ -204,16 +41,12 @@ export const load = async ({ locals, depends }) => {
 	return {
 		form,
 		transactionForm,
-		payments: [],
-		billings: [],
-		userRole: 'user',
-		isAdminLevel: false,
-		isAccountant: false,
-		isUtility: false,
-		isFrontdesk: false,
-		isResident: false,
-		lazy: true,
-		paymentsPromise: loadPaymentsData(locals)
+		userRole: userRole?.role || 'user',
+		isAdminLevel,
+		isAccountant,
+		isUtility,
+		isFrontdesk,
+		isResident
 	};
 };
 
@@ -252,8 +85,9 @@ export const actions = {
 
 		// Get user role
 		const userRoleResult = await db
-			.select({ role: profiles.role, name: profiles.name })
+			.select({ role: profiles.role, name: userTable.name })
 			.from(profiles)
+			.innerJoin(userTable, eq(profiles.id, userTable.id))
 			.where(eq(profiles.id, user.id))
 			.limit(1);
 		const userRole = userRoleResult[0];
@@ -278,7 +112,7 @@ export const actions = {
 			});
 		}
 
-		if (form.data.amount > billing.balance) {
+		if (form.data.amount > Number(billing.balance)) {
 			return fail(400, {
 				form,
 				error: `Payment amount (${form.data.amount}) exceeds billing balance (${billing.balance}). Please enter an amount less than or equal to the balance.`
@@ -286,35 +120,58 @@ export const actions = {
 		}
 
 		// Check for late payment and calculate penalty
-		const penaltyConfig = await getPenaltyConfig(db, billing.type);
+		const penaltyConfig = await getPenaltyConfig(billing.type);
 		let penaltyAmount = 0;
 
+		const billingForCalc = {
+			id: billing.id,
+			lease_id: billing.leaseId,
+			type: billing.type,
+			utility_type: billing.utilityType ?? undefined,
+			amount: Number(billing.amount),
+			paid_amount: Number(billing.paidAmount ?? '0'),
+			balance: Number(billing.balance),
+			status: billing.status,
+			due_date: billing.dueDate,
+			billing_date: billing.billingDate,
+			penalty_amount: Number(billing.penaltyAmount ?? '0'),
+			notes: billing.notes ?? undefined
+		};
+
 		if (penaltyConfig && new Date(form.data.paid_at) > new Date(billing.dueDate)) {
-			penaltyAmount = await calculatePenalty(billing, penaltyConfig, new Date(form.data.paid_at));
+			penaltyAmount = await calculatePenalty(billingForCalc, penaltyConfig, new Date(form.data.paid_at));
 		}
 
 		let createdPayment;
 		try {
-			const timestamp = getUTCTimestamp();
+			const now = new Date();
 			const result = await db
 				.insert(payments)
 				.values({
-					...form.data,
+					billingId: form.data.billing_id,
+					billingIds: [form.data.billing_id],
+					amount: String(form.data.amount),
+					method: form.data.method,
+					referenceNumber: form.data.reference_number,
+					paidBy: form.data.paid_by,
+					paidAt: new Date(form.data.paid_at),
+					notes: form.data.notes,
+					receiptUrl: form.data.receipt_url,
 					createdBy: user.id,
 					updatedBy: user.id,
-					createdAt: timestamp,
-					updatedAt: timestamp
+					createdAt: now,
+					updatedAt: now
 				})
 				.returning();
 
 			createdPayment = result[0];
 
 			// Update billing status
-			await updateBillingStatus(db, billing, billing.paidAmount + form.data.amount);
+			await updateBillingStatus(billingForCalc, Number(billing.paidAmount ?? '0') + form.data.amount);
 
 			// Create penalty billing if needed
 			if (penaltyAmount > 0) {
-				await createPenaltyBilling(db, billing, penaltyAmount);
+				await createPenaltyBilling(billingForCalc, penaltyAmount);
 			}
 
 			cache.delete(cacheKeys.payments());
@@ -381,7 +238,7 @@ export const actions = {
 		const existingResult = await db
 			.select()
 			.from(payments)
-			.where(eq(payments.id, form.data.id))
+			.where(eq(payments.id, form.data.id!))
 			.limit(1);
 
 		if (existingResult.length === 0) {
@@ -395,11 +252,17 @@ export const actions = {
 			await db
 				.update(payments)
 				.set({
-					...form.data,
+					amount: String(form.data.amount),
+					method: form.data.method,
+					referenceNumber: form.data.reference_number,
+					paidBy: form.data.paid_by,
+					paidAt: new Date(form.data.paid_at),
+					notes: form.data.notes,
+					receiptUrl: form.data.receipt_url,
 					updatedBy: user.id,
-					updatedAt: getUTCTimestamp()
+					updatedAt: new Date(getUTCTimestamp())
 				})
-				.where(eq(payments.id, form.data.id));
+				.where(eq(payments.id, form.data.id!));
 		} catch (err) {
 			console.error('Failed to update payment:', err);
 			return fail(500, {
@@ -468,7 +331,7 @@ export const actions = {
 		// Call DB function to revert via raw SQL
 		try {
 			const revertResult = await db.execute(
-				sql`SELECT revert_payment(${paymentId}, ${reason}, ${user.id})`
+				sql`SELECT revert_payment(${paymentId}::int, ${reason}::text, ${user.id}::text)`
 			);
 
 			cache.delete(cacheKeys.payments());
@@ -518,13 +381,12 @@ export const actions = {
 
 		// Convert transaction data back to payment format
 		const paymentData = {
-			id: form.data.id,
 			billingIds: form.data.billing_ids || [],
-			amount: form.data.amount,
-			method: mapTransactionMethodToPayment(form.data.method),
+			amount: String(form.data.amount),
+			method: mapTransactionMethodToPayment(form.data.method) as 'CASH' | 'BANK' | 'GCASH' | 'OTHER' | 'SECURITY_DEPOSIT',
 			referenceNumber: form.data.reference_number,
 			paidBy: form.data.paid_by,
-			paidAt: form.data.paid_at,
+			paidAt: form.data.paid_at ? new Date(form.data.paid_at) : new Date(),
 			notes: form.data.notes,
 			receiptUrl: form.data.receipt_url
 		};
@@ -535,9 +397,9 @@ export const actions = {
 				.set({
 					...paymentData,
 					updatedBy: user.id,
-					updatedAt: getUTCTimestamp()
+					updatedAt: new Date(getUTCTimestamp())
 				})
-				.where(eq(payments.id, form.data.id));
+				.where(eq(payments.id, form.data.id!));
 		} catch (err) {
 			console.error('Failed to update payment:', err);
 			return fail(500, {

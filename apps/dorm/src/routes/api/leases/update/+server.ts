@@ -3,6 +3,8 @@ import { db } from '$lib/server/db';
 import { leases, leaseTenants } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 
+type LeaseStatus = (typeof leases.status.enumValues)[number];
+
 interface UpdateLeaseRequest {
 	id: number | string;
 	name: string;
@@ -91,13 +93,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				startDate: leaseUpdates.start_date,
 				endDate: calculatedEndDate,
 				termsMonth: leaseUpdates.terms_month,
-				status: leaseUpdates.status,
+				status: leaseUpdates.status as LeaseStatus,
 				notes: leaseUpdates.notes?.trim() || null,
 				rentalUnitId: leaseUpdates.rental_unit_id,
-				// Preserve existing financial fields
 				rentAmount: existingLease.rentAmount,
 				securityDeposit: existingLease.securityDeposit,
-				balance: existingLease.balance,
 				updatedAt: new Date()
 			})
 			.where(eq(leases.id, leaseId))

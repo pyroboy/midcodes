@@ -227,7 +227,7 @@
 	});
 </script>
 
-<Dialog {open} onOpenChange={(open) => !open && onOpenChange()}>
+<Dialog {open} onOpenChange={(open) => !open && onOpenChange(false)}>
 	<DialogContent class="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
 		<DialogHeader>
 			<div class="flex items-center gap-2">

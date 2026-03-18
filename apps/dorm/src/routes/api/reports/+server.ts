@@ -58,6 +58,9 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 
 	try {
 		const propId = Number(propertyId);
+		if (!Number.isFinite(propId)) {
+			return json({ error: 'Invalid property ID' }, { status: 400 });
+		}
 
 		// Step 1: Get all rental units for the selected property
 		const propertyUnits = await db

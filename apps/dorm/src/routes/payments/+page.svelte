@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import PaymentForm from './PaymentForm.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import type { PageData } from './$types';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import { paymentSchema } from './formSchema';
-	import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
+	import { createRxStore } from '$lib/stores/rx.svelte';
 
 	type Payment = z.infer<typeof paymentSchema> & {
 		billing?: {
 			id: number;
 			type: string;
 			utility_type?: string;
+			status?: string;
 			lease?: {
 				id: number;
 				name: string;
@@ -39,39 +39,111 @@
 
 	let { data }: Props = $props();
 
+	// ─── RxDB reactive stores ───────────────────────────────────────────
+	const paymentsStore = createRxStore<any>('payments',
+		(db) => db.payments.find({ sort: [{ updated_at: 'desc' }] })
+	);
+	const billingsStore = createRxStore<any>('billings',
+		(db) => db.billings.find()
+	);
+	const leasesStore = createRxStore<any>('leases',
+		(db) => db.leases.find()
+	);
+	const rentalUnitsStore = createRxStore<any>('rental_units',
+		(db) => db.rental_units.find()
+	);
+	const floorsStore = createRxStore<any>('floors',
+		(db) => db.floors.find()
+	);
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find()
+	);
+
+	// Enriched payments with billing info
+	let payments = $derived.by(() => {
+		return paymentsStore.value.map((payment: any) => {
+			const billingIds = Array.isArray(payment.billing_ids) ? payment.billing_ids : [];
+			const primaryBillingId = billingIds[0];
+			const primaryBilling = primaryBillingId
+				? billingsStore.value.find((b: any) => String(b.id) === String(primaryBillingId))
+				: null;
+
+			let billing = null;
+			if (primaryBilling) {
+				const lease = leasesStore.value.find((l: any) => String(l.id) === String(primaryBilling.lease_id));
+				const unit = lease ? rentalUnitsStore.value.find((u: any) => String(u.id) === String(lease.rental_unit_id)) : null;
+				const floor = unit ? floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id)) : null;
+				const property = floor ? propertiesStore.value.find((p: any) => String(p.id) === String(floor.property_id)) : null;
+
+				billing = {
+					id: Number(primaryBilling.id),
+					type: primaryBilling.type,
+					utility_type: primaryBilling.utility_type,
+					status: primaryBilling.status,
+					lease: lease ? {
+						id: Number(lease.id),
+						name: lease.name,
+						rental_unit: unit ? {
+							id: Number(unit.id),
+							rental_unit_number: unit.number,
+							floor: floor ? {
+								floor_number: floor.floor_number,
+								wing: floor.wing,
+								property: property ? { name: property.name } : undefined
+							} : undefined
+						} : undefined
+					} : null
+				};
+			}
+
+			return {
+				...payment,
+				id: Number(payment.id),
+				amount: parseFloat(payment.amount) || 0,
+				billing
+			} as Payment;
+		});
+	});
+
+	// Unpaid billings for the payment form
+	let billings = $derived.by(() => {
+		return billingsStore.value
+			.filter((b: any) => ['PENDING', 'PARTIAL', 'OVERDUE'].includes(b.status))
+			.map((b: any) => {
+				const lease = leasesStore.value.find((l: any) => String(l.id) === String(b.lease_id));
+				const unit = lease ? rentalUnitsStore.value.find((u: any) => String(u.id) === String(lease.rental_unit_id)) : null;
+				const floor = unit ? floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id)) : null;
+				const property = floor ? propertiesStore.value.find((p: any) => String(p.id) === String(floor.property_id)) : null;
+				return {
+					...b,
+					id: Number(b.id),
+					amount: parseFloat(b.amount) || 0,
+					paidAmount: parseFloat(b.paid_amount) || 0,
+					balance: parseFloat(b.balance) || 0,
+					lease: lease ? {
+						id: Number(lease.id),
+						name: lease.name,
+						rental_unit: unit ? {
+							id: Number(unit.id),
+							rental_unit_number: unit.number,
+							floor: floor ? {
+								floor_number: floor.floor_number,
+								wing: floor.wing,
+								property: property ? { name: property.name } : undefined
+							} : undefined
+						} : undefined
+					} : null
+				};
+			})
+			.sort((a: any, b: any) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+	});
+
+	// Role flags come from server data (not RxDB)
+	let { userRole, isAdminLevel, isAccountant, isFrontdesk, isResident } = $derived(data);
+	let isLoading = $derived(!paymentsStore.initialized);
+
 	let showForm = $state(false);
 	let selectedPayment: Payment | undefined = $state(undefined);
-	let isLoading = $state(data.lazy === true);
-	let payments = $state<Payment[]>(data.payments || []);
-	let billings = $state(data.billings || []);
-	let userRole = $state(data.userRole);
-	let isAdminLevel = $state(data.isAdminLevel);
-	let isAccountant = $state(data.isAccountant);
-	let isFrontdesk = $state(data.isFrontdesk);
-	let isResident = $state(data.isResident);
-
-	// Load data lazily on mount
-	onMount(async () => {
-		if (data.lazy && data.paymentsPromise) {
-			try {
-				const loadedData = await data.paymentsPromise;
-				payments = loadedData.payments;
-				billings = loadedData.billings;
-				userRole = loadedData.userRole;
-				isAdminLevel = loadedData.isAdminLevel;
-				isAccountant = loadedData.isAccountant;
-				isFrontdesk = loadedData.isFrontdesk;
-				isResident = loadedData.isResident;
-				isLoading = false;
-
-				// Mirror to client cache
-				cache.set(cacheKeys.payments(), loadedData, CACHE_TTL.SHORT);
-			} catch (error) {
-				console.error('Error loading payments data:', error);
-				isLoading = false;
-			}
-		}
-	});
 
 	function handlePaymentAdded() {
 		showForm = false;
@@ -145,7 +217,7 @@
 						<Card.Header>
 							<Card.Title class="flex justify-between items-center">
 								{payment.billing?.lease?.name ?? 'Unknown'}
-								<Badge variant={getStatusVariant(payment.billing?.status)}>
+								<Badge variant={getStatusVariant(payment.billing?.status ?? '')}>
 									{payment.billing?.status}
 								</Badge>
 							</Card.Title>
@@ -172,15 +244,15 @@
 										{new Date(payment.paid_at).toLocaleDateString()}
 									</span>
 								</div>
-								{#if payment.billing?.rental_unit}
+								{#if payment.billing?.lease?.rental_unit}
 									<div class="flex justify-between">
 										<span class="text-muted-foreground">Rental_unit:</span>
 										<span class="font-medium">
-											{payment.billing.rental_unit.rental_unit_number}
-											{#if payment.billing.rental_unit.floor}
-												- Floor {payment.billing.rental_unit.floor.floor_number}
-												{#if payment.billing.rental_unit.floor.wing}
-													Wing {payment.billing.rental_unit.floor.wing}
+											{payment.billing.lease.rental_unit.rental_unit_number}
+											{#if payment.billing.lease.rental_unit.floor}
+												- Floor {payment.billing.lease.rental_unit.floor.floor_number}
+												{#if payment.billing.lease.rental_unit.floor.wing}
+													Wing {payment.billing.lease.rental_unit.floor.wing}
 												{/if}
 											{/if}
 										</span>
@@ -226,4 +298,3 @@
 		</p>
 	</div>
 {/if}
-

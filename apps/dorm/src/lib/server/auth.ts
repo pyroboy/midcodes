@@ -1,8 +1,8 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin } from 'better-auth/plugins/admin';
-import { getDb } from './db';
-import * as schema from './schema';
+import { getAuthDb } from './db-auth';
+import * as authSchema from './schema-auth';
 import { env } from './env';
 
 // Lazy-initialized auth instance
@@ -10,18 +10,25 @@ let _auth: ReturnType<typeof createAuth> | null = null;
 
 /**
  * Create the Better Auth instance with proper configuration.
- * Called lazily on first access.
+ * Uses the lightweight auth-only DB (schema-auth.ts = 4 tables)
+ * instead of the full schema (schema.ts = 32 tables + 25 enums)
+ * to stay under CF Workers' 10ms CPU limit.
  */
 function createAuth() {
-	const db = getDb();
+	const db = getAuthDb();
+	const secret = env.BETTER_AUTH_SECRET;
+	const baseURL = env.BETTER_AUTH_URL || 'https://dorm-brz.pages.dev';
+
 	return betterAuth({
+		secret,
+		baseURL,
 		database: drizzleAdapter(db, {
 			provider: 'pg',
 			schema: {
-				user: schema.user,
-				session: schema.session,
-				account: schema.account,
-				verification: schema.verification
+				user: authSchema.user,
+				session: authSchema.session,
+				account: authSchema.account,
+				verification: authSchema.verification
 			}
 		}),
 		plugins: [admin()],
@@ -30,6 +37,7 @@ function createAuth() {
 			'http://localhost:5173',
 			'https://dorm.midcodes.app',
 			'https://www.dorm.midcodes.app',
+			'https://dorm-brz.pages.dev',
 			...(env.BETTER_AUTH_URL ? [env.BETTER_AUTH_URL] : [])
 		],
 		emailAndPassword: {
@@ -41,8 +49,12 @@ function createAuth() {
 					after: async (user) => {
 						console.log('[AUTH HOOK] Creating profile for user:', user.id);
 						try {
+							// Lazy-import full schema only when creating a profile
+							// (happens once per user signup, not on every request)
+							const { getDb } = await import('./db');
+							const { profiles } = await import('./schema');
 							const db = getDb();
-							await db.insert(schema.profiles).values({
+							await db.insert(profiles).values({
 								id: user.id,
 								email: user.email
 							});
@@ -72,8 +84,6 @@ export function getAuth() {
 export type Auth = ReturnType<typeof createAuth>;
 
 // Export a getter object for backwards compatibility with existing code
-// This allows `auth.api.getSession()...` to work without changing all call sites
-// The proxy ensures lazy initialization happens on first property access
 export const auth: Auth = new Proxy({} as Auth, {
 	get(_target, prop) {
 		const realAuth = getAuth();

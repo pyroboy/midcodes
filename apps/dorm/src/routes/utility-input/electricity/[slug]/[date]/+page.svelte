@@ -5,7 +5,7 @@
 	import { readingSubmissionSchema, meterReadingFieldSchema } from './formSchema';
 	import { toast } from 'svelte-sonner';
 	import { invalidateAll } from '$app/navigation';
-	import { z } from 'zod';
+	import { z } from 'zod/v3';
 	import { onMount, tick } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -261,7 +261,7 @@
 					<!-- Previous Day Button -->
 					<div class="absolute left-6 top-1/2 transform -translate-y-1/2 z-10">
 						<a
-							href="/utility-input/electricity/{data.property?.slug}/{getPreviousDate(data.date)}"
+							href="/utility-input/electricity/{data.property?.id}/{getPreviousDate(data.date)}"
 							class="inline-flex items-center justify-center w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200 shadow-lg hover:shadow-xl border-2 border-white"
 							title="Previous Day"
 							aria-label="Go to previous day"
@@ -291,7 +291,7 @@
 					<!-- Next Day Button -->
 					<div class="absolute right-4 top-1/2 transform -translate-y-1/2">
 						<a
-							href="/utility-input/electricity/{data.property?.slug}/{getNextDate(data.date)}"
+							href="/utility-input/electricity/{data.property?.id}/{getNextDate(data.date)}"
 							class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors duration-200 shadow-sm hover:shadow-md"
 							title="Next Day"
 							aria-label="Go to next day"

@@ -4,130 +4,17 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { rental_unitSchema } from './formSchema';
-import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+import { cache, cacheKeys } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import { rentalUnit, properties, floors } from '$lib/server/schema';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
-// Separate async function for loading rental units data with caching
-async function loadRentalUnitsData(locals: any) {
+export const load: PageServerLoad = async ({ locals }) => {
 	const { permissions } = locals;
-	const hasAccess = permissions.includes('properties.create');
-
-	if (!hasAccess) {
-		return { rentalUnits: [], properties: [], floors: [] };
-	}
-
-	const cacheKey = cacheKeys.rentalUnits();
-	const cached = cache.get<any>(cacheKey);
-	if (cached) {
-		console.log('CACHE HIT: Returning cached rental units data');
-		return cached;
-	}
-
-	console.log('CACHE MISS: Fetching rental units from database');
-
-	try {
-		const [rentalUnitsData, propertiesData, floorsData] = await Promise.all([
-			db
-				.select({
-					id: rentalUnit.id,
-					name: rentalUnit.name,
-					number: rentalUnit.number,
-					type: rentalUnit.type,
-					baseRate: rentalUnit.baseRate,
-					capacity: rentalUnit.capacity,
-					rentalUnitStatus: rentalUnit.rentalUnitStatus,
-					propertyId: rentalUnit.propertyId,
-					floorId: rentalUnit.floorId,
-					createdAt: rentalUnit.createdAt,
-					updatedAt: rentalUnit.updatedAt,
-					propertyName: properties.name,
-					propertyDbId: properties.id,
-					floorDbId: floors.id,
-					floorPropertyId: floors.propertyId,
-					floorNumber: floors.floorNumber,
-					floorWing: floors.wing
-				})
-				.from(rentalUnit)
-				.leftJoin(properties, eq(rentalUnit.propertyId, properties.id))
-				.leftJoin(floors, eq(rentalUnit.floorId, floors.id))
-				.orderBy(asc(rentalUnit.propertyId), asc(rentalUnit.floorId), asc(rentalUnit.number)),
-
-			db
-				.select({ id: properties.id, name: properties.name })
-				.from(properties)
-				.where(eq(properties.status, 'ACTIVE'))
-				.orderBy(asc(properties.name)),
-
-			db
-				.select({
-					id: floors.id,
-					propertyId: floors.propertyId,
-					floorNumber: floors.floorNumber,
-					wing: floors.wing,
-					status: floors.status
-				})
-				.from(floors)
-				.where(eq(floors.status, 'ACTIVE'))
-				.orderBy(asc(floors.propertyId), asc(floors.floorNumber))
-		]);
-
-		// Map rental units to match original structure
-		const mappedUnits = rentalUnitsData.map((unit) => ({
-			...unit,
-			property: unit.propertyDbId ? { id: unit.propertyDbId, name: unit.propertyName } : null,
-			floor: unit.floorDbId
-				? {
-						id: unit.floorDbId,
-						property_id: unit.floorPropertyId,
-						floor_number: unit.floorNumber,
-						wing: unit.floorWing
-					}
-				: null
-		}));
-
-		const result = {
-			rentalUnits: mappedUnits,
-			properties: propertiesData || [],
-			floors: floorsData || []
-		};
-
-		cache.set(cacheKey, result, CACHE_TTL.MEDIUM);
-		console.log('Cached rental units data');
-
-		return result;
-	} catch (err) {
-		console.error('Error in database queries:', err);
-		return {
-			rentalUnits: [],
-			properties: [],
-			floors: []
-		};
-	}
-}
-
-export const load: PageServerLoad = async ({ locals, depends }) => {
-	depends('app:rental-units');
-
-	const { permissions } = locals;
-	const hasAccess = permissions.includes('properties.create');
-
-	if (!hasAccess) {
-		throw error(401, 'Unauthorized');
-	}
-
+	const hasAccess = permissions?.includes('properties.create');
+	if (!hasAccess) throw error(401, 'Unauthorized');
 	const form = await superValidate(zod(rental_unitSchema));
-
-	return {
-		form,
-		rental_unit: [],
-		rentalUnits: [],
-		properties: [],
-		floors: [],
-		lazy: true,
-		rentalUnitsPromise: loadRentalUnitsData(locals)
-	};
+	return { form };
 };
 
 export const actions: Actions = {
@@ -145,8 +32,8 @@ export const actions: Actions = {
 			.from(rentalUnit)
 			.where(
 				and(
-					eq(rentalUnit.propertyId, form.data.property_id),
-					eq(rentalUnit.floorId, form.data.floor_id || null),
+					eq(rentalUnit.propertyId, form.data.property_id!),
+					eq(rentalUnit.floorId, form.data.floor_id!),
 					eq(rentalUnit.number, form.data.number)
 				)
 			)
@@ -159,15 +46,22 @@ export const actions: Actions = {
 
 		try {
 			await db.insert(rentalUnit).values({
-				...form.data,
-				floorId: form.data.floor_id || null
+				name: form.data.name,
+				number: form.data.number,
+				type: form.data.type,
+				capacity: form.data.capacity,
+				baseRate: String(form.data.base_rate),
+				rentalUnitStatus: form.data.rental_unit_status,
+				propertyId: form.data.property_id!,
+				floorId: form.data.floor_id || 0,
+				amenities: form.data.amenities || []
 			});
 		} catch (err: any) {
 			console.error('Error creating rental unit:', err);
 			return fail(500, { form });
 		}
 
-		cache.delete(cacheKeys.rentalUnits());
+		cache.deletePattern(/^rental_units:/);
 		console.log('Invalidated rental units cache');
 
 		return { form };
@@ -191,7 +85,15 @@ export const actions: Actions = {
 			await db
 				.update(rentalUnit)
 				.set({
-					...updateData,
+					name: updateData.name,
+					number: updateData.number,
+					type: updateData.type,
+					capacity: updateData.capacity,
+					baseRate: String(updateData.base_rate),
+					rentalUnitStatus: updateData.rental_unit_status,
+					propertyId: updateData.property_id,
+					floorId: updateData.floor_id || 0,
+					amenities: updateData.amenities || [],
 					updatedAt: new Date()
 				})
 				.where(eq(rentalUnit.id, form.data.id));
@@ -204,7 +106,7 @@ export const actions: Actions = {
 			return fail(500, { form, message: 'Failed to update rental unit' });
 		}
 
-		cache.delete(cacheKeys.rentalUnits());
+		cache.deletePattern(/^rental_units:/);
 		console.log('Invalidated rental units cache');
 
 		return { form };
@@ -238,7 +140,7 @@ export const actions: Actions = {
 			return fail(500, { message: 'Failed to delete rental unit' });
 		}
 
-		cache.delete(cacheKeys.rentalUnits());
+		cache.deletePattern(/^rental_units:/);
 		console.log('Invalidated rental units cache');
 
 		return { success: true };

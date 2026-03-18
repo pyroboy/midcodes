@@ -10,7 +10,7 @@
 	import { Receipt, Wallet, Plus, X } from 'lucide-svelte';
 	import type { PageData } from './$types';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import { expenseSchema, expenseTypeEnum, expenseStatusEnum, months } from './schema';
 	import type { Expense } from './types';
 

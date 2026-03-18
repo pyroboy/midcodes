@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // Define budget project category enum
 export const budgetCategoryEnum = z.enum([

@@ -8,7 +8,7 @@
 	import { propertyStatus, propertyType } from './formSchema';
 	import type { propertySchema } from './formSchema';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 
 	interface Props {
 		data: PageData;

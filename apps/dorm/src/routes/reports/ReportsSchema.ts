@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 // Schema for expense data
 export const ExpenseSchema = z.object({

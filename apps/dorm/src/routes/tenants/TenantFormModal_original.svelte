@@ -19,7 +19,7 @@
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { invalidateAll, invalidate } from '$app/navigation';
 	import { tenantFormSchema, TenantStatusEnum, defaultEmergencyContact } from './formSchema';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import ImageUpload from '$lib/components/ui/ImageUpload.svelte';
 

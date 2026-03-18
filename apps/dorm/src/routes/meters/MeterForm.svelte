@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Select from '$lib/components/ui/select';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import {
 		utilityTypeEnum,
 		meterStatusEnum,
@@ -63,14 +64,7 @@
 		submitting: SuperForm<z.infer<typeof meterFormSchema>>['submitting'];
 	}
 
-	// Use props with no type argument
-
 	let { data, editMode = false, form, errors, enhance, constraints, submitting }: Props = $props();
-
-	// Debug logs
-	// console.log('MeterForm Component - editMode:', editMode);
-	// console.log('MeterForm Component - form data:', $form);
-	// console.log('MeterForm Component - selected meter:', data.meter);
 
 	const dispatch = createEventDispatcher<{
 		meterAdded: void;
@@ -184,43 +178,7 @@
 	function handleCancel() {
 		dispatch('cancel');
 	}
-
-	function askDeleteConfirmation() {
-		console.log('Asking for delete confirmation');
-		showDeleteConfirm = true;
-	}
-
-	function cancelDelete() {
-		showDeleteConfirm = false;
-	}
 </script>
-
-{#if showDeleteConfirm}
-	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-		<div class="bg-white rounded-lg p-6 w-full max-w-md">
-			<h3 class="text-lg font-medium mb-4">Confirm Deletion</h3>
-			<p class="mb-4">Are you sure you want to delete this meter? This action cannot be undone.</p>
-			<div class="flex justify-end space-x-3">
-				<button
-					type="button"
-					class="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-					onclick={cancelDelete}
-				>
-					Cancel
-				</button>
-				<form method="POST" action="?/delete">
-					<input type="hidden" name="id" value={$form.id} />
-					<button
-						type="submit"
-						class="px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-					>
-						Delete Meter
-					</button>
-				</form>
-			</div>
-		</div>
-	</div>
-{/if}
 
 <form method="POST" action={editMode ? '?/update' : '?/create'} use:enhance class="space-y-3">
 	{#if $form.id}
@@ -330,10 +288,6 @@
 					{#each filteredRental_Units as rental_unit}
 						<Select.Item value={rental_unit.id.toString()}>
 							{rental_unit.name || ''}
-							<!-- Unit {rental_unit.number}
-              {#if rental_unit.floor?.property}
-                - {rental_unit.floor.property.name}
-              {/if} -->
 						</Select.Item>
 					{/each}
 				</Select.Content>
@@ -382,18 +336,17 @@
 	</div>
 
 	<div class="flex justify-between items-center pt-3">
-		<!-- Delete button - always visible in edit mode -->
+		<!-- Delete button - visible in edit mode -->
 		{#if editMode}
 			<button
 				type="button"
 				class="px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-				onclick={askDeleteConfirmation}
+				onclick={() => { showDeleteConfirm = true; }}
 			>
 				Delete
 			</button>
 		{:else}
 			<div></div>
-			<!-- Empty div for spacing when not in edit mode -->
 		{/if}
 
 		<div class="flex space-x-2">
@@ -414,3 +367,22 @@
 		</div>
 	</div>
 </form>
+
+<!-- Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={showDeleteConfirm}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Meter</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete this meter? This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => { showDeleteConfirm = false; }}>Cancel</AlertDialog.Cancel>
+			<form method="POST" action="?/delete" class="inline">
+				<input type="hidden" name="id" value={$form.id} />
+				<AlertDialog.Action type="submit">Delete Meter</AlertDialog.Action>
+			</form>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

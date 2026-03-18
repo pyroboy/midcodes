@@ -2,7 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import type { MeterData, ShareData } from './types';
 	import { Button } from '$lib/components/ui/button';
-	import * as Switch from '$lib/components/ui/switch';
+	import { Switch } from '$lib/components/ui/switch';
 	import { Label } from '$lib/components/ui/label';
 	type Props = {
 		open: boolean;
@@ -199,9 +199,7 @@
 				<!-- Rounding Option -->
 				<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
 					<div class="flex items-center space-x-2">
-						<Switch.Root bind:checked={roundNumbers} id="round-numbers">
-							<Switch.Thumb />
-						</Switch.Root>
+						<Switch bind:checked={roundNumbers} id="round-numbers" />
 						<Label for="round-numbers" class="text-sm font-medium">
 							Round numbers to nearest 10s
 						</Label>

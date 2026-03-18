@@ -866,15 +866,6 @@ importers:
       '@shadcn/ui':
         specifier: ^0.0.4
         version: 0.0.4
-      '@supabase/postgrest-js':
-        specifier: ^1.21.3
-        version: 1.21.4
-      '@supabase/ssr':
-        specifier: ^0.5.2
-        version: 0.5.2(@supabase/supabase-js@2.87.1)
-      '@supabase/supabase-js':
-        specifier: ^2.46.1
-        version: 2.87.1
       '@tailwindcss/forms':
         specifier: ^0.5.9
         version: 0.5.10(tailwindcss@3.4.19(tsx@4.21.0))
@@ -889,16 +880,19 @@ importers:
         version: 10.0.0
       better-auth:
         specifier: ^1.4.7
-        version: 1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9))(mongodb@6.21.0)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.8)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0))
+        version: 1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.13.1))(mongodb@6.21.0)(pg@8.13.1)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.8)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0))
       cloudinary:
         specifier: ^2.7.0
         version: 2.8.0
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      dexie:
+        specifier: ^4.3.0
+        version: 4.3.0
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9)
+        version: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.13.1)
       esm-env:
         specifier: ^1.2.1
         version: 1.2.2
@@ -920,6 +914,12 @@ importers:
       nanoid:
         specifier: ^5.1.5
         version: 5.1.6
+      rxdb:
+        specifier: ^16.21.1
+        version: 16.21.1(rxjs@7.8.2)
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
       svelte-radix:
         specifier: ^1.1.1
         version: 1.1.1(svelte@5.45.8)
@@ -936,6 +936,9 @@ importers:
       '@playwright/test':
         specifier: ^1.49.1
         version: 1.57.0
+      '@sveltejs/adapter-cloudflare':
+        specifier: ^7.2.4
+        version: 7.2.4(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(wrangler@4.54.0(@cloudflare/workers-types@4.20251212.0))
       '@sveltejs/adapter-node':
         specifier: ^5.2.13
         version: 5.4.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))
@@ -969,6 +972,9 @@ importers:
       '@types/node':
         specifier: ^22.10.1
         version: 22.19.2
+      '@types/pg':
+        specifier: ^8.18.0
+        version: 8.18.0
       '@types/three':
         specifier: ^0.171.0
         version: 0.171.0
@@ -981,6 +987,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dotenv:
+        specifier: ^17.3.1
+        version: 17.3.1
       drizzle-kit:
         specifier: ^0.31.8
         version: 0.31.8
@@ -1008,6 +1017,9 @@ importers:
       msw:
         specifier: ^2.7.0
         version: 2.12.4(@types/node@22.19.2)(typescript@5.9.3)
+      pg:
+        specifier: ^8.13.1
+        version: 8.13.1
       postcss:
         specifier: ^8.4.40
         version: 8.5.6
@@ -1054,8 +1066,8 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0)
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
+        specifier: ^4.1.13
+        version: 4.1.13
 
   apps/dorm-docs:
     devDependencies:
@@ -1543,7 +1555,7 @@ importers:
         version: 5.3.6
       better-auth:
         specifier: ^1.4.7
-        version: 1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9))(mongodb@6.21.0)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.9)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0))
+        version: 1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.20.0))(mongodb@6.21.0)(pg@8.20.0)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.9)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0))
       cmdk-sv:
         specifier: ^0.0.19
         version: 0.0.19(svelte@5.45.9)
@@ -1555,7 +1567,7 @@ importers:
         version: 5.6.1
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9)
+        version: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.20.0)
       esm-env:
         specifier: ^1.2.1
         version: 1.2.2
@@ -1911,7 +1923,7 @@ importers:
         version: 4.1.0
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9)
+        version: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.20.0)
       esm-env:
         specifier: ^1.2.1
         version: 1.2.2
@@ -5404,13 +5416,6 @@ packages:
     resolution: {integrity: sha512-rWmYo4gRD0XAjMhYDlz7IH67bp4TIQ1UE4VqwIQtl1gGPwtLDq6wcRnu7jLKlXx0Gtrknw/eoiHYG9//XrCTzQ==}
     engines: {node: '>=20.0.0'}
 
-  '@supabase/node-fetch@2.6.15':
-    resolution: {integrity: sha512-1ibVeYUacxWYi9i0cf5efil6adJ9WRyZBLivgjs+AUpewx1F3xPi7gLgaASI2SmIQxPoCEjAsLAzKPgMJVgOUQ==}
-    engines: {node: 4.x || >=6.0.0}
-
-  '@supabase/postgrest-js@1.21.4':
-    resolution: {integrity: sha512-TxZCIjxk6/dP9abAi89VQbWWMBbybpGWyvmIzTd79OeravM13OjR/YEYeyUOPcM1C3QyvXkvPZhUfItvmhY1IQ==}
-
   '@supabase/postgrest-js@2.87.1':
     resolution: {integrity: sha512-Yzu5eL3iGmZW0C/8x+vEojAOou63FI9oVw8HI8YOq63+5yM8g8aGh7Y1E2vbXFb7+gHGsPqLnaC6dPhrYt7qBA==}
     engines: {node: '>=20.0.0'}
@@ -6006,8 +6011,8 @@ packages:
   '@types/pbf@3.0.5':
     resolution: {integrity: sha512-j3pOPiEcWZ34R6a6mN07mUkM4o4Lwf6hPNt8eilOeZhTFbxFXmKhvXl9Y28jotFPaI1bpPDJsbCprUoNke6OrA==}
 
-  '@types/pg@8.16.0':
-    resolution: {integrity: sha512-RmhMd/wD+CF8Dfo+cVIy3RR5cl8CyfXQ0tGgW6XBL8L4LM/UTEbNXYRbLwU6w+CgrKBNbrQWt4FUtTfaU5jSYQ==}
+  '@types/pg@8.18.0':
+    resolution: {integrity: sha512-gT+oueVQkqnj6ajGJXblFR4iavIXWsGAFCk3dP4Kki5+a9R4NMt0JARdk6s8cUKcfUoqP5dAtDSLU8xYUTFV+Q==}
 
   '@types/phoenix@1.6.7':
     resolution: {integrity: sha512-oN9ive//QSBkf19rfDv45M7eZPi0eEXylht2OLEXicu5b4KoQ1OzXIw+xDSGWxSxe1JmepRR/ZH283vsu518/Q==}
@@ -9172,16 +9177,51 @@ packages:
   periscopic@3.1.0:
     resolution: {integrity: sha512-vKiQ8RRtkl9P+r/+oefh25C3fhybptkHKCZSPlcXiJux2tJF55GnEj3BVn4A5gKfq9NWWXXrxkHBwVPUfH0opw==}
 
+  pg-cloudflare@1.3.0:
+    resolution: {integrity: sha512-6lswVVSztmHiRtD6I8hw4qP/nDm1EJbKMRhf3HCYaqud7frGysPv7FYJ5noZQdhQtN2xJnimfMtvQq21pdbzyQ==}
+
+  pg-connection-string@2.12.0:
+    resolution: {integrity: sha512-U7qg+bpswf3Cs5xLzRqbXbQl85ng0mfSV/J0nnA31MCLgvEaAo7CIhmeyrmJpOr7o+zm0rXK+hNnT5l9RHkCkQ==}
+
   pg-int8@1.0.1:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
     engines: {node: '>=4.0.0'}
 
+  pg-pool@3.13.0:
+    resolution: {integrity: sha512-gB+R+Xud1gLFuRD/QgOIgGOBE2KCQPaPwkzBBGC9oG69pHTkhQeIuejVIk3/cnDyX39av2AxomQiyPT13WKHQA==}
+    peerDependencies:
+      pg: '>=8.0'
+
   pg-protocol@1.10.3:
     resolution: {integrity: sha512-6DIBgBQaTKDJyxnXaLiLR8wBpQQcGWuAESkRBX/t6OwA8YsqP+iVSiond2EDy6Y/dsGk8rh/jtax3js5NeV7JQ==}
+
+  pg-protocol@1.13.0:
+    resolution: {integrity: sha512-zzdvXfS6v89r6v7OcFCHfHlyG/wvry1ALxZo4LqgUoy7W9xhBDMaqOuMiF3qEV45VqsN6rdlcehHrfDtlCPc8w==}
 
   pg-types@2.2.0:
     resolution: {integrity: sha512-qTAAlrEsl8s4OiEQY69wDvcMIdQN6wdz5ojQiOy6YRMuynxenON0O5oCpJI6lshc6scgAY8qvJ2On/p+CXY0GA==}
     engines: {node: '>=4'}
+
+  pg@8.13.1:
+    resolution: {integrity: sha512-OUir1A0rPNZlX//c7ksiu7crsGZTKSOXJPgtNiHGIlC9H0lO+NC6ZDYksSgBYY/thSWhnSRBv8w1lieNNGATNQ==}
+    engines: {node: '>= 8.0.0'}
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+
+  pg@8.20.0:
+    resolution: {integrity: sha512-ldhMxz2r8fl/6QkXnBD3CR9/xg694oT6DZQ2s6c/RI28OjtSOpxnPrUCGOBJ46RCUxcWdx3p6kw/xnDHjKvaRA==}
+    engines: {node: '>= 16.0.0'}
+    peerDependencies:
+      pg-native: '>=3.0.1'
+    peerDependenciesMeta:
+      pg-native:
+        optional: true
+
+  pgpass@1.0.5:
+    resolution: {integrity: sha512-FdW9r/jQZhSeohs1Z3sI1yxFQNFvMcnmfuj4WBMUTxOrAyLMaTcE1aAMBiTlbMNaXvBCQuVi0R7hd8udDSP7ug==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -9990,6 +10030,10 @@ packages:
 
   splaytree@0.1.4:
     resolution: {integrity: sha512-D50hKrjZgBzqD3FT2Ek53f2dcDLAQT8SSGrzj3vidNH5ISRgceeGVJ2dQIthKOuayqFXfFjXheHNo4bbt9LhRQ==}
+
+  split2@4.2.0:
+    resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
+    engines: {node: '>= 10.x'}
 
   ssim.js@3.5.0:
     resolution: {integrity: sha512-Aj6Jl2z6oDmgYFFbQqK7fght19bXdOxY7Tj03nF+03M9gCBAjeIiO8/PlEGMfKDwYpw4q6iBqVq2YuREorGg/g==}
@@ -11939,7 +11983,7 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@3.25.76))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)':
+  '@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@4.1.13))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)':
     dependencies:
       '@better-auth/utils': 0.3.0
       '@better-fetch/fetch': 1.1.21
@@ -11950,9 +11994,9 @@ snapshots:
       nanostores: 1.1.0
       zod: 4.1.13
 
-  '@better-auth/telemetry@1.4.7(@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@3.25.76))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0))':
+  '@better-auth/telemetry@1.4.7(@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@4.1.13))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0))':
     dependencies:
-      '@better-auth/core': 1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@3.25.76))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)
+      '@better-auth/core': 1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@4.1.13))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)
       '@better-auth/utils': 0.3.0
       '@better-fetch/fetch': 1.1.21
 
@@ -13076,7 +13120,7 @@ snapshots:
   '@neondatabase/serverless@1.0.2':
     dependencies:
       '@types/node': 22.19.2
-      '@types/pg': 8.16.0
+      '@types/pg': 8.18.0
 
   '@noble/ciphers@2.1.1': {}
 
@@ -14581,14 +14625,6 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@supabase/node-fetch@2.6.15':
-    dependencies:
-      whatwg-url: 5.0.0
-
-  '@supabase/postgrest-js@1.21.4':
-    dependencies:
-      '@supabase/node-fetch': 2.6.15
-
   '@supabase/postgrest-js@2.87.1':
     dependencies:
       tslib: 2.8.1
@@ -14646,6 +14682,13 @@ snapshots:
   '@sveltejs/adapter-auto@6.1.1(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.45.9)(vite@7.3.0(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@7.3.0(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))':
     dependencies:
       '@sveltejs/kit': 2.49.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.45.9)(vite@7.3.0(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0)))(svelte@5.45.9)(vite@7.3.0(@types/node@22.19.2)(jiti@2.6.1)(lightningcss@1.30.2)(sass@1.96.0)(tsx@4.21.0))
+
+  '@sveltejs/adapter-cloudflare@7.2.4(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(wrangler@4.54.0(@cloudflare/workers-types@4.20251212.0))':
+    dependencies:
+      '@cloudflare/workers-types': 4.20251212.0
+      '@sveltejs/kit': 2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0))
+      worktop: 0.8.0-next.18
+      wrangler: 4.54.0(@cloudflare/workers-types@4.20251212.0)
 
   '@sveltejs/adapter-cloudflare@7.2.4(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(wrangler@4.54.0(@cloudflare/workers-types@4.20251212.0))':
     dependencies:
@@ -15375,7 +15418,7 @@ snapshots:
 
   '@types/pbf@3.0.5': {}
 
-  '@types/pg@8.16.0':
+  '@types/pg@8.18.0':
     dependencies:
       '@types/node': 22.19.2
       pg-protocol: 1.10.3
@@ -16046,10 +16089,10 @@ snapshots:
 
   baseline-browser-mapping@2.9.6: {}
 
-  better-auth@1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9))(mongodb@6.21.0)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.8)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0)):
+  better-auth@1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.13.1))(mongodb@6.21.0)(pg@8.13.1)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.8)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0)):
     dependencies:
-      '@better-auth/core': 1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@3.25.76))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)
-      '@better-auth/telemetry': 1.4.7(@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@3.25.76))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0))
+      '@better-auth/core': 1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@4.1.13))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)
+      '@better-auth/telemetry': 1.4.7(@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@4.1.13))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0))
       '@better-auth/utils': 0.3.0
       '@better-fetch/fetch': 1.1.21
       '@noble/ciphers': 2.1.1
@@ -16063,17 +16106,18 @@ snapshots:
     optionalDependencies:
       '@sveltejs/kit': 2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.8)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0))
       drizzle-kit: 0.31.8
-      drizzle-orm: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9)
+      drizzle-orm: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.13.1)
       mongodb: 6.21.0
+      pg: 8.13.1
       react: 19.2.2
       react-dom: 19.2.2(react@19.2.2)
       svelte: 5.45.8
       vitest: 1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0)
 
-  better-auth@1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9))(mongodb@6.21.0)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.9)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0)):
+  better-auth@1.4.7(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(drizzle-kit@0.31.8)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.20.0))(mongodb@6.21.0)(pg@8.20.0)(react-dom@19.2.2(react@19.2.2))(react@19.2.2)(svelte@5.45.9)(vitest@1.6.1(@types/node@22.19.2)(jsdom@25.0.1)(lightningcss@1.30.2)(sass@1.96.0)):
     dependencies:
-      '@better-auth/core': 1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@3.25.76))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)
-      '@better-auth/telemetry': 1.4.7(@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@3.25.76))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0))
+      '@better-auth/core': 1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@4.1.13))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0)
+      '@better-auth/telemetry': 1.4.7(@better-auth/core@1.4.7(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.21)(better-call@1.1.5(zod@4.1.13))(jose@6.1.3)(kysely@0.28.9)(nanostores@1.1.0))
       '@better-auth/utils': 0.3.0
       '@better-fetch/fetch': 1.1.21
       '@noble/ciphers': 2.1.1
@@ -16087,8 +16131,9 @@ snapshots:
     optionalDependencies:
       '@sveltejs/kit': 2.49.2(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0)))(svelte@5.45.9)(vite@5.4.21(@types/node@22.19.2)(lightningcss@1.30.2)(sass@1.96.0))
       drizzle-kit: 0.31.8
-      drizzle-orm: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9)
+      drizzle-orm: 0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.20.0)
       mongodb: 6.21.0
+      pg: 8.20.0
       react: 19.2.2
       react-dom: 19.2.2(react@19.2.2)
       svelte: 5.45.9
@@ -16756,12 +16801,21 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.16.0)(kysely@0.28.9):
+  drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.13.1):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20251212.0
       '@neondatabase/serverless': 1.0.2
-      '@types/pg': 8.16.0
+      '@types/pg': 8.18.0
       kysely: 0.28.9
+      pg: 8.13.1
+
+  drizzle-orm@0.45.1(@cloudflare/workers-types@4.20251212.0)(@neondatabase/serverless@1.0.2)(@types/pg@8.18.0)(kysely@0.28.9)(pg@8.20.0):
+    optionalDependencies:
+      '@cloudflare/workers-types': 4.20251212.0
+      '@neondatabase/serverless': 1.0.2
+      '@types/pg': 8.18.0
+      kysely: 0.28.9
+      pg: 8.20.0
 
   dunder-proto@1.0.1:
     dependencies:
@@ -19001,9 +19055,25 @@ snapshots:
       estree-walker: 3.0.3
       is-reference: 3.0.3
 
+  pg-cloudflare@1.3.0:
+    optional: true
+
+  pg-connection-string@2.12.0: {}
+
   pg-int8@1.0.1: {}
 
+  pg-pool@3.13.0(pg@8.13.1):
+    dependencies:
+      pg: 8.13.1
+
+  pg-pool@3.13.0(pg@8.20.0):
+    dependencies:
+      pg: 8.20.0
+    optional: true
+
   pg-protocol@1.10.3: {}
+
+  pg-protocol@1.13.0: {}
 
   pg-types@2.2.0:
     dependencies:
@@ -19012,6 +19082,31 @@ snapshots:
       postgres-bytea: 1.0.1
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
+
+  pg@8.13.1:
+    dependencies:
+      pg-connection-string: 2.12.0
+      pg-pool: 3.13.0(pg@8.13.1)
+      pg-protocol: 1.13.0
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.3.0
+
+  pg@8.20.0:
+    dependencies:
+      pg-connection-string: 2.12.0
+      pg-pool: 3.13.0(pg@8.20.0)
+      pg-protocol: 1.13.0
+      pg-types: 2.2.0
+      pgpass: 1.0.5
+    optionalDependencies:
+      pg-cloudflare: 1.3.0
+    optional: true
+
+  pgpass@1.0.5:
+    dependencies:
+      split2: 4.2.0
 
   picocolors@1.1.1: {}
 
@@ -19893,6 +19988,8 @@ snapshots:
       signal-exit: 3.0.7
 
   splaytree@0.1.4: {}
+
+  split2@4.2.0: {}
 
   ssim.js@3.5.0: {}
 

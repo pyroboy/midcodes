@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { onMount } from 'svelte';
 	import TenantFormModal from './TenantFormModal.svelte';
 	import TenantCard from './TenantCard.svelte';
 	import TenantTable from './TenantTable.svelte';
@@ -13,7 +11,9 @@
 		AlertTriangle,
 		Search,
 		LayoutGrid,
-		List
+		List,
+		ChevronLeft,
+		ChevronRight
 	} from 'lucide-svelte';
 	import type { TenantResponse } from '$lib/types/tenant';
 	import type { PageData } from './$types';
@@ -23,99 +23,153 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
-	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+	import { createRxStore } from '$lib/stores/rx.svelte';
+	import { optimisticUpsertTenant, optimisticDeleteTenant } from '$lib/db/optimistic';
 
 	let { data } = $props<{ data: PageData }>();
 
-	// Server-side caching for DB queries, client-side cache for debug panel visibility
-	let tenants = $state<TenantResponse[]>(data.tenants);
-	let properties = $state<any[]>(data.properties);
-	let isLoading = $state(data.lazy === true);
+	// ─── RxDB reactive stores ───────────────────────────────────────────
+	const tenantsStore = createRxStore<any>('tenants',
+		(db) => db.tenants.find({ selector: { deleted_at: { $eq: null } }, sort: [{ name: 'asc' }] })
+	);
+	const leaseTenantsStore = createRxStore<any>('lease_tenants',
+		(db) => db.lease_tenants.find()
+	);
+	const leasesStore = createRxStore<any>('leases',
+		(db) => db.leases.find()
+	);
+	const rentalUnitsStore = createRxStore<any>('rental_units',
+		(db) => db.rental_units.find()
+	);
+	const propertiesStore = createRxStore<any>('properties',
+		(db) => db.properties.find()
+	);
+
+	// Enrich tenants with lease relationships using Map lookups (O(1) per join)
+	let tenants = $derived.by(() => {
+		// Build lookup maps once — O(n) total instead of O(n*m) per tenant
+		const leaseMap = new Map<string, any>();
+		for (const l of leasesStore.value) leaseMap.set(String(l.id), l);
+
+		const unitMap = new Map<string, any>();
+		for (const u of rentalUnitsStore.value) unitMap.set(String(u.id), u);
+
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+
+		// Group lease_tenants by tenant_id
+		const ltByTenant = new Map<string, any[]>();
+		for (const lt of leaseTenantsStore.value) {
+			const tid = String(lt.tenant_id);
+			const arr = ltByTenant.get(tid);
+			if (arr) arr.push(lt);
+			else ltByTenant.set(tid, [lt]);
+		}
+
+		return tenantsStore.value.map((t: any) => {
+			const ltDocs = ltByTenant.get(String(t.id)) || [];
+			const tenantLeases: any[] = [];
+			for (const lt of ltDocs) {
+				const lease = leaseMap.get(String(lt.lease_id));
+				if (!lease) continue;
+				const unit = unitMap.get(String(lease.rental_unit_id));
+				const property = unit ? propMap.get(String(unit.property_id)) : null;
+				tenantLeases.push({
+					id: Number(lease.id),
+					name: lease.name,
+					start_date: lease.start_date,
+					end_date: lease.end_date,
+					status: lease.status,
+					rental_unit: unit
+						? {
+								id: unit.id,
+								name: unit.name,
+								number: unit.number,
+								property: property ? { id: property.id, name: property.name } : null
+							}
+						: null
+				});
+			}
+			const primaryLease = tenantLeases.find((l: any) => l.status === 'ACTIVE') ?? tenantLeases[0] ?? null;
+			return {
+				...t,
+				id: Number(t.id),
+				leases: tenantLeases,
+				lease: primaryLease
+			} as TenantResponse;
+		});
+	});
+
+	let isLoading = $derived(!tenantsStore.initialized);
 
 	let showModal = $state(false);
 	let selectedTenant: TenantResponse | undefined = $state();
 	let editMode = $state(false);
 	let searchTerm = $state('');
+	let debouncedSearch = $state('');
 	let selectedStatus = $state('');
 	let viewMode = $state<'card' | 'list'>('card');
 	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('active');
+	let currentPage = $state(1);
+	const PAGE_SIZE = 24;
+
+	// Debounce search input (300ms)
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		const term = searchTerm;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => { debouncedSearch = term; }, 300);
+		return () => clearTimeout(searchTimer);
+	});
+
+	// Reset page when filters change
+	$effect(() => {
+		void debouncedSearch;
+		void selectedStatus;
+		void activeFilter;
+		currentPage = 1;
+	});
 
 	// Delete confirmation dialog state
 	let showDeleteDialog = $state(false);
 	let tenantToDelete = $state<TenantResponse | null>(null);
 
-	// Load data lazily from server promises
-	async function loadDataFromPromises() {
-		if (data.tenantsPromise && data.propertiesPromise) {
-			try {
-				const [loadedTenants, loadedProperties] = await Promise.all([
-					data.tenantsPromise,
-					data.propertiesPromise
-				]);
+	// Single-pass: compute stats + filtered list together
+	let { stats, filteredTenants } = $derived.by(() => {
+		let active = 0, inactive = 0, pending = 0, blacklisted = 0;
+		const searchLower = debouncedSearch.toLowerCase();
+		const filterUpper = activeFilter !== 'all' ? activeFilter.toUpperCase() : '';
+		const filtered: TenantResponse[] = [];
 
-				console.log('📥 Loaded tenants from promise:', loadedTenants.length);
-				tenants = loadedTenants;
-				properties = loadedProperties;
-				isLoading = false;
-
-				// Mirror server cache to client-side for debug panel visibility
-				cache.set(cacheKeys.tenants(), loadedTenants, CACHE_TTL.MEDIUM);
-				cache.set(cacheKeys.activeProperties(), loadedProperties, CACHE_TTL.LONG);
-			} catch (error) {
-				console.error('Error loading tenant data:', error);
-				isLoading = false;
-			}
-		}
-	}
-
-	// Load data lazily on mount
-	onMount(async () => {
-		console.log('🎯 Tenants page mounted, lazy:', data.lazy);
-		if (data.lazy && data.tenantsPromise) {
-			await loadDataFromPromises();
-		}
-	});
-
-	// Filtered tenants
-	let filteredTenants = $derived.by(() => {
-		console.log('🔍 Filtering tenants:', {
-			totalTenants: tenants.length,
-			searchTerm,
-			selectedStatus,
-			activeFilter
-		});
-
-		const filtered = tenants.filter((tenant: TenantResponse) => {
-			const searchMatch =
-				!searchTerm || tenant.name.toLowerCase().includes(searchTerm.toLowerCase());
-			const statusMatch = !selectedStatus || tenant.tenant_status === selectedStatus;
-
-			// Apply activeFilter
-			let filterMatch = true;
-			if (activeFilter !== 'all') {
-				filterMatch = tenant.tenant_status === activeFilter.toUpperCase();
+		for (const tenant of tenants) {
+			// Count stats (always, regardless of filters)
+			switch (tenant.tenant_status) {
+				case 'ACTIVE': active++; break;
+				case 'INACTIVE': inactive++; break;
+				case 'PENDING': pending++; break;
+				case 'BLACKLISTED': blacklisted++; break;
 			}
 
-			return searchMatch && statusMatch && filterMatch;
-		});
+			// Apply filters
+			if (searchLower && !tenant.name.toLowerCase().includes(searchLower)) continue;
+			if (selectedStatus && tenant.tenant_status !== selectedStatus) continue;
+			if (filterUpper && tenant.tenant_status !== filterUpper) continue;
 
-		console.log('✅ Filtered result:', filtered.length);
-		return filtered;
-	});
+			filtered.push(tenant);
+		}
 
-	// Stats calculations
-	let stats = $derived.by(() => {
 		const total = tenants.length;
-		const active = tenants.filter((t: TenantResponse) => t.tenant_status === 'ACTIVE').length;
-		const inactive = tenants.filter((t: TenantResponse) => t.tenant_status === 'INACTIVE').length;
-		const pending = tenants.filter((t: TenantResponse) => t.tenant_status === 'PENDING').length;
-		const blacklisted = tenants.filter(
-			(t: TenantResponse) => t.tenant_status === 'BLACKLISTED'
-		).length;
-
-		return { total, active, inactive, pending, blacklisted };
+		return {
+			stats: { total, active, inactive, pending, blacklisted },
+			filteredTenants: filtered
+		};
 	});
+
+	// Pagination
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredTenants.length / PAGE_SIZE)));
+	let paginatedTenants = $derived(
+		filteredTenants.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+	);
 
 	function handleAddTenant() {
 		selectedTenant = undefined;
@@ -131,19 +185,15 @@
 
 	function handleFilterClick(filter: 'all' | 'active' | 'inactive' | 'pending' | 'blacklisted') {
 		activeFilter = filter;
-		// Clear the select dropdown when using the mini stats filters
 		if (filter !== 'all') {
 			selectedStatus = '';
 		}
 	}
 
-	// Function to update tenant in local state immediately
-	function updateTenantInState(updatedTenant: TenantResponse) {
-		const index = tenants.findIndex((t) => t.id === updatedTenant.id);
-		if (index !== -1) {
-			tenants[index] = updatedTenant;
-			tenants = [...tenants]; // Trigger reactivity
-		}
+	// Called by TenantFormModal after successful create/update.
+	// Optimistic write already happened in the modal — this is a no-op now.
+	function updateTenantInState(_updatedTenant: TenantResponse) {
+		// Optimistic upsert already fired in TenantFormModal
 	}
 
 	function handleDeleteTenant(tenant: TenantResponse) {
@@ -157,6 +207,9 @@
 		showDeleteDialog = false;
 		tenantToDelete = null;
 
+		// Optimistic: remove from UI immediately
+		await optimisticDeleteTenant(tenant.id);
+
 		const formData = new FormData();
 		formData.append('id', String(tenant.id));
 		formData.append('reason', 'User initiated deletion');
@@ -169,18 +222,20 @@
 			const response = await result.json();
 
 			if (result.ok) {
-				tenants = tenants.filter((t: TenantResponse) => t.id !== tenant.id);
-				await invalidateAll();
 				toast.success(
 					`Tenant "${tenant.name}" has been successfully archived. All data has been preserved for audit purposes.`
 				);
 			} else {
 				console.error('Delete failed:', response);
 				toast.error(response.error || response.message || 'Failed to delete tenant');
+				const { resyncCollection } = await import('$lib/db/replication');
+				resyncCollection('tenants');
 			}
 		} catch (error) {
 			console.error('Error deleting tenant:', error);
 			toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			const { resyncCollection } = await import('$lib/db/replication');
+			resyncCollection('tenants');
 		}
 	}
 
@@ -369,7 +424,6 @@
 						</SelectContent>
 					</Select>
 
-					
 					<!-- View Toggle Buttons -->
 					<div class="flex border border-slate-200 rounded-md bg-white">
 						<Button
@@ -407,21 +461,15 @@
 							<div class="border border-slate-200 rounded-lg p-4">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-3 flex-1">
-										<!-- Avatar skeleton -->
 										<Skeleton class="w-10 h-10 rounded-full" />
 										<div class="space-y-2">
-											<!-- Name skeleton -->
 											<Skeleton class="h-4 w-32" />
-											<!-- Contact info skeleton -->
 											<Skeleton class="h-3 w-48" />
 										</div>
 									</div>
 									<div class="flex items-center gap-2">
-										<!-- Status badge skeleton -->
 										<Skeleton class="h-6 w-16 rounded-full" />
-										<!-- Edit button skeleton -->
 										<Skeleton class="h-9 w-9 rounded-md" />
-										<!-- Delete button skeleton -->
 										<Skeleton class="h-9 w-9 rounded-md" />
 									</div>
 								</div>
@@ -451,17 +499,60 @@
 				{:else if viewMode === 'card'}
 					<!-- Card View (Grid) -->
 					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-						{#each filteredTenants as tenant (tenant.id)}
+						{#each paginatedTenants as tenant (tenant.id)}
 							<TenantCard {tenant} onEdit={handleEdit} onDelete={handleDeleteTenant} />
 						{/each}
 					</div>
 				{:else}
 					<!-- List View (Table) -->
 					<TenantTable
-						tenants={filteredTenants}
+						tenants={paginatedTenants}
 						on:edit={(e) => handleEdit(e.detail)}
 						on:delete={(e) => handleDeleteTenant(e.detail)}
 					/>
+				{/if}
+
+				<!-- Pagination Controls -->
+				{#if totalPages > 1}
+					<div class="flex items-center justify-between pt-6 border-t border-slate-200/60 mt-6">
+						<p class="text-sm text-slate-500">
+							Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredTenants.length)} of {filteredTenants.length}
+						</p>
+						<div class="flex items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={currentPage <= 1}
+								onclick={() => currentPage--}
+							>
+								<ChevronLeft class="w-4 h-4" />
+							</Button>
+							{#each Array(totalPages) as _, i (i)}
+								{#if totalPages <= 7 || i === 0 || i === totalPages - 1 || Math.abs(i + 1 - currentPage) <= 1}
+									<Button
+										variant={currentPage === i + 1 ? 'default' : 'outline'}
+										size="sm"
+										onclick={() => currentPage = i + 1}
+										class="w-9"
+									>
+										{i + 1}
+									</Button>
+								{:else if i === 1 && currentPage > 3}
+									<span class="text-slate-400 px-1">...</span>
+								{:else if i === totalPages - 2 && currentPage < totalPages - 2}
+									<span class="text-slate-400 px-1">...</span>
+								{/if}
+							{/each}
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={currentPage >= totalPages}
+								onclick={() => currentPage++}
+							>
+								<ChevronRight class="w-4 h-4" />
+							</Button>
+						</div>
+					</div>
 				{/if}
 			</div>
 		</div>

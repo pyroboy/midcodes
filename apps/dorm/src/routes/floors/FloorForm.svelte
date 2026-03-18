@@ -3,10 +3,9 @@
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import * as Select from '$lib/components/ui/select';
-	import { createEventDispatcher } from 'svelte';
 	import { floorStatusEnum } from './formSchema';
 	import type { SuperForm } from 'sveltekit-superforms';
-	import type { z } from 'zod';
+	import type { z } from 'zod/v3';
 	import type { floorSchema } from './formSchema';
 	import type { PageData } from './$types';
 	import { propertyStore } from '$lib/stores/property';
@@ -18,11 +17,10 @@
 		errors: SuperForm<z.infer<typeof floorSchema>>['errors'];
 		enhance: SuperForm<z.infer<typeof floorSchema>>['enhance'];
 		constraints: SuperForm<z.infer<typeof floorSchema>>['constraints'];
+		oncancel?: () => void;
 	}
 
-	let { data, editMode = false, form, errors, enhance, constraints }: Props = $props();
-
-	const dispatch = createEventDispatcher();
+	let { data, editMode = false, form, errors, enhance, constraints, oncancel }: Props = $props();
 
 	$effect(() => {
 		if ($propertyStore.selectedProperty) {
@@ -120,12 +118,10 @@
 	</div>
 
 	<div class="flex justify-end space-x-2">
+		<Button type="button" variant="outline" onclick={() => oncancel?.()}>Cancel</Button>
 		<Button type="submit">
 			{editMode ? 'Update' : 'Add'} Floor
 		</Button>
-		{#if editMode}
-			<Button type="button" variant="destructive" onclick={() => dispatch('cancel')}>Cancel</Button>
-		{/if}
 	</div>
 </form>
 
