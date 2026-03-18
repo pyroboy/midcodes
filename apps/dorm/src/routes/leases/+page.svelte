@@ -14,6 +14,7 @@
 	import { createRxStore } from '$lib/stores/rx.svelte';
 	import { resyncCollection } from '$lib/db/replication';
 	import { optimisticDeleteLease } from '$lib/db/optimistic-leases';
+	import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 	type FormType = z.infer<typeof leaseSchema>;
 
@@ -292,13 +293,17 @@
 
 	// Resync relevant collections after server actions
 	async function refreshData() {
-		await Promise.all([
-			resyncCollection('leases'),
-			resyncCollection('lease_tenants'),
-			resyncCollection('billings'),
-			resyncCollection('payments'),
-			resyncCollection('payment_allocations')
-		]).catch((err) => console.warn('[Leases] refreshData resync failed:', err));
+		const collections = ['leases', 'lease_tenants', 'billings', 'payments', 'payment_allocations'];
+		console.log('[Leases] refreshData → resyncing:', collections.join(', '));
+		syncStatus.addLog('Leases: resyncing after server action...', 'info');
+		try {
+			await Promise.all(collections.map((c) => resyncCollection(c)));
+			console.log('[Leases] refreshData → all collections resynced ✓');
+			syncStatus.addLog('Leases: all collections resynced ✓', 'success');
+		} catch (err) {
+			console.warn('[Leases] refreshData resync failed:', err);
+			syncStatus.addLog(`Leases: resync failed — ${err instanceof Error ? err.message : err}`, 'error');
+		}
 	}
 
 	function handleAddLease() {
@@ -348,6 +353,8 @@
 		formData.append('reason', 'User initiated deletion');
 
 		try {
+			console.log(`[Leases] Server: sending delete for lease #${lease.id} to Neon...`);
+			syncStatus.addLog(`Server: deleting lease "${lease.name}" → sending to Neon...`, 'info');
 			const result = await fetch('?/delete', {
 				method: 'POST',
 				body: formData
@@ -355,17 +362,21 @@
 			const response = await result.json();
 
 			if (result.ok) {
+				console.log(`[Leases] Server: lease #${lease.id} deleted on Neon ✓`);
+				syncStatus.addLog(`Server: lease "${lease.name}" deleted on Neon ✓`, 'success');
 				toast.success(
 					`Lease "${lease.name}" has been successfully archived. Payment history has been preserved.`
 				);
 			} else {
-				console.error('Delete failed:', response);
+				console.error('[Leases] Server: delete rejected:', response);
+				syncStatus.addLog(`Server: lease delete rejected — ${response.error || response.message || 'Unknown'}`, 'error');
 				toast.error(response.error || response.message || 'Failed to delete lease');
 				// Resync to restore the original state
 				resyncCollection('leases');
 			}
 		} catch (error) {
-			console.error('Error deleting lease:', error);
+			console.error('[Leases] Server: delete network error:', error);
+			syncStatus.addLog(`Server: lease delete failed — ${error instanceof Error ? error.message : 'Network error'}`, 'error');
 			toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			// Resync to restore the original state on network error
 			resyncCollection('leases');

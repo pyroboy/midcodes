@@ -1,5 +1,6 @@
 import { getDb } from '$lib/db';
 import { resyncCollection } from '$lib/db/replication';
+import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 /**
  * Optimistic write helpers for the dorm RxDB cache.
@@ -8,11 +9,19 @@ import { resyncCollection } from '$lib/db/replication';
  * then fire a background resync to reconcile with Neon.
  */
 
-/** Background resync — fire and forget, never blocks UI. */
+/** Background resync — fire and forget, never blocks UI. Logs to sync modal. */
 function bgResync(collection: string) {
-	resyncCollection(collection).catch((err) =>
-		console.warn(`[Optimistic] Background resync for "${collection}" failed:`, err)
-	);
+	console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
+	syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
+	resyncCollection(collection)
+		.then(() => {
+			console.log(`[Optimistic] Resync "${collection}" complete ✓`);
+			syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
+		})
+		.catch((err) => {
+			console.warn(`[Optimistic] Resync "${collection}" failed:`, err);
+			syncStatus.addLog(`Resync: ${collection} failed — ${err?.message || err}`, 'error');
+		});
 }
 
 /**
@@ -33,6 +42,8 @@ export async function optimisticUpsertTenant(data: {
 	birthday?: string | null;
 }) {
 	try {
+		console.log(`[Optimistic] Tenant upsert id=${data.id} → writing to RxDB...`);
+		syncStatus.addLog(`Optimistic: tenant "${data.name}" → writing to RxDB...`, 'info');
 		const db = await getDb();
 		const sid = String(data.id);
 		// Check if doc exists to preserve created_at on updates
@@ -55,8 +66,11 @@ export async function optimisticUpsertTenant(data: {
 			created_by: existing?.created_by ?? null,
 			deleted_at: null
 		});
+		console.log(`[Optimistic] Tenant upsert id=${data.id} → RxDB updated ✓`);
+		syncStatus.addLog(`Optimistic: tenant "${data.name}" → RxDB updated ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Tenant upsert failed, falling back to resync:', err);
+		syncStatus.addLog(`Optimistic: tenant upsert failed — ${err instanceof Error ? err.message : err}`, 'error');
 	}
 	bgResync('tenants');
 }
@@ -68,6 +82,8 @@ export async function optimisticUpsertTenant(data: {
  */
 export async function optimisticDeleteTenant(tenantId: number) {
 	try {
+		console.log(`[Optimistic] Tenant delete id=${tenantId} → soft-deleting in RxDB...`);
+		syncStatus.addLog(`Optimistic: tenant #${tenantId} → soft-deleting in RxDB...`, 'info');
 		const db = await getDb();
 		const doc = await db.tenants.findOne(String(tenantId)).exec();
 		if (doc) {
@@ -75,9 +91,15 @@ export async function optimisticDeleteTenant(tenantId: number) {
 				deleted_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
 			});
+			console.log(`[Optimistic] Tenant delete id=${tenantId} → RxDB soft-deleted ✓`);
+			syncStatus.addLog(`Optimistic: tenant #${tenantId} → RxDB soft-deleted ✓`, 'success');
+		} else {
+			console.warn(`[Optimistic] Tenant id=${tenantId} not found in RxDB`);
+			syncStatus.addLog(`Optimistic: tenant #${tenantId} not found in RxDB`, 'warn');
 		}
 	} catch (err) {
 		console.warn('[Optimistic] Tenant delete failed, falling back to resync:', err);
+		syncStatus.addLog(`Optimistic: tenant delete failed — ${err instanceof Error ? err.message : err}`, 'error');
 	}
 	bgResync('tenants');
 }

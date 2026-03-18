@@ -1,13 +1,9 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 
-export const GET: RequestHandler = async ({ locals }) => {
-	if (!locals.user) {
-		throw error(401, 'Unauthorized');
-	}
-
+export const GET: RequestHandler = async () => {
 	const start = Date.now();
 	try {
 		await db.execute(sql`SELECT 1`);

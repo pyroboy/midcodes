@@ -41,7 +41,24 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 
 					const res = await fetch(`/api/rxdb/pull/${name}?${params}`);
 					if (!res.ok) {
-						throw new Error(`Pull ${name} failed: ${res.status}`);
+						let detail = '';
+						try {
+							const text = await res.text();
+							// Try JSON first, fall back to raw text
+							try {
+								const body = JSON.parse(text);
+								detail = body.detail || body.error || body.message || '';
+							} catch {
+								// SvelteKit may return HTML error pages — extract the message
+								const match = text.match(/<pre[^>]*>([^<]+)/);
+								detail = match?.[1]?.trim() || text.slice(0, 200);
+							}
+						} catch { /* ignore */ }
+						const msg = detail
+							? `Pull ${name} failed: ${res.status} — ${detail}`
+							: `Pull ${name} failed: ${res.status}`;
+						console.warn(`[RxSync:${name}]`, msg);
+						throw new Error(msg);
 					}
 
 					const data = await res.json();
@@ -57,20 +74,22 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 			autoStart: true
 		});
 
-		// Track errors first so we know if replication had issues
-		let hadError = false;
+		// Track errors — reset on each sync attempt
+		let lastError = false;
 
 		repl.error$.subscribe((err) => {
-			hadError = true;
+			lastError = true;
 			console.error(`[RxSync:${name}] Replication error:`, err);
-			// Pass raw error object so the store can extract RxDB error codes
 			syncStatus.markError(name, err);
 		});
 
-		// Track sync completion — active$ emits false when idle
-		// Only mark synced if no errors occurred
+		// active$ emits false when replication goes idle after a pull batch.
+		// Only mark synced if no error occurred during this pull cycle.
 		repl.active$.subscribe((active) => {
-			if (!active && !hadError) {
+			if (active) {
+				// Starting a new pull — reset error flag
+				lastError = false;
+			} else if (!lastError) {
 				syncStatus.markSynced(name, 0);
 			}
 		});

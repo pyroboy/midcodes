@@ -145,33 +145,54 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 
 	const { table, transform, updatedAtCol, idCol } = config;
 
-	// Checkpoint-based query: rows newer than checkpoint, or same timestamp but higher ID
-	const rows = await db
-		.select()
-		.from(table)
-		.where(
-			or(
-				gt(updatedAtCol, new Date(updatedAt)),
-				and(eq(updatedAtCol, new Date(updatedAt)), gt(idCol, id))
+	try {
+		// Use COALESCE to handle NULL updated_at — treat NULL as epoch so rows are always included
+		const coalesced = sql`COALESCE(${updatedAtCol}, '1970-01-01T00:00:00Z'::timestamptz)`;
+		// IMPORTANT: Cast the checkpoint as a raw timestamptz string, NOT new Date().
+		// PostgreSQL has microsecond precision; JS Date only has millisecond precision.
+		// new Date('...123456Z') truncates to '...123Z', making gt() always true → infinite loop.
+		const checkpointTs = sql`${updatedAt}::timestamptz`;
+
+		// Select all columns + raw timestamp with full microsecond precision as a string.
+		// Drizzle converts timestamps to JS Date (ms precision only), which truncates
+		// microseconds and causes infinite re-pull loops when used as checkpoint.
+		const rawTsExpr = sql<string>`to_char(COALESCE(${updatedAtCol}, '1970-01-01T00:00:00Z'::timestamptz) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`.as('_raw_updated_at');
+
+		const rows = await db
+			.select({ _all: table, _rawUpdatedAt: rawTsExpr })
+			.from(table)
+			.where(
+				or(
+					gt(coalesced, checkpointTs),
+					and(eq(coalesced, checkpointTs), gt(idCol, id))
+				)
 			)
-		)
-		.orderBy(asc(updatedAtCol), asc(idCol))
-		.limit(limit);
+			.orderBy(asc(coalesced), asc(idCol))
+			.limit(limit);
 
-	const documents = rows.map(transform);
+		const documents = rows.map((r) => transform(r._all));
 
-	// Build new checkpoint from last row (Drizzle returns camelCase JS property names)
-	const lastRow = rows[rows.length - 1] as any;
-	let checkpoint: { updated_at: string; id: string };
-	if (lastRow) {
-		const rawUpdatedAt = lastRow.updatedAt;
-		checkpoint = {
-			updated_at: rawUpdatedAt instanceof Date ? rawUpdatedAt.toISOString() : String(rawUpdatedAt ?? updatedAt),
-			id: String(lastRow.id ?? id)
-		};
-	} else {
-		checkpoint = { updated_at: updatedAt, id: String(id) };
+		// Build new checkpoint from last row using the raw microsecond-precision string.
+		const lastRow = rows[rows.length - 1];
+		let checkpoint: { updated_at: string; id: string };
+		if (lastRow) {
+			// _rawUpdatedAt is a full-precision string like "2026-03-18T02:33:18.030456Z"
+			// This preserves microseconds so the next pull correctly skips this row.
+			checkpoint = {
+				updated_at: lastRow._rawUpdatedAt || '1970-01-01T00:00:00.000000Z',
+				id: String((lastRow._all as any).id)
+			};
+		} else {
+			checkpoint = { updated_at: updatedAt, id: String(id) };
+		}
+
+		return json({ documents, checkpoint });
+	} catch (err: any) {
+		const msg = err?.message || String(err);
+		console.error(`[RxDB Pull] ${collectionName} failed:`, msg);
+		return json(
+			{ error: `Pull ${collectionName} failed`, detail: msg.slice(0, 500) },
+			{ status: 500 }
+		);
 	}
-
-	return json({ documents, checkpoint });
 };

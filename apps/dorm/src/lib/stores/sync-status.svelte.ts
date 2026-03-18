@@ -127,11 +127,12 @@ export function parseError(err: any): ParsedError {
 		};
 	}
 
-	// HTTP-style errors from fetch (e.g. "Pull tenants failed: 401")
-	const httpMatch = err?.message?.match(/failed:\s*(\d{3})/);
+	// HTTP-style errors from fetch (e.g. "Pull tenants failed: 500 — detail here")
+	const httpMatch = err?.message?.match(/failed:\s*(\d{3})(?:\s*—\s*(.+))?/);
 	if (httpMatch) {
 		const status = httpMatch[1];
-		const labels: Record<string, string> = {
+		const detail = httpMatch[2]?.trim();
+		const fallbackLabels: Record<string, string> = {
 			'401': 'Unauthorized — session expired?',
 			'403': 'Forbidden — missing permissions',
 			'404': 'Endpoint not found',
@@ -142,7 +143,7 @@ export function parseError(err: any): ParsedError {
 		};
 		return {
 			code: `HTTP ${status}`,
-			summary: labels[status] || `Server returned ${status}`,
+			summary: detail || fallbackLabels[status] || `Server returned ${status}`,
 			isRxdb: false,
 			url: null
 		};
@@ -229,9 +230,9 @@ function createSyncStatusStore() {
 			parsedError: null
 		});
 		addLog(`${name} synced`, 'success');
-		// Check if all are synced
+		// Check if all are synced — only log once
 		const allSynced = collections.every((c) => c.status === 'synced');
-		if (allSynced) {
+		if (allSynced && phase !== 'complete') {
 			phase = 'complete';
 			addLog('All collections synced', 'success');
 		}
