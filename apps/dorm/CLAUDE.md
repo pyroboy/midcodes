@@ -1,401 +1,190 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with the dorm app.
 
 ## Development Commands
 
-- **Start development server**: `pnpm dev`
-- **Build for production**: `pnpm build`
-- **Run tests**: `pnpm test` (runs both integration and unit tests)
-- **Run unit tests only**: `pnpm test:unit` (Vitest)
-- **Run integration tests only**: `pnpm test:integration` (Playwright)
-- **Type checking**: `pnpm check`
-- **Linting**: `pnpm lint` (Prettier + ESLint)
-- **Format code**: `pnpm format`
-- **Clean build artifacts**: `pnpm clean`
+- `pnpm dev` — start development server
+- `pnpm build` — build for production (Cloudflare)
+- `pnpm check` — type-check (svelte-check)
+- `pnpm lint` — Prettier + ESLint
+- `pnpm format` — auto-format code
+- `pnpm test` — run all tests (integration + unit)
+- `pnpm test:unit` — Vitest only
+- `pnpm test:integration` — Playwright only
 
 ## Architecture Overview
 
-This is a **SvelteKit** application for dormitory management built with:
+SvelteKit dormitory management app with an **offline-first** dual-database architecture.
 
-- **Frontend**: Svelte 5 + SvelteKit with TypeScript
-- **Backend**: Supabase (PostgreSQL database + Auth)
-- **UI Components**: shadcn-svelte with Tailwind CSS
-- **Testing**: Vitest (unit) + Playwright (integration)
-- **State Management**: Svelte stores + context
-- **Authentication**: Supabase Auth with JWT tokens and role-based permissions
-- **Currency**: Philippine Peso (PHP) - All monetary values use PHP formatting
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Frontend | Svelte 5 + SvelteKit 2, Tailwind CSS 3, shadcn-svelte | UI |
+| Client DB | RxDB 16 (Dexie/IndexedDB) | Local cache, offline-first reads |
+| Server DB | Neon PostgreSQL + Drizzle ORM | Source of truth |
+| Auth | Better Auth 1.4 (email/password, admin plugin) | Sessions, roles, permissions |
+| Deployment | Cloudflare Pages (adapter-cloudflare) | Edge runtime |
+| Forms | sveltekit-superforms + Zod | Validation |
+| Storage | AWS S3 (presigned URLs) | Image uploads |
+| Currency | Philippine Peso (PHP) — use `formatCurrency()` from `$lib/utils/format` | |
 
-### Database & Authentication
+## Database Architecture
 
-- **Supabase Client**: Initialized in `src/lib/supabaseClient.ts`
-- **Auth Flow**: Handled in `src/hooks.server.ts` with session management and role-based access control
-- **Permissions**: Role-based system managed in `src/lib/services/permissions.ts`
-- **Database Types**: Auto-generated types in `src/lib/database.types.ts`
+### Dual Database (Server + Client)
 
-### Route Structure
+**Server (Neon + Drizzle):**
+- Schema: `src/lib/server/schema.ts` — 32 tables, 25 pgEnums
+- Connection: `src/lib/server/db.ts` — lazy-init Neon HTTP with retry/timeout/circuit-breaker
+- Auth schema: `src/lib/server/schema-auth.ts` — lightweight 4-table subset for Better Auth (stays under CF Workers CPU limit)
 
-The application follows SvelteKit's file-based routing with feature-based organization:
+**Client (RxDB):**
+- Setup: `src/lib/db/index.ts` — singleton on `globalThis`, Dexie storage
+- Schemas: `src/lib/db/schemas.ts` — 14 collections mirroring server tables
+- Collections: tenants, leases, lease_tenants, rental_units, properties, floors, meters, readings, billings, payments, payment_allocations, expenses, budgets, penalty_configs
 
-- **Authentication**: `/auth/*` routes for login/logout/password reset
-- **Property Management**: `/properties` - manage dormitory properties
-- **Tenant Management**: `/tenants` - tenant information and registration
-- **Lease Management**: `/leases` - lease agreements and billing
-- **Utility Billing**: `/utility-billings` - meter readings and utility calculations
-- **Financial**: `/payments`, `/transactions`, `/expenses`, `/budgets` - financial management
-- **Reports**: `/reports`, `/lease-report` - various reporting features
-- **Room Management**: `/rental-unit`, `/floors`, `/meters` - physical space management
+### Replication (Pull-Only)
 
-### Input Components & Form Functionality
+- `src/lib/db/replication.ts` — checkpoint-based pull from `/api/rxdb/pull/[collection]`
+- Batch size: 200, retry: 5s
+- Checkpoint: `updated_at + id` for pagination
+- `resyncCollection(name)` / `resyncAll()` for manual invalidation after server mutations
 
-The application features sophisticated input handling across different routes:
+### Optimistic Updates
 
-#### Image Upload with Cropping (`ImageUploadWithCrop.svelte`)
-**Location**: `src/lib/components/ui/ImageUploadWithCrop.svelte`
-**Used in**: Tenant profiles
+- `src/lib/db/optimistic.ts` — write to RxDB immediately, resync in background
+- Pattern: `optimisticUpsertTenant()`, `optimisticDeleteTenant()` (similar for other entities)
+- Soft-delete: sets `deleted_at` timestamp; RxDB queries filter `deleted_at: { $eq: null }`
+- If server rejects, `resyncCollection()` reverts the optimistic write
 
-**Features**:
-- **Deferred Upload Pattern**: Images are cropped and prepared locally, but only uploaded when the parent form is saved
-- **Canvas-Based Cropping**: Circular crop area with real-time preview using HTML5 Canvas
-- **Touch & Mouse Support**: Full mobile/desktop interaction with pan, zoom, and rotation
-- **Performance Optimized**: Large images are automatically scaled during preview for smooth performance
-- **Sequential Processing**: Custom form submission ensures image upload completes before form data submission
-- **State Management**: Tracks unsaved changes to prevent accidental modal closure
-- **Blob URL Management**: Proper cleanup and memory management for image previews
+### Drizzle Type Gotcha
 
-**Usage Pattern**:
+`decimal()` columns return **strings**, not numbers. When writing to Drizzle:
+- Amounts: `String(number)` for inserts/updates
+- Timestamps: `new Date(string)` for timestamp columns
+- Reading back: `Number(row.amount)` or `parseFloat(row.amount)`
+
+## Authentication
+
+- **Better Auth** configured in `src/lib/server/auth.ts`
+- **Hook chain** in `src/hooks.server.ts`: `betterAuthHandle` → `securityHeadersHandle` → `authGuard`
+- **Session cookie**: `better-auth.session_token`
+- **Dev bypass**: `dev_role` cookie for quick role switching in development
+- **Roles** (from `userRoleEnum`): super_admin, property_admin, property_manager, property_accountant, property_maintenance, property_utility, property_frontdesk, property_tenant, property_guest, etc.
+- **Permissions**: string array on `locals.permissions` (e.g., `'tenants.read'`, `'payments.create'`)
+- `locals.permissions` is **optional** (`string[] | undefined`) — always use `?.includes()` or guard
+
+## State Management
+
+### RxDB Reactive Stores
+
+Data flows through RxDB stores, not server load functions:
+
 ```typescript
-// Deferred upload - image processes on form save
-<ImageUploadWithCrop
-  bind:value={imageDisplayValue}
-  onCropReady={handleCropReady}  // Called when crop is ready
-  onremove={handleRemove}
-  cropSize={{ width: 400, height: 400 }}
-/>
+// src/lib/stores/rx.svelte.ts
+const tenantsStore = createRxStore<any>('tenants',
+  (db) => db.tenants.find({ selector: { deleted_at: { $eq: null } }, sort: [{ name: 'asc' }] })
+);
+
+// In template: {#each tenantsStore.value as tenant}
+// Loading state: {#if !tenantsStore.initialized} → show skeleton
 ```
 
-#### Birthday Input (`birthday-input.svelte`)
-**Location**: `src/lib/components/ui/birthday-input.svelte`
-**Used in**: Tenant registration
+Server `+page.server.ts` files now only provide **superforms** for create/update actions. Data loading is client-side via RxDB.
 
-**Features**:
-- **Three-Field Format**: Separate MM/DD/YYYY inputs for better UX
-- **Smart Navigation**: Auto-advance between fields on completion
-- **Validation**: Real-time date validation with error display
-- **Mobile Optimized**: Numeric input modes and proper keyboard layouts
+### Enriching RxDB Data (Client-Side Joins)
 
-#### Form Patterns by Route
+Pages that need relationships (e.g., tenants with leases) build **Map lookups** for O(1) joins:
 
-**Tenant Management (`/tenants`)**:
-- **Profile Pictures**: Advanced image cropping with deferred upload
-- **Emergency Contacts**: Nested object handling with flat form fields
-- **Status Management**: Enum-based status selection with color coding
-- **Contact Information**: Optional email/phone with validation
-- **Address Fields**: Multi-line address inputs with proper formatting
-
-**Lease Management (`/leases`)**:
-- **Tenant Association**: Multi-select tenant assignment with search
-- **Rental Unit Selection**: Hierarchical property → unit selection
-- **Date Management**: Start/end dates with automatic calculation
-- **Billing Integration**: Automatic rent scheduling and security deposit handling
-
-**Property Management (`/properties`)**:
-- **Hierarchical Structure**: Property → Floor → Unit relationships
-- **Configuration Settings**: Property-specific billing and utility settings
-- **Status Management**: Active/inactive property status with cascading effects
-
-**Utility Billing (`/utility-billings`)**:
-- **Meter Readings**: Numeric inputs with automatic consumption calculation
-- **Bulk Operations**: Multi-unit reading entry with validation
-- **Historical Data**: Previous reading display and validation against historical patterns
-
-**Financial Routes (`/payments`, `/transactions`)**:
-- **Amount Inputs**: Currency formatting with PHP locale
-- **Payment Methods**: Method-specific form fields (reference numbers, etc.)
-- **Allocation System**: Payment distribution across multiple billings
-- **Receipt Management**: File upload integration for payment receipts
-
-#### Form Validation & Error Handling
-
-**Validation Strategy**:
-- **Zod Schemas**: Comprehensive validation with TypeScript integration
-- **SuperForms Integration**: Client and server-side validation with `sveltekit-superforms`
-- **Real-time Feedback**: Instant validation feedback during user input
-- **Error Display**: Contextual error messages with red styling and icons
-
-**Common Patterns**:
 ```typescript
-// Form initialization with validation
-const { form, errors, enhance } = superForm(initialForm, {
+let enriched = $derived.by(() => {
+  const leaseMap = new Map();
+  for (const l of leasesStore.value) leaseMap.set(String(l.id), l);
+  // ... join via map lookups instead of .find()
+});
+```
+
+### Sync Status
+
+- `src/lib/stores/sync-status.svelte.ts` — tracks per-collection sync state
+- `src/lib/components/sync/SyncIndicator.svelte` — UI indicator
+
+## Route Structure
+
+Each feature route contains:
+- `+page.server.ts` — form actions (create/update/delete) + superform init
+- `+page.svelte` — main page with RxDB stores for data
+- `formSchema.ts` — Zod validation schema
+- `types.ts` — TypeScript interfaces
+- Component files (modals, forms, tables, cards)
+
+### Routes
+
+| Route | Purpose |
+|-------|---------|
+| `/auth` | Login/logout/password reset |
+| `/properties` | Dormitory properties |
+| `/floors` | Building floors and wings |
+| `/rental-unit` | Individual rental units |
+| `/tenants` | Tenant management |
+| `/leases` | Lease agreements |
+| `/meters` | Utility meters |
+| `/utility-billings` | Meter readings and billing |
+| `/utility-input/electricity/[slug]/[date]` | Bulk meter reading entry |
+| `/payments` | Payment recording |
+| `/transactions` | Financial transactions |
+| `/expenses` | Expense tracking |
+| `/budgets` | Budget management |
+| `/penalties` | Late payment penalties |
+| `/reports`, `/lease-report` | Reporting |
+| `/insights` | Analytics dashboard |
+| `/api/rxdb/pull/[collection]` | RxDB replication endpoint |
+| `/api/rxdb/health` | Sync health check |
+| `/api/auth/[...all]` | Better Auth API routes |
+| `/api/cron` | Automated jobs (penalties, reminders) |
+
+## Key Patterns
+
+### Form Handling
+
+```typescript
+// Server: provide superform
+export const load = async () => ({
+  form: await superValidate(zod(formSchema))
+});
+
+// Client: use superform with optimistic writes
+const { form, errors, enhance } = superForm(data.form, {
   validators: zodClient(formSchema),
   validationMethod: 'onsubmit',
-  resetForm: true
+  invalidateAll: false // don't refetch — RxDB handles it
 });
 
-// Error display in components
-{#if $errors.fieldName}
-  <p class="text-sm text-red-500 flex items-center gap-1">
-    <AlertCircle class="w-4 h-4" />
-    {$errors.fieldName}
-  </p>
-{/if}
+// After server confirms, optimistic write to RxDB
+await optimisticUpsertTenant({ id: tenantId, ...formData });
 ```
 
-**Custom Validation Rules**:
-- **Email Uniqueness**: Server-side duplicate checking for tenant emails
-- **Date Relationships**: End dates after start dates, billing periods
-- **Business Logic**: Security deposit amounts, payment allocations
-- **File Constraints**: Image size limits, file type validation
-
-### Key Components & Libraries
-
-- **UI Components**: Located in `src/lib/components/ui/` using shadcn-svelte
-- **Schemas**: Zod validation schemas in `src/lib/schemas/`
-- **Utilities**: Helper functions in `src/lib/utils/`
-- **Types**: TypeScript definitions in `src/lib/types/`
-
-### Currency Formatting
-
-All monetary values in the application use **Philippine Peso (PHP)** formatting:
-
-- **Primary Currency Function**: Use `formatCurrency()` from `src/lib/utils/format.ts`
-- **Locale**: `en-PH` (English Philippines)
-- **Currency Code**: `PHP`
-- **Example Output**: `₱1,234.56`
-
-**Usage:**
-
-```typescript
-import { formatCurrency } from '$lib/utils/format';
-
-// Format amounts consistently
-const displayAmount = formatCurrency(1234.56); // "₱1,234.56"
-```
-
-**Important**: Always use the centralized `formatCurrency` function instead of creating inline formatters to maintain consistency across the application.
-
-### State Management
-
-- **Global Stores**: Configuration, organization, property, settings, and feature flags stores in `src/lib/stores/`
-- **Form Handling**: sveltekit-superforms for form validation and submission
-- **Data Fetching**: SvelteKit load functions with Supabase queries
-- **Feature Flags**: Configurable feature toggles managed in `src/lib/stores/featureFlags.ts`
-
-### Important Patterns
-
-1. **Route Structure**: Each feature route contains:
-
-   - `+page.server.ts` - Server-side data loading and form actions
-   - `+page.svelte` - Main page component
-   - Component files for modals/forms/tables
-   - `formSchema.ts` - Zod validation schemas
-   - `types.ts` - TypeScript interfaces
-
-2. **Authentication**: All routes except `/auth/*` require authentication via `hooks.server.ts`
-
-3. **Database Operations**: Use the Supabase client with proper error handling and type safety
-
-4. **Form Validation**: Use Zod schemas with sveltekit-superforms for consistent validation
-
-## Feature Flags
-
-The application includes a feature flag system for controlling the visibility of features without code changes.
-
-### Implementation
-
-**Store Location**: `src/lib/stores/featureFlags.ts`
-
-The feature flag store provides:
-- Persistent storage via localStorage
-- TypeScript type safety
-- Helper methods for common operations
-- Environment variable support (future)
-
-### Current Features
-
-- **Security Deposit Indicator**: Shows a green shield icon on lease cards when all security deposit billings are fully paid
-  - **Default**: Enabled
-  - **Location**: Lease cards in desktop and mobile layouts
-  - **Helper Function**: `isSecurityDepositFullyPaid()` in `src/lib/utils/lease.ts`
-
-### Usage Pattern
-
-```typescript
-import { featureFlags } from '$lib/stores/featureFlags';
-
-// In component
-let showFeature = $derived($featureFlags.showSecurityDepositIndicator);
-
-// Conditional rendering
-{#if showFeature}
-  <!-- Feature content -->
-{/if}
-```
-
-### Management
-
-Feature flags can be toggled programmatically:
-
-```typescript
-import { featureFlags } from '$lib/stores/featureFlags';
-
-// Toggle specific feature
-featureFlags.toggleSecurityDepositIndicator();
-
-// Set specific value
-featureFlags.setSecurityDepositIndicator(true);
-```
-
-### Adding New Features
-
-1. Update `FeatureFlags` interface in `featureFlags.ts`
-2. Add default value in `getInitialFeatureFlags()`
-3. Add helper methods if needed
-4. Use the flag in components with conditional rendering
-
-## Test Structure
-
-- **Unit Tests**: In `src/lib/__tests__/` and route-specific `__tests__/` directories
-- **Integration Tests**: Playwright tests for full user workflows
-- **Test Utils**: Environment setup in `src/lib/test-utils/`
-
-## Performance Optimizations
-
-The application includes several performance optimizations for instant route switching:
-
-### Caching Strategy
-
-- **Client-side Data Cache**: `src/lib/services/cache.ts` provides in-memory caching with TTL
-- **Cached Supabase Client**: `src/lib/services/cachedSupabase.ts` wraps Supabase queries with caching
-- **Service Worker**: Aggressive caching for static assets and offline support
-- **Cache TTL Configuration**: Different cache durations for various data types (properties: 10min, leases: 3min, transactions: 2min)
-
-### Route Optimizations
-
-- **Preloading**: Navigation links use `data-sveltekit-preload-data="hover"` for instant loading
-- **Smart Prefetching**: `src/lib/utils/prefetch.ts` provides intelligent route prefetching based on user behavior
-- **Streaming Layout**: Properties load in background while UI renders immediately
-- **Code Splitting**: Vite configured to split large dependencies into separate chunks
-
-### Build Optimizations
-
-- **Vite Configuration**: Optimized with esbuild, manual chunks, and dependency pre-bundling
-- **Service Worker**: Cache-first strategy for assets, network-first for API calls
-- **Layout Streaming**: Non-blocking property loading with progressive enhancement
-
-### Usage
-
-The caching system automatically handles data invalidation and provides cache debugging. Route switching should be near-instant after the first visit to each route.
-
-## Lazy Loading & Skeleton Pattern
-
-The application implements a high-performance lazy loading pattern for instant navigation, demonstrated in the tenants route.
-
-### Implementation Pattern
-
-**Server-Side (`+page.server.ts`):**
-
-```typescript
-export const load: PageServerLoad = async ({ locals, depends }) => {
-	// Set up dependencies for invalidation
-	depends('app:tenants');
-
-	// Return minimal data for instant navigation
-	return {
-		// Start with empty arrays for instant rendering
-		tenants: [],
-		properties: [],
-		form: await superValidate(zod(tenantFormSchema)),
-		// Flag to indicate lazy loading
-		lazy: true,
-		// Return promises that resolve with the actual data
-		tenantsPromise: loadTenantsData(locals),
-		propertiesPromise: loadPropertiesData(locals)
-	};
-};
-
-// Separate async functions for heavy data loading
-async function loadTenantsData(locals: any) {
-	const result = await locals.supabase.from('tenants').select('*').order('name');
-	return result.data || [];
-}
-```
-
-**Client-Side (`+page.svelte`):**
-
-```typescript
-let isLoading = $state(data.lazy === true);
-let tenants = $state<TenantResponse[]>(data.tenants);
-
-// Load data lazily on mount
-onMount(async () => {
-	if (data.lazy && data.tenantsPromise) {
-		try {
-			const loadedTenants = await data.tenantsPromise;
-			tenants = loadedTenants;
-			isLoading = false;
-		} catch (error) {
-			console.error('Error loading data:', error);
-			isLoading = false;
-		}
-	}
-});
-```
-
-**Skeleton Loading:**
-
-```svelte
-{#if isLoading}
-	<!-- Skeleton cards that match real content structure -->
-	<div class="space-y-2">
-		{#each Array(5) as _, i (i)}
-			<div class="border border-slate-200 rounded-lg p-4">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-3 flex-1">
-						<Skeleton class="w-10 h-10 rounded-full" />
-						<div class="space-y-2">
-							<Skeleton class="h-4 w-32" />
-							<Skeleton class="h-3 w-48" />
-						</div>
-					</div>
-				</div>
-			</div>
-		{/each}
-	</div>
-{:else}
-	<!-- Real content -->
-{/if}
-```
-
-### Benefits
-
-- **Instant Navigation**: Pages render immediately (0ms perceived load time)
-- **Progressive Enhancement**: Data streams in while UI is already interactive
-- **Better UX**: Skeleton loaders show expected content structure
-- **No Flicker**: Smooth transitions from skeleton to real content
-- **Maintains Performance**: Heavy database queries don't block navigation
-
-### When to Use This Pattern
-
-Apply this pattern to routes with:
-
-- Heavy database queries (multiple joins, large datasets)
-- Complex data processing
-- Non-critical initial load data
-- High navigation frequency
-
-### Integration with Existing Systems
-
-This pattern works seamlessly with:
-
-- **Hover Preloading**: Links still preload on hover for even faster subsequent visits
-- **Caching System**: Cached routes load instantly without skeletons
-- **Service Worker**: Static assets remain cached while data loads
-
-## Documentation
-
-Feature-specific documentation is available in:
-
-- Route-level `INSTRUCTIONS.md` files
-- `docs/` directory with detailed specifications
-- `DORMSCHEMA.md` for database schema information
+### Performance Patterns
+
+- **Search debouncing**: 300ms debounce on search inputs before filtering
+- **Pagination**: client-side pagination (e.g., 24 items/page) to cap DOM nodes
+- **Single-pass derived**: combine stats + filtering in one loop, not separate `.filter()` calls
+- **Map lookups**: use `Map` for O(1) joins instead of nested `.find()` calls
+- **Skeleton loading**: show skeletons while `!store.initialized`, then render data
+- **No console.log in $derived**: avoid GC pressure in reactive computations
+
+### Image Upload
+
+`src/lib/components/ui/ImageUploadWithCrop.svelte` — deferred upload pattern:
+1. User crops image locally (canvas-based)
+2. `onCropReady` stores file + preview URL
+3. On form submit: upload to `/api/upload-image` first, then submit form with URL
+
+## Important Constraints
+
+- **Cloudflare Workers**: edge runtime with CPU/memory limits. Auth uses lightweight 4-table schema; full 32-table schema lazy-loaded only after auth.
+- **RxDB primary keys are strings**: Drizzle serial IDs must be coerced to strings in RxDB schemas
+- **`decimal()` → string**: all monetary/numeric Drizzle decimal columns return strings (see Drizzle Type Gotcha above)
+- **`permissions` is optional**: always guard with `?.includes()` or `if (!permissions)` check
+- **Svelte 5 runes**: use `$state()`, `$derived()`, `$effect()` — not legacy stores
+- **Store files**: must use `.svelte.ts` extension for runes reactivity
+- **No top-level await** in client modules (Safari WebKit bug #242740)
