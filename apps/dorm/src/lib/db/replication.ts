@@ -14,6 +14,11 @@ const replications = new Map<string, RxReplicationState<any, any>>();
  * Start pull-only replication for all collections.
  * Each collection pulls from GET /api/rxdb/pull/[collection] using
  * checkpoint-based pagination (updated_at + id).
+ *
+ * Pull strategy (quota-friendly):
+ * - One-shot pull on startup (checkpoint-based — returns 0 docs if nothing changed)
+ * - Per-mutation resync via resyncCollection() after each create/update/delete
+ * - No polling, no visibility resync — minimizes Neon data transfer
  */
 export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, any>> {
 	syncStatus.setPhase('syncing');
@@ -35,7 +40,6 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 				async handler(checkpoint: any, batchSize: number) {
 					const cpUpdatedAt = checkpoint?.updated_at || '1970-01-01T00:00:00Z';
 					const cpId = String(checkpoint?.id || '0');
-					console.log(`[RxSync:${name}] Pull → checkpoint: {updated_at: "${cpUpdatedAt}", id: "${cpId}"}`);
 
 					const params = new URLSearchParams({
 						updatedAt: cpUpdatedAt,
@@ -48,12 +52,10 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 						let detail = '';
 						try {
 							const text = await res.text();
-							// Try JSON first, fall back to raw text
 							try {
 								const body = JSON.parse(text);
-								detail = body.detail || body.error || body.message || '';
+								detail = body.cause || body.detail || body.error || body.message || '';
 							} catch {
-								// SvelteKit may return HTML error pages — extract the message
 								const match = text.match(/<pre[^>]*>([^<]+)/);
 								detail = match?.[1]?.trim() || text.slice(0, 200);
 							}
@@ -68,12 +70,8 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 					const data = await res.json();
 					const docCount = data.documents?.length || 0;
 					if (docCount > 0) {
-						const ids = data.documents.map((d: any) => d.id).join(', ');
-						console.log(`[RxSync:${name}] ← ${docCount} doc(s) from Neon [ids: ${ids}]`);
-						console.log(`[RxSync:${name}]   new checkpoint: {updated_at: "${data.checkpoint?.updated_at}", id: "${data.checkpoint?.id}"}`);
-						syncStatus.addLog(`Pull: ${name} ← ${docCount} doc(s) from Neon [${ids}]`, 'info');
-					} else {
-						console.log(`[RxSync:${name}] ← 0 docs (up to date)`);
+						console.log(`[RxSync:${name}] ← ${docCount} doc(s) from Neon`);
+						syncStatus.addLog(`Pull: ${name} ← ${docCount} doc(s)`, 'info');
 					}
 					return {
 						documents: data.documents,
@@ -83,11 +81,10 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 				batchSize: 200
 			},
 			live: false,
-			retryTime: 5000,
+			retryTime: 30000,
 			autoStart: true
 		});
 
-		// Track errors — reset on each sync attempt
 		let lastError = false;
 
 		repl.error$.subscribe((err) => {
@@ -96,11 +93,8 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 			syncStatus.markError(name, err);
 		});
 
-		// active$ emits false when replication goes idle after a pull batch.
-		// Only mark synced if no error occurred during this pull cycle.
 		repl.active$.subscribe((active) => {
 			if (active) {
-				// Starting a new pull — reset error flag
 				lastError = false;
 			} else if (!lastError) {
 				syncStatus.markSynced(name, 0);
@@ -123,15 +117,13 @@ export async function resyncCollection(name: string): Promise<void> {
 		console.warn(`[RxSync] No replication found for "${name}"`);
 		return;
 	}
-	console.log(`[RxSync:${name}] resyncCollection() called — triggering re-pull`);
 	syncStatus.markSyncing(name);
 	await repl.reSync();
 	await repl.awaitInSync();
-	console.log(`[RxSync:${name}] resyncCollection() complete — now in sync`);
 }
 
 /**
- * Force all collections to re-pull.
+ * Force all collections to re-pull (manual refresh only).
  */
 export async function resyncAll(): Promise<void> {
 	await Promise.all(

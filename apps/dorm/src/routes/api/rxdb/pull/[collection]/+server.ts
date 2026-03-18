@@ -188,10 +188,26 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 
 		return json({ documents, checkpoint });
 	} catch (err: any) {
-		const msg = err?.message || String(err);
-		console.error(`[RxDB Pull] ${collectionName} failed:`, msg);
+		// Neon driver wraps PG errors — dig into all possible locations
+		const detail = err?.cause?.message || err?.sourceError?.message
+			|| err?.detail || err?.hint || err?.code || '';
+		const fullMsg = err?.message || String(err);
+		// Log everything on the server for debugging
+		console.error(`[RxDB Pull] ${collectionName} error:`, {
+			message: fullMsg?.slice(0, 200),
+			code: err?.code,
+			detail: err?.detail,
+			hint: err?.hint,
+			cause: err?.cause?.message,
+			sourceError: err?.sourceError?.message,
+			name: err?.name,
+			keys: Object.keys(err || {})
+		});
 		return json(
-			{ error: `Pull ${collectionName} failed`, detail: msg.slice(0, 500) },
+			{
+				error: `Pull ${collectionName} failed`,
+				detail: detail || fullMsg?.slice(-500) || 'Unknown error'
+			},
 			{ status: 500 }
 		);
 	}
