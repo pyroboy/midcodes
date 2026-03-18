@@ -1,5 +1,6 @@
 import { getDb } from '$lib/db';
 import { resyncCollection } from '$lib/db/replication';
+import { syncStatus } from '$lib/stores/sync-status.svelte';
 
 /**
  * Optimistic write helpers for the properties RxDB cache.
@@ -10,9 +11,17 @@ import { resyncCollection } from '$lib/db/replication';
 
 /** Background resync — fire and forget, never blocks UI. */
 function bgResync(collection: string) {
-	resyncCollection(collection).catch((err) =>
-		console.warn(`[Optimistic] Background resync for "${collection}" failed:`, err)
-	);
+	console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
+	syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
+	resyncCollection(collection)
+		.then(() => {
+			console.log(`[Optimistic] Resync "${collection}" complete ✓`);
+			syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
+		})
+		.catch((err) => {
+			console.warn(`[Optimistic] Resync "${collection}" failed:`, err);
+			syncStatus.addLog(`Resync: ${collection} failed — ${err?.message || err}`, 'error');
+		});
 }
 
 /**
@@ -26,6 +35,8 @@ export async function optimisticUpsertProperty(data: {
 	type: string;
 	status: string;
 }) {
+	console.log(`[Optimistic] property #${data.id} → writing to RxDB...`);
+	syncStatus.addLog(`Optimistic: property #${data.id} → writing to RxDB...`, 'info');
 	try {
 		const db = await getDb();
 		const sid = String(data.id);
@@ -39,8 +50,11 @@ export async function optimisticUpsertProperty(data: {
 			created_at: existing ? existing.created_at : new Date().toISOString(),
 			updated_at: new Date().toISOString()
 		});
+		console.log(`[Optimistic] property #${data.id} upsert complete ✓`);
+		syncStatus.addLog(`Optimistic: property #${data.id} upserted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Property upsert failed, falling back to resync:', err);
+		syncStatus.addLog(`Optimistic: property #${data.id} upsert failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	bgResync('properties');
 }
@@ -50,14 +64,19 @@ export async function optimisticUpsertProperty(data: {
  * Properties use hard delete (no deleted_at column).
  */
 export async function optimisticDeleteProperty(propertyId: number) {
+	console.log(`[Optimistic] property #${propertyId} → deleting from RxDB...`);
+	syncStatus.addLog(`Optimistic: property #${propertyId} → deleting from RxDB...`, 'info');
 	try {
 		const db = await getDb();
 		const doc = await db.properties.findOne(String(propertyId)).exec();
 		if (doc) {
 			await doc.remove();
 		}
+		console.log(`[Optimistic] property #${propertyId} delete complete ✓`);
+		syncStatus.addLog(`Optimistic: property #${propertyId} deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Property delete failed, falling back to resync:', err);
+		syncStatus.addLog(`Optimistic: property #${propertyId} delete failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	bgResync('properties');
 }

@@ -1,10 +1,20 @@
 import { getDb } from '$lib/db';
 import { resyncCollection } from '$lib/db/replication';
+import { syncStatus } from '$lib/stores/sync-status.svelte';
 
+/** Background resync — fire and forget, never blocks UI. */
 function bgResync(collection: string) {
-	resyncCollection(collection).catch((err) =>
-		console.warn(`[Optimistic] Background resync for "${collection}" failed:`, err)
-	);
+	console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
+	syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
+	resyncCollection(collection)
+		.then(() => {
+			console.log(`[Optimistic] Resync "${collection}" complete ✓`);
+			syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
+		})
+		.catch((err) => {
+			console.warn(`[Optimistic] Resync "${collection}" failed:`, err);
+			syncStatus.addLog(`Resync: ${collection} failed — ${err?.message || err}`, 'error');
+		});
 }
 
 export async function optimisticUpsertBudget(data: {
@@ -22,6 +32,8 @@ export async function optimisticUpsertBudget(data: {
 	property_id: number;
 	created_by?: string | null;
 }) {
+	console.log(`[Optimistic] budget #${data.id} → writing to RxDB...`);
+	syncStatus.addLog(`Optimistic: budget #${data.id} → writing to RxDB...`, 'info');
 	try {
 		const db = await getDb();
 		const sid = String(data.id);
@@ -43,21 +55,29 @@ export async function optimisticUpsertBudget(data: {
 			created_at: existing ? existing.created_at : new Date().toISOString(),
 			updated_at: new Date().toISOString()
 		});
+		console.log(`[Optimistic] budget #${data.id} upsert complete ✓`);
+		syncStatus.addLog(`Optimistic: budget #${data.id} upserted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Budget upsert failed, falling back to resync:', err);
+		syncStatus.addLog(`Optimistic: budget #${data.id} upsert failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	bgResync('budgets');
 }
 
 export async function optimisticDeleteBudget(budgetId: number) {
+	console.log(`[Optimistic] budget #${budgetId} → deleting from RxDB...`);
+	syncStatus.addLog(`Optimistic: budget #${budgetId} → deleting from RxDB...`, 'info');
 	try {
 		const db = await getDb();
 		const doc = await db.budgets.findOne(String(budgetId)).exec();
 		if (doc) {
 			await doc.remove();
 		}
+		console.log(`[Optimistic] budget #${budgetId} delete complete ✓`);
+		syncStatus.addLog(`Optimistic: budget #${budgetId} deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Budget delete failed, falling back to resync:', err);
+		syncStatus.addLog(`Optimistic: budget #${budgetId} delete failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	bgResync('budgets');
 }
