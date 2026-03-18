@@ -10,26 +10,54 @@ const COLLECTIONS_TO_SYNC = [
 
 const replications = new Map<string, RxReplicationState<any, any>>();
 
+/** When true, all pulls are halted — Neon quota is exhausted or unreachable. */
+let neonDown = false;
+
+/**
+ * Preflight: hit the health endpoint once before starting 14 replications.
+ * Returns true if Neon is reachable, false if quota exceeded or down.
+ */
+async function checkNeonReachable(): Promise<boolean> {
+	try {
+		const res = await fetch('/api/rxdb/health');
+		if (!res.ok) {
+			console.warn(`[RxSync] Neon health check failed (${res.status}) — skipping replication`);
+			syncStatus.addLog(`Neon unreachable (${res.status}) — using cached data`, 'warn');
+			return false;
+		}
+		return true;
+	} catch {
+		console.warn('[RxSync] Neon health check unreachable — skipping replication');
+		syncStatus.addLog('Neon unreachable — using cached data', 'warn');
+		return false;
+	}
+}
+
 /**
  * Start pull-only replication for all collections.
- * Each collection pulls from GET /api/rxdb/pull/[collection] using
- * checkpoint-based pagination (updated_at + id).
  *
- * Pull strategy (quota-friendly):
- * - One-shot pull on startup (checkpoint-based — returns 0 docs if nothing changed)
+ * Strategy (quota-friendly):
+ * - Preflight health check — if Neon returns 402, skip everything
+ * - One-shot pull on startup (checkpoint-based — 0 docs if nothing changed)
  * - Per-mutation resync via resyncCollection() after each create/update/delete
- * - No polling, no visibility resync — minimizes Neon data transfer
+ * - No polling, no visibility resync, no retries on fatal errors
  */
-export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, any>> {
+export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicationState<any, any>>> {
 	syncStatus.setPhase('syncing');
+	neonDown = false;
+
+	// Preflight: check if Neon is reachable before firing 14 parallel pulls
+	const reachable = await checkNeonReachable();
+	if (!reachable) {
+		neonDown = true;
+		syncStatus.setPhase('error');
+		return replications;
+	}
 
 	for (const name of COLLECTIONS_TO_SYNC) {
 		if (replications.has(name)) continue;
 		const collection = (db as any)[name];
-		if (!collection) {
-			console.warn(`[RxSync] Collection "${name}" not found, skipping`);
-			continue;
-		}
+		if (!collection) continue;
 
 		syncStatus.markSyncing(name);
 
@@ -38,6 +66,10 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 			replicationIdentifier: `dorm-neon-${name}`,
 			pull: {
 				async handler(checkpoint: any, batchSize: number) {
+					if (neonDown) {
+						return { documents: [], checkpoint };
+					}
+
 					const cpUpdatedAt = checkpoint?.updated_at || '1970-01-01T00:00:00Z';
 					const cpId = String(checkpoint?.id || '0');
 
@@ -60,6 +92,17 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 								detail = match?.[1]?.trim() || text.slice(0, 200);
 							}
 						} catch { /* ignore */ }
+
+						if (detail.includes('402') || detail.includes('exceeded the data transfer quota')) {
+							if (!neonDown) {
+								console.error('[RxSync] Neon quota exceeded — stopping all replication');
+								syncStatus.addLog('Neon quota exceeded — replication paused', 'error');
+							}
+							neonDown = true;
+							cancelAllReplications();
+							return { documents: [], checkpoint };
+						}
+
 						const msg = detail
 							? `Pull ${name} failed: ${res.status} — ${detail}`
 							: `Pull ${name} failed: ${res.status}`;
@@ -81,7 +124,7 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 				batchSize: 200
 			},
 			live: false,
-			retryTime: 30000,
+			retryTime: 120000, // 2 min — only matters if a transient error occurs
 			autoStart: true
 		});
 
@@ -89,8 +132,10 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 
 		repl.error$.subscribe((err) => {
 			lastError = true;
-			console.error(`[RxSync:${name}] Replication error:`, err);
-			syncStatus.markError(name, err);
+			if (!neonDown) {
+				console.error(`[RxSync:${name}] Replication error:`, err);
+				syncStatus.markError(name, err);
+			}
 		});
 
 		repl.active$.subscribe((active) => {
@@ -107,16 +152,21 @@ export function startSync(db: RxDatabase): Map<string, RxReplicationState<any, a
 	return replications;
 }
 
+function cancelAllReplications() {
+	for (const [, repl] of replications) {
+		repl.cancel();
+	}
+	replications.clear();
+}
+
 /**
  * Force a single collection to re-pull from Neon.
  * Call this after a mutation (create/update/delete) to refresh local data.
  */
 export async function resyncCollection(name: string): Promise<void> {
+	if (neonDown) return;
 	const repl = replications.get(name);
-	if (!repl) {
-		console.warn(`[RxSync] No replication found for "${name}"`);
-		return;
-	}
+	if (!repl) return;
 	syncStatus.markSyncing(name);
 	await repl.reSync();
 	await repl.awaitInSync();
@@ -126,6 +176,7 @@ export async function resyncCollection(name: string): Promise<void> {
  * Force all collections to re-pull (manual refresh only).
  */
 export async function resyncAll(): Promise<void> {
+	if (neonDown) return;
 	await Promise.all(
 		Array.from(replications.keys()).map((name) => resyncCollection(name))
 	);

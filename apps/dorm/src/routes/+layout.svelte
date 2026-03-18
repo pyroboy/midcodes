@@ -11,6 +11,7 @@
 	import { contextualPreload, safePreloadData } from '$lib/utils/prefetch';
 	import { preloadHeavyComponents } from '$lib/utils/lazyLoad';
 	import SyncIndicator from '$lib/components/sync/SyncIndicator.svelte';
+	import { createRxStore } from '$lib/stores/rx.svelte';
 	import GlobalPropertyViewer from '$lib/components/3d/GlobalPropertyViewer.svelte';
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { Button } from '$lib/components/ui/button';
@@ -117,42 +118,19 @@
 		// });
 	}
 
-	// Initialize properties store - simplified approach
-	let propertiesInitialized = $state(false);
-	let resolvedProperties = $state<Property[]>([]);
+	// Properties gate — RxDB is the source of truth (offline-first)
+	const rxProperties = createRxStore<any>('properties',
+		(db) => db.properties.find({ sort: [{ name: 'asc' }] })
+	);
+	let propertiesInitialized = $derived(rxProperties.initialized);
+	let resolvedProperties = $derived(
+		rxProperties.value.map((p: any) => ({ id: Number(p.id), name: p.name, address: p.address, type: p.type, status: p.status })) as Property[]
+	);
 
+	// Sync propertyStore when RxDB properties change
 	$effect(() => {
-		// Reset initialization state when data changes
-		if (data.properties) {
-			// Handle the properties promise
-			if (data.properties instanceof Promise) {
-				propertiesInitialized = false;
-				data.properties
-					.then((properties) => {
-						resolvedProperties = properties || [];
-						propertiesInitialized = true;
-						if (properties && properties.length > 0) {
-							propertyStore.init(properties);
-						}
-					})
-					.catch((error) => {
-						console.error('Failed to load properties:', error);
-						resolvedProperties = [];
-						propertiesInitialized = true; // Still mark as initialized even on error
-					});
-			} else {
-				// Properties already resolved
-				const props = (data.properties as unknown as Property[]) || [];
-				resolvedProperties = props;
-				propertiesInitialized = true;
-				if (props.length > 0) {
-					propertyStore.init(props);
-				}
-			}
-		} else {
-			// No properties data
-			resolvedProperties = [];
-			propertiesInitialized = true;
+		if (resolvedProperties.length > 0) {
+			propertyStore.init(resolvedProperties);
 		}
 	});
 
