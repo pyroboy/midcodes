@@ -5,7 +5,7 @@ finds one of these patterns, reference this document to note it is a **known sys
 rather than a one-off finding. This helps the fix-audit skill prioritize systemic fixes over
 isolated patches.
 
-Last updated: 2026-03-10 (based on 15 representative audits across all modules — kitchen KDS+weigh rush audit)
+Last updated: 2026-03-18 (based on 15 representative audits across all modules + sidebar component analysis)
 
 ---
 
@@ -224,6 +224,21 @@ DISHES section, rendering meats with the same ✓ checkmark + RETURN/86 actions.
 if `/kitchen/orders` is intentionally a dishes-only view (the stove focus page), add a
 prominent banner: "MEATS handled by Dispatch station — use /kitchen/dispatch for meat tickets".
 **Status:** Active — document intent (dishes-only vs all-items) and either render or explain.
+
+---
+
+## KP-14 — Sidebar Collapsed State Hides Critical Context
+
+**Frequency:** New (added 2026-03-18, based on component analysis)
+**Principle:** Visibility of System Status + Fitts's Law
+**Root cause:** When the sidebar collapses to icon-only mode (`group-data-[collapsible=icon]:hidden`), multiple information-bearing elements vanish entirely: location name, clock, Quick Actions grid, user name, and role badge. Only the avatar initial and nav icons remain.
+**Key gaps:**
+- **Location invisible** — Staff on a shared tablet can't confirm which branch they're operating at a glance. Critical when both branches share a prep area or during cross-branch manager visits.
+- **Quick Actions invisible** — Manager's 8 quick-action shortcuts (Receive Delivery, Log Expense, etc.) completely vanish. No icon-only fallback, no tooltip. Manager must expand sidebar to access any of them.
+- **Role badge invisible** — Only the avatar initial letter shows. On shared tablets, the initial "S" could be Staff Sara or Manager Sir Dan — no visual distinction without expanding.
+- **Clock invisible** — Kitchen and manager roles use the clock for timing decisions (ticket age, shift boundaries). Hidden when collapsed.
+**Fix pattern:** In collapsed mode: (1) show a compact location indicator (badge or colored dot keyed to branch), (2) provide icon-only Quick Action shortcuts or a "+" overflow button, (3) tint the avatar ring by role color so role is visually encoded without text, (4) consider showing a mini-clock or time badge below the W! toggle.
+**Status:** Active — evaluate during every sidebar audit.
 
 ---
 

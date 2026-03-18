@@ -9,7 +9,7 @@ description: >
   page's usability, visual hierarchy, cognitive load, motor efficiency, or consistency with the
   WTFPOS design system. Also triggers on "touch targets", "contrast ratio", "too many buttons",
   "feels cluttered", "hard to find", "confusing layout".
-version: 5.1.0
+version: 5.2.0
 ---
 
 # UX Audit — WTFPOS
@@ -526,9 +526,115 @@ SidebarProvider
 +-- AppSidebar          (collapsible left rail / Sheet drawer)
 +-- SidebarInset
     +-- MobileTopBar    (md:hidden, hamburger trigger)
-    +-- LocationBanner  (always visible, all authenticated pages)
+    +-- StatusBar       (always visible, all authenticated pages)
     +-- {children}      (page content)
 ```
+
+### Sidebar Audit Criteria
+
+The `AppSidebar` (`src/lib/components/AppSidebar.svelte`) is a **persistent element on every authenticated page**. It has three visual states and role-conditional content. Auditing a page without evaluating the sidebar misses friction that compounds across every interaction.
+
+#### Three States to Evaluate
+
+| State | Trigger | What's visible | Where |
+|---|---|---|---|
+| **Expanded** | Default on desktop (cookie-persisted) | Full nav labels, Quick Actions grid, location, clock, user profile | Desktop ≥768px |
+| **Collapsed (icon-only)** | Toggle via W! button or cookie | Icons only, tooltips on hover, Quick Actions hidden, user avatar only | Desktop ≥768px |
+| **Mobile Sheet** | Hamburger in `MobileTopBar` | Full sidebar as Sheet overlay from left | Mobile <768px |
+
+**Audit rule:** Every sidebar audit MUST evaluate at least the expanded and collapsed states. Mobile sheet is required when viewport is set to mobile dimensions.
+
+#### Sidebar Zones (top to bottom)
+
+```
+┌─────────────────────────┐
+│ HEADER                  │
+│  [W!] brand toggle      │  ← toggle button (44px min touch)
+│  WTF! SAMGYUP / POS     │  ← hidden in collapsed
+│  Location / ticker      │  ← hidden in collapsed
+│  Clock (mono)           │  ← hidden in collapsed
+├─────────────────────────┤
+│ QUICK ACTIONS           │  ← elevated roles only
+│  4-col icons (phone)    │  ← hidden in collapsed
+│  2-col labels (tablet+) │
+├─────────────────────────┤
+│ PRIMARY NAV             │
+│  POS / Kitchen / Stock  │  ← role-filtered via ROLE_NAV_ACCESS
+│  Reports / Admin        │
+├─────────────────────────┤
+│ FOOTER                  │
+│  User avatar + role     │  ← popover: Change Location, Logout
+│  Popover menu           │  ← location confirm w/ open order count
+└─────────────────────────┘
+```
+
+#### Sidebar-Specific Principles to Evaluate
+
+| Principle | What to check | Pass criteria |
+|---|---|---|
+| **Fitts's Law** | W! toggle button, nav items, Quick Action tiles, footer avatar | All ≥44px touch target. Quick Action tiles ≥40px on phone grid |
+| **Hick's Law** | Quick Actions count (8 items), nav items count per role | Staff sees ≤2 nav items. Manager sees ≤5 + 8 QA = 13 choices — evaluate if chunking is sufficient |
+| **Miller's Law** | Are Quick Actions visually chunked? Is nav separated from QA? | SidebarSeparator between zones. QA grid has clear boundary |
+| **Visibility of Status** | Active nav item highlighting, location display, clock updating, role badge | Active item uses `bg-accent-light !text-accent`. Role badge has color-coded border |
+| **Gestalt: Proximity** | Are related items grouped? (nav vs QA vs footer) | Clear visual separation between zones |
+| **Gestalt: Common Region** | Does each zone feel contained? | Separators + padding define regions |
+| **Consistency (internal)** | Do collapsed icons match expanded labels? Tooltip text = label text? | 1:1 mapping between icon-only and expanded states |
+| **Consistency (design system)** | Color tokens, radii, font sizes match design system | accent, border, status colors from tailwind config |
+| **WCAG: Touch Targets** | Every interactive element in sidebar ≥44px | Measure: nav buttons, QA tiles, footer trigger, W! toggle |
+| **WCAG: Color Contrast** | Text on sidebar backgrounds, role badge readability | Gray-400 text on white ≥4.5:1. Role badge text on tinted bg |
+
+#### Collapsed-State Gotchas
+
+These are common issues in the collapsed/icon-only state. Always check:
+
+1. **Quick Actions vanish** — In collapsed mode, the entire QA grid is hidden (`group-data-[collapsible=icon]:hidden`). Manager loses quick access to Receive Delivery, Log Expense, etc. Is this acceptable or should collapsed mode show icon-only QA tiles?
+2. **Location display vanishes** — Clock and location text are hidden in collapsed mode. Staff may not know which branch they're operating under.
+3. **User name vanishes** — Only the avatar initial shows. In shared-tablet environments, is the initial sufficient to confirm who's logged in?
+4. **Tooltip coverage** — Nav items have tooltips via `SidebarMenuButton`. Verify Quick Actions and footer also have tooltips in collapsed mode.
+5. **Rail click area** — `SidebarRail` provides a thin hover zone to expand. Is it discoverable? Does it have sufficient width for touch?
+
+#### Role-Based Visibility Checks
+
+| Element | staff | kitchen | manager | owner | admin |
+|---|---|---|---|---|---|
+| Quick Actions section | Hidden | Hidden | **Visible** | **Visible** | **Visible** |
+| Change Location (footer) | Hidden | Hidden | **Visible** | **Visible** | **Visible** |
+| POS nav item | ✓ | ✗ | ✓ | ✓ | ✓ |
+| Kitchen nav item | ✗ | ✓ | ✗ | ✓ | ✓ |
+| Stock nav item | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Reports nav item | ✗ | ✗ | ✓ | ✓ | ✓ |
+| Admin nav item | ✗ | ✗ | ✗ | ✓ | ✓ |
+
+**Audit rule:** For each role audited, verify that ONLY the permitted items appear. Extra items = security concern. Missing items = broken filter.
+
+#### Sidebar Playwright Audit Steps
+
+To properly audit the sidebar, use this sequence within the browser session:
+
+```bash
+# 1. Snapshot expanded state
+playwright-cli -s=${_ux_run_id} snapshot   # Check nav items, QA grid, footer
+
+# 2. Toggle to collapsed — click the W! button
+playwright-cli -s=${_ux_run_id} click text="W!"   # or click the toggle ref from snapshot
+
+# 3. Snapshot collapsed state
+playwright-cli -s=${_ux_run_id} snapshot   # Verify icon-only mode, hidden elements
+
+# 4. Toggle back to expanded
+playwright-cli -s=${_ux_run_id} click text="W!"
+
+# 5. Open footer popover — click user avatar area
+playwright-cli -s=${_ux_run_id} snapshot   # Find the footer trigger ref
+playwright-cli -s=${_ux_run_id} click eNN  # Click the user profile trigger
+playwright-cli -s=${_ux_run_id} snapshot   # Audit popover content
+
+# 6. Test Change Location flow (elevated roles)
+playwright-cli -s=${_ux_run_id} click text="Change Location"
+playwright-cli -s=${_ux_run_id} snapshot   # Confirm dialog with open order count
+```
+
+**Snapshot budget note:** Sidebar audit adds ~4-6 snapshots. Budget accordingly when auditing sidebar alongside page content.
 
 ### Roles & Their Primary Pages
 
@@ -1236,6 +1342,7 @@ will work" — in standalone mode it produces a Viability Report without proceed
 
 | Route | Primary Role | Audit Focus |
 |---|---|---|
+| `AppSidebar` (component) | All (authenticated) | Expanded/collapsed/mobile states, Quick Actions grid, nav filtering by role, footer popover, location display, collapsed-state discoverability, touch targets across all states |
 | `/` | All | Login speed, role selection clarity, error states |
 | `/pos` | Staff | Floor plan readability, table status at a glance, order creation speed |
 | `/pos` (order sidebar) | Staff | Item adding flow, quantity changes, checkout efficiency |
@@ -1320,6 +1427,7 @@ Append one row after every execution. This data drives self-improvement decision
 
 | Version | Date | Change |
 |---|---|---|
+| 5.2.0 | 2026-03-18 | **Sidebar audit criteria**: (1) Added dedicated Sidebar Audit Criteria section with 3-state evaluation (expanded/collapsed/mobile), zone diagram, principle-specific checklist, collapsed-state gotchas, role-based visibility matrix, and playwright audit steps. (2) Added AppSidebar to Auditable Pages Quick Reference. (3) Added KP-14 (Sidebar Collapsed State Hides Critical Context) to KNOWN_PATTERNS.md. |
 | 5.1.0 | 2026-03-11 | **Revert to playwright-cli directly**: (1) Removed `.spec.ts` test generation. (2) Simplified execution model to use `playwright-cli` interactive command steps. (3) Merged Path A and Path B back into a unified workflow. |
 | 5.0.0 | 2026-03-10 | Full paradigm shift — Playwright spec files replace playwright-cli. |
 | 4.7.0 | 2026-03-10 | Multi-agent with varied scenarios + script-first enforcement |
