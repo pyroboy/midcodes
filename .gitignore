@@ -41,6 +41,19 @@ yarn-error.log*
 pnpm-debug.log*
 .env*.local
 
+# Playwright CLI snapshots
+.playwright-cli/
+apps/.playwright-cli/
+apps/*/.playwright-cli/
+
+# Test/debug screenshots
+*.png
+apps/*.png
+apps/*/*.png
+
+# Upload directories
+apps/*/static/uploads/
+
 # Windows problematic files
 nul
 apps/nul
