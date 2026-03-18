@@ -19,7 +19,7 @@
 
 	let { data }: Props = $props();
 
-	const { form, errors, enhance, delayed, message } = superForm(data.form, {
+	const { form, errors, enhance, delayed, message } = superForm((() => data.form)(), {
 		resetForm: false
 	});
 

@@ -59,7 +59,7 @@
 	let selectedAmount = $state(0);
 	let selectedBillings = $state<Set<number>>(new Set());
 	let referenceNumber = $state('');
-	let paidBy = $state(lease.lease_tenants?.[0]?.tenant?.name || '');
+	let paidBy = $state((() => lease.lease_tenants?.[0]?.tenant?.name || '')());
 	let paidAt = $state(new Date().toISOString().split('T')[0]);
 
 	// Calculate available security deposit amount (based on paid_amount, not balance)

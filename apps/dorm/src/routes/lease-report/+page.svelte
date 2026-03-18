@@ -8,7 +8,7 @@
 	import type { LeaseReportData } from './reportSchema';
 
 	let { data } = $props();
-	let reportData = $state<LeaseReportData>(data.reportData);
+	let reportData = $state<LeaseReportData>((() => data.reportData)());
 
 	$effect(() => {
 		reportData = data.reportData;

@@ -14,7 +14,7 @@
 		properties: Property[];
 	}>();
 
-	const { form, enhance, errors, constraints } = superForm(formData, {
+	const { form, enhance, errors, constraints } = superForm((() => formData)(), {
 		id: 'filter-form',
 		dataType: 'form',
 		taintedMessage: null

@@ -26,7 +26,7 @@
 	// Simple client-side validation state
 	let fieldErrors = $state<Record<string, string>>({});
 
-	const { form, errors, enhance, submitting, reset } = superForm(data.form, {
+	const { form, errors, enhance, submitting, reset } = superForm((() => data.form)(), {
 		validators: zodClient(readingSubmissionSchema),
 		resetForm: false,
 		onResult: async ({ result }) => {

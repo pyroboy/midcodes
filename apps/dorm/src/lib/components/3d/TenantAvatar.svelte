@@ -6,9 +6,9 @@
 	let { imageUrl, position = [0, 0, 0] as [number, number, number], name } = $props();
 
 	// Use a default avatar generator if no image provided
-	const avatarUrl =
+	const avatarUrl = (() =>
 		imageUrl ||
-		`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`;
+		`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`)();
 	const texture = useTexture(avatarUrl);
 </script>
 

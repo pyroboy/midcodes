@@ -39,7 +39,7 @@
 	let fileInput: HTMLInputElement;
 	let dragOver = $state(false);
 	let uploading = $state(false);
-	let preview = $state<string | null>(value);
+	let preview = $state<string | null>((() => value)());
 
 	// Update preview when value changes
 	$effect(() => {

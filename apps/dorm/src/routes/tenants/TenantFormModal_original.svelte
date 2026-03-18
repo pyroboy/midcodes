@@ -48,7 +48,7 @@
 	let uploadingImage = $state(false);
 
 	// Initialize Superforms
-	const { form, errors, enhance, constraints, submitting, reset } = superForm(initialForm, {
+	const { form, errors, enhance, constraints, submitting, reset } = superForm((() => initialForm)(), {
 		validators: zodClient(tenantFormSchema),
 		validationMethod: 'onsubmit',
 		resetForm: true,

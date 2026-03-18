@@ -43,9 +43,6 @@
 
 	let { expenses = [], properties }: Props = $props();
 
-	// Debug logging for properties data
-	console.log('ExpenseList received data:', expenses);
-	console.log('ExpenseList properties:', properties);
 
 	// Event dispatcher
 	const dispatch = createEventDispatcher<{

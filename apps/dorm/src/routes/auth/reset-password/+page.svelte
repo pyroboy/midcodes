@@ -19,7 +19,7 @@
 
 	let { data }: Props = $props();
 
-	const { form, errors, enhance, delayed, message } = superForm(data.form);
+	const { form, errors, enhance, delayed, message } = superForm((() => data.form)());
 </script>
 
 <div class="container mx-auto flex h-screen w-screen flex-col items-center justify-center">

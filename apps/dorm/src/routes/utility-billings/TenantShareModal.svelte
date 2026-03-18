@@ -36,7 +36,7 @@
 	let view: View = $state('tenants');
 	let selectedLeases = $state(new Set<number>()); // Store selected lease IDs
 	let selectedTenants = $state(new Set<string>()); // Store selected tenant IDs (leaseId-tenantId)
-	let searchQuery = $state(reading?.meterName ?? '');
+	let searchQuery = $state((() => reading?.meterName ?? '')());
 
 	// Filter leases based on meter location
 	const filteredLeases = $derived(() => {

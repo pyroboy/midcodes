@@ -72,7 +72,7 @@
 	}
 
 	// Form data with optional end_date
-	let formData = $state({
+	let formData = $state((() => ({
 		name: lease?.name || '',
 		start_date: formatDate(lease?.start_date || ''),
 		end_date: formatDate(lease?.end_date || '') || '', // Make optional
@@ -82,7 +82,7 @@
 		rental_unit_id: lease?.rental_unit?.id || 0,
 		rent_amount: lease?.rent_amount || 0,
 		selectedTenants: getTenantIds(lease)
-	});
+	}))());
 
 	// Auto-calculate end_date when start_date or terms change
 	$effect(() => {

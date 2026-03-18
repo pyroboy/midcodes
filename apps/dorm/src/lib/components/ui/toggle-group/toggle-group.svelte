@@ -45,7 +45,9 @@
 		get value() {
 			return value;
 		},
-		onValueChange,
+		get onValueChange() {
+			return onValueChange;
+		},
 		get type() {
 			return type;
 		},

@@ -44,7 +44,7 @@
 	// Initialize Superform with default form data
 	const initialFormData: SecurityDepositForm = {
 		action: 'create',
-		lease_id: lease.id || 0, // Fallback to 0 if lease.id is not available yet
+		lease_id: (() => lease.id || 0)(), // Fallback to 0 if lease.id is not available yet
 		type: 'SECURITY_DEPOSIT',
 		amount: 0,
 		due_date: '',

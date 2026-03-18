@@ -60,12 +60,12 @@
 	// Year and month handling
 	const currentYear = new Date().getFullYear();
 	let years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-	let selectedYear = form.expense_date
+	let selectedYear = (() => form.expense_date
 		? new Date(form.expense_date).getFullYear().toString()
-		: currentYear.toString();
-	let selectedMonth = form.expense_date
+		: currentYear.toString())();
+	let selectedMonth = (() => form.expense_date
 		? months[new Date(form.expense_date).getMonth()]
-		: months[new Date().getMonth()];
+		: months[new Date().getMonth()])();
 
 	// State for expense types
 	let operationalExpenseType = $state<string>('OPERATIONAL');
@@ -79,26 +79,28 @@
 	];
 
 	// Expense lists
-	let operationalExpenses: ExpenseItem[] = $state([
+	let operationalExpenses: ExpenseItem[] = $state((() => [
 		{ label: form.description || 'Expense', amount: form.amount?.toString() || '' }
-	]);
+	])());
 
 	let capitalExpenses: ExpenseItem[] = $state([]);
 
 	// If editing an existing expense, initialize the lists accordingly
-	if (editMode && form.expense_type) {
-		if (form.expense_type === 'OPERATIONAL') {
-			operationalExpenses = [
-				{ label: form.description || 'Expense', amount: form.amount?.toString() || '' }
-			];
-			capitalExpenses = [];
-		} else if (form.expense_type === 'CAPITAL') {
-			operationalExpenses = [];
-			capitalExpenses = [
-				{ label: form.description || 'Expense', amount: form.amount?.toString() || '' }
-			];
+	(() => {
+		if (editMode && form.expense_type) {
+			if (form.expense_type === 'OPERATIONAL') {
+				operationalExpenses = [
+					{ label: form.description || 'Expense', amount: form.amount?.toString() || '' }
+				];
+				capitalExpenses = [];
+			} else if (form.expense_type === 'CAPITAL') {
+				operationalExpenses = [];
+				capitalExpenses = [
+					{ label: form.description || 'Expense', amount: form.amount?.toString() || '' }
+				];
+			}
 		}
-	}
+	})();
 
 	function handleExpenseChange(
 		index: number,

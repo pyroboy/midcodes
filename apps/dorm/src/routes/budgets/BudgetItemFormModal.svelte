@@ -27,13 +27,13 @@
 	}
 
 	// Form data
-	let formData = $state<BudgetItem>({
+	let formData = $state<BudgetItem>((() => ({
 		id: item?.id,
 		name: item?.name || '',
 		type: item?.type || 'MATERIALS',
 		cost: item?.cost || 0,
 		quantity: item?.quantity || 1
-	});
+	}))());
 
 	// Form validation
 	let errors = $state({
