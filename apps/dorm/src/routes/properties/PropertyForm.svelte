@@ -4,22 +4,22 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { createEventDispatcher } from 'svelte';
-	import type { PageData } from './$types';
 	import { propertyStatus, propertyType } from './formSchema';
 	import type { propertySchema } from './formSchema';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { z } from 'zod/v3';
 
 	interface Props {
-		data: PageData;
 		editMode?: boolean;
 		form: SuperForm<z.infer<typeof propertySchema>>['form'];
 		errors: SuperForm<z.infer<typeof propertySchema>>['errors'];
 		enhance: SuperForm<z.infer<typeof propertySchema>>['enhance'];
 		constraints: SuperForm<z.infer<typeof propertySchema>>['constraints'];
+		actionCreate?: string;
+		actionUpdate?: string;
 	}
 
-	let { data, editMode = false, form, errors, enhance, constraints }: Props = $props();
+	let { editMode = false, form, errors, enhance, constraints, actionCreate = '?/create', actionUpdate = '?/update' }: Props = $props();
 
 	const dispatch = createEventDispatcher();
 
@@ -35,7 +35,7 @@
 
 <form
 	method="POST"
-	action={editMode ? '?/update' : '?/create'}
+	action={editMode ? actionUpdate : actionCreate}
 	use:enhance
 	class="space-y-4"
 	novalidate

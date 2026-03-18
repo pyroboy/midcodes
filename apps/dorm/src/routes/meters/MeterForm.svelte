@@ -64,7 +64,13 @@
 		submitting: SuperForm<z.infer<typeof meterFormSchema>>['submitting'];
 	}
 
-	let { data, editMode = false, form, errors, enhance, constraints, submitting }: Props = $props();
+	interface ActionProps {
+		actionCreate?: string;
+		actionUpdate?: string;
+		actionDelete?: string;
+	}
+
+	let { data, editMode = false, form, errors, enhance, constraints, submitting, actionCreate = '?/create', actionUpdate = '?/update', actionDelete = '?/delete' }: Props & ActionProps = $props();
 
 	const dispatch = createEventDispatcher<{
 		meterAdded: void;
@@ -180,7 +186,7 @@
 	}
 </script>
 
-<form method="POST" action={editMode ? '?/update' : '?/create'} use:enhance class="space-y-3">
+<form method="POST" action={editMode ? actionUpdate : actionCreate} use:enhance class="space-y-3">
 	{#if $form.id}
 		<input type="hidden" name="id" value={$form.id} />
 	{/if}
@@ -379,7 +385,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteConfirm = false; }}>Cancel</AlertDialog.Cancel>
-			<form method="POST" action="?/delete" class="inline">
+			<form method="POST" action={actionDelete} class="inline">
 				<input type="hidden" name="id" value={$form.id} />
 				<AlertDialog.Action type="submit">Delete Meter</AlertDialog.Action>
 			</form>

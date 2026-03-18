@@ -7,20 +7,20 @@
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { z } from 'zod/v3';
 	import type { floorSchema } from './formSchema';
-	import type { PageData } from './$types';
 	import { propertyStore } from '$lib/stores/property';
 
 	interface Props {
-		data: PageData;
 		editMode?: boolean;
 		form: SuperForm<z.infer<typeof floorSchema>>['form'];
 		errors: SuperForm<z.infer<typeof floorSchema>>['errors'];
 		enhance: SuperForm<z.infer<typeof floorSchema>>['enhance'];
 		constraints: SuperForm<z.infer<typeof floorSchema>>['constraints'];
 		oncancel?: () => void;
+		actionCreate?: string;
+		actionUpdate?: string;
 	}
 
-	let { data, editMode = false, form, errors, enhance, constraints, oncancel }: Props = $props();
+	let { editMode = false, form, errors, enhance, constraints, oncancel, actionCreate = '?/create', actionUpdate = '?/update' }: Props = $props();
 
 	$effect(() => {
 		if ($propertyStore.selectedProperty) {
@@ -51,7 +51,7 @@
 
 <form
 	method="POST"
-	action={editMode ? '?/update' : '?/create'}
+	action={editMode ? actionUpdate : actionCreate}
 	use:enhance
 	class="space-y-4"
 	novalidate
