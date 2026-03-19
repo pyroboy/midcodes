@@ -11,12 +11,12 @@
 		TooltipProvider,
 		TooltipTrigger
 	} from '$lib/components/ui/tooltip';
+	import { getStatusClasses } from '$lib/utils/format';
 
 	// Props using Svelte 5 $props rune
-	let { budget, formatCurrency, getStatusColor, onEdit, onDelete, onAddItem } = $props<{
+	let { budget, formatCurrency, onEdit, onDelete, onAddItem } = $props<{
 		budget: BudgetWithStats;
 		formatCurrency: (amount: number) => string;
-		getStatusColor: (status: string) => string;
 		onEdit: () => void;
 		onDelete: () => void;
 		onAddItem: () => void;
@@ -70,7 +70,7 @@
 	<div class="px-4 py-3 border-b bg-white flex items-center">
 		<div class="flex-1 flex items-center gap-3">
 			<h3 class="text-base font-semibold text-gray-800">{budget.project_name}</h3>
-			<Badge class={`${getStatusColor(budget.status)}`}>
+			<Badge class={`${getStatusClasses(budget.status)}`}>
 				{budget.status}
 			</Badge>
 		</div>
@@ -160,7 +160,9 @@
 			<div class="flex justify-between text-xs mt-0.5">
 				<span>{allocationPercentage}% allocated</span>
 				{#if (budget.remainingAmount ?? 0) < 0}
-					<span class="text-red-600">Over budget</span>
+					<Badge variant="destructive" class="text-xs px-1.5 py-0">
+						Over by {safeFormatCurrency(Math.abs(budget.remainingAmount))}
+					</Badge>
 				{/if}
 			</div>
 		</div>

@@ -11,6 +11,7 @@
 
 	interface Props {
 		editMode?: boolean;
+		updatedAt?: string | null;
 		form: SuperForm<z.infer<typeof floorSchema>>['form'];
 		errors: SuperForm<z.infer<typeof floorSchema>>['errors'];
 		enhance: SuperForm<z.infer<typeof floorSchema>>['enhance'];
@@ -20,7 +21,7 @@
 		actionUpdate?: string;
 	}
 
-	let { editMode = false, form, errors, enhance, constraints, oncancel, actionCreate = '?/create', actionUpdate = '?/update' }: Props = $props();
+	let { editMode = false, updatedAt = null, form, errors, enhance, constraints, oncancel, actionCreate = '?/create', actionUpdate = '?/update' }: Props = $props();
 
 	$effect(() => {
 		if ($propertyStore.selectedProperty) {
@@ -58,6 +59,7 @@
 >
 	{#if editMode && $form.id}
 		<input type="hidden" name="id" bind:value={$form.id} />
+		<input type="hidden" name="_updated_at" value={updatedAt ?? ''} />
 	{/if}
 
 	<input type="hidden" name="property_id" bind:value={$form.property_id} />

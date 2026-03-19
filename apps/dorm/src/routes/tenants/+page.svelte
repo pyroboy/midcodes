@@ -25,6 +25,7 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		tenantsStore,
 		leaseTenantsStore,
@@ -33,6 +34,9 @@
 		propertiesStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertTenant, optimisticDeleteTenant } from '$lib/db/optimistic';
+	import { bufferedMutation } from '$lib/db/optimistic-utils';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	// Enrich tenants with lease relationships using Map lookups (O(1) per join)
 	let tenants = $derived.by(() => {
@@ -98,7 +102,9 @@
 	let debouncedSearch = $state('');
 	let selectedStatus = $state('');
 	let viewMode = $state<'card' | 'list'>('card');
-	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('active');
+	// Read initial filter from URL params for persistence
+	const initialFilter = $page.url.searchParams.get('filter') as 'all' | 'active' | 'inactive' | 'pending' | 'blacklisted' | null;
+	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>(initialFilter ?? 'active');
 	let currentPage = $state(1);
 	const PAGE_SIZE = 24;
 
@@ -177,6 +183,14 @@
 		if (filter !== 'all') {
 			selectedStatus = '';
 		}
+		// Persist filter to URL for back-button support and bookmarking
+		const url = new URL($page.url);
+		if (filter === 'active') {
+			url.searchParams.delete('filter');
+		} else {
+			url.searchParams.set('filter', filter);
+		}
+		goto(url.toString(), { replaceState: true, keepFocus: true });
 	}
 
 	// Called by TenantFormModal after successful create/update.
@@ -196,36 +210,32 @@
 		showDeleteDialog = false;
 		tenantToDelete = null;
 
-		// Optimistic: remove from UI immediately
-		await optimisticDeleteTenant(tenant.id);
-
 		const formData = new FormData();
 		formData.append('id', String(tenant.id));
 		formData.append('reason', 'User initiated deletion');
 
-		try {
-			const result = await fetch('?/delete', {
-				method: 'POST',
-				body: formData
-			});
-			const response = await result.json();
-
-			if (result.ok) {
-				toast.success(
-					`Tenant "${tenant.name}" has been successfully archived. All data has been preserved for audit purposes.`
-				);
-			} else {
-				console.error('Delete failed:', response);
-				toast.error(response.error || response.message || 'Failed to delete tenant');
-				const { resyncCollection } = await import('$lib/db/replication');
-				resyncCollection('tenants');
+		await bufferedMutation({
+			label: `Delete Tenant: ${tenant.name}`,
+			collection: 'tenants',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteTenant(tenant.id);
+			},
+			serverAction: async () => {
+				const result = await fetch('?/delete', {
+					method: 'POST',
+					body: formData
+				});
+				if (!result.ok) {
+					const response = await result.json();
+					throw new Error(response.error || response.message || 'Failed to delete tenant');
+				}
+				return result;
+			},
+			onSuccess: async () => {
+				toast.success(`Tenant "${tenant.name}" has been archived.`);
 			}
-		} catch (error) {
-			console.error('Error deleting tenant:', error);
-			toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			const { resyncCollection } = await import('$lib/db/replication');
-			resyncCollection('tenants');
-		}
+		});
 	}
 
 	function handleModalClose(open: boolean) {
@@ -238,6 +248,9 @@
 </script>
 
 <div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+		<SyncErrorBanner collections={['tenants', 'leases', 'lease_tenants']} />
+	</div>
 	<!-- Header Section with Integrated Stats -->
 	<div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">

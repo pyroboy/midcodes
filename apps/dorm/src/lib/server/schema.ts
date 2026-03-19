@@ -659,7 +659,9 @@ export const floorLayoutItemTypeEnum = pgEnum('floor_layout_item_type', [
 	'STORAGE',
 	'OFFICE',
 	'CUSTOM',
-	'WALL'
+	'WALL',
+	'DOOR',
+	'WINDOW'
 ]);
 
 export const notifications = pgTable('notifications', {

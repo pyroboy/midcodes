@@ -18,6 +18,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 	import * as Accordion from '$lib/components/ui/accordion';
+	import { onlineStatus } from '$lib/utils/offline.svelte';
 
 	// Import Lucide icons
 	import {
@@ -43,7 +44,8 @@
 		X,
 		ChevronRight,
 		Lightbulb,
-		MapPin
+		MapPin,
+		WifiOff
 	} from 'lucide-svelte';
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 
@@ -52,7 +54,8 @@
 	let ready = $state(false);
 	let isAuthRoute = $state(false);
 	let show3DModel = $state(false);
-	let rxdbInitialized = false;
+	// Persist across HMR — plain `let` resets on hot reload, causing duplicate sync cycles
+	let rxdbInitialized = (globalThis as any).__dorm_rxdb_initialized ?? false;
 
 	onMount(() => {
 		ready = true;
@@ -96,6 +99,7 @@
 	$effect(() => {
 		if (!data.user || rxdbInitialized) return;
 		rxdbInitialized = true;
+		(globalThis as any).__dorm_rxdb_initialized = true;
 
 		// Persist IndexedDB storage to prevent browser eviction
 		navigator.storage?.persist?.().then((granted) => {
@@ -126,6 +130,8 @@
 				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 					syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
 					syncStatus.addLog(`RxDB opened in ${initMs}ms — ${Object.keys(db.collections).length} collections`, 'success');
+					// A2: Capture RxDB version
+					import('rxdb').then(({ RXDB_VERSION }) => syncStatus.setVersionInfo(RXDB_VERSION)).catch(() => {});
 					// F6: Clear reload-loop counter on successful init
 					sessionStorage.removeItem('__dorm_db_reset_v2');
 
@@ -139,6 +145,21 @@
 					const syncMs = Date.now() - t1;
 					import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 						syncStatus.addLog(`Initial sync completed in ${syncMs}ms`, 'success');
+
+						// B2: Stale checkpoint auto-resync — check every 10 min
+						// Guard against HMR creating duplicate intervals
+						const STALE_CHECK_MS = 10 * 60 * 1000;
+						if ((globalThis as any).__dorm_stale_interval) clearInterval((globalThis as any).__dorm_stale_interval);
+						(globalThis as any).__dorm_stale_interval = setInterval(async () => {
+							if (!navigator.onLine || document.visibilityState !== 'visible') return;
+							const stale = syncStatus.getStaleCollections(STALE_CHECK_MS);
+							if (stale.length === 0) return;
+							syncStatus.addLog(`Auto-resyncing ${stale.length} stale collection(s)`, 'info');
+							const { resyncCollection } = await import('$lib/db/replication');
+							for (const name of stale) {
+								resyncCollection(name).catch(() => {});
+							}
+						}, STALE_CHECK_MS);
 					});
 					// Post-sync: prune old records and check storage usage
 					import('$lib/db/pruning').then(({ pruneOldRecords }) => {
@@ -357,6 +378,7 @@
 									href="/"
 									class="block no-underline"
 									data-sveltekit-preload-data="hover"
+									aria-label="Dashboard"
 								>
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
@@ -377,6 +399,7 @@
 									href="/locations"
 									class="block no-underline"
 									data-sveltekit-preload-data="hover"
+									aria-label="Locations"
 								>
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
@@ -403,6 +426,7 @@
 											href={link.href}
 											class="block no-underline"
 											data-sveltekit-preload-data="hover"
+											aria-label={link.label}
 										>
 											<Sidebar.MenuItem>
 												<Sidebar.MenuButton
@@ -435,7 +459,7 @@
 								{#each navigationLinks as group (group.category)}
 									<Accordion.Item value={group.category} class="border-b-0">
 										<Accordion.Trigger
-											class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:no-underline hover:text-foreground transition-colors"
+											class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 hover:no-underline hover:text-foreground transition-colors"
 											onmouseover={() => onSectionHover(group.links)}
 										>
 											{group.category}
@@ -448,6 +472,7 @@
 														class="block no-underline"
 														data-sveltekit-preload-data="hover"
 														data-sveltekit-preload-code="hover"
+														aria-label={link.label}
 													>
 														<Sidebar.MenuItem>
 															<Sidebar.MenuButton
@@ -485,9 +510,6 @@
 										</div>
 										<div class="flex flex-col min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
 											<span class="text-sm font-medium truncate">{data.user?.email || 'Logged in'}</span>
-											<div class="flex items-center gap-2">
-												<SyncIndicator />
-											</div>
 										</div>
 									</div>
 									<a
@@ -495,6 +517,7 @@
 										class="flex items-center gap-2 rounded-lg px-2 py-2 mt-1 text-sm text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors group-data-[collapsible=icon]:justify-center"
 										data-sveltekit-preload-data="off"
 										data-sveltekit-reload
+									aria-label="Sign out"
 									>
 										<LogOut class="h-4 w-4" />
 										<span class="group-data-[collapsible=icon]:hidden">Sign out</span>
@@ -504,6 +527,7 @@
 										href="/auth"
 										class="flex items-center gap-2 rounded-lg p-2 text-sm text-primary hover:bg-primary/10 transition-colors"
 										data-sveltekit-preload-data="off"
+									aria-label="Sign in"
 									>
 										<User class="h-4 w-4" />
 										<span class="group-data-[collapsible=icon]:hidden">Sign in</span>
@@ -525,8 +549,16 @@
 
 								{#if data.user}
 									<div class="flex items-center gap-2">
+										<!-- W11: Offline indicator -->
+										{#if !onlineStatus.value}
+											<div class="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md">
+												<WifiOff class="w-3.5 h-3.5 text-red-500" />
+												<span class="text-xs font-medium text-red-600 dark:text-red-400">Offline</span>
+											</div>
+										{/if}
 										<PropertySelector />
 										<NotificationBell />
+										<SyncIndicator />
 
 										<!-- 3D Toggle Button moved here -->
 										{#if $featureFlags.enable3DView}

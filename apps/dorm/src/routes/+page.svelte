@@ -10,6 +10,7 @@
 		leasesStore,
 		paymentsStore
 	} from '$lib/stores/collections.svelte';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -26,6 +27,7 @@
 </script>
 
 <div class="container mx-auto p-6 space-y-8">
+	<SyncErrorBanner collections={['properties', 'tenants', 'leases', 'payments']} />
 	<div class="text-center space-y-4">
 		<h1 class="text-4xl font-bold">Welcome to Dorm Management</h1>
 		<p class="text-xl text-muted-foreground max-w-2xl mx-auto">

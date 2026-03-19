@@ -10,6 +10,7 @@ import {
 	billings, paymentAllocations
 } from '$lib/server/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
@@ -57,6 +58,8 @@ export const actions: Actions = {
 			const lease = leaseResult[0];
 			if (!lease) throw new Error('Failed to create lease');
 
+			form.data.id = lease.id;
+
 			// Create lease-tenant relationships
 			const leaseTenantsToInsert = tenantIdsArray.map((tenant_id: number) => ({
 				leaseId: lease.id,
@@ -82,6 +85,7 @@ export const actions: Actions = {
 	updateLease: async ({ request, locals }) => {
 		console.log('Updating lease via form action');
 		const formData = await request.formData();
+		const lockTs = extractLockTimestamp(formData);
 
 		const { user } = locals;
 		if (!user) return fail(403, { message: ['Unauthorized'] });
@@ -122,9 +126,9 @@ export const actions: Actions = {
 				calculatedEndDate = end.toISOString().split('T')[0];
 			}
 
-			const updatedResult = await db
-				.update(leases)
-				.set({
+			const lockResult = await optimisticLockUpdate(
+				db, leases, leases.id, id, leases.updatedAt, lockTs,
+				{
 					name: name.trim(),
 					startDate: start_date,
 					endDate: calculatedEndDate,
@@ -135,9 +139,12 @@ export const actions: Actions = {
 					rentAmount: String(rent_amount),
 					securityDeposit: existingLease.securityDeposit,
 					updatedAt: new Date()
-				})
-				.where(eq(leases.id, id))
-				.returning();
+				}
+			);
+			if (lockResult.conflict) {
+				return fail(409, { conflict: true, message: [lockResult.message] });
+			}
+			const updatedResult = lockResult.rows;
 
 			// Update tenant relationships
 			if (tenantIdsStr) {

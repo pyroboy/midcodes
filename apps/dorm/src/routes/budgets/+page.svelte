@@ -5,11 +5,13 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		budgetsStore,
 		propertiesStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertBudget, optimisticDeleteBudget } from '$lib/db/optimistic-budgets';
+	import { bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import {
 		Card,
 		CardContent,
@@ -35,6 +37,7 @@
 	import BudgetDistributionCard from './BudgetDistributionCard.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { cn } from '$lib/utils';
+	import { formatDate, formatCurrency, getStatusClasses } from '$lib/utils/format';
 	import BudgetProjectCard from './BudgetProjectCard.svelte';
 	import {
 		Tooltip,
@@ -98,12 +101,8 @@
 					cost: typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0,
 					quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
 				})),
-				start_date: budget.start_date ? new Date(budget.start_date).toLocaleDateString('en-US', {
-					year: 'numeric', month: '2-digit', day: '2-digit'
-				}) : null,
-				end_date: budget.end_date ? new Date(budget.end_date).toLocaleDateString('en-US', {
-					year: 'numeric', month: '2-digit', day: '2-digit'
-				}) : null
+				start_date: budget.start_date ? formatDate(budget.start_date) : null,
+				end_date: budget.end_date ? formatDate(budget.end_date) : null
 			};
 		});
 	});
@@ -130,6 +129,9 @@
 	let isLoading = $derived(!budgetsStore.initialized);
 
 	// State management for modals and UI
+	let savedFormData = $state<any>(null);
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
 	let showDeleteDialog = $state(false);
 	let budgetToDeleteId = $state<number | null>(null);
 	let showBudgetFormModal = $state(false);
@@ -168,45 +170,67 @@
 		onUpdate: ({ form }) => {
 			console.log('Form updated', form);
 		},
-		onError: ({ result }) => {
+		onSubmit: async () => {
+			// Capture current form data before submission
+			submitSeq++;
+			savedFormData = { ...$form, _seq: submitSeq };
+			const isEdit = editingBudget;
+			// Close modal immediately for instant feel
+			showBudgetFormModal = false;
+			toast.info(isEdit ? 'Saving budget...' : 'Creating budget...');
+			// For updates: optimistic write to RxDB now (ID is already known)
+			if (isEdit && savedFormData?.id) {
+				rollback = await optimisticUpsertBudget({
+					id: savedFormData.id,
+					project_name: savedFormData.project_name,
+					project_description: savedFormData.project_description,
+					project_category: savedFormData.project_category,
+					planned_amount: String(savedFormData.planned_amount),
+					pending_amount: savedFormData.pending_amount != null ? String(savedFormData.pending_amount) : null,
+					actual_amount: savedFormData.actual_amount != null ? String(savedFormData.actual_amount) : null,
+					budget_items: savedFormData.budget_items,
+					status: savedFormData.status,
+					start_date: savedFormData.start_date,
+					end_date: savedFormData.end_date,
+					property_id: savedFormData.property_id
+				});
+			}
+		},
+		onError: async ({ result }) => {
 			console.error('Form error', result.error);
 			toast.error('Error saving budget');
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('budgets'));
 		},
-		onResult: ({ result }) => {
+		onResult: async ({ result }) => {
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
 			if (result.type === 'success') {
-				toast.success(selectedBudget ? 'Budget updated' : 'Budget added');
-				selectedBudget = null;
-				// Optimistic upsert after server confirms
 				const resultData = (result as any).data;
+				const isEdit = editingBudget;
+				selectedBudget = null;
+				editingBudget = false;
+				rollback = null; // Success — discard snapshot
+				toast.success(isEdit ? 'Budget updated' : 'Budget added');
+				// For creates: upsert with server-assigned data (real ID)
 				if (resultData?.budget) {
-					optimisticUpsertBudget(resultData.budget);
+					await optimisticUpsertBudget(resultData.budget);
 				}
+			} else if (result.type === 'failure') {
+				if ((result.data as any)?.conflict) {
+					toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				} else {
+					console.error('[Budgets] Server: budget form action failed', result);
+					toast.error('Failed to save budget');
+				}
+				// Instant rollback, then confirm with resync
+				if (rollback) { await rollback(); rollback = null; }
+				import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('budgets'));
 			}
 		}
 	});
-
-	// Format currency with Peso sign
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP',
-			minimumFractionDigits: 2
-		}).format(amount);
-	}
-
-	// Get status badge color
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'PLANNED':
-				return 'bg-blue-100 text-blue-800';
-			case 'ONGOING':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'COMPLETED':
-				return 'bg-green-100 text-green-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
 
 	// Handle add budget
 	function handleAddBudget() {
@@ -215,10 +239,13 @@
 		showBudgetFormModal = true;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	// Handle edit budget
 	function handleEditBudget(budget: BudgetWithStats) {
 		selectedBudget = budget;
 		editingBudget = true;
+		editUpdatedAt = (budget as any).updated_at ?? null;
 		showBudgetFormModal = true;
 	}
 
@@ -324,25 +351,25 @@
 		showDeleteDialog = false;
 		budgetToDeleteId = null;
 
-		try {
-			const formData = new FormData();
-			formData.append('id', budgetId.toString());
+		const deleteFormData = new FormData();
+		deleteFormData.append('id', String(budgetId));
 
-			const response = await fetch(`?/delete`, {
-				method: 'POST',
-				body: formData
-			});
-
-			if (response.ok) {
+		await bufferedMutation({
+			label: `Delete Budget #${budgetId}`,
+			collection: 'budgets',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteBudget(budgetId);
+			},
+			serverAction: async () => {
+				const response = await fetch('?/delete', { method: 'POST', body: deleteFormData });
+				if (!response.ok) throw new Error('Server rejected delete');
+				return response;
+			},
+			onSuccess: async () => {
 				toast.success('Budget deleted');
-				optimisticDeleteBudget(budgetId);
-			} else {
-				toast.error('Error deleting budget');
 			}
-		} catch (error) {
-			console.error('Error deleting budget', error);
-			toast.error('Error deleting budget');
-		}
+		});
 	}
 
 	// Refresh data
@@ -354,6 +381,7 @@
 </script>
 
 <div class="container mx-auto py-8 px-4">
+	<SyncErrorBanner collections={['budgets', 'properties']} />
 	<!-- Page Header -->
 	<div class="flex justify-between items-center mb-8 border-b pb-4">
 		<div>
@@ -487,6 +515,7 @@
 	<!-- Hidden form for submitting budget data -->
 	<form id="budget-form" method="POST" action="?/upsert" use:enhance>
 		<input type="hidden" name="id" value={$form.id} />
+		<input type="hidden" name="_updated_at" value={editUpdatedAt ?? ''} />
 		<input type="hidden" name="property_id" value={$form.property_id} />
 		<input type="hidden" name="project_name" value={$form.project_name} />
 		<input type="hidden" name="project_description" value={$form.project_description} />
@@ -531,7 +560,6 @@
 					<BudgetProjectCard
 						{budget}
 						{formatCurrency}
-						{getStatusColor}
 						onEdit={() => handleEditBudget(budget)}
 						onDelete={() => handleDeleteBudget(budget.id)}
 						onAddItem={() => handleAddItem(budget.id)}

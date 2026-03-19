@@ -18,12 +18,13 @@
 		type MeterFormData,
 		meterFormSchema
 	} from './formSchema';
-	import { Loader2, Plus, Gauge } from 'lucide-svelte';
+	import { Loader2, Plus, Gauge, ChevronUp, ChevronDown } from 'lucide-svelte';
 	import MeterForm from './MeterForm.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { toast } from 'svelte-sonner';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		metersStore,
 		propertiesStore,
@@ -32,6 +33,8 @@
 		readingsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
+	import { getStatusClasses } from '$lib/utils/format';
 
 	// Type definitions
 	interface Property {
@@ -171,6 +174,12 @@
 
 	let isLoading = $derived(!metersStore.initialized);
 
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
+
 	let selectedMeter = $state<ExtendedMeterFormData | undefined>(undefined);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
@@ -295,43 +304,98 @@
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
-		onSubmit: () => {
+		onSubmit: async () => {
 			loading = true;
+			submitSeq++;
+			savedFormData = { ...$form, _seq: submitSeq };
+			savedEditMode = editMode;
+
+			// Close modal immediately for snappy UX
+			editMode = false;
+			selectedMeter = undefined;
+			showModal = false;
+
+			toast.info(savedEditMode ? 'Saving meter...' : 'Creating meter...');
+
+			// For updates where we already know the ID, run the optimistic write immediately
+			if (savedEditMode && savedFormData?.id) {
+				const fd = savedFormData;
+				rollback = await optimisticUpsertMeter({
+					id: fd.id,
+					name: fd.name,
+					location_type: fd.location_type,
+					property_id: fd.property_id,
+					floor_id: fd.floor_id,
+					rental_unit_id: fd.rental_unit_id,
+					type: fd.type,
+					is_active: fd.status === 'ACTIVE',
+					status: fd.status,
+					notes: fd.notes,
+					initial_reading: String(fd.initial_reading)
+				});
+			}
 		},
-		onError: ({ result }) => {
+		onError: async ({ result }) => {
 			toast.error('Error saving meter');
 			error = result.error?.message || 'An error occurred during submission';
 			loading = false;
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			bgResync('meters');
 		},
 		onResult: async ({ result }) => {
 			loading = false;
 
-			if (result.type === 'success') {
-				toast.success(editMode ? 'Meter updated' : 'Meter created');
-				error = null;
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
 
-				// Optimistic upsert into RxDB
-				if ($form.id) {
-					await optimisticUpsertMeter({
-						id: $form.id,
-						name: $form.name,
-						location_type: $form.location_type,
-						property_id: $form.property_id,
-						floor_id: $form.floor_id,
-						rental_unit_id: $form.rental_unit_id,
-						type: $form.type,
-						is_active: $form.status === 'ACTIVE',
-						status: $form.status,
-						notes: $form.notes,
-						initial_reading: String($form.initial_reading)
-					});
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('meters');
+				savedFormData = null;
+				return;
+			}
+
+			if (result.type === 'success') {
+				const serverData = (result as any).data?.form?.data;
+				error = null;
+				rollback = null; // Success — discard snapshot
+
+				if (!savedEditMode) {
+					// Create: server assigned a new ID — upsert with the real ID
+					const fd = serverData ?? savedFormData;
+					if (fd?.id) {
+						await optimisticUpsertMeter({
+							id: fd.id,
+							name: fd.name,
+							location_type: fd.location_type,
+							property_id: fd.property_id,
+							floor_id: fd.floor_id,
+							rental_unit_id: fd.rental_unit_id,
+							type: fd.type,
+							is_active: fd.status === 'ACTIVE',
+							status: fd.status,
+							notes: fd.notes,
+							initial_reading: String(fd.initial_reading)
+						});
+					} else {
+						bgResync('meters');
+					}
+					toast.success('Meter created');
+				} else {
+					// Update: optimistic write already ran in onSubmit; confirm with success toast
+					toast.success('Meter updated');
 				}
 
-				// Reset the form state and close modal
-				editMode = false;
-				selectedMeter = undefined;
-				showModal = false;
+				savedFormData = null;
 				reset();
+			} else if (result.type === 'failure' || result.type === 'error') {
+				toast.error('Failed to save meter');
+				// Instant rollback, then confirm with resync
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('meters');
+				savedFormData = null;
 			}
 		}
 	});
@@ -359,9 +423,12 @@
 		selectedStatus = value;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	function handleEdit(meter: ExtendedMeterFormData) {
 		editMode = true;
 		selectedMeter = meter;
+		editUpdatedAt = (meter as any).updated_at ?? null;
 
 		// Make sure to copy all properties to the form
 		$form = {
@@ -442,19 +509,6 @@
 		}
 	}
 
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'ACTIVE':
-				return 'bg-green-100 text-green-800';
-			case 'INACTIVE':
-				return 'bg-gray-100 text-gray-800';
-			case 'MAINTENANCE':
-				return 'bg-yellow-100 text-yellow-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
-
 	function formatReading(value: number): string {
 		return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 	}
@@ -470,6 +524,7 @@
 </script>
 
 <div class="space-y-6">
+	<SyncErrorBanner collections={['meters', 'readings', 'properties', 'floors', 'rental_units']} />
 	<!-- Error / Success Alerts -->
 	{#if error}
 		<Alert.Root variant="destructive" class="fixed top-4 right-4 z-50 max-w-md">
@@ -595,31 +650,31 @@
 
 	<!-- Sort Buttons -->
 	<div class="flex items-center justify-between text-sm text-gray-500 px-2">
-		<div class="flex space-x-4">
-			<button
-				class={`${sortBy === 'name' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('name')}
-			>
-				Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'type' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('type')}
-			>
-				Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'status' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('status')}
-			>
-				Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'reading' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('reading')}
-			>
-				Reading {sortBy === 'reading' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
+		<div class="flex space-x-1">
+			<Button variant="ghost" size="sm" class={sortBy === 'name' ? 'text-black font-medium' : ''} onclick={() => handleSort('name')}>
+				Name
+				{#if sortBy === 'name'}
+					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
+				{/if}
+			</Button>
+			<Button variant="ghost" size="sm" class={sortBy === 'type' ? 'text-black font-medium' : ''} onclick={() => handleSort('type')}>
+				Type
+				{#if sortBy === 'type'}
+					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
+				{/if}
+			</Button>
+			<Button variant="ghost" size="sm" class={sortBy === 'status' ? 'text-black font-medium' : ''} onclick={() => handleSort('status')}>
+				Status
+				{#if sortBy === 'status'}
+					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
+				{/if}
+			</Button>
+			<Button variant="ghost" size="sm" class={sortBy === 'reading' ? 'text-black font-medium' : ''} onclick={() => handleSort('reading')}>
+				Reading
+				{#if sortBy === 'reading'}
+					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
+				{/if}
+			</Button>
 		</div>
 	</div>
 
@@ -675,7 +730,7 @@
 													<Badge variant={getTypeVariant(meter.type)} class="text-xs px-2 py-0.5">
 														{meter.type}
 													</Badge>
-													<Badge class={`text-xs px-2 py-0.5 ${getStatusColor(meter.status)}`}>
+													<Badge class={`text-xs px-2 py-0.5 ${getStatusClasses(meter.status)}`}>
 														{meter.status}
 													</Badge>
 												</div>
@@ -730,6 +785,7 @@
 
 		<MeterForm
 			{editMode}
+			updatedAt={editUpdatedAt}
 			data={{
 				properties: propertiesData,
 				floors: floorsData,

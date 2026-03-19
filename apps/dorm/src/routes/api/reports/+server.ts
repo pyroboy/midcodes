@@ -62,15 +62,33 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			return json({ error: 'Invalid property ID' }, { status: 400 });
 		}
 
-		// Step 1: Get all rental units for the selected property
-		const propertyUnits = await db
-			.select({ id: rentalUnit.id })
-			.from(rentalUnit)
-			.where(eq(rentalUnit.propertyId, propId));
+		// Step 1 (parallel): Get rental units (with floorId) + floors
+		const [rentalUnitsData, floorsData] = await Promise.all([
+			db
+				.select({ id: rentalUnit.id, floorId: rentalUnit.floorId })
+				.from(rentalUnit)
+				.where(eq(rentalUnit.propertyId, propId)),
+			db
+				.select({ id: floors.id, floorNumber: floors.floorNumber })
+				.from(floors)
+				.where(eq(floors.propertyId, propId))
+		]);
 
-		const unitIds = propertyUnits.map((unit) => unit.id);
+		const unitIds = rentalUnitsData.map((unit) => unit.id);
 
-		// Step 2: Get all leases for the units in this property
+		// Create a map of rental_unit_id to floor_id
+		const unitToFloorMap = new Map<number, number>();
+		rentalUnitsData.forEach((unit) => {
+			unitToFloorMap.set(unit.id, unit.floorId);
+		});
+
+		// Create a map of floor_id to floor_number
+		const floorMap = new Map<number, number>();
+		floorsData.forEach((floor) => {
+			floorMap.set(floor.id, floor.floorNumber);
+		});
+
+		// Step 2 (sequential, depends on unitIds): Get leases
 		const leasesData =
 			unitIds.length > 0
 				? await db
@@ -85,31 +103,6 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			leaseToUnitMap.set(lease.id, lease.rentalUnitId);
 		});
 
-		// Step 3: Get all rental units with their floor IDs
-		const rentalUnitsData = await db
-			.select({ id: rentalUnit.id, floorId: rentalUnit.floorId })
-			.from(rentalUnit)
-			.where(eq(rentalUnit.propertyId, propId));
-
-		// Create a map of rental_unit_id to floor_id
-		const unitToFloorMap = new Map<number, number>();
-		rentalUnitsData.forEach((unit) => {
-			unitToFloorMap.set(unit.id, unit.floorId);
-		});
-
-		// Step 4: Get all floors for the selected property
-		const floorsData = await db
-			.select({ id: floors.id, floorNumber: floors.floorNumber })
-			.from(floors)
-			.where(eq(floors.propertyId, propId));
-
-		// Create a map of floor_id to floor_number
-		const floorMap = new Map<number, number>();
-		floorsData.forEach((floor) => {
-			floorMap.set(floor.id, floor.floorNumber);
-		});
-
-		// Step 5: Get all lease IDs for this property
 		const leaseIds = leasesData.map((lease) => lease.id);
 
 		// Initialize tenant counts for each floor
@@ -118,31 +111,16 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 			tenantCountByFloor.set(floor.id, 0);
 		});
 
-		// Get all lease tenants for the active leases
-		const leaseTenantsData =
+		// Step 3 (parallel, depends on leaseIds): lease_tenants + billings + payments + expenses
+		const [leaseTenantsData, allBillings, paymentsData, expensesData] = await Promise.all([
 			leaseIds.length > 0
-				? await db
+				? db
 						.select({ leaseId: leaseTenants.leaseId, tenantId: leaseTenants.tenantId })
 						.from(leaseTenants)
 						.where(inArray(leaseTenants.leaseId, leaseIds))
-				: [];
-
-		// Count tenants per floor
-		leaseTenantsData.forEach((leaseTenant) => {
-			const rentalUnitId = leaseToUnitMap.get(leaseTenant.leaseId);
-			if (rentalUnitId) {
-				const floorId = unitToFloorMap.get(rentalUnitId);
-				if (floorId) {
-					const currentCount = tenantCountByFloor.get(floorId) || 0;
-					tenantCountByFloor.set(floorId, currentCount + 1);
-				}
-			}
-		});
-
-		// Step 6: Get all billings for the period
-		const allBillings =
+				: Promise.resolve([]),
 			leaseIds.length > 0
-				? await db
+				? db
 						.select({
 							id: billings.id,
 							amount: billings.amount,
@@ -161,45 +139,54 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 								inArray(billings.leaseId, leaseIds)
 							)
 						)
-				: [];
-
-		// Step 7: Get payment history for the month
-		const paymentsData = await db
-			.select({
-				id: payments.id,
-				amount: payments.amount,
-				paidAt: payments.paidAt,
-				billingIds: payments.billingIds,
-				method: payments.method
-			})
-			.from(payments)
-			.where(
-				and(
-					gte(payments.paidAt, startDate),
-					lte(payments.paidAt, new Date(endDate.getTime() + 86400000 - 1))
+				: Promise.resolve([]),
+			db
+				.select({
+					id: payments.id,
+					amount: payments.amount,
+					paidAt: payments.paidAt,
+					billingIds: payments.billingIds,
+					method: payments.method
+				})
+				.from(payments)
+				.where(
+					and(
+						gte(payments.paidAt, startDate),
+						lte(payments.paidAt, new Date(endDate.getTime() + 86400000 - 1))
+					)
 				)
-			)
-			.orderBy(desc(payments.paidAt));
-
-		// Step 8: Get all expenses for the period and property
-		const expensesData = await db
-			.select({
-				id: expenses.id,
-				amount: expenses.amount,
-				description: expenses.description,
-				type: expenses.type,
-				status: expenses.status,
-				createdAt: expenses.createdAt
-			})
-			.from(expenses)
-			.where(
-				and(
-					eq(expenses.propertyId, propId),
-					gte(expenses.createdAt, startDate),
-					lte(expenses.createdAt, endDate)
+				.orderBy(desc(payments.paidAt)),
+			db
+				.select({
+					id: expenses.id,
+					amount: expenses.amount,
+					description: expenses.description,
+					type: expenses.type,
+					status: expenses.status,
+					createdAt: expenses.createdAt
+				})
+				.from(expenses)
+				.where(
+					and(
+						eq(expenses.propertyId, propId),
+						gte(expenses.createdAt, startDate),
+						lte(expenses.createdAt, endDate)
+					)
 				)
-			)
-			.orderBy(desc(expenses.createdAt));
+				.orderBy(desc(expenses.createdAt))
+		]);
+
+		// Count tenants per floor
+		leaseTenantsData.forEach((leaseTenant) => {
+			const rentalUnitId = leaseToUnitMap.get(leaseTenant.leaseId);
+			if (rentalUnitId) {
+				const floorId = unitToFloorMap.get(rentalUnitId);
+				if (floorId) {
+					const currentCount = tenantCountByFloor.get(floorId) || 0;
+					tenantCountByFloor.set(floorId, currentCount + 1);
+				}
+			}
+		});
 
 		// Initialize floorData structure for all floors
 		const floorDataMap: Record<number, any> = {};

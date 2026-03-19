@@ -9,7 +9,9 @@ export type FloorLayoutItemType =
 	| 'STORAGE'
 	| 'OFFICE'
 	| 'CUSTOM'
-	| 'WALL';
+	| 'WALL'
+	| 'DOOR'
+	| 'WINDOW';
 
 export interface FloorLayoutItem {
 	id: string;
@@ -53,7 +55,9 @@ export const ITEM_TYPE_LABELS: Record<string, string> = {
 	STORAGE: 'Storage',
 	OFFICE: 'Office',
 	CUSTOM: 'Custom',
-	WALL: 'Wall'
+	WALL: 'Wall',
+	DOOR: 'Door',
+	WINDOW: 'Window'
 };
 
 export const ITEM_TYPE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -67,7 +71,9 @@ export const ITEM_TYPE_COLORS: Record<string, { bg: string; border: string; text
 	STORAGE: { bg: 'bg-stone-100', border: 'border-stone-300', text: 'text-stone-700' },
 	OFFICE: { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800' },
 	CUSTOM: { bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-700' },
-	WALL: { bg: 'bg-slate-500', border: 'border-slate-700', text: 'text-white' }
+	WALL: { bg: 'bg-slate-500', border: 'border-slate-700', text: 'text-white' },
+	DOOR: { bg: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-800' },
+	WINDOW: { bg: 'bg-sky-100', border: 'border-sky-300', text: 'text-sky-800' }
 };
 
 export const PAINT_TYPES: { value: FloorLayoutItemType; label: string }[] = [

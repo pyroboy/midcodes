@@ -7,6 +7,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Trash2, Receipt, Wallet, Plus } from 'lucide-svelte';
+	import { getStatusClasses } from '$lib/utils/format';
 	import type { Expense } from './types';
 	import type { Property } from './types';
 	import type { PageData } from './$types';
@@ -71,19 +72,6 @@
 		});
 	}
 
-	// Status badge color
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'PENDING':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'APPROVED':
-				return 'bg-green-100 text-green-800';
-			case 'REJECTED':
-				return 'bg-red-100 text-red-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
 
 	// Get property name from property_id
 	function getPropertyName(property_id: number) {

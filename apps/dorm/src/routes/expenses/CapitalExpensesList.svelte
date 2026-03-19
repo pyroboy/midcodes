@@ -77,7 +77,7 @@
 	});
 </script>
 
-<Card class="shadow-lg">
+<Card class="shadow-lg border-l-4 border-l-blue-400">
 	<CardHeader class="border-b bg-gray-50">
 		<CardTitle class="flex items-center gap-2 text-gray-700">
 			<Building2 class="h-5 w-5" />

@@ -24,6 +24,10 @@
 		paymentAllocationsStore
 	} from '$lib/stores/collections.svelte';
 	import { resyncCollection } from '$lib/db/replication';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
+	import { formatCurrency } from '$lib/utils/format';
+	import * as Card from '$lib/components/ui/card';
+	import { DollarSign, Hash, CreditCard } from 'lucide-svelte';
 
 	// ─── Form defaults (no server load, so we create client-side) ────
 	const formDefaults = { form: defaults(zod(transactionSchema)) };
@@ -108,6 +112,22 @@
 	});
 
 	let isLoading = $derived(!paymentsStore.initialized);
+
+	// Summary stats
+	let stats = $derived.by(() => {
+		let totalAmount = 0;
+		const methodBreakdown = new Map<string, number>();
+		for (const tx of transactions) {
+			totalAmount += tx.amount || 0;
+			const method = tx.method || 'Unknown';
+			methodBreakdown.set(method, (methodBreakdown.get(method) || 0) + 1);
+		}
+		// Top 3 methods for display
+		const topMethods = [...methodBreakdown.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 3);
+		return { totalAmount, count: transactions.length, topMethods };
+	});
 
 	// Form for adding/editing transactions
 	const { form, errors, enhance, constraints, submitting, reset } = superForm(defaults(zod(transactionSchema)), {
@@ -339,9 +359,53 @@
 </script>
 
 <div class="container mx-auto py-6">
+	<SyncErrorBanner collections={['payments', 'billings', 'leases', 'lease_tenants', 'tenants', 'payment_allocations']} />
 	<!-- Page Header -->
 	<div class="flex justify-between items-center mb-6 border-b pb-4">
 		<h1 class="text-3xl font-bold">Transaction Management</h1>
+	</div>
+
+	<!-- Summary Stats -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+		<Card.Root>
+			<Card.Content class="flex items-center gap-3 p-4">
+				<div class="rounded-lg bg-emerald-50 p-2">
+					<DollarSign class="h-5 w-5 text-emerald-600" />
+				</div>
+				<div>
+					<p class="text-sm text-muted-foreground">Total Amount</p>
+					<p class="text-lg font-bold">{formatCurrency(stats.totalAmount)}</p>
+				</div>
+			</Card.Content>
+		</Card.Root>
+		<Card.Root>
+			<Card.Content class="flex items-center gap-3 p-4">
+				<div class="rounded-lg bg-blue-50 p-2">
+					<Hash class="h-5 w-5 text-blue-600" />
+				</div>
+				<div>
+					<p class="text-sm text-muted-foreground">Total Transactions</p>
+					<p class="text-lg font-bold">{stats.count}</p>
+				</div>
+			</Card.Content>
+		</Card.Root>
+		<Card.Root>
+			<Card.Content class="flex items-center gap-3 p-4">
+				<div class="rounded-lg bg-purple-50 p-2">
+					<CreditCard class="h-5 w-5 text-purple-600" />
+				</div>
+				<div>
+					<p class="text-sm text-muted-foreground">Top Methods</p>
+					<p class="text-sm font-medium">
+						{#if stats.topMethods.length > 0}
+							{stats.topMethods.map(([method, count]) => `${method} (${count})`).join(', ')}
+						{:else}
+							No data
+						{/if}
+					</p>
+				</div>
+			</Card.Content>
+		</Card.Root>
 	</div>
 
 	<!-- Hidden form for POST actions -->

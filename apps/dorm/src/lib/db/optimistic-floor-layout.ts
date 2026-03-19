@@ -63,23 +63,29 @@ export async function optimisticUpsertFloorLayoutItem(data: {
 	};
 }
 
-export async function optimisticDeleteFloorLayoutItem(itemId: number) {
-	console.log(`[Optimistic] floor_layout_item #${itemId} → soft-deleting in RxDB...`);
-	syncStatus.addLog(`Optimistic: floor_layout_item #${itemId} → soft-deleting in RxDB...`, 'info');
+export async function optimisticDeleteFloorLayoutItem(itemId: number | string) {
+	const sid = String(itemId);
+	if (!sid || sid === 'undefined' || sid === 'null' || sid === 'NaN') {
+		console.warn(`[Optimistic] FloorLayoutItem delete skipped — invalid id: ${itemId}`);
+		syncStatus.addLog(`Optimistic: floor_layout_item delete skipped — invalid id: ${itemId}`, 'warn');
+		return;
+	}
+	console.log(`[Optimistic] floor_layout_item #${sid} → soft-deleting in RxDB...`);
+	syncStatus.addLog(`Optimistic: floor_layout_item #${sid} → soft-deleting in RxDB...`, 'info');
 	try {
 		const db = await getDb();
-		const doc = await db.floor_layout_items.findOne(String(itemId)).exec();
+		const doc = await db.floor_layout_items.findOne(sid).exec();
 		if (doc) {
 			await doc.incrementalPatch({
 				deleted_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
 			});
 		}
-		console.log(`[Optimistic] floor_layout_item #${itemId} soft-deleted ✓`);
-		syncStatus.addLog(`Optimistic: floor_layout_item #${itemId} soft-deleted ✓`, 'success');
+		console.log(`[Optimistic] floor_layout_item #${sid} soft-deleted ✓`);
+		syncStatus.addLog(`Optimistic: floor_layout_item #${sid} soft-deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Floor layout item delete failed:', err);
-		syncStatus.addLog(`Optimistic: floor_layout_item #${itemId} delete failed — ${(err as Error)?.message || err}`, 'error');
+		syncStatus.addLog(`Optimistic: floor_layout_item #${sid} delete failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	// Note: bgResync is NOT called here — bufferedMutation handles resync on server confirm/fail
 }

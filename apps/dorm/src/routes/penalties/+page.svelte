@@ -16,6 +16,9 @@
 		tenantsStore
 	} from '$lib/stores/collections.svelte';
 	import { resyncCollection } from '$lib/db/replication';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	// UI Components
 	import {
@@ -129,7 +132,8 @@
 	let isFilterOpen = $state(false);
 	let showRulesModal = $state(false);
 	let viewMode = $state<'card' | 'list'>('list');
-	let activeFilter = $state<'all' | 'pending' | 'overdue' | 'penalized'>('all');
+	const initialPenaltyFilter = $page.url.searchParams.get('filter') as 'all' | 'pending' | 'overdue' | 'penalized' | null;
+	let activeFilter = $state<'all' | 'pending' | 'overdue' | 'penalized'>(initialPenaltyFilter ?? 'all');
 
 	// Filter state
 	let filter: PenaltyFilter = $state({
@@ -308,6 +312,14 @@
 		if (filter !== 'all') {
 			statusFilter = '';
 		}
+		// Persist filter to URL for back-button support
+		const url = new URL($page.url);
+		if (filter === 'all') {
+			url.searchParams.delete('filter');
+		} else {
+			url.searchParams.set('filter', filter);
+		}
+		goto(url.toString(), { replaceState: true, keepFocus: true });
 	}
 
 	async function handleRefresh() {
@@ -326,6 +338,9 @@
 
 <!-- Modern Penalties Page -->
 <div class="min-h-screen bg-gray-50/50">
+	<div class="max-w-7xl mx-auto px-4 pt-4">
+		<SyncErrorBanner collections={['billings', 'leases', 'rental_units', 'floors', 'properties', 'tenants']} />
+	</div>
 	<!-- Modern Header -->
 	<div class="bg-white border-b border-gray-200">
 		<div class="max-w-7xl mx-auto px-4 py-6">

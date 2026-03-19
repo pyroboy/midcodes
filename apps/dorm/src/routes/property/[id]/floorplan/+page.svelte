@@ -13,7 +13,7 @@
 	import { Save, Undo2, Redo2, Loader2 } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { FloorLayoutItemType, DrawTool } from './types';
-	import { parseEdgeKey, itemsToWallSet, parseWallMeta, serializeWallMeta, type WallEdge, type WallStorageItem, type WallMeta } from './wallEngine';
+	import { parseEdgeKey, itemsToWallSet, detectRooms, parseWallMeta, serializeWallMeta, type WallEdge, type WallStorageItem, type WallMeta } from './wallEngine';
 
 	let { data } = $props();
 	let propertyId = $derived(data.propertyId);
@@ -84,6 +84,9 @@
 	let pendingChanges = $state<PendingChange[]>([]);
 	let isSaving = $state(false);
 	let isDirty = $derived(pendingChanges.length > 0);
+
+	let brokenRooms = $state<{ id: string; label: string }[]>([]);
+	let showBrokenConfirm = $state(false);
 
 	// ─── Undo / Redo ─────────────────────────────────────────────────
 
@@ -289,6 +292,53 @@
 		// Only real IDs (positive) need server calls; temp IDs are local-only
 		const realIds = matchedIds.filter((id) => parseInt(id, 10) > 0).map((id) => parseInt(id, 10));
 		pendingChanges = [...pendingChanges, { type: 'wall_remove', ids: realIds }];
+
+		checkBrokenRooms();
+	}
+
+	function checkBrokenRooms() {
+		const assignments = currentFloorItems.filter((i: any) => i.item_type !== 'WALL');
+		if (assignments.length === 0) return;
+
+		const wallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const wallSet = itemsToWallSet(wallItems as unknown as WallStorageItem[]);
+		const rooms = detectRooms(wallSet, 60, 60);
+
+		const existingBounds = new Set(
+			rooms.map(
+				(r) =>
+					`${r.bounds.minQ},${r.bounds.minR},${r.bounds.maxQ - r.bounds.minQ},${r.bounds.maxR - r.bounds.minR}`
+			)
+		);
+
+		const broken: { id: string; label: string }[] = [];
+		for (const a of assignments) {
+			const key = `${a.grid_x},${a.grid_y},${a.grid_w},${a.grid_h}`;
+			if (!existingBounds.has(key)) {
+				broken.push({ id: a.id, label: a.label || a.item_type });
+			}
+		}
+
+		if (broken.length > 0) {
+			brokenRooms = broken;
+			showBrokenConfirm = true;
+		}
+	}
+
+	async function confirmUnassignBroken() {
+		const count = brokenRooms.length;
+		for (const b of brokenRooms) {
+			await optimisticDeleteFloorLayoutItem(parseInt(b.id, 10));
+			pendingChanges = [...pendingChanges, { type: 'delete', id: b.id }];
+		}
+		showBrokenConfirm = false;
+		brokenRooms = [];
+		toast.info(`Unassigned ${count} broken room(s)`);
+	}
+
+	function dismissBrokenConfirm() {
+		showBrokenConfirm = false;
+		brokenRooms = [];
 	}
 
 	async function handleRoomAssign(assignment: {
@@ -326,10 +376,33 @@
 		pendingChanges = [...pendingChanges, { type: 'upsert', item }];
 	}
 
+	async function handleAreaUpdate(update: { id: string; grid_x: number; grid_y: number; grid_w: number; grid_h: number; cells?: string[] }) {
+		pushUndo(captureSnapshot());
+		const item = currentFloorItems.find((i: any) => i.id === update.id);
+		if (!item) return;
+
+		const updated = {
+			id: parseInt(update.id, 10),
+			floor_id: parseInt(selectedFloorId!, 10),
+			rental_unit_id: item.rental_unit_id ? parseInt(item.rental_unit_id, 10) : null,
+			item_type: item.item_type,
+			grid_x: update.grid_x,
+			grid_y: update.grid_y,
+			grid_w: update.grid_w,
+			grid_h: update.grid_h,
+			label: item.label ?? null,
+			color: update.cells ? update.cells.join(';') : (item.color ?? null)
+		};
+
+		await optimisticUpsertFloorLayoutItem(updated);
+		pendingChanges = [...pendingChanges, { type: 'upsert', item: updated }];
+	}
+
 	async function handleRoomClear(roomId: string) {
 		pushUndo(captureSnapshot());
-		const nonWallItems = currentFloorItems.filter((i: any) => i.item_type !== 'WALL');
-		for (const item of nonWallItems) {
+		// Delete only the specific area item, not all non-wall items
+		const item = currentFloorItems.find((i: any) => i.id === roomId && i.item_type !== 'WALL');
+		if (item) {
 			await optimisticDeleteFloorLayoutItem(parseInt(item.id, 10));
 			pendingChanges = [...pendingChanges, { type: 'delete', id: item.id }];
 		}
@@ -369,7 +442,7 @@
 			} else {
 				// Toggle on: add window, also remove door if present
 				const { door: _d, swing: _s, ...rest } = currentMeta;
-				newMeta = { ...rest, window: 'standard', sill: 0.9 };
+				newMeta = { ...rest, window: 'fixed', sill: 0.9 };
 			}
 		}
 
@@ -378,6 +451,24 @@
 
 		await optimisticUpsertFloorLayoutItem(updated);
 		pendingChanges = [...pendingChanges, { type: 'upsert', item: updated }];
+	}
+
+	async function handleWallMetaUpdate(edge: WallEdge, newMeta: WallMeta) {
+		const wallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const match = wallItems.find((i: any) => {
+			if (edge.dir === 'N') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_w === 0;
+			if (edge.dir === 'W') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_h === 0;
+			return false;
+		});
+		if (!match) return;
+
+		pushUndo(captureSnapshot());
+
+		const updatedLabel = serializeWallMeta(newMeta);
+		const updatedItem = { ...match, label: updatedLabel };
+
+		await optimisticUpsertFloorLayoutItem(updatedItem);
+		pendingChanges = [...pendingChanges, { type: 'upsert', item: updatedItem }];
 	}
 
 	// ─── Feature 7: Wall Color Change ────────────────────────────────
@@ -658,7 +749,9 @@
 						onRoomAssign={handleRoomAssign}
 						onRoomClear={handleRoomClear}
 						onWallMetaToggle={handleWallMetaToggle}
+						onWallMetaUpdate={handleWallMetaUpdate}
 						onWallColorChange={handleWallColorChange}
+						onAreaUpdate={handleAreaUpdate}
 						onToolToggle={() => (drawTool = drawTool === 'draw' ? 'erase' : 'draw')}
 					/>
 				{:else}
@@ -681,4 +774,34 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if showBrokenConfirm && brokenRooms.length > 0}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+			<div class="bg-background rounded-lg shadow-xl p-5 max-w-sm mx-4 space-y-3">
+				<h3 class="text-sm font-semibold">Room assignments broken</h3>
+				<p class="text-xs text-muted-foreground">
+					Removing walls broke {brokenRooms.length} room assignment{brokenRooms.length !== 1 ? 's' : ''}. These rooms are no longer enclosed:
+				</p>
+				<ul class="text-xs space-y-1 max-h-32 overflow-y-auto">
+					{#each brokenRooms as b (b.id)}
+						<li class="px-2 py-1 bg-red-50 rounded text-red-700 border border-red-200">{b.label}</li>
+					{/each}
+				</ul>
+				<div class="flex gap-2">
+					<button
+						class="flex-1 px-3 py-1.5 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700"
+						onclick={confirmUnassignBroken}
+					>
+						Unassign
+					</button>
+					<button
+						class="flex-1 px-3 py-1.5 rounded border text-xs hover:bg-secondary"
+						onclick={dismissBrokenConfirm}
+					>
+						Keep anyway
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

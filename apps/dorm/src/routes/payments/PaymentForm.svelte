@@ -12,6 +12,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import { paymentSchema, type PaymentSchema } from './formSchema';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
 		data: any;
@@ -73,12 +74,23 @@
 	let canEdit = $derived(data.isAdminLevel || data.isAccountant || data.isFrontdesk);
 	let canUpdateStatus = $derived(data.isAdminLevel || data.isAccountant);
 	let selectedBilling = $derived(billings.find((b) => b.id === $form.billing_id));
+
+	// Overpayment prevention
+	function handleFormSubmit(event: Event) {
+		if (selectedBilling && $form.amount > selectedBilling.balance) {
+			event.preventDefault();
+			toast.error('Amount exceeds billing balance', {
+				description: `Maximum payable: ${formatCurrency(selectedBilling.balance)}`
+			});
+		}
+	}
 </script>
 
 <form
 	method="POST"
 	action={editMode ? '?/update' : '?/create'}
 	use:enhance
+	onsubmit={handleFormSubmit}
 	class="space-y-4 w-full max-w-xl mx-auto p-4 bg-card rounded-lg border shadow"
 >
 	{#if editMode}

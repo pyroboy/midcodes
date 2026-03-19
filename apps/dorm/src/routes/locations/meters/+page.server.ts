@@ -5,7 +5,7 @@ import type { Actions } from './$types';
 import { meterSchema } from '../../meters/formSchema';
 import { db } from '$lib/server/db';
 import { meters, floors, rentalUnit, readings, profiles } from '$lib/server/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, isNull } from 'drizzle-orm';
 
 export const actions: Actions = {
 	meterCreate: async ({ request, locals }) => {
@@ -116,7 +116,8 @@ export const actions: Actions = {
 
 		const duplicateConditions = [
 			eq(meters.name, form.data.name),
-			eq(meters.propertyId, insertData.propertyId)
+			eq(meters.propertyId, insertData.propertyId),
+			isNull(meters.deletedAt)
 		];
 		if (location_type === 'FLOOR' && insertData.floorId)
 			duplicateConditions.push(eq(meters.floorId, insertData.floorId));
@@ -135,7 +136,8 @@ export const actions: Actions = {
 			});
 		}
 
-		await db.insert(meters).values(insertData);
+		const [inserted] = await db.insert(meters).values(insertData).returning({ id: meters.id });
+		form.data.id = inserted.id;
 		return { form, success: true };
 	},
 
@@ -259,7 +261,8 @@ export const actions: Actions = {
 		const duplicateConditions = [
 			eq(meters.name, form.data.name),
 			eq(meters.propertyId, cleanUpdateData.propertyId),
-			ne(meters.id, id)
+			ne(meters.id, id),
+			isNull(meters.deletedAt)
 		];
 		if (location_type === 'FLOOR' && cleanUpdateData.floorId)
 			duplicateConditions.push(eq(meters.floorId, cleanUpdateData.floorId));

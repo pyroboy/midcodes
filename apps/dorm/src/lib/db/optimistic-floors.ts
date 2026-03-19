@@ -8,13 +8,15 @@ export async function optimisticUpsertFloor(data: {
 	floor_number: number;
 	wing?: string | null;
 	status: string;
-}) {
+}): Promise<(() => Promise<void>) | null> {
 	console.log(`[Optimistic] floor #${data.id} → writing to RxDB...`);
 	syncStatus.addLog(`Optimistic: floor #${data.id} → writing to RxDB...`, 'info');
+	let snapshot: Record<string, any> | null = null;
 	try {
 		const db = await getDb();
 		const sid = String(data.id);
 		const existing = await db.floors.findOne(sid).exec();
+		snapshot = existing ? existing.toJSON(true) : null;
 		await db.floors.upsert({
 			id: sid,
 			property_id: String(data.property_id),
@@ -30,27 +32,52 @@ export async function optimisticUpsertFloor(data: {
 	} catch (err) {
 		console.warn('[Optimistic] Floor upsert failed, falling back to resync:', err);
 		syncStatus.addLog(`Optimistic: floor #${data.id} upsert failed — ${(err as Error)?.message || err}`, 'error');
+		bgResync('floors');
+		return null;
 	}
 	bgResync('floors');
+	// Return rollback function for instant revert on server failure
+	const capturedSnapshot = snapshot;
+	const sid = String(data.id);
+	return async () => {
+		try {
+			const db = await getDb();
+			if (capturedSnapshot) {
+				await db.floors.upsert(capturedSnapshot);
+			} else {
+				const doc = await db.floors.findOne(sid).exec();
+				if (doc) await doc.incrementalPatch({ deleted_at: new Date().toISOString() });
+			}
+			syncStatus.addLog(`Optimistic: floor #${data.id} rolled back`, 'warn');
+		} catch (err) {
+			console.warn('[Optimistic] Floor rollback failed:', err);
+		}
+	};
 }
 
-export async function optimisticDeleteFloor(floorId: number) {
-	console.log(`[Optimistic] floor #${floorId} → soft-deleting in RxDB...`);
-	syncStatus.addLog(`Optimistic: floor #${floorId} → soft-deleting in RxDB...`, 'info');
+export async function optimisticDeleteFloor(floorId: number | string) {
+	const sid = String(floorId);
+	if (!sid || sid === 'undefined' || sid === 'null' || sid === 'NaN') {
+		console.warn(`[Optimistic] Floor delete skipped — invalid id: ${floorId}`);
+		syncStatus.addLog(`Optimistic: floor delete skipped — invalid id: ${floorId}`, 'warn');
+		return;
+	}
+	console.log(`[Optimistic] floor #${sid} → soft-deleting in RxDB...`);
+	syncStatus.addLog(`Optimistic: floor #${sid} → soft-deleting in RxDB...`, 'info');
 	try {
 		const db = await getDb();
-		const doc = await db.floors.findOne(String(floorId)).exec();
+		const doc = await db.floors.findOne(sid).exec();
 		if (doc) {
 			await doc.incrementalPatch({
 				deleted_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
 			});
 		}
-		console.log(`[Optimistic] floor #${floorId} soft-deleted ✓`);
-		syncStatus.addLog(`Optimistic: floor #${floorId} soft-deleted ✓`, 'success');
+		console.log(`[Optimistic] floor #${sid} soft-deleted ✓`);
+		syncStatus.addLog(`Optimistic: floor #${sid} soft-deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Floor delete failed, falling back to resync:', err);
-		syncStatus.addLog(`Optimistic: floor #${floorId} delete failed — ${(err as Error)?.message || err}`, 'error');
+		syncStatus.addLog(`Optimistic: floor #${sid} delete failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	bgResync('floors');
 }

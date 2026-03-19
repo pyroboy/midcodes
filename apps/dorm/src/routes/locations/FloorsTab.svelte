@@ -19,8 +19,16 @@
 		leaseTenantsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertFloor, optimisticDeleteFloor } from '$lib/db/optimistic-floors';
-	import { Search, Pencil, Trash2 } from 'lucide-svelte';
+	import { bgResync, bufferedMutation } from '$lib/db/optimistic-utils';
+	import { Search, Pencil, Trash2, Building2, Layers } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
+	import { getStatusClasses } from '$lib/utils/format';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let savedEditMode = false;
 
 	interface Props {
 		floorForm: any;
@@ -34,6 +42,7 @@
 	let isDeleteDialogOpen = $state(false);
 	let floorToDelete = $state<FloorWithProperty | null>(null);
 	let searchQuery = $state('');
+	let isLoading = $derived(!floorsStore.initialized);
 
 	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
@@ -85,28 +94,35 @@
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
+		onSubmit: () => {
+			savedFormData = { ...$formData };
+			savedEditMode = editMode;
+		},
 		onError: ({ result }) => {
 			console.error('Form submission error:', result);
 			toast.error('Error saving floor');
 		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
-				toast.success(editMode ? 'Floor updated' : 'Floor created');
+				const serverData = (result as any).data?.form?.data;
+				const fd = serverData ?? savedFormData;
+
+				toast.success(savedEditMode ? 'Floor updated' : 'Floor created');
 				showModal = false;
 				editMode = false;
-				const d = $formData;
-				if (d.id) {
+
+				if (fd?.id) {
 					await optimisticUpsertFloor({
-						id: d.id,
-						property_id: d.property_id,
-						floor_number: d.floor_number,
-						wing: d.wing,
-						status: d.status || 'ACTIVE'
+						id: fd.id,
+						property_id: fd.property_id,
+						floor_number: fd.floor_number,
+						wing: fd.wing,
+						status: fd.status || 'ACTIVE'
 					});
 				} else {
-					const { resyncCollection } = await import('$lib/db/replication');
-					resyncCollection('floors');
+					bgResync('floors');
 				}
+				savedFormData = null;
 			}
 		}
 	});
@@ -171,26 +187,35 @@
 	async function proceedWithDelete() {
 		if (!floorToDelete) return;
 
-		await optimisticDeleteFloor(floorToDelete.id);
-
-		const formData = new FormData();
-		formData.append('id', floorToDelete.id.toString());
-		const response = await fetch('?/floorDelete', {
-			method: 'POST',
-			body: formData
-		});
-
-		if (!response.ok) {
-			console.error('Failed to delete floor.', response);
-			toast.error('Failed to delete floor');
-			const { resyncCollection } = await import('$lib/db/replication');
-			resyncCollection('floors');
-		} else {
-			toast.success('Floor deleted');
-		}
-
+		const deletingId = floorToDelete.id;
 		isDeleteDialogOpen = false;
 		floorToDelete = null;
+
+		const deleteFormData = new FormData();
+		deleteFormData.append('id', deletingId.toString());
+
+		await bufferedMutation({
+			label: `Delete Floor #${deletingId}`,
+			collection: 'floors',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteFloor(deletingId);
+			},
+			serverAction: async () => {
+				const response = await fetch('?/floorDelete', {
+					method: 'POST',
+					body: deleteFormData
+				});
+				if (!response.ok) throw new Error('Server rejected delete');
+				return response;
+			},
+			onSuccess: async () => {
+				toast.success('Floor deleted');
+			},
+			onFailure: async () => {
+				toast.error('Failed to delete floor');
+			}
+		});
 	}
 </script>
 
@@ -207,18 +232,36 @@
 	</div>
 
 	<!-- Content -->
-	{#if !selectedProperty}
-		<div class="text-center py-8">
-			<p class="text-gray-500">Please select a property to view floors.</p>
+	{#if isLoading}
+		<div class="rounded-lg border bg-card">
+			<div class="hidden sm:grid sm:grid-cols-[1fr_1fr_1fr_auto] gap-4 px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b bg-muted/50 rounded-t-lg">
+				<div>Floor Number</div>
+				<div>Rental Units</div>
+				<div>Status</div>
+				<div class="text-right">Actions</div>
+			</div>
+			<div class="divide-y">
+				{#each Array(3) as _, i (i)}
+					<div class="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4 px-6 py-4">
+						<Skeleton class="h-4 w-20" />
+						<Skeleton class="h-4 w-8" />
+						<Skeleton class="h-5 w-16 rounded-full" />
+						<div class="flex items-center justify-end gap-2">
+							<Skeleton class="h-8 w-8 rounded" />
+							<Skeleton class="h-8 w-8 rounded" />
+						</div>
+					</div>
+				{/each}
+			</div>
 		</div>
+	{:else if !selectedProperty}
+		<EmptyState icon={Building2} title="No Property Selected" description="Select a property from the dropdown in the header to view floors." />
 	{:else if !filteredFloors.length}
-		<div class="text-center py-8">
-			<p class="text-gray-500">No floors found for this property.</p>
-		</div>
+		<EmptyState icon={Layers} title="No Floors Found" description={searchQuery ? 'No floors match your search criteria.' : 'Get started by adding the first floor to this property.'} />
 	{:else}
 		<div class="rounded-lg border bg-card">
 			<div
-				class="hidden md:grid md:grid-cols-[1fr_1fr_1fr_auto] gap-4 px-4 py-2 font-medium border-b bg-muted/50 rounded-t-lg"
+				class="hidden sm:grid sm:grid-cols-[1fr_1fr_1fr_auto] gap-4 px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b bg-muted/50 rounded-t-lg"
 			>
 				<div>Floor Number</div>
 				<div>Rental Units</div>
@@ -229,10 +272,10 @@
 				{#each filteredFloors as floor (floor.id)}
 					<Accordion.Root type="single" class="w-full">
 						<Accordion.Item value={floor.id.toString()} class="border-b-0">
-							<div class="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4 px-4 py-2">
+							<div class="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors">
 								<div>{floor.floor_number}</div>
 								<div>{floor.rental_unit.length}</div>
-								<div><Badge>{floor.status}</Badge></div>
+								<div><Badge class={getStatusClasses(floor.status)}>{floor.status}</Badge></div>
 								<div class="flex items-center justify-end gap-2">
 									<Button
 										size="icon"

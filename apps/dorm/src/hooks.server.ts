@@ -174,6 +174,7 @@ const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 		"img-src 'self' data: blob: https://*.neon.tech https://images.unsplash.com https://res.cloudinary.com",
 		connectSrc,
 		"worker-src 'self' blob:",
+		"frame-src 'self' https://rxdb.info",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
 		"form-action 'self'"

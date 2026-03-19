@@ -50,6 +50,7 @@
 		rentalUnitsStore
 	} from '$lib/stores/collections.svelte';
 	import { resyncUtilityData } from '$lib/db/optimistic-utility-billings';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 
 	// ─── Loading state from RxDB initialization ────────────────────────
 	let isLoading = $derived(
@@ -425,6 +426,7 @@
 </script>
 
 <div class="container mx-auto py-6">
+	<SyncErrorBanner collections={['meters', 'readings', 'billings', 'leases', 'properties', 'tenants', 'rental_units']} />
 	<!-- Page Header -->
 	<div class="flex justify-between items-center mb-4 border-b pb-4">
 		<h1 class="text-3xl font-bold">Utility Readings Management</h1>

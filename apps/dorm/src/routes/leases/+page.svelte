@@ -3,7 +3,8 @@
 	import LeaseList from './LeaseList.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign } from 'lucide-svelte';
+	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign, FileText } from 'lucide-svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import type { z } from 'zod/v3';
 	import { leaseSchema } from './formSchema';
 	import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
@@ -24,7 +25,9 @@
 	} from '$lib/stores/collections.svelte';
 	import { resyncCollection } from '$lib/db/replication';
 	import { optimisticDeleteLease } from '$lib/db/optimistic-leases';
+	import { bufferedMutation } from '$lib/db/optimistic-utils';
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 
 	type FormType = z.infer<typeof leaseSchema>;
 
@@ -328,45 +331,38 @@
 	async function confirmDeleteLease() {
 		if (!leaseToDelete) return;
 		const lease = leaseToDelete;
+
+		// Close confirmation dialog immediately
 		showDeleteDialog = false;
 		leaseToDelete = null;
 
-		// Optimistic: remove from UI immediately
-		await optimisticDeleteLease(lease.id);
-
-		const formData = new FormData();
-		formData.append('id', String(lease.id));
-		formData.append('reason', 'User initiated deletion');
-
-		try {
-			console.log(`[Leases] Server: sending delete for lease #${lease.id} to Neon...`);
-			syncStatus.addLog(`Server: deleting lease "${lease.name}" → sending to Neon...`, 'info');
-			const result = await fetch('?/delete', {
-				method: 'POST',
-				body: formData
-			});
-			const response = await result.json();
-
-			if (result.ok) {
-				console.log(`[Leases] Server: lease #${lease.id} deleted on Neon ✓`);
-				syncStatus.addLog(`Server: lease "${lease.name}" deleted on Neon ✓`, 'success');
+		await bufferedMutation({
+			label: `Delete lease "${lease.name}"`,
+			collection: 'leases',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteLease(lease.id);
+			},
+			serverAction: async () => {
+				const formData = new FormData();
+				formData.append('id', String(lease.id));
+				formData.append('reason', 'User initiated deletion');
+				const result = await fetch('?/delete', {
+					method: 'POST',
+					body: formData
+				});
+				if (!result.ok) {
+					const response = await result.json().catch(() => ({}));
+					throw new Error(response.error || response.message || 'Failed to delete lease');
+				}
+				return result;
+			},
+			onSuccess: async () => {
 				toast.success(
 					`Lease "${lease.name}" has been successfully archived. Payment history has been preserved.`
 				);
-			} else {
-				console.error('[Leases] Server: delete rejected:', response);
-				syncStatus.addLog(`Server: lease delete rejected — ${response.error || response.message || 'Unknown'}`, 'error');
-				toast.error(response.error || response.message || 'Failed to delete lease');
-				// Resync to restore the original state
-				resyncCollection('leases');
 			}
-		} catch (error) {
-			console.error('[Leases] Server: delete network error:', error);
-			syncStatus.addLog(`Server: lease delete failed — ${error instanceof Error ? error.message : 'Network error'}`, 'error');
-			toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			// Resync to restore the original state on network error
-			resyncCollection('leases');
-		}
+		});
 	}
 
 	function handleModalClose() {
@@ -381,6 +377,9 @@
 </script>
 
 <div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+	<div class="max-w-7xl mx-auto px-3 sm:px-4 pt-3">
+		<SyncErrorBanner collections={['leases', 'tenants', 'lease_tenants', 'billings', 'payments', 'payment_allocations', 'rental_units']} />
+	</div>
 	<!-- Header Section with Integrated Stats -->
 	<div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
 		<div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
@@ -591,6 +590,17 @@
 							</div>
 						{/each}
 					</div>
+				</div>
+			{:else if leasesWithStatus.length === 0}
+				<div class="p-6">
+					<EmptyState icon={FileText} title="No Leases Found" description="Get started by creating your first lease agreement.">
+						{#snippet action()}
+							<Button onclick={handleAddLease} class="bg-blue-600 hover:bg-blue-700 text-white">
+								<Plus class="w-4 h-4 mr-2" />
+								Create Lease
+							</Button>
+						{/snippet}
+					</EmptyState>
 				</div>
 			{:else}
 				<LeaseList

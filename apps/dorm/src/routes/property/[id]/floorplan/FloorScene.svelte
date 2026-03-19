@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { T, useThrelte } from '@threlte/core';
+	import { T, useThrelte, useTask } from '@threlte/core';
 	import { OrbitControls, interactivity } from '@threlte/extras';
 	import { Vector3 } from 'three';
+	import { onDestroy } from 'svelte';
 	import type { FloorLayoutItem } from './types';
-	import { itemsToWallSet, edgesToLines, edgeKey, buildWallMetaMap, type WallStorageItem } from './wallEngine';
+	import { itemsToWallSet, edgesToLines, edgeKey, buildWallMetaMap, type WallStorageItem, type WallMeta, type WallLine } from './wallEngine';
+	import { createWallWithOpenings, clearWallGeomCache, type WallOpening } from './wallGeometry';
 
 	let {
 		floors,
@@ -162,6 +164,75 @@
 		}
 		requestAnimationFrame(animate);
 	});
+
+	// ─── Interactive door open/close with tweened animation ──────────────────
+	// Tracks which doors are closed. By default all doors render OPEN.
+	let closedDoors = $state<Set<string>>(new Set());
+
+	function toggleDoor(doorKey: string) {
+		const next = new Set(closedDoors);
+		if (next.has(doorKey)) next.delete(doorKey);
+		else next.add(doorKey);
+		closedDoors = next;
+		_anyAnimating = true; // wake up the tween loop
+	}
+
+	const OPEN_ANGLE = Math.PI * 0.44; // ~80° swing
+
+	// Tween system: plain objects (not $state) to avoid state_unsafe_mutation.
+	// useTask lerps currents toward targets each frame, then bumps a $state
+	// tick counter to trigger template re-render.
+	const _animTargets = new Map<string, number>();
+	const _animCurrents: Record<string, number> = {};
+	let _animTick = $state(0);
+
+	/** Returns an animated (tweened) value that smoothly approaches `target`. */
+	function animatedVal(key: string, target: number): number {
+		_animTargets.set(key, target);
+		if (!(key in _animCurrents)) _animCurrents[key] = target;
+		void _animTick; // subscribe to tick for re-renders
+		return _animCurrents[key];
+	}
+
+	let _anyAnimating = false;
+
+	useTask((delta) => {
+		if (!_anyAnimating) return; // skip when all doors are at rest
+		const speed = 6;
+		let stillMoving = false;
+		for (const [key, target] of _animTargets) {
+			const current = _animCurrents[key] ?? target;
+			const diff = target - current;
+			if (Math.abs(diff) > 0.001) {
+				_animCurrents[key] = current + diff * Math.min(1, speed * delta);
+				stillMoving = true;
+			} else if (current !== target) {
+				_animCurrents[key] = target;
+			}
+		}
+		_anyAnimating = stillMoving;
+		if (stillMoving) _animTick++;
+	});
+
+	// Dispose cached geometries on component destroy
+	onDestroy(() => clearWallGeomCache());
+
+	// ─── Door/Window opening computation ─────────────────────────────────────
+	const DOOR_HEIGHT = 2.1; // meters
+
+	function computeOpenings(meta: WallMeta, wallLength: number): WallOpening[] {
+		if (meta.door) {
+			const doorW = Math.min((meta.doorWidth ?? 80) / 100, wallLength * 0.9);
+			return [{ offsetAlongWall: wallLength / 2, width: doorW, bottomY: 0, topY: DOOR_HEIGHT }];
+		}
+		if (meta.window) {
+			const winW = Math.min((meta.windowWidth ?? 100) / 100, wallLength * 0.9);
+			const sill = meta.sill ?? 0.9;
+			const winH = (meta.windowHeight ?? 120) / 100;
+			return [{ offsetAlongWall: wallLength / 2, width: winW, bottomY: sill, topY: Math.min(sill + winH, WALL_3D_HEIGHT) }];
+		}
+		return [];
+	}
 </script>
 
 <T.AmbientLight intensity={0.7} />
@@ -216,140 +287,346 @@
 			: edgeKey(line.x1, Math.min(line.y1, line.y2), 'W')}
 		{@const meta = floorWallMetaMap.get(eKey) ?? {}}
 		{@const wallColor = meta.color ?? WALL_3D_COLOR}
-		{@const doorW = CELL * 0.8}
-		{@const windowW = CELL * 0.6}
+		{@const openings = computeOpenings(meta, totalLen)}
+		{@const wallGeom = createWallWithOpenings(totalLen, WALL_3D_HEIGHT, WALL_3D_THICK, openings)}
 
-		{#if meta.door && totalLen > doorW}
-			<!-- Door: two wall segments flanking a gap -->
-			{@const halfLen = (totalLen - doorW) / 2}
-			{#if isHoriz}
-				{@const startX = line.x1 * CELL}
-				{@const z = line.y1 * CELL}
-				<!-- Left segment -->
-				<T.Mesh
-					position.x={startX + halfLen / 2}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={z}
-				>
-					<T.BoxGeometry args={[halfLen, WALL_3D_HEIGHT, WALL_3D_THICK]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-				<!-- Right segment -->
-				<T.Mesh
-					position.x={startX + halfLen + doorW + halfLen / 2}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={z}
-				>
-					<T.BoxGeometry args={[halfLen, WALL_3D_HEIGHT, WALL_3D_THICK]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-			{:else}
-				{@const x = line.x1 * CELL}
-				{@const startZ = line.y1 * CELL}
-				<!-- Top segment -->
-				<T.Mesh
-					position.x={x}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={startZ + halfLen / 2}
-				>
-					<T.BoxGeometry args={[WALL_3D_THICK, WALL_3D_HEIGHT, halfLen]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-				<!-- Bottom segment -->
-				<T.Mesh
-					position.x={x}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={startZ + halfLen + doorW + halfLen / 2}
-				>
-					<T.BoxGeometry args={[WALL_3D_THICK, WALL_3D_HEIGHT, halfLen]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-			{/if}
-		{:else if meta.window && totalLen > windowW}
-			<!-- Window: two wall segments + transparent glass pane -->
-			{@const flankLen = (totalLen - windowW) / 2}
-			{@const glassH = WALL_3D_HEIGHT * 0.6}
-			{#if isHoriz}
-				{@const startX = line.x1 * CELL}
-				{@const z = line.y1 * CELL}
-				<!-- Left flank -->
-				<T.Mesh
-					position.x={startX + flankLen / 2}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={z}
-				>
-					<T.BoxGeometry args={[flankLen, WALL_3D_HEIGHT, WALL_3D_THICK]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-				<!-- Right flank -->
-				<T.Mesh
-					position.x={startX + flankLen + windowW + flankLen / 2}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={z}
-				>
-					<T.BoxGeometry args={[flankLen, WALL_3D_HEIGHT, WALL_3D_THICK]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-				<!-- Glass pane -->
-				<T.Mesh
-					position.x={startX + flankLen + windowW / 2}
-					position.y={yBase + WALL_3D_HEIGHT * 0.55}
-					position.z={z}
-				>
-					<T.BoxGeometry args={[windowW, glassH, 0.02]} />
-					<T.MeshStandardMaterial color="#93c5fd" transparent opacity={0.35} roughness={0.1} />
-				</T.Mesh>
-			{:else}
-				{@const x = line.x1 * CELL}
-				{@const startZ = line.y1 * CELL}
-				<!-- Top flank -->
-				<T.Mesh
-					position.x={x}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={startZ + flankLen / 2}
-				>
-					<T.BoxGeometry args={[WALL_3D_THICK, WALL_3D_HEIGHT, flankLen]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-				<!-- Bottom flank -->
-				<T.Mesh
-					position.x={x}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={startZ + flankLen + windowW + flankLen / 2}
-				>
-					<T.BoxGeometry args={[WALL_3D_THICK, WALL_3D_HEIGHT, flankLen]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
-				</T.Mesh>
-				<!-- Glass pane -->
-				<T.Mesh
-					position.x={x}
-					position.y={yBase + WALL_3D_HEIGHT * 0.55}
-					position.z={startZ + flankLen + windowW / 2}
-				>
-					<T.BoxGeometry args={[0.02, glassH, windowW]} />
-					<T.MeshStandardMaterial color="#93c5fd" transparent opacity={0.35} roughness={0.1} />
-				</T.Mesh>
-			{/if}
+		<!-- Wall mesh with proper cutouts via ExtrudeGeometry -->
+		{#if isHoriz}
+			<T.Mesh
+				position.x={line.x1 * CELL}
+				position.y={yBase}
+				position.z={line.y1 * CELL - WALL_3D_THICK / 2}
+				geometry={wallGeom}
+			>
+				<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
+			</T.Mesh>
 		{:else}
-			<!-- Standard wall -->
+			<T.Mesh
+				position.x={line.x1 * CELL + WALL_3D_THICK / 2}
+				position.y={yBase}
+				position.z={line.y1 * CELL}
+				rotation.y={Math.PI / 2}
+				geometry={wallGeom}
+			>
+				<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
+			</T.Mesh>
+		{/if}
+
+		<!-- 3D Door models (interactive open/close with tween) -->
+		{#if meta.door && openings.length > 0}
+			{@const op = openings[0]}
+			{@const doorH = op.topY - op.bottomY}
+			{@const dType = meta.door}
+			{@const DOOR_THICK = 0.04}
+			{@const DOOR_COLOR = '#8B6914'}
+			{@const DOOR_FRAME_COLOR = '#5C4A1E'}
+			{@const FRAME_W = 0.05}
+			{@const isOpen = !closedDoors.has(eKey)}
+			{@const swingLeft = (meta.swing ?? 'left') === 'left'}
+			{@const inward = (meta.openDir ?? 'inward') === 'inward'}
+
 			{#if isHoriz}
-				<T.Mesh
-					position.x={(line.x1 + (line.x2 - line.x1) / 2) * CELL}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={line.y1 * CELL}
-				>
-					<T.BoxGeometry args={[totalLen, WALL_3D_HEIGHT, WALL_3D_THICK]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
+				{@const fx = line.x1 * CELL + op.offsetAlongWall}
+				{@const fz = line.y1 * CELL}
+				{@const doorTarget = isOpen ? -(swingLeft ? 1 : -1) * (inward ? 1 : -1) * OPEN_ANGLE : 0}
+				{@const doorAngle = animatedVal(eKey, doorTarget)}
+
+				<!-- Door frame (static — doesn't rotate) -->
+				<T.Mesh position.x={fx} position.y={yBase + op.topY + FRAME_W / 2} position.z={fz}>
+					<T.BoxGeometry args={[op.width + FRAME_W * 2, FRAME_W, WALL_3D_THICK + 0.02]} />
+					<T.MeshStandardMaterial color={DOOR_FRAME_COLOR} roughness={0.7} />
 				</T.Mesh>
+				<T.Mesh position.x={fx - op.width / 2 - FRAME_W / 2} position.y={yBase + doorH / 2} position.z={fz}>
+					<T.BoxGeometry args={[FRAME_W, doorH, WALL_3D_THICK + 0.02]} />
+					<T.MeshStandardMaterial color={DOOR_FRAME_COLOR} roughness={0.7} />
+				</T.Mesh>
+				<T.Mesh position.x={fx + op.width / 2 + FRAME_W / 2} position.y={yBase + doorH / 2} position.z={fz}>
+					<T.BoxGeometry args={[FRAME_W, doorH, WALL_3D_THICK + 0.02]} />
+					<T.MeshStandardMaterial color={DOOR_FRAME_COLOR} roughness={0.7} />
+				</T.Mesh>
+
+				<!-- Door panel(s) — pivot group at hinge edge -->
+				{#if dType === 'single' || dType === 'pocket' || dType === 'french'}
+					{@const hingeX = swingLeft ? fx - op.width / 2 : fx + op.width / 2}
+					{@const panelOff = swingLeft ? (op.width - 0.02) / 2 : -(op.width - 0.02) / 2}
+					<T.Group position.x={hingeX} position.y={yBase + doorH / 2} position.z={fz} rotation.y={doorAngle}>
+						<T.Mesh position.x={panelOff} onclick={() => toggleDoor(eKey)}>
+							<T.BoxGeometry args={[op.width - 0.02, doorH - 0.02, DOOR_THICK]} />
+							<T.MeshStandardMaterial
+								color={dType === 'french' ? '#93c5fd' : DOOR_COLOR}
+								roughness={dType === 'french' ? 0.1 : 0.6}
+								transparent={dType === 'french'}
+								opacity={dType === 'french' ? 0.4 : 1}
+							/>
+						</T.Mesh>
+						{@const handleOff = swingLeft ? op.width - 0.1 : -(op.width - 0.1)}
+						<T.Mesh position.x={handleOff} position.y={-doorH * 0.05} position.z={DOOR_THICK / 2 + 0.02}>
+							<T.BoxGeometry args={[0.03, 0.12, 0.04]} />
+							<T.MeshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+						</T.Mesh>
+					</T.Group>
+				{:else if dType === 'double' || dType === 'bifold'}
+					{@const halfW = op.width / 2 - 0.01}
+					{@const leftTarget = isOpen ? -(inward ? 1 : -1) * OPEN_ANGLE : 0}
+					{@const rightTarget = isOpen ? (inward ? 1 : -1) * OPEN_ANGLE : 0}
+					{@const leftAngle = animatedVal(`${eKey}-L`, leftTarget)}
+					{@const rightAngle = animatedVal(`${eKey}-R`, rightTarget)}
+					<!-- Left leaf -->
+					<T.Group position.x={fx - op.width / 2} position.y={yBase + doorH / 2} position.z={fz}
+						rotation.y={leftAngle}>
+						<T.Mesh position.x={halfW / 2} onclick={() => toggleDoor(eKey)}>
+							<T.BoxGeometry args={[halfW, doorH - 0.02, DOOR_THICK]} />
+							<T.MeshStandardMaterial color={DOOR_COLOR} roughness={0.6} />
+						</T.Mesh>
+						<T.Mesh position.x={halfW - 0.06} position.y={-doorH * 0.05} position.z={DOOR_THICK / 2 + 0.02}>
+							<T.BoxGeometry args={[0.03, 0.1, 0.03]} />
+							<T.MeshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+						</T.Mesh>
+					</T.Group>
+					<!-- Right leaf -->
+					<T.Group position.x={fx + op.width / 2} position.y={yBase + doorH / 2} position.z={fz}
+						rotation.y={rightAngle}>
+						<T.Mesh position.x={-halfW / 2} onclick={() => toggleDoor(eKey)}>
+							<T.BoxGeometry args={[halfW, doorH - 0.02, DOOR_THICK]} />
+							<T.MeshStandardMaterial color={DOOR_COLOR} roughness={0.6} />
+						</T.Mesh>
+						<T.Mesh position.x={-(halfW - 0.06)} position.y={-doorH * 0.05} position.z={DOOR_THICK / 2 + 0.02}>
+							<T.BoxGeometry args={[0.03, 0.1, 0.03]} />
+							<T.MeshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+						</T.Mesh>
+					</T.Group>
+				{:else if dType === 'sliding'}
+					{@const slideTarget = isOpen ? op.width * 0.42 : 0}
+					{@const slideOff = animatedVal(`${eKey}-slide`, slideTarget)}
+					<T.Mesh position.x={fx - op.width * 0.13} position.y={yBase + doorH / 2} position.z={fz - DOOR_THICK / 2}>
+						<T.BoxGeometry args={[op.width * 0.55, doorH - 0.02, DOOR_THICK * 0.7]} />
+						<T.MeshStandardMaterial color="#7A5C12" roughness={0.6} />
+					</T.Mesh>
+					<T.Mesh
+						position.x={fx + op.width * 0.13 - slideOff}
+						position.y={yBase + doorH / 2}
+						position.z={fz + DOOR_THICK / 2}
+						onclick={() => toggleDoor(eKey)}
+					>
+						<T.BoxGeometry args={[op.width * 0.55, doorH - 0.02, DOOR_THICK * 0.7]} />
+						<T.MeshStandardMaterial color={DOOR_COLOR} roughness={0.6} />
+					</T.Mesh>
+				{/if}
+
 			{:else}
-				<T.Mesh
-					position.x={line.x1 * CELL}
-					position.y={yBase + WALL_3D_HEIGHT / 2}
-					position.z={(line.y1 + (line.y2 - line.y1) / 2) * CELL}
-				>
-					<T.BoxGeometry args={[WALL_3D_THICK, WALL_3D_HEIGHT, totalLen]} />
-					<T.MeshStandardMaterial color={wallColor} roughness={0.85} />
+				{@const fx = line.x1 * CELL}
+				{@const fz = line.y1 * CELL + op.offsetAlongWall}
+				{@const doorTarget = isOpen ? (swingLeft ? 1 : -1) * (inward ? 1 : -1) * OPEN_ANGLE : 0}
+				{@const doorAngle = animatedVal(eKey, doorTarget)}
+
+				<!-- Door frame (static) -->
+				<T.Mesh position.x={fx} position.y={yBase + op.topY + FRAME_W / 2} position.z={fz}>
+					<T.BoxGeometry args={[WALL_3D_THICK + 0.02, FRAME_W, op.width + FRAME_W * 2]} />
+					<T.MeshStandardMaterial color={DOOR_FRAME_COLOR} roughness={0.7} />
 				</T.Mesh>
+				<T.Mesh position.x={fx} position.y={yBase + doorH / 2} position.z={fz - op.width / 2 - FRAME_W / 2}>
+					<T.BoxGeometry args={[WALL_3D_THICK + 0.02, doorH, FRAME_W]} />
+					<T.MeshStandardMaterial color={DOOR_FRAME_COLOR} roughness={0.7} />
+				</T.Mesh>
+				<T.Mesh position.x={fx} position.y={yBase + doorH / 2} position.z={fz + op.width / 2 + FRAME_W / 2}>
+					<T.BoxGeometry args={[WALL_3D_THICK + 0.02, doorH, FRAME_W]} />
+					<T.MeshStandardMaterial color={DOOR_FRAME_COLOR} roughness={0.7} />
+				</T.Mesh>
+
+				<!-- Door panel(s) — pivot group at hinge edge -->
+				{#if dType === 'single' || dType === 'pocket' || dType === 'french'}
+					{@const hingeZ = swingLeft ? fz - op.width / 2 : fz + op.width / 2}
+					{@const panelOff = swingLeft ? (op.width - 0.02) / 2 : -(op.width - 0.02) / 2}
+					<T.Group position.x={fx} position.y={yBase + doorH / 2} position.z={hingeZ} rotation.y={doorAngle}>
+						<T.Mesh position.z={panelOff} onclick={() => toggleDoor(eKey)}>
+							<T.BoxGeometry args={[DOOR_THICK, doorH - 0.02, op.width - 0.02]} />
+							<T.MeshStandardMaterial
+								color={dType === 'french' ? '#93c5fd' : DOOR_COLOR}
+								roughness={dType === 'french' ? 0.1 : 0.6}
+								transparent={dType === 'french'}
+								opacity={dType === 'french' ? 0.4 : 1}
+							/>
+						</T.Mesh>
+						{@const handleOff = swingLeft ? op.width - 0.1 : -(op.width - 0.1)}
+						<T.Mesh position.x={DOOR_THICK / 2 + 0.02} position.y={-doorH * 0.05} position.z={handleOff}>
+							<T.BoxGeometry args={[0.04, 0.12, 0.03]} />
+							<T.MeshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+						</T.Mesh>
+					</T.Group>
+				{:else if dType === 'double' || dType === 'bifold'}
+					{@const halfW = op.width / 2 - 0.01}
+					{@const leftTarget = isOpen ? (inward ? 1 : -1) * OPEN_ANGLE : 0}
+					{@const rightTarget = isOpen ? -(inward ? 1 : -1) * OPEN_ANGLE : 0}
+					{@const leftAngle = animatedVal(`${eKey}-L`, leftTarget)}
+					{@const rightAngle = animatedVal(`${eKey}-R`, rightTarget)}
+					<T.Group position.x={fx} position.y={yBase + doorH / 2} position.z={fz - op.width / 2}
+						rotation.y={leftAngle}>
+						<T.Mesh position.z={halfW / 2} onclick={() => toggleDoor(eKey)}>
+							<T.BoxGeometry args={[DOOR_THICK, doorH - 0.02, halfW]} />
+							<T.MeshStandardMaterial color={DOOR_COLOR} roughness={0.6} />
+						</T.Mesh>
+						<T.Mesh position.x={DOOR_THICK / 2 + 0.02} position.y={-doorH * 0.05} position.z={halfW - 0.06}>
+							<T.BoxGeometry args={[0.03, 0.1, 0.03]} />
+							<T.MeshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+						</T.Mesh>
+					</T.Group>
+					<T.Group position.x={fx} position.y={yBase + doorH / 2} position.z={fz + op.width / 2}
+						rotation.y={rightAngle}>
+						<T.Mesh position.z={-halfW / 2} onclick={() => toggleDoor(eKey)}>
+							<T.BoxGeometry args={[DOOR_THICK, doorH - 0.02, halfW]} />
+							<T.MeshStandardMaterial color={DOOR_COLOR} roughness={0.6} />
+						</T.Mesh>
+						<T.Mesh position.x={DOOR_THICK / 2 + 0.02} position.y={-doorH * 0.05} position.z={-(halfW - 0.06)}>
+							<T.BoxGeometry args={[0.03, 0.1, 0.03]} />
+							<T.MeshStandardMaterial color="#C0C0C0" metalness={0.8} roughness={0.2} />
+						</T.Mesh>
+					</T.Group>
+				{:else if dType === 'sliding'}
+					{@const slideTarget = isOpen ? op.width * 0.42 : 0}
+					{@const slideOff = animatedVal(`${eKey}-slide`, slideTarget)}
+					<T.Mesh position.x={fx - DOOR_THICK / 2} position.y={yBase + doorH / 2} position.z={fz - op.width * 0.13}>
+						<T.BoxGeometry args={[DOOR_THICK * 0.7, doorH - 0.02, op.width * 0.55]} />
+						<T.MeshStandardMaterial color="#7A5C12" roughness={0.6} />
+					</T.Mesh>
+					<T.Mesh
+						position.x={fx + DOOR_THICK / 2}
+						position.y={yBase + doorH / 2}
+						position.z={fz + op.width * 0.13 - slideOff}
+						onclick={() => toggleDoor(eKey)}
+					>
+						<T.BoxGeometry args={[DOOR_THICK * 0.7, doorH - 0.02, op.width * 0.55]} />
+						<T.MeshStandardMaterial color={DOOR_COLOR} roughness={0.6} />
+					</T.Mesh>
+				{/if}
+			{/if}
+		{/if}
+
+		<!-- 3D Window model (frame + glass + mullions) -->
+		{#if meta.window && openings.length > 0}
+			{@const op = openings[0]}
+			{@const glassH = op.topY - op.bottomY}
+			{@const glassCenterY = yBase + (op.bottomY + op.topY) / 2}
+			{@const wType = meta.window}
+			{@const FRAME_T = 0.04}
+			{@const FRAME_COLOR = '#E8E8E8'}
+			{@const GLASS_COLOR = '#93c5fd'}
+
+			{#if isHoriz}
+				{@const wx = line.x1 * CELL + op.offsetAlongWall}
+				{@const wz = line.y1 * CELL}
+
+				<!-- Window frame (4 sides) -->
+				<!-- Top rail -->
+				<T.Mesh position.x={wx} position.y={yBase + op.topY - FRAME_T / 2} position.z={wz}>
+					<T.BoxGeometry args={[op.width, FRAME_T, WALL_3D_THICK * 0.8]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+				<!-- Bottom rail (sill) -->
+				<T.Mesh position.x={wx} position.y={yBase + op.bottomY + FRAME_T / 2} position.z={wz}>
+					<T.BoxGeometry args={[op.width + 0.06, FRAME_T, WALL_3D_THICK + 0.04]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+				<!-- Left stile -->
+				<T.Mesh position.x={wx - op.width / 2 + FRAME_T / 2} position.y={glassCenterY} position.z={wz}>
+					<T.BoxGeometry args={[FRAME_T, glassH, WALL_3D_THICK * 0.8]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+				<!-- Right stile -->
+				<T.Mesh position.x={wx + op.width / 2 - FRAME_T / 2} position.y={glassCenterY} position.z={wz}>
+					<T.BoxGeometry args={[FRAME_T, glassH, WALL_3D_THICK * 0.8]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+
+				<!-- Glass pane -->
+				<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+					<T.BoxGeometry args={[op.width - FRAME_T * 2, glassH - FRAME_T * 2, 0.01]} />
+					<T.MeshStandardMaterial color={GLASS_COLOR} transparent opacity={0.3} roughness={0.05} metalness={0.1} />
+				</T.Mesh>
+
+				<!-- Type-specific mullions -->
+				{#if wType === 'fixed'}
+					<!-- Cross mullion (horizontal + vertical) -->
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.02, glassH - FRAME_T * 2, 0.03]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[op.width - FRAME_T * 2, 0.02, 0.03]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{:else if wType === 'sliding'}
+					<!-- Vertical center divider -->
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.025, glassH - FRAME_T * 2, 0.03]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{:else if wType === 'casement'}
+					<!-- Vertical center divider (two panes that open) -->
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.025, glassH - FRAME_T * 2, 0.03]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{:else if wType === 'awning'}
+					<!-- Horizontal center divider -->
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[op.width - FRAME_T * 2, 0.025, 0.03]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{/if}
+			{:else}
+				{@const wx = line.x1 * CELL}
+				{@const wz = line.y1 * CELL + op.offsetAlongWall}
+
+				<!-- Window frame (4 sides) - vertical wall -->
+				<T.Mesh position.x={wx} position.y={yBase + op.topY - FRAME_T / 2} position.z={wz}>
+					<T.BoxGeometry args={[WALL_3D_THICK * 0.8, FRAME_T, op.width]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+				<T.Mesh position.x={wx} position.y={yBase + op.bottomY + FRAME_T / 2} position.z={wz}>
+					<T.BoxGeometry args={[WALL_3D_THICK + 0.04, FRAME_T, op.width + 0.06]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+				<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz - op.width / 2 + FRAME_T / 2}>
+					<T.BoxGeometry args={[WALL_3D_THICK * 0.8, glassH, FRAME_T]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+				<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz + op.width / 2 - FRAME_T / 2}>
+					<T.BoxGeometry args={[WALL_3D_THICK * 0.8, glassH, FRAME_T]} />
+					<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+				</T.Mesh>
+
+				<!-- Glass pane -->
+				<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+					<T.BoxGeometry args={[0.01, glassH - FRAME_T * 2, op.width - FRAME_T * 2]} />
+					<T.MeshStandardMaterial color={GLASS_COLOR} transparent opacity={0.3} roughness={0.05} metalness={0.1} />
+				</T.Mesh>
+
+				<!-- Type-specific mullions -->
+				{#if wType === 'fixed'}
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.03, glassH - FRAME_T * 2, 0.02]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.03, 0.02, op.width - FRAME_T * 2]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{:else if wType === 'sliding'}
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.03, glassH - FRAME_T * 2, 0.025]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{:else if wType === 'casement'}
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.03, glassH - FRAME_T * 2, 0.025]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{:else if wType === 'awning'}
+					<T.Mesh position.x={wx} position.y={glassCenterY} position.z={wz}>
+						<T.BoxGeometry args={[0.03, 0.025, op.width - FRAME_T * 2]} />
+						<T.MeshStandardMaterial color={FRAME_COLOR} roughness={0.3} />
+					</T.Mesh>
+				{/if}
 			{/if}
 		{/if}
 	{/each}

@@ -25,6 +25,7 @@
 		open = false,
 		data,
 		editMode = false,
+		updatedAt = null,
 		form,
 		errors,
 		enhance,
@@ -34,6 +35,7 @@
 		open?: boolean;
 		data: PageData;
 		editMode?: boolean;
+		updatedAt?: string | null;
 		form: any;
 		errors: any;
 		enhance: any;
@@ -194,6 +196,7 @@
 				>
 					{#if editMode && form.id}
 						<input type="hidden" name="id" bind:value={form.id} />
+						<input type="hidden" name="_updated_at" value={updatedAt ?? ''} />
 					{/if}
 
 					<!-- Property Selection -->

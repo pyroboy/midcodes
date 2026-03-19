@@ -9,7 +9,7 @@
 	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { formatCurrency } from '$lib/utils/format';
+	import { formatCurrency, formatDate, getStatusClasses } from '$lib/utils/format';
 	import type { PenaltyBilling } from './types';
 
 	let { penalty, onClose, onUpdate } = $props<{
@@ -18,34 +18,11 @@
 		onUpdate: (penalty: PenaltyBilling) => void;
 	}>();
 
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'PAID':
-				return 'bg-green-100 text-green-800';
-			case 'PARTIAL':
-				return 'bg-blue-100 text-blue-800';
-			case 'PENDING':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'OVERDUE':
-				return 'bg-red-100 text-red-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
-
 	function getFormattedType(type: string, utilityType: string | null): string {
 		if (type === 'UTILITY' && utilityType) {
 			return `${type} (${utilityType})`;
 		}
 		return type;
-	}
-
-	function formatDate(dateStr: string) {
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
 	}
 </script>
 
@@ -72,7 +49,7 @@
 					</div>
 					<div>
 						<p class="text-sm text-gray-500">Status</p>
-						<Badge variant="outline" class={getStatusColor(penalty.status)}>
+						<Badge variant="outline" class={getStatusClasses(penalty.status)}>
 							{penalty.status}
 						</Badge>
 					</div>

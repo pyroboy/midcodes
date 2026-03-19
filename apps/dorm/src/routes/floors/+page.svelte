@@ -12,6 +12,7 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import type { FloorWithProperty } from './formSchema';
 	import { propertyStore } from '$lib/stores/property';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		floorsStore,
 		propertiesStore,
@@ -20,8 +21,17 @@
 		leaseTenantsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertFloor, optimisticDeleteFloor } from '$lib/db/optimistic-floors';
-	import { Layers, Plus, Search, Pencil, Trash2 } from 'lucide-svelte';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
+	import { Layers, Plus, Search, Pencil, Trash2, Building2 } from 'lucide-svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { toast } from 'svelte-sonner';
+
+	// Capture form data before superForm resets it (resetForm: true clears $formData before onResult)
+	let savedFormData: { id?: number; property_id: number; floor_number: number; wing?: string | null; status: string; _seq?: number } | null = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
 
 	let editMode = $state(false);
 	let showModal = $state(false);
@@ -78,33 +88,84 @@
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
-		onError: ({ result }) => {
+		onSubmit: async () => {
+			// Capture form data BEFORE superForm resets it — resetForm: true
+			// clears $formData before onResult runs, making $formData.id always undefined
+			submitSeq++;
+			savedFormData = { ...$formData, _seq: submitSeq };
+			savedEditMode = editMode;
+
+			// Close modal immediately for snappy UX
+			showModal = false;
+			toast.info(savedEditMode ? 'Saving floor...' : 'Creating floor...');
+
+			// For updates where ID is known, write to RxDB immediately
+			if (savedEditMode && savedFormData.id) {
+				rollback = await optimisticUpsertFloor({
+					id: savedFormData.id,
+					property_id: savedFormData.property_id,
+					floor_number: savedFormData.floor_number,
+					wing: savedFormData.wing,
+					status: savedFormData.status || 'ACTIVE'
+				});
+			}
+		},
+		onError: async ({ result }) => {
 			console.error('Form submission error:', {
 				error: result.error,
 				status: result.status
 			});
 			toast.error('Error saving floor');
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			bgResync('floors');
 		},
 		onResult: async ({ result }) => {
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('floors');
+				savedFormData = null;
+				return;
+			}
+
 			if (result.type === 'success') {
-				toast.success(editMode ? 'Floor updated' : 'Floor created');
-				showModal = false;
+				// Server response has the form data WITH the new ID (for creates)
+				// This is reliable — not affected by resetForm: true
+				const serverData = (result as any).data?.form?.data;
+				const fd = serverData ?? savedFormData;
+
 				editMode = false;
-				// Optimistic upsert into RxDB instead of invalidateAll
-				const d = $formData;
-				if (d.id) {
-					await optimisticUpsertFloor({
-						id: d.id,
-						property_id: d.property_id,
-						floor_number: d.floor_number,
-						wing: d.wing,
-						status: d.status || 'ACTIVE'
-					});
+				rollback = null; // Success — discard snapshot
+				toast.success(savedEditMode ? 'Floor updated' : 'Floor created');
+
+				if (fd?.id) {
+					// For creates: apply optimistic write with the real server ID
+					if (!savedEditMode) {
+						await optimisticUpsertFloor({
+							id: fd.id,
+							property_id: fd.property_id,
+							floor_number: fd.floor_number,
+							wing: fd.wing,
+							status: fd.status || 'ACTIVE'
+						});
+					}
+					// Confirm in background either way
+					bgResync('floors');
 				} else {
-					// For creates, resync to pick up the server-assigned id
-					const { resyncCollection } = await import('$lib/db/replication');
-					resyncCollection('floors');
+					// Fallback: no ID available — pull from server
+					bgResync('floors');
 				}
+				savedFormData = null;
+			} else {
+				// Non-success result (validation error, etc.) — instant rollback
+				toast.error('Failed to save floor');
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('floors');
+				savedFormData = null;
 			}
 		}
 	});
@@ -127,6 +188,7 @@
 		return floors;
 	});
 
+	let isLoading = $derived(!floorsStore.initialized);
 	let selectedFloor = $state<FloorWithProperty | null>(null);
 
 	function openAddModal() {
@@ -135,9 +197,12 @@
 		showModal = true;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	function handleFloorClick(floor: FloorWithProperty) {
 		editMode = true;
 		selectedFloor = floor;
+		editUpdatedAt = floor.updated_at ?? null;
 		reset({
 			data: {
 				id: floor.id,
@@ -164,32 +229,33 @@
 	async function proceedWithDelete() {
 		if (!floorToDelete) return;
 
-		// Optimistic: remove from RxDB immediately
-		await optimisticDeleteFloor(floorToDelete.id);
-
-		const formData = new FormData();
-		formData.append('id', floorToDelete.id.toString());
-		const response = await fetch('?/delete', {
-			method: 'POST',
-			body: formData
-		});
-
-		if (!response.ok) {
-			console.error('Failed to delete floor.', response);
-			toast.error('Failed to delete floor');
-			// Resync to restore the original state on error
-			const { resyncCollection } = await import('$lib/db/replication');
-			resyncCollection('floors');
-		} else {
-			toast.success('Floor deleted');
-		}
-
+		const targetFloor = floorToDelete;
 		isDeleteDialogOpen = false;
 		floorToDelete = null;
+
+		await bufferedMutation({
+			label: 'Delete floor',
+			collection: 'floors',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteFloor(targetFloor.id);
+			},
+			serverAction: async () => {
+				const body = new FormData();
+				body.append('id', targetFloor.id.toString());
+				const response = await fetch('?/delete', { method: 'POST', body });
+				if (!response.ok) throw new Error(`Server returned ${response.status}`);
+				return response;
+			},
+			onSuccess: async () => {
+				toast.success('Floor deleted');
+			}
+		});
 	}
 </script>
 
 <div class="container mx-auto p-4 space-y-6">
+	<SyncErrorBanner collections={['floors', 'properties', 'rental_units', 'leases', 'lease_tenants']} />
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-3">
@@ -219,10 +285,24 @@
 	</div>
 
 	<!-- Content -->
-	{#if !selectedProperty}
-		<div class="text-center py-8">
-			<p class="text-gray-500">Please select a property to view floors.</p>
+	{#if isLoading}
+		<div class="space-y-2">
+			{#each Array(4) as _, i (i)}
+				<div class="border rounded-lg p-4">
+					<div class="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4">
+						<Skeleton class="h-5 w-20" />
+						<Skeleton class="h-5 w-12" />
+						<Skeleton class="h-6 w-16 rounded-full" />
+						<div class="flex gap-2">
+							<Skeleton class="h-8 w-8" />
+							<Skeleton class="h-8 w-8" />
+						</div>
+					</div>
+				</div>
+			{/each}
 		</div>
+	{:else if !selectedProperty}
+		<EmptyState icon={Building2} title="No Property Selected" description="Select a property from the dropdown in the header to view floors." />
 	{:else if !filteredFloors.length}
 		<div class="text-center py-8">
 			<p class="text-gray-500">No floors found for this property.</p>
@@ -312,6 +392,7 @@
 		</Dialog.Header>
 		<FloorForm
 			{editMode}
+			updatedAt={editUpdatedAt}
 			form={formData}
 			{errors}
 			{enhance}

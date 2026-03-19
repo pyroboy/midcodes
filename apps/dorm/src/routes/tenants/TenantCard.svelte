@@ -13,7 +13,8 @@
 		Home
 	} from 'lucide-svelte';
 	import type { TenantResponse } from '$lib/types/tenant';
-	import { formatCurrency } from '$lib/utils/format';
+	import { formatCurrency, getStatusClasses } from '$lib/utils/format';
+	import { getStatusIcon } from '$lib/utils/status-icons';
 
 	interface Props {
 		tenant: TenantResponse;
@@ -24,16 +25,6 @@
 	let { tenant, onEdit, onDelete }: Props = $props();
 
 	let showMoreOptions = $state(false);
-
-	function getStatusColor(status: string) {
-		const colors: Record<string, string> = {
-			ACTIVE: 'bg-green-100 text-green-800 border-green-200',
-			PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-			INACTIVE: 'bg-gray-100 text-gray-800 border-gray-200',
-			BLACKLISTED: 'bg-red-100 text-red-800 border-red-200'
-		};
-		return colors[status] || colors['INACTIVE'];
-	}
 
 	function getBalanceStatus(balance: number | null | undefined): string {
 		if (!balance || balance <= 0) return 'bg-green-100 text-green-800 border-green-200';
@@ -98,8 +89,9 @@
 				{/if}
 				<div class="absolute bottom-[-10px] w-full flex justify-center">
 					<Badge
-						class={`${getStatusColor(tenant.tenant_status)} text-xs font-medium px-3 py-1.5 rounded-full border`}
+						class={`${getStatusClasses(tenant.tenant_status)} text-xs font-medium px-3 py-1.5 rounded-full border`}
 					>
+						{@const TenantStatusIcon = getStatusIcon(tenant.tenant_status)}<TenantStatusIcon class="h-3.5 w-3.5 mr-1 inline" />
 						{tenant.tenant_status}
 					</Badge>
 				</div>
@@ -147,13 +139,10 @@
                             </div>
 						</div>
 						<div class="text-right">
-							<Badge 
-								class={`text-xs px-2 py-0.5 rounded-full border ${
-									lease.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' :
-									lease.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-									'bg-gray-100 text-gray-800 border-gray-200'
-								}`}
+							<Badge
+								class={`text-xs px-2 py-0.5 rounded-full border ${getStatusClasses(lease.status)}`}
 							>
+								{@const LeaseStatusIcon = getStatusIcon(lease.status)}<LeaseStatusIcon class="h-3.5 w-3.5 mr-1 inline" />
 								{lease.status}
 							</Badge>
 						</div>

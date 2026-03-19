@@ -44,9 +44,9 @@
 				if (value) handlePropertyChange(value);
 			}}
 		>
-			<Select.Trigger class="w-[200px] text-base">
+			<Select.Trigger class="w-[200px] text-base" title={triggerContent}>
 				<!-- The content is placed directly inside the trigger, not in a Select.Value component -->
-				{triggerContent}
+				<span class="truncate">{triggerContent}</span>
 			</Select.Trigger>
 			<Select.Content>
 				<Select.Group>

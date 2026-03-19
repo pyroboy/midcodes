@@ -15,6 +15,10 @@
 		floorsStore,
 		propertiesStore
 	} from '$lib/stores/collections.svelte';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import { formatCurrency, formatDate, getStatusClasses } from '$lib/utils/format';
+	import { CreditCard, DollarSign, Hash, Wallet } from 'lucide-svelte';
 
 	type Payment = z.infer<typeof paymentSchema> & {
 		billing?: {
@@ -144,23 +148,27 @@
 		selectedPayment = undefined;
 	}
 
-	function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
-		switch (status) {
-			case 'PAID':
-				return 'default';
-			case 'PENDING':
-				return 'secondary';
-			case 'PARTIAL':
-				return 'outline';
-			case 'OVERDUE':
-				return 'destructive';
-			default:
-				return 'outline';
+	// Summary stats
+	let stats = $derived.by(() => {
+		let totalAmount = 0;
+		let count = 0;
+		const byMethod: Record<string, { count: number; total: number }> = {};
+
+		for (const p of payments) {
+			totalAmount += p.amount;
+			count += 1;
+			const method = p.method ?? 'OTHER';
+			if (!byMethod[method]) byMethod[method] = { count: 0, total: 0 };
+			byMethod[method].count += 1;
+			byMethod[method].total += p.amount;
 		}
-	}
+
+		return { totalAmount, count, byMethod };
+	});
 </script>
 
 <div class="space-y-4">
+	<SyncErrorBanner collections={['payments', 'billings', 'leases', 'rental_units', 'floors', 'properties']} />
 	{#if !showForm}
 		<div class="flex justify-between items-center">
 			<h1 class="text-2xl font-bold">Payments</h1>
@@ -175,6 +183,48 @@
 				</Button>
 			{/if}
 		</div>
+
+		<!-- Summary Stats -->
+		{#if !isLoading && payments.length > 0}
+			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+				<Card.Root>
+					<Card.Content class="flex items-center gap-3 p-4">
+						<div class="rounded-full bg-emerald-100 p-2 flex-shrink-0">
+							<DollarSign class="h-5 w-5 text-emerald-600" />
+						</div>
+						<div>
+							<p class="text-sm font-medium text-muted-foreground">Total Collected</p>
+							<p class="text-xl font-bold">{formatCurrency(stats.totalAmount)}</p>
+						</div>
+					</Card.Content>
+				</Card.Root>
+				<Card.Root>
+					<Card.Content class="flex items-center gap-3 p-4">
+						<div class="rounded-full bg-blue-100 p-2 flex-shrink-0">
+							<Hash class="h-5 w-5 text-blue-600" />
+						</div>
+						<div>
+							<p class="text-sm font-medium text-muted-foreground">Total Payments</p>
+							<p class="text-xl font-bold">{stats.count}</p>
+						</div>
+					</Card.Content>
+				</Card.Root>
+				{#each Object.entries(stats.byMethod).slice(0, 2) as [method, data]}
+					<Card.Root>
+						<Card.Content class="flex items-center gap-3 p-4">
+							<div class="rounded-full bg-purple-100 p-2 flex-shrink-0">
+								<Wallet class="h-5 w-5 text-purple-600" />
+							</div>
+							<div>
+								<p class="text-sm font-medium text-muted-foreground">{method}</p>
+								<p class="text-xl font-bold">{formatCurrency(data.total)}</p>
+								<p class="text-xs text-muted-foreground">{data.count} payment{data.count !== 1 ? 's' : ''}</p>
+							</div>
+						</Card.Content>
+					</Card.Root>
+				{/each}
+			</div>
+		{/if}
 
 		{#if isLoading}
 			<!-- Skeleton loaders -->
@@ -211,7 +261,7 @@
 						<Card.Header>
 							<Card.Title class="flex justify-between items-center">
 								{payment.billing?.lease?.name ?? 'Unknown'}
-								<Badge variant={getStatusVariant(payment.billing?.status ?? '')}>
+								<Badge class={getStatusClasses(payment.billing?.status ?? '')}>
 									{payment.billing?.status}
 								</Badge>
 							</Card.Title>
@@ -226,7 +276,7 @@
 							<div class="space-y-2">
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Amount:</span>
-									<span class="font-medium">${payment.amount}</span>
+									<span class="font-medium">{formatCurrency(payment.amount)}</span>
 								</div>
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Method:</span>
@@ -235,12 +285,12 @@
 								<div class="flex justify-between">
 									<span class="text-muted-foreground">Date:</span>
 									<span class="font-medium">
-										{new Date(payment.paid_at).toLocaleDateString()}
+										{formatDate(payment.paid_at)}
 									</span>
 								</div>
 								{#if payment.billing?.lease?.rental_unit}
 									<div class="flex justify-between">
-										<span class="text-muted-foreground">Rental_unit:</span>
+										<span class="text-muted-foreground">Unit:</span>
 										<span class="font-medium">
 											{payment.billing.lease.rental_unit.rental_unit_number}
 											{#if payment.billing.lease.rental_unit.floor}
@@ -258,7 +308,7 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="text-center py-8 text-muted-foreground">No payments found</div>
+			<EmptyState icon={CreditCard} title="No Payments" description="No payments have been recorded yet." />
 		{/if}
 	{:else}
 		<div class="flex justify-between items-center">

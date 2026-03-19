@@ -9,7 +9,7 @@
 	import type { Floor } from './formSchema';
 	import { X, Plus, Loader2 } from 'lucide-svelte';
 
-	let { data, editMode = false, form, errors, enhance, constraints, actionCreate = '?/create', actionUpdate = '?/update' } = $props();
+	let { data, editMode = false, updatedAt = null, form, errors, enhance, constraints, actionCreate = '?/create', actionUpdate = '?/update' }: { data: any; editMode?: boolean; updatedAt?: string | null; form: any; errors: any; enhance: any; constraints: any; actionCreate?: string; actionUpdate?: string } = $props();
 
 	const dispatch = createEventDispatcher();
 	let selectedProperty = $derived($propertyStore.selectedProperty);
@@ -53,6 +53,7 @@
 <form method="POST" action={editMode ? actionUpdate : actionCreate} use:enhance class="space-y-6">
 	{#if editMode}
 		<input type="hidden" name="id" value={$form.id || ''} />
+		<input type="hidden" name="_updated_at" value={updatedAt ?? ''} />
 	{/if}
 
 	<!-- Ensure property ID is submitted -->

@@ -11,6 +11,7 @@
 
 	interface Props {
 		editMode?: boolean;
+		updatedAt?: string | null;
 		form: SuperForm<z.infer<typeof propertySchema>>['form'];
 		errors: SuperForm<z.infer<typeof propertySchema>>['errors'];
 		enhance: SuperForm<z.infer<typeof propertySchema>>['enhance'];
@@ -19,7 +20,7 @@
 		actionUpdate?: string;
 	}
 
-	let { editMode = false, form, errors, enhance, constraints, actionCreate = '?/create', actionUpdate = '?/update' }: Props = $props();
+	let { editMode = false, updatedAt = null, form, errors, enhance, constraints, actionCreate = '?/create', actionUpdate = '?/update' }: Props = $props();
 
 	const dispatch = createEventDispatcher();
 
@@ -42,6 +43,7 @@
 >
 	{#if editMode && $form.id}
 		<input type="hidden" name="id" bind:value={$form.id} />
+		<input type="hidden" name="_updated_at" value={updatedAt ?? ''} />
 	{/if}
 
 	<div class="space-y-4">

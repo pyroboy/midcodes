@@ -7,6 +7,7 @@
 		DialogDescription
 	} from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
@@ -16,7 +17,8 @@
 	import { format } from 'date-fns';
 	import { leaseStatusEnum } from './formSchema';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { optimisticUpsertLease } from '$lib/db/optimistic-leases';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 
 	let {
@@ -132,6 +134,17 @@
 		});
 	});
 
+	// Unsaved changes confirmation dialog state
+	let showUnsavedDialog = $state(false);
+
+	// Track form changes to prevent accidental exits
+	let initialFormData = $state<string>('');
+	let hasUnsavedChanges = $derived.by(() => {
+		if (!open) return false;
+		const currentData = JSON.stringify(formData);
+		return initialFormData !== '' && currentData !== initialFormData;
+	});
+
 	// Validation
 	let validationErrors = $state<Record<string, string>>({});
 	let isFormValid = $state(false);
@@ -196,6 +209,12 @@
 		return formData.selectedTenants.includes(tenantId);
 	}
 
+	// Capture form data before submission (needed because form may reset before onResult)
+	let savedFormData: (typeof formData & { _seq?: number }) | null = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
+
 	// Form submission with use:enhance
 	const handleFormSubmit = () => {
 		if (!isFormValid) {
@@ -223,11 +242,30 @@
 				selectedTenants: tenantIds
 			};
 			searchTerm = '';
+
+			// Set initial form data after form is populated
+			setTimeout(() => {
+				initialFormData = JSON.stringify(formData);
+			}, 100);
 		}
 	});
+
+	// Handle modal close with unsaved changes check
+	function handleModalClose(shouldClose: boolean) {
+		if (!shouldClose && hasUnsavedChanges) {
+			showUnsavedDialog = true;
+			return;
+		}
+		onOpenChange(false);
+	}
+
+	function confirmDiscardChanges() {
+		showUnsavedDialog = false;
+		onOpenChange(false);
+	}
 </script>
 
-<Dialog {open} onOpenChange={(open) => !open && onOpenChange(false)}>
+<Dialog {open} onOpenChange={(isOpen) => !isOpen && handleModalClose(false)}>
 	<DialogContent class="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
 		<DialogHeader>
 			<div class="flex items-center gap-2">
@@ -249,18 +287,78 @@
 			method="POST"
 			action={editMode ? '?/updateLease' : '?/create'}
 			use:enhance={() => {
+				// Capture form snapshot before potential reset
+				submitSeq++;
+				savedFormData = { ...formData, _seq: submitSeq };
+				savedEditMode = editMode;
+
+				// Close modal immediately + show in-progress toast
+				onOpenChange(false);
+				toast.info(savedEditMode ? 'Saving lease...' : 'Creating lease...');
+
+				// For updates where ID is known, write optimistically right away
+				if (savedEditMode && lease?.id && savedFormData) {
+					const fd = savedFormData;
+					optimisticUpsertLease({
+						id: lease.id,
+						rental_unit_id: fd.rental_unit_id,
+						name: fd.name,
+						start_date: fd.start_date,
+						end_date: fd.end_date,
+						rent_amount: fd.rent_amount,
+						notes: fd.notes,
+						terms_month: fd.terms_month,
+						status: fd.status
+					}).then((rb) => { rollback = rb; }).catch(() => {/* non-critical */});
+				}
+
 				return async ({ result }) => {
+					// Ignore if a newer submission has already overwritten
+					if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
 					if (result.type === 'success') {
-						toast.success(editMode ? 'Lease updated successfully' : 'Lease created successfully');
-						onOpenChange(false);
-						// Use the onDataChange callback to refresh data
-						if (onDataChange) {
-							await onDataChange();
+						// Prefer server data (has real ID for creates), fall back to saved snapshot
+						const serverData = (result as any).data?.form?.data;
+						const leaseResult = (result as any).data?.lease;
+						const fd = savedFormData;
+						const leaseId = serverData?.id ?? leaseResult?.id ?? (savedEditMode ? lease?.id : null);
+
+						rollback = null; // Success — discard snapshot
+						toast.success(savedEditMode ? 'Lease updated successfully' : 'Lease created successfully');
+
+						if (leaseId && fd) {
+							// For creates: apply optimistic upsert now that we have the real server ID
+							if (!savedEditMode) {
+								optimisticUpsertLease({
+									id: leaseId,
+									rental_unit_id: fd.rental_unit_id,
+									name: fd.name,
+									start_date: fd.start_date,
+									end_date: fd.end_date,
+									rent_amount: fd.rent_amount,
+									notes: fd.notes,
+									terms_month: fd.terms_month,
+									status: fd.status
+								}).catch(() => {/* non-critical */});
+							}
 						} else {
-							await invalidateAll();
+							// Fallback: no ID available — pull from server
+							bgResync('leases');
 						}
+
+						// Also resync lease_tenants since tenant assignments changed
+						bgResync('lease_tenants');
+						savedFormData = null;
 					} else if (result.type === 'failure') {
-						toast.error(editMode ? 'Failed to update lease' : 'Failed to create lease');
+						if ((result.data as any)?.conflict) {
+							toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+						} else {
+							toast.error(savedEditMode ? 'Failed to update lease' : 'Failed to create lease');
+						}
+						// Instant rollback, then confirm with resync
+						if (rollback) { await rollback(); rollback = null; }
+						bgResync('leases');
+						savedFormData = null;
 					}
 				};
 			}}
@@ -269,6 +367,7 @@
 			<!-- Hidden form fields for server action -->
 			{#if editMode}
 				<input type="hidden" name="id" value={lease?.id} />
+				<input type="hidden" name="_updated_at" value={lease?.updated_at ?? ''} />
 			{/if}
 			<input type="hidden" name="name" bind:value={formData.name} />
 			<input type="hidden" name="start_date" bind:value={formData.start_date} />
@@ -444,7 +543,7 @@
 					/>
 				</div>
 				<div
-					class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3"
+					class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-80 overflow-y-auto border rounded-md p-3"
 				>
 					{#if filteredTenants.length === 0}
 						<div class="col-span-2 text-center py-8 text-gray-500">
@@ -506,7 +605,7 @@
 			</div>
 
 			<div class="flex justify-end gap-2 pt-4">
-				<Button type="button" variant="outline" onclick={() => onOpenChange(false)}>Cancel</Button>
+				<Button type="button" variant="outline" onclick={() => handleModalClose(false)}>Cancel</Button>
 				<Button type="submit" disabled={!isFormValid}>
 					{editMode ? 'Save Changes' : 'Create Lease'}
 				</Button>
@@ -514,3 +613,19 @@
 		</form>
 	</DialogContent>
 </Dialog>
+
+<!-- Unsaved Changes Confirmation Dialog -->
+<AlertDialog.Root bind:open={showUnsavedDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Unsaved Changes</AlertDialog.Title>
+			<AlertDialog.Description>
+				You have unsaved changes. Are you sure you want to close without saving?
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => (showUnsavedDialog = false)}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDiscardChanges}>Discard Changes</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

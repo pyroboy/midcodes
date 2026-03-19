@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
-	import { resyncAll } from '$lib/db/replication';
+	import { mutationQueue } from '$lib/stores/mutation-queue.svelte';
+	import { resyncAll, resyncCollection, pauseSync, resumeSync } from '$lib/db/replication';
+	import { getStorageTrend } from '$lib/db/storage-monitor';
 	import {
 		Dialog,
 		DialogContent,
@@ -26,12 +28,41 @@
 		Copy,
 		Check,
 		Trash2,
-		RotateCcw
+		RotateCcw,
+		ArrowLeft,
+		ArrowRight,
+		ArrowLeftRight,
+		X,
+		ChevronDown,
+		Pause,
+		Play,
+		TrendingUp,
+		TrendingDown,
+		Minus,
+		Pencil,
+		Plus
 	} from 'lucide-svelte';
+	import { page } from '$app/stores';
 	import { toast } from 'svelte-sonner';
 
 	let { open = $bindable(false) } = $props();
 	let isResyncing = $state(false);
+	// W5: Per-collection retry state
+	let resyncingCollections = $state<Set<string>>(new Set());
+
+	async function handleResyncCollection(name: string) {
+		resyncingCollections = new Set([...resyncingCollections, name]);
+		try {
+			await resyncCollection(name);
+			toast.success(`${collectionLabels[name] || name} resynced`);
+		} catch {
+			toast.error(`Failed to resync ${collectionLabels[name] || name}`);
+		} finally {
+			const next = new Set(resyncingCollections);
+			next.delete(name);
+			resyncingCollections = next;
+		}
+	}
 
 	const collectionLabels: Record<string, string> = {
 		tenants: 'Tenants',
@@ -47,7 +78,8 @@
 		payment_allocations: 'Payment Allocations',
 		expenses: 'Expenses',
 		budgets: 'Budgets',
-		penalty_configs: 'Penalty Rules'
+		penalty_configs: 'Penalty Rules',
+		floor_layout_items: 'Floor Plan Items'
 	};
 
 	function getStatusIcon(status: string) {
@@ -134,6 +166,23 @@
 		return Array.from(grouped.values());
 	});
 
+	let errorCollectionsList = $derived(
+		syncStatus.collections.filter((c) => c.status === 'error')
+	);
+	let isRetryingAllFailed = $state(false);
+
+	async function handleRetryAllFailed() {
+		isRetryingAllFailed = true;
+		try {
+			await Promise.all(errorCollectionsList.map((c) => resyncCollection(c.name)));
+			toast.success(`Retried ${errorCollectionsList.length} failed collection(s)`);
+		} catch {
+			toast.error('Some retries failed');
+		} finally {
+			isRetryingAllFailed = false;
+		}
+	}
+
 	async function handleResyncAll() {
 		isResyncing = true;
 		try {
@@ -156,10 +205,40 @@
 
 	let activeTab = $state<'collections' | 'logs' | 'system'>('collections');
 	let copied = $state(false);
+	let expandedCollection = $state<string | null>(null);
+
+	// Live "since" timer — only ticks when modal is open
+	let now = $state(Date.now());
+	$effect(() => {
+		if (!open) return;
+		now = Date.now(); // immediate update on open
+		const interval = setInterval(() => { now = Date.now(); }, 30000);
+		return () => clearInterval(interval);
+	});
+
+	let lastNeonAge = $derived.by(() => {
+		const ts = syncStatus.neonUsage.lastInteraction?.timestamp;
+		if (!ts) return null;
+		const seconds = Math.floor((now - ts) / 1000);
+		if (seconds < 60) return 'just now';
+		if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+		if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+		return `${Math.floor(seconds / 86400)}d ago`;
+	});
+
+	let lastNeonLabel = $derived.by(() => {
+		const last = syncStatus.neonUsage.lastInteraction;
+		if (!last) return '';
+		if (last.type === 'health') return 'health check';
+		return `${last.type}: ${last.collection}`;
+	});
 
 	// System diagnostics
 	let storageEstimate = $state<{ usage: string; quota: string; percent: string } | null>(null);
 	let onlineStatus = $state(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+	// B3: Storage usage trend
+	let storageTrend = $state<'growing' | 'stable' | 'shrinking' | null>(null);
 
 	// Update online status reactively
 	if (typeof window !== 'undefined') {
@@ -175,6 +254,30 @@
 				const percent = est.usage && est.quota ? ((est.usage / est.quota) * 100).toFixed(1) : '?';
 				storageEstimate = { usage: `${usage} MB`, quota: `${quota} MB`, percent: `${percent}%` };
 			});
+			// B3: Compute storage trend when modal opens
+			storageTrend = getStorageTrend();
+		}
+	});
+
+	// Fetch real Neon billing when System tab opens
+	$effect(() => {
+		if (open && activeTab === 'system') {
+			syncStatus.fetchNeonBilling();
+		}
+	});
+
+	// Flow direction — uses single source of truth from syncStatus.statusLabel
+	let flowArrow = $derived.by(() => {
+		const s = syncStatus.statusLabel;
+		switch (s.state) {
+			case 'paused': return { icon: Pause, label: s.label, color: 'text-amber-500', animate: false };
+			case 'in-sync': return { icon: CheckCircle, label: s.label, color: 'text-emerald-500', animate: false };
+			case 'syncing': return { icon: ArrowLeft, label: s.label, color: 'text-blue-500', animate: true };
+			case 'saving': return { icon: ArrowRight, label: s.label, color: 'text-amber-500', animate: true };
+			case 'error': return { icon: XCircle, label: s.label, color: 'text-red-500', animate: false };
+			case 'errors': return { icon: AlertCircle, label: s.label, color: 'text-amber-500', animate: false };
+			case 'unsaved': return { icon: Circle, label: s.label, color: 'text-orange-500', animate: false };
+			default: return { icon: Circle, label: s.label, color: 'text-muted-foreground/50', animate: false };
 		}
 	});
 
@@ -200,29 +303,79 @@
 	}
 
 	async function copyLogs() {
+		const flowLabels: Record<string, string> = {
+			pull: 'Neon → IndexedDB',
+			push: 'IndexedDB → Neon',
+			error: 'disconnected',
+			idle: 'idle'
+		};
+		const errCollections = syncStatus.collections.filter((c) => c.status === 'error');
 		const lines = [
 			`Dorm Sync Diagnostics — ${new Date().toLocaleString()}`,
 			``,
-			`=== System ===`,
-			`RxDB: ${syncStatus.rxdbHealth}${syncStatus.rxdbError ? ` (${syncStatus.rxdbError})` : ''}`,
-			`Neon: ${syncStatus.neonHealth}${syncStatus.neonLatency ? ` ${syncStatus.neonLatency}ms` : ''}${syncStatus.neonError ? ` (${syncStatus.neonError})` : ''}`,
-			`Phase: ${syncStatus.phase} — ${syncStatus.syncedCount}/${syncStatus.totalCount} synced`,
-			`Total cached docs: ${syncStatus.totalDocs}`,
+			`=== Environment ===`,
+			`Route: ${$page.url.pathname}`,
+			`User-Agent: ${navigator.userAgent}`,
 			`Network: ${navigator.onLine ? 'online' : 'offline'}`,
-			`Last sync: ${syncStatus.dataAge || 'never'}`,
+			`RxDB: v${syncStatus.rxdbVersion || 'unknown'}`,
+			`App: v${syncStatus.appVersion}`,
 			...(storageEstimate ? [`Storage: ${storageEstimate.usage} / ${storageEstimate.quota} (${storageEstimate.percent})`] : []),
+			`Multi-tab: ${typeof BroadcastChannel !== 'undefined' ? 'supported' : 'unavailable'}`,
+			``,
+			`=== System ===`,
+			`RxDB: ${syncStatus.rxdbHealth}${syncStatus.rxdbError ? ` — ${syncStatus.rxdbError}` : ''}`,
+			`Neon: ${syncStatus.neonHealth}${syncStatus.neonLatency ? ` (${syncStatus.neonLatency}ms)` : ''}${syncStatus.neonError ? ` — ${syncStatus.neonError}` : ''}`,
+			`Phase: ${syncStatus.phase} — ${syncStatus.syncedCount}/${syncStatus.totalCount} synced`,
+			`Flow: ${syncStatus.flowDirection} (${flowLabels[syncStatus.flowDirection] || 'unknown'})`,
+			`Pending mutations: ${syncStatus.pendingMutations}`,
+			`Paused: ${syncStatus.paused ? 'yes' : 'no'}`,
+			`Total cached docs: ${syncStatus.totalDocs}`,
+			`Last sync: ${syncStatus.dataAge || 'never'}`,
 			`Schema: v1 (14 collections)`,
 			`Replication: pull-only, batch 200, checkpoint-based`,
 			``,
+			`=== Neon Usage (Session) ===`,
+			`Last interaction: ${syncStatus.neonUsage.lastInteraction ? `${lastNeonAge} (${lastNeonLabel})` : 'none'}`,
+			`Session queries: ${syncStatus.totalNeonQueries} (${syncStatus.neonUsage.pullCount} pulls + ${syncStatus.neonUsage.pushCount} pushes + ${syncStatus.neonUsage.healthCheckCount} health)`,
+			`Docs received: ${syncStatus.neonUsage.totalDocsReceived.toLocaleString()}`,
+			`Data received: ~${syncStatus.estimatedTransferKB.toFixed(1)} KB`,
+			`Est. compute: ~${syncStatus.estimatedComputeSeconds.toFixed(2)}s`,
+			`Session started: ${new Date(syncStatus.neonUsage.sessionStartedAt).toLocaleString()}`,
+			``,
+			...(syncStatus.neonBilling ? [
+				`=== Neon Billing (This Period) ===`,
+				`Compute: ${syncStatus.neonBilling.compute.used} / ${syncStatus.neonBilling.compute.limit} ${syncStatus.neonBilling.compute.unit}`,
+				`Storage: ${syncStatus.neonBilling.storage.used} / ${syncStatus.neonBilling.storage.limit} ${syncStatus.neonBilling.storage.unit}`,
+				`Transfer: ${syncStatus.neonBilling.transfer.used} / ${syncStatus.neonBilling.transfer.limit} ${syncStatus.neonBilling.transfer.unit}`,
+				``
+			] : []),
 			`=== Collections ===`,
 			...syncStatus.collections.map((c) => {
 				const parts = [`  ${c.name}: ${c.status}`];
 				if (c.docCount > 0) parts.push(`${c.docCount} docs`);
 				if (c.lastSyncedAt) parts.push(`synced ${formatTime(c.lastSyncedAt)}`);
-				if (c.parsedError) parts.push(`ERROR [${c.parsedError.code}] ${c.parsedError.summary}`);
+				if (c.parsedError) {
+					parts.push(`ERROR [${c.parsedError.code || '?'}] ${c.parsedError.summary}`);
+					if (c.parsedError.url) parts.push(`docs: ${c.parsedError.url}`);
+				}
+				if (c.error && c.error !== c.parsedError?.summary) {
+					parts.push(`raw: ${c.error.slice(0, 300)}`);
+				}
 				return parts.join(' | ');
 			}),
-			``,
+			...(errCollections.length > 0 ? [
+				``,
+				`=== Error Details (${errCollections.length} failed) ===`,
+				...errCollections.flatMap((c) => [
+					`  [${c.name}]`,
+					`    Code: ${c.parsedError?.code || 'none'}`,
+					`    Summary: ${c.parsedError?.summary || 'unknown'}`,
+					`    RxDB error: ${c.parsedError?.isRxdb ? 'yes' : 'no'}`,
+					...(c.parsedError?.url ? [`    Docs: ${c.parsedError.url}`] : []),
+					...(c.error ? [`    Raw: ${c.error.slice(0, 500)}`] : []),
+					``
+				])
+			] : []),
 			`=== Log (${syncStatus.logs.length} entries) ===`,
 			...syncStatus.logs.map((l) => `[${l.time}] ${l.level.toUpperCase().padEnd(7)} ${l.message}`)
 		];
@@ -246,7 +399,7 @@
 
 		<!-- Service Health -->
 		<div class="flex items-center justify-between py-3 px-4 bg-muted/30 rounded-lg flex-shrink-0">
-			<div class="flex items-center gap-4">
+			<div class="flex items-center gap-2.5">
 				{#if true}
 					{@const RxIcon = getHealthIcon(syncStatus.rxdbHealth)}
 					<div class="flex items-center gap-1.5">
@@ -255,13 +408,19 @@
 						<span class="text-sm font-medium">IndexedDB</span>
 					</div>
 				{/if}
-				<span class="text-muted-foreground">→</span>
+				{#if true}
+					{@const FlowIcon = flowArrow.icon}
+					<div class="flex flex-col items-center min-w-[48px]">
+						<FlowIcon class="w-4 h-4 {flowArrow.color} {flowArrow.animate ? 'animate-pulse' : ''}" />
+						<span class="text-[9px] {flowArrow.color} leading-none mt-0.5">{flowArrow.label}</span>
+					</div>
+				{/if}
 				{#if true}
 					{@const NeonIcon = getHealthIcon(syncStatus.neonHealth)}
 					<div class="flex items-center gap-1.5">
-						<NeonIcon class="w-3.5 h-3.5 {getHealthColor(syncStatus.neonHealth)} {syncStatus.neonHealth === 'checking' ? 'animate-spin' : ''}" />
 						<Cloud class="w-4 h-4 text-muted-foreground" />
 						<span class="text-sm font-medium">Neon</span>
+						<NeonIcon class="w-3.5 h-3.5 {getHealthColor(syncStatus.neonHealth)} {syncStatus.neonHealth === 'checking' ? 'animate-spin' : ''}" />
 						{#if syncStatus.neonLatency !== null && syncStatus.neonHealth === 'ok'}
 							<span class="text-[10px] text-muted-foreground tabular-nums">{syncStatus.neonLatency}ms</span>
 						{/if}
@@ -269,14 +428,103 @@
 				{/if}
 			</div>
 			<div class="flex items-center gap-2">
+				{#if syncStatus.paused}
+					<Badge variant="outline" class="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600">Paused</Badge>
+				{/if}
 				<Badge variant={syncStatus.phase === 'complete' && !syncStatus.hasErrors ? 'secondary' : syncStatus.phase === 'error' ? 'destructive' : 'default'}>
 					{syncStatus.syncedCount}/{syncStatus.totalCount} synced
 				</Badge>
-				<Button variant="ghost" size="sm" onclick={handleResyncAll} disabled={isResyncing} class="h-7 px-2">
+				<!-- C1: Pause/Resume toggle -->
+				<Button
+					variant="ghost"
+					size="sm"
+					onclick={() => syncStatus.paused ? resumeSync() : pauseSync()}
+					class="h-7 px-2"
+					title={syncStatus.paused ? 'Resume sync' : 'Pause sync'}
+				>
+					{#if syncStatus.paused}
+						<Play class="w-3.5 h-3.5 text-emerald-500" />
+					{:else}
+						<Pause class="w-3.5 h-3.5" />
+					{/if}
+				</Button>
+				<Button variant="ghost" size="sm" onclick={handleResyncAll} disabled={isResyncing || syncStatus.paused} class="h-7 px-2">
 					<RefreshCw class="w-3.5 h-3.5 {isResyncing ? 'animate-spin' : ''}" />
 				</Button>
 			</div>
 		</div>
+
+		<!-- "Since" indicator — shows when no Neon interaction for >5 min -->
+		{#if syncStatus.neonUsage.lastInteraction && lastNeonAge && lastNeonAge !== 'just now' && !lastNeonAge.includes('just')}
+			{@const sinceSeconds = Math.floor((now - syncStatus.neonUsage.lastInteraction.timestamp) / 1000)}
+			{#if sinceSeconds >= 300}
+				<div class="text-[10px] text-muted-foreground text-center -mt-1">
+					No Neon push/pull since {lastNeonAge}
+				</div>
+			{/if}
+		{/if}
+
+		<!-- Pending Mutations Queue -->
+		{#if mutationQueue.items.length > 0}
+			<div class="flex-shrink-0 space-y-1">
+				<div class="flex items-center justify-between">
+					<span class="text-xs font-medium text-muted-foreground">
+						Pending Updates ({mutationQueue.items.length}){#if mutationQueue.paused} <Badge variant="outline" class="text-[10px] px-1 py-0 border-amber-300 text-amber-600 ml-1">paused</Badge>{/if}
+					</span>
+					{#if mutationQueue.items.some((m) => m.status === 'confirmed')}
+						<button
+							onclick={() => mutationQueue.clearConfirmed()}
+							class="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+						>
+							Clear confirmed
+						</button>
+					{/if}
+				</div>
+				{#each mutationQueue.items as mutation (mutation.id)}
+					<div class="flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-md">
+						<!-- Type icon -->
+						{#if mutation.type === 'update'}
+							<Pencil class="w-3 h-3 text-blue-500 flex-shrink-0" />
+						{:else if mutation.type === 'create'}
+							<Plus class="w-3 h-3 text-emerald-500 flex-shrink-0" />
+						{:else}
+							<Trash2 class="w-3 h-3 text-red-500 flex-shrink-0" />
+						{/if}
+						<!-- Label -->
+						<span class="text-xs truncate flex-1">{mutation.label}</span>
+						<!-- Status badge -->
+						{#if mutation.status === 'queued'}
+							<Badge variant="outline" class="text-[10px] px-1.5 py-0">queued</Badge>
+						{:else if mutation.status === 'syncing'}
+							<Badge variant="default" class="text-[10px] px-1.5 py-0 animate-pulse">syncing</Badge>
+						{:else if mutation.status === 'confirmed'}
+							<Badge variant="secondary" class="text-[10px] px-1.5 py-0 text-emerald-600">confirmed</Badge>
+						{:else if mutation.status === 'failed'}
+							<Badge variant="destructive" class="text-[10px] px-1.5 py-0">failed</Badge>
+							<Button
+								variant="ghost"
+								size="sm"
+								onclick={() => mutationQueue.retry(mutation.id)}
+								class="h-5 px-1.5"
+								title="Retry"
+							>
+								<RotateCcw class="w-3 h-3" />
+							</Button>
+						{/if}
+						<!-- Dismiss -->
+						{#if mutation.status === 'confirmed' || mutation.status === 'failed'}
+							<button
+								onclick={() => mutationQueue.dismiss(mutation.id)}
+								class="text-muted-foreground hover:text-foreground cursor-pointer"
+								title="Dismiss"
+							>
+								<X class="w-3 h-3" />
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- Error Summary (deduplicated by code) -->
 		{#if errorSummary.length > 0 || (syncStatus.rxdbHealth === 'error' && syncStatus.rxdbError) || (syncStatus.neonHealth === 'error' && syncStatus.neonError)}
@@ -358,26 +606,114 @@
 		<!-- Tab content — min-h-0 is critical for flex overflow scroll -->
 		<div class="min-h-0 flex-1 overflow-y-auto pr-1">
 			{#if activeTab === 'collections'}
-				<div class="space-y-1">
+				{#if errorCollectionsList.length > 1}
+					<div class="flex justify-end px-3 py-1.5">
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 text-[11px] gap-1"
+							onclick={handleRetryAllFailed}
+							disabled={isRetryingAllFailed}
+						>
+							<RefreshCw class="w-3 h-3 {isRetryingAllFailed ? 'animate-spin' : ''}" />
+							Retry all failed ({errorCollectionsList.length})
+						</Button>
+					</div>
+				{/if}
+				<div class="space-y-0.5">
 					{#each syncStatus.collections as col (col.name)}
 						{@const Icon = getStatusIcon(col.status)}
-						<div class="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 transition-colors">
-							<div class="flex items-center gap-2.5 min-w-0">
-								<Icon class="w-4 h-4 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
-								<span class="text-sm truncate">{collectionLabels[col.name] || col.name}</span>
-							</div>
-							<div class="flex items-center gap-2 flex-shrink-0">
-								{#if col.parsedError?.code}
-									<Badge variant="outline" class="text-[10px] px-1.5 py-0 font-mono border-red-300 text-red-600">{col.parsedError.code}</Badge>
-								{:else if col.error}
-									<span class="text-xs text-red-500 max-w-[100px] truncate" title={col.error}>{col.error}</span>
-								{:else if col.lastSyncedAt}
-									<span class="text-xs text-muted-foreground tabular-nums">{formatTime(col.lastSyncedAt)}</span>
-								{/if}
-								<Badge variant={getBadgeVariant(col.status)} class="text-[10px] px-1.5 py-0">
-									{col.status}
-								</Badge>
-							</div>
+						{@const isExpanded = expandedCollection === col.name}
+						{@const hasError = col.status === 'error' && (col.parsedError || col.error)}
+						<div>
+							<button
+								type="button"
+								onclick={() => expandedCollection = isExpanded ? null : col.name}
+								class="w-full flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 transition-colors cursor-pointer text-left"
+							>
+								<div class="flex items-center gap-2.5 min-w-0">
+									<Icon class="w-4 h-4 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
+									<span class="text-sm truncate">{collectionLabels[col.name] || col.name}</span>
+								</div>
+								<div class="flex items-center gap-2 flex-shrink-0">
+									{#if col.parsedError?.code}
+										<Badge variant="outline" class="text-[10px] px-1.5 py-0 font-mono border-red-300 text-red-600">{col.parsedError.code}</Badge>
+									{:else if col.lastSyncedAt && col.status !== 'error'}
+										<span class="text-xs text-muted-foreground tabular-nums">{formatTime(col.lastSyncedAt)}</span>
+									{/if}
+									{#if col.status === 'syncing' && (syncStatus.pulledDocs[col.name] || 0) > 0}
+										<!-- W12: Show pulled doc count during sync -->
+										<span class="text-[10px] text-blue-500 tabular-nums font-medium">↓ {syncStatus.pulledDocs[col.name]}</span>
+									{:else if col.docCount > 0}
+										<span class="text-[10px] text-muted-foreground tabular-nums">{col.docCount}</span>
+									{/if}
+									<Badge variant={getBadgeVariant(col.status)} class="text-[10px] px-1.5 py-0">
+										{col.status}
+									</Badge>
+									{#if col.status === 'error'}
+										<!-- W5: Per-collection retry button -->
+										<button
+											onclick={(e) => { e.stopPropagation(); handleResyncCollection(col.name); }}
+											disabled={resyncingCollections.has(col.name)}
+											class="p-0.5 rounded hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50"
+											title="Retry {collectionLabels[col.name] || col.name}"
+										>
+											<RefreshCw class="w-3 h-3 text-red-500 hover:text-red-700 {resyncingCollections.has(col.name) ? 'animate-spin' : ''}" />
+										</button>
+									{/if}
+									{#if hasError}
+										<ChevronDown class="w-3 h-3 text-muted-foreground transition-transform {isExpanded ? 'rotate-180' : ''}" />
+									{/if}
+								</div>
+							</button>
+							{#if isExpanded && hasError}
+								<div class="mx-3 mb-2 px-3 py-2 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800 space-y-1.5">
+									{#if col.parsedError}
+										<div class="flex items-start gap-2">
+											<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">Code</span>
+											<div class="flex items-center gap-1.5">
+												<code class="text-xs font-mono text-red-600 dark:text-red-400">{col.parsedError.code || 'none'}</code>
+												{#if col.parsedError.isRxdb}
+													<Badge variant="outline" class="text-[9px] px-1 py-0 border-red-300 text-red-500">RxDB</Badge>
+												{:else}
+													<Badge variant="outline" class="text-[9px] px-1 py-0 border-amber-300 text-amber-600">HTTP</Badge>
+												{/if}
+											</div>
+										</div>
+										<div class="flex items-start gap-2">
+											<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">What</span>
+											<span class="text-xs text-red-700 dark:text-red-300">{col.parsedError.summary}</span>
+										</div>
+										{#if col.parsedError.url}
+											<div class="flex items-start gap-2">
+												<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">Docs</span>
+												<a href={col.parsedError.url} target="_blank" rel="noopener" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+													{col.parsedError.url}
+													<ExternalLink class="w-3 h-3" />
+												</a>
+											</div>
+										{/if}
+									{/if}
+									{#if col.error}
+										<div class="flex items-start gap-2">
+											<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">Raw</span>
+											<pre class="text-[10px] text-red-600/80 dark:text-red-400/80 font-mono break-all whitespace-pre-wrap">{col.error}</pre>
+										</div>
+									{/if}
+								</div>
+							{/if}
+							{#if isExpanded && !hasError}
+								<div class="mx-3 mb-2 px-3 py-2 bg-muted/20 rounded-md space-y-1">
+									<div class="flex items-start gap-2">
+										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">Docs</span>
+										<span class="text-xs tabular-nums">{col.docCount.toLocaleString()}</span>
+									</div>
+									<div class="flex items-start gap-2">
+										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">Synced</span>
+										<span class="text-xs">{col.lastSyncedAt ? formatTime(col.lastSyncedAt) : 'never'}</span>
+									</div>
+								</div>
+							{/if}
 						</div>
 					{/each}
 				</div>
@@ -394,7 +730,7 @@
 							<div class="flex items-start gap-2 py-1.5 px-3 rounded-md hover:bg-muted/20 transition-colors">
 								<LogIcon class="w-3.5 h-3.5 mt-0.5 flex-shrink-0 {getLogColor(log.level)}" />
 								<span class="text-xs text-muted-foreground tabular-nums whitespace-nowrap">{log.time}</span>
-								<span class="text-xs break-all {log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-600' : 'text-foreground'}">{log.message}</span>
+								<span class="text-xs break-all {log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-600' : 'text-foreground'}" title={log.message}>{log.message}</span>
 							</div>
 						{/each}
 					</div>
@@ -417,6 +753,14 @@
 							<div class="flex justify-between text-xs">
 								<span class="text-muted-foreground">Schema Version</span>
 								<span>v1</span>
+							</div>
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">RxDB Version</span>
+								<span>{syncStatus.rxdbVersion ? `v${syncStatus.rxdbVersion}` : '—'}</span>
+							</div>
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">App Version</span>
+								<span>v{syncStatus.appVersion}</span>
 							</div>
 							<div class="flex justify-between text-xs">
 								<span class="text-muted-foreground">Collections</span>
@@ -462,6 +806,98 @@
 									<span class="text-muted-foreground">Error</span>
 									<span class="text-red-500 truncate max-w-[200px]" title={syncStatus.neonError}>{syncStatus.neonError}</span>
 								</div>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Neon Usage (Session) -->
+					<div class="space-y-1.5">
+						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Neon Usage (Session)</h4>
+						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">Last Interaction</span>
+								{#if syncStatus.neonUsage.lastInteraction}
+									<span>{lastNeonAge} ({lastNeonLabel})</span>
+								{:else}
+									<span class="text-muted-foreground">none</span>
+								{/if}
+							</div>
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">Session Queries</span>
+								<span class="tabular-nums">{syncStatus.totalNeonQueries} ({syncStatus.neonUsage.pullCount} pulls + {syncStatus.neonUsage.pushCount} pushes + {syncStatus.neonUsage.healthCheckCount} health)</span>
+							</div>
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">Docs Received</span>
+								<span class="tabular-nums">{syncStatus.neonUsage.totalDocsReceived.toLocaleString()}</span>
+							</div>
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">Data Received</span>
+								<span class="tabular-nums">~{syncStatus.estimatedTransferKB.toFixed(1)} KB</span>
+							</div>
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">Est. Compute</span>
+								<span class="tabular-nums">~{syncStatus.estimatedComputeSeconds.toFixed(2)}s</span>
+							</div>
+						</div>
+					</div>
+
+					<!-- Neon Billing (Real — from Management API) -->
+					<div class="space-y-1.5">
+						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Neon Billing (This Period)</h4>
+						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1.5">
+							{#if syncStatus.neonBillingLoading}
+								<div class="flex items-center gap-2 text-xs text-muted-foreground">
+									<Loader2 class="w-3 h-3 animate-spin" />
+									<span>Fetching billing data...</span>
+								</div>
+							{:else if syncStatus.neonBillingError}
+								<div class="text-xs text-red-500">{syncStatus.neonBillingError}</div>
+							{:else if syncStatus.neonBilling}
+								{@const b = syncStatus.neonBilling}
+								<!-- Compute -->
+								<div class="space-y-0.5">
+									<div class="flex justify-between text-xs">
+										<span class="text-muted-foreground">Compute</span>
+										<span class="tabular-nums font-medium">{b.compute.used} / {b.compute.limit} {b.compute.unit}</span>
+									</div>
+									<div class="w-full bg-muted rounded-full h-1.5">
+										<div
+											class="h-1.5 rounded-full transition-all {(b.compute.used / b.compute.limit) > 0.9 ? 'bg-red-500' : (b.compute.used / b.compute.limit) > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'}"
+											style="width: {Math.min((b.compute.used / b.compute.limit) * 100, 100)}%"
+										></div>
+									</div>
+								</div>
+								<!-- Storage -->
+								<div class="space-y-0.5">
+									<div class="flex justify-between text-xs">
+										<span class="text-muted-foreground">Storage</span>
+										<span class="tabular-nums font-medium">{b.storage.used} / {b.storage.limit} {b.storage.unit}</span>
+									</div>
+									<div class="w-full bg-muted rounded-full h-1.5">
+										<div
+											class="h-1.5 rounded-full transition-all {(b.storage.used / b.storage.limit) > 0.9 ? 'bg-red-500' : (b.storage.used / b.storage.limit) > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'}"
+											style="width: {Math.min((b.storage.used / b.storage.limit) * 100, 100)}%"
+										></div>
+									</div>
+								</div>
+								<!-- Network Transfer -->
+								<div class="space-y-0.5">
+									<div class="flex justify-between text-xs">
+										<span class="text-muted-foreground">Network Transfer</span>
+										<span class="tabular-nums font-medium">{b.transfer.used} / {b.transfer.limit} {b.transfer.unit}</span>
+									</div>
+									<div class="w-full bg-muted rounded-full h-1.5">
+										<div
+											class="h-1.5 rounded-full transition-all {(b.transfer.used / b.transfer.limit) > 0.9 ? 'bg-red-500' : (b.transfer.used / b.transfer.limit) > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'}"
+											style="width: {Math.min((b.transfer.used / b.transfer.limit) * 100, 100)}%"
+										></div>
+									</div>
+								</div>
+								<div class="text-[10px] text-muted-foreground text-right">
+									Cached {new Date(b.fetchedAt).toLocaleTimeString()} · refreshes on next open after 5 min
+								</div>
+							{:else}
+								<div class="text-xs text-muted-foreground">No billing data yet</div>
 							{/if}
 						</div>
 					</div>
@@ -513,6 +949,23 @@
 										class="h-1.5 rounded-full transition-all {parseFloat(storageEstimate.percent) > 90 ? 'bg-red-500' : parseFloat(storageEstimate.percent) > 70 ? 'bg-amber-500' : 'bg-emerald-500'}"
 										style="width: {Math.min(parseFloat(storageEstimate.percent), 100)}%"
 									></div>
+								</div>
+							{/if}
+							{#if storageTrend}
+								<div class="flex justify-between text-xs">
+									<span class="text-muted-foreground">Storage Trend</span>
+									<span class="flex items-center gap-1">
+										{#if storageTrend === 'growing'}
+											<TrendingUp class="w-3 h-3 text-amber-500" />
+											<span class="text-amber-500">Growing</span>
+										{:else if storageTrend === 'shrinking'}
+											<TrendingDown class="w-3 h-3 text-emerald-500" />
+											<span class="text-emerald-500">Shrinking</span>
+										{:else}
+											<Minus class="w-3 h-3 text-muted-foreground" />
+											<span>Stable</span>
+										{/if}
+									</span>
 								</div>
 							{/if}
 							<div class="flex justify-between text-xs">

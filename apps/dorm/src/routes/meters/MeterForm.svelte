@@ -70,7 +70,11 @@
 		actionDelete?: string;
 	}
 
-	let { data, editMode = false, form, errors, enhance, constraints, submitting, actionCreate = '?/create', actionUpdate = '?/update', actionDelete = '?/delete' }: Props & ActionProps = $props();
+	interface ExtraProps {
+		updatedAt?: string | null;
+	}
+
+	let { data, editMode = false, updatedAt = null, form, errors, enhance, constraints, submitting, actionCreate = '?/create', actionUpdate = '?/update', actionDelete = '?/delete' }: Props & ActionProps & ExtraProps = $props();
 
 	const dispatch = createEventDispatcher<{
 		meterAdded: void;
@@ -189,6 +193,9 @@
 <form method="POST" action={editMode ? actionUpdate : actionCreate} use:enhance class="space-y-3">
 	{#if $form.id}
 		<input type="hidden" name="id" value={$form.id} />
+		{#if editMode}
+			<input type="hidden" name="_updated_at" value={updatedAt ?? ''} />
+		{/if}
 	{/if}
 
 	<div>

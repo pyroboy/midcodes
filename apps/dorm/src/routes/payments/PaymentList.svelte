@@ -10,6 +10,7 @@
 		CardTitle
 	} from '$lib/components/ui/card';
 	import { createEventDispatcher } from 'svelte';
+	import { getStatusClasses } from '$lib/utils/format';
 
 	interface Props {
 		payments?: any[];
@@ -35,37 +36,6 @@
 		}
 	}
 
-	function getStatusBadgeVariant(
-		status: string
-	): 'default' | 'destructive' | 'outline' | 'secondary' {
-		switch (status) {
-			case 'PAID':
-				return 'default';
-			case 'PARTIAL':
-				return 'secondary';
-			case 'PENDING':
-				return 'outline';
-			case 'OVERDUE':
-				return 'destructive';
-			default:
-				return 'outline';
-		}
-	}
-
-	function getStatusClass(status: string): string {
-		switch (status) {
-			case 'PAID':
-				return 'bg-green-50 border-green-200';
-			case 'PARTIAL':
-				return 'bg-blue-50 border-blue-200';
-			case 'PENDING':
-				return 'bg-yellow-50 border-yellow-200';
-			case 'OVERDUE':
-				return 'bg-red-50 border-red-200';
-			default:
-				return 'bg-gray-50 border-gray-200';
-		}
-	}
 
 	function formatDate(date: string): string {
 		return new Date(date).toLocaleString();
@@ -81,7 +51,7 @@
 
 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 	{#each payments as payment}
-		<Card class="w-full {getStatusClass(payment.billing?.status)} transition-colors duration-200">
+		<Card class="w-full {getStatusClasses(payment.billing?.status ?? '')} transition-colors duration-200">
 			<CardHeader>
 				<div class="flex items-center justify-between">
 					<CardTitle class="text-lg">
@@ -106,7 +76,7 @@
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">Status:</span>
-						<Badge variant={getStatusBadgeVariant(payment.billing.status)}>
+						<Badge class={getStatusClasses(payment.billing.status)}>
 							{payment.billing.status}
 						</Badge>
 					</div>

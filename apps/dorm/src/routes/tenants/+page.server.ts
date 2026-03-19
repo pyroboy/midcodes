@@ -12,6 +12,7 @@ import { cache, cacheKeys } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import { tenants } from '$lib/server/schema';
 import { eq, and, ne, isNull, ilike } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 // Base tenant insert type
 type TenantInsertBase = {
@@ -135,11 +136,14 @@ export const actions: Actions = {
 
 		cache.delete(cacheKeys.tenants());
 
+		form.data.id = newTenantId;
 		return { form, tenantId: newTenantId };
 	},
 
 	update: async ({ request }: RequestEvent) => {
-		const form = await superValidate(request, zod(tenantFormSchema));
+		const rawFormData = await request.formData();
+		const lockTs = extractLockTimestamp(rawFormData);
+		const form = await superValidate(rawFormData, zod(tenantFormSchema));
 		if (!form.valid) {
 			console.error('Form validation failed:', form.errors);
 			return fail(400, { form });
@@ -213,23 +217,27 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db
-				.update(tenants)
-				.set({
-					name: form.data.name,
-					contactNumber: form.data.contact_number || null,
-					email:
-						form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
-					address: form.data.address ?? null,
-					tenantStatus: form.data.tenant_status,
-					emergencyContact: parsedEmergencyContact,
-					updatedAt: new Date(),
-					profilePictureUrl: form.data.profile_picture_url || null,
-					schoolOrWorkplace: form.data.school_or_workplace ?? null,
-					facebookName: form.data.facebook_name ?? null,
-					birthday: form.data.birthday ?? null
-				})
-				.where(eq(tenants.id, form.data.id!));
+			const setData = {
+				name: form.data.name,
+				contactNumber: form.data.contact_number || null,
+				email:
+					form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
+				address: form.data.address ?? null,
+				tenantStatus: form.data.tenant_status,
+				emergencyContact: parsedEmergencyContact,
+				updatedAt: new Date(),
+				profilePictureUrl: form.data.profile_picture_url || null,
+				schoolOrWorkplace: form.data.school_or_workplace ?? null,
+				facebookName: form.data.facebook_name ?? null,
+				birthday: form.data.birthday ?? null
+			};
+
+			const result = await optimisticLockUpdate(
+				db, tenants, tenants.id, form.data.id!, tenants.updatedAt, lockTs, setData
+			);
+			if (result.conflict) {
+				return fail(409, { form, conflict: true, message: result.message });
+			}
 		} catch (err: any) {
 			console.error('Error updating tenant:', err);
 			if (err.message?.includes('Policy check failed')) {

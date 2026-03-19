@@ -13,7 +13,7 @@ import type {
 } from './reportSchema';
 import { db } from '$lib/server/db';
 import { floors, properties, rentalUnit, leases, leaseTenants, tenants, billings } from '$lib/server/schema';
-import { eq, and, inArray, asc } from 'drizzle-orm';
+import { eq, and, inArray, asc, gte, lte } from 'drizzle-orm';
 
 // Configure ISR for lease report caching
 export const config = {
@@ -144,12 +144,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					number: rentalUnit.number,
 					capacity: rentalUnit.capacity,
 					floorId: rentalUnit.floorId,
-					propertyId: rentalUnit.propertyId,
-					propertyName: properties.name,
-					propertyDbId: properties.id
+					propertyId: rentalUnit.propertyId
 				})
 				.from(rentalUnit)
-				.leftJoin(properties, eq(rentalUnit.propertyId, properties.id))
 		]);
 
 		// Build lease query
@@ -160,24 +157,40 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			leasesData = await db.select().from(leases);
 		}
 
-		// Fetch lease tenants with tenant data
+		// Fetch lease tenants and billings in parallel
 		const leaseIds = leasesData.map((l: any) => l.id);
-		const leaseTenantsData = leaseIds.length > 0
-			? await db
-					.select({
-						leaseId: leaseTenants.leaseId,
-						tenantId: tenants.id,
-						tenantName: tenants.name
-					})
-					.from(leaseTenants)
-					.innerJoin(tenants, eq(leaseTenants.tenantId, tenants.id))
-					.where(inArray(leaseTenants.leaseId, leaseIds))
-			: [];
 
-		// Fetch billings for these leases
-		const billingsData = leaseIds.length > 0
-			? await db.select().from(billings).where(inArray(billings.leaseId, leaseIds))
-			: [];
+		// Compute date range for billings filter from report months
+		const months = getMonthsArray(filterForm.data.startMonth, filterForm.data.monthCount);
+		const firstMonthStart = months[0] + '-01';
+		const [lastYear, lastMonth] = months[months.length - 1].split('-').map((n) => parseInt(n));
+		const lastMonthEnd = `${lastYear}-${lastMonth.toString().padStart(2, '0')}-${new Date(lastYear, lastMonth, 0).getDate()}`;
+
+		const [leaseTenantsData, billingsData] = await Promise.all([
+			leaseIds.length > 0
+				? db
+						.select({
+							leaseId: leaseTenants.leaseId,
+							tenantId: tenants.id,
+							tenantName: tenants.name
+						})
+						.from(leaseTenants)
+						.innerJoin(tenants, eq(leaseTenants.tenantId, tenants.id))
+						.where(inArray(leaseTenants.leaseId, leaseIds))
+				: Promise.resolve([]),
+			leaseIds.length > 0
+				? db
+						.select()
+						.from(billings)
+						.where(
+							and(
+								inArray(billings.leaseId, leaseIds),
+								gte(billings.dueDate, firstMonthStart),
+								lte(billings.dueDate, lastMonthEnd)
+							)
+						)
+				: Promise.resolve([])
+		]);
 
 		// Build lookup maps
 		const ltMap = new Map<number, any[]>();
@@ -198,8 +211,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			billingsMap.get(b.leaseId)!.push(mapped);
 		}
 
-		// Generate months array
-		const months = getMonthsArray(filterForm.data.startMonth, filterForm.data.monthCount);
 		const endMonth = months[months.length - 1];
 
 		const reportData: LeaseReportData = {

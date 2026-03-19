@@ -18,7 +18,9 @@
 		type MeterFormData,
 		meterFormSchema
 	} from '../meters/formSchema';
-	import { Loader2, Gauge } from 'lucide-svelte';
+	import { Loader2, Gauge, Search, ChevronUp, ChevronDown } from 'lucide-svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import MeterForm from '../meters/MeterForm.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
@@ -31,6 +33,8 @@
 		readingsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
+	import { bgResync } from '$lib/db/optimistic-utils';
+	import { getStatusClasses, formatDate } from '$lib/utils/format';
 
 	// Type definitions
 	interface Property {
@@ -167,6 +171,10 @@
 
 	let isLoading = $derived(!metersStore.initialized);
 
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let savedEditMode = false;
+
 	let selectedMeter = $state<ExtendedMeterFormData | undefined>(undefined);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
@@ -268,6 +276,8 @@
 		resetForm: true,
 		onSubmit: () => {
 			loading = true;
+			savedFormData = { ...$form };
+			savedEditMode = editMode;
 		},
 		onError: ({ result }) => {
 			toast.error('Error saving meter');
@@ -278,27 +288,32 @@
 			loading = false;
 
 			if (result.type === 'success') {
-				toast.success(editMode ? 'Meter updated' : 'Meter created');
+				const serverData = (result as any).data?.form?.data;
+				const fd = serverData ?? savedFormData;
+				toast.success(savedEditMode ? 'Meter updated' : 'Meter created');
 				error = null;
-				if ($form.id) {
+				if (fd?.id) {
 					await optimisticUpsertMeter({
-						id: $form.id,
-						name: $form.name,
-						location_type: $form.location_type,
-						property_id: $form.property_id,
-						floor_id: $form.floor_id,
-						rental_unit_id: $form.rental_unit_id,
-						type: $form.type,
-						is_active: $form.status === 'ACTIVE',
-						status: $form.status,
-						notes: $form.notes,
-						initial_reading: $form.initial_reading
+						id: fd.id,
+						name: fd.name,
+						location_type: fd.location_type,
+						property_id: fd.property_id,
+						floor_id: fd.floor_id,
+						rental_unit_id: fd.rental_unit_id,
+						type: fd.type,
+						is_active: fd.status === 'ACTIVE',
+						status: fd.status,
+						notes: fd.notes,
+						initial_reading: String(fd.initial_reading)
 					});
+				} else {
+					bgResync('meters');
 				}
 
 				editMode = false;
 				selectedMeter = undefined;
 				showModal = false;
+				savedFormData = null;
 				reset();
 			}
 		}
@@ -401,19 +416,6 @@
 		}
 	}
 
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'ACTIVE':
-				return 'bg-green-100 text-green-800';
-			case 'INACTIVE':
-				return 'bg-gray-100 text-gray-800';
-			case 'MAINTENANCE':
-				return 'bg-yellow-100 text-yellow-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
-
 	function formatReading(value: number): string {
 		return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 	}
@@ -452,27 +454,12 @@
 		<Card.Content class="p-4">
 			<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 				<div class="relative">
-					<span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="16"
-							height="16"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<circle cx="11" cy="11" r="8"></circle>
-							<line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-						</svg>
-					</span>
+					<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
 					<Input
 						type="text"
 						placeholder="Search by name or location"
 						bind:value={searchQuery}
-						class="pl-10"
+						class="pl-9"
 					/>
 				</div>
 				<div>
@@ -536,46 +523,66 @@
 	</Card.Root>
 
 	<!-- Sort Buttons -->
-	<div class="flex items-center justify-between text-sm text-gray-500 px-2">
-		<div class="flex space-x-4">
-			<button
-				class={`${sortBy === 'name' ? 'text-black font-medium' : ''}`}
+	<div class="flex items-center justify-between text-sm text-muted-foreground px-2">
+		<div class="flex space-x-2">
+			<Button
+				variant="ghost"
+				size="sm"
+				class={sortBy === 'name' ? 'text-foreground font-medium' : ''}
 				onclick={() => handleSort('name')}
 			>
-				Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'type' ? 'text-black font-medium' : ''}`}
+				Name {#if sortBy === 'name'}{#if sortOrder === 'asc'}<ChevronUp class="h-3 w-3 inline" />{:else}<ChevronDown class="h-3 w-3 inline" />{/if}{/if}
+			</Button>
+			<Button
+				variant="ghost"
+				size="sm"
+				class={sortBy === 'type' ? 'text-foreground font-medium' : ''}
 				onclick={() => handleSort('type')}
 			>
-				Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'status' ? 'text-black font-medium' : ''}`}
+				Type {#if sortBy === 'type'}{#if sortOrder === 'asc'}<ChevronUp class="h-3 w-3 inline" />{:else}<ChevronDown class="h-3 w-3 inline" />{/if}{/if}
+			</Button>
+			<Button
+				variant="ghost"
+				size="sm"
+				class={sortBy === 'status' ? 'text-foreground font-medium' : ''}
 				onclick={() => handleSort('status')}
 			>
-				Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'reading' ? 'text-black font-medium' : ''}`}
+				Status {#if sortBy === 'status'}{#if sortOrder === 'asc'}<ChevronUp class="h-3 w-3 inline" />{:else}<ChevronDown class="h-3 w-3 inline" />{/if}{/if}
+			</Button>
+			<Button
+				variant="ghost"
+				size="sm"
+				class={sortBy === 'reading' ? 'text-foreground font-medium' : ''}
 				onclick={() => handleSort('reading')}
 			>
-				Reading {sortBy === 'reading' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
+				Reading {#if sortBy === 'reading'}{#if sortOrder === 'asc'}<ChevronUp class="h-3 w-3 inline" />{:else}<ChevronDown class="h-3 w-3 inline" />{/if}{/if}
+			</Button>
 		</div>
 	</div>
 
 	<!-- Content -->
 	{#if isLoading}
-		<div class="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-lg">
-			<Loader2 class="w-8 h-8 animate-spin text-gray-400 mb-3" />
-			<p class="text-center text-gray-500">Loading meters...</p>
+		<div class="rounded-lg border bg-card">
+			<div class="p-4 space-y-3">
+				{#each Array(4) as _, i (i)}
+					<div class="flex items-center justify-between p-3 border rounded-lg">
+						<div class="space-y-2">
+							<Skeleton class="h-4 w-32" />
+							<Skeleton class="h-3 w-48" />
+						</div>
+						<Skeleton class="h-4 w-20" />
+					</div>
+				{/each}
+			</div>
 		</div>
 	{:else if groupedMeters.length === 0}
-		<div class="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-lg">
-			<Gauge class="w-10 h-10 text-gray-400 mb-3" />
-			<p class="text-center text-gray-500">No meters found</p>
-		</div>
+		<EmptyState icon={Gauge} title="No Meters Found" description={searchQuery || selectedType || selectedStatus ? 'No meters match your filter criteria.' : 'Get started by adding your first meter.'}>
+			{#snippet action()}
+				{#if !searchQuery && !selectedType && !selectedStatus}
+					<Button variant="outline" onclick={handleAddMeter}>Add Meter</Button>
+				{/if}
+			{/snippet}
+		</EmptyState>
 	{:else}
 		<div class="space-y-6">
 			{#each groupedMeters as group}
@@ -597,7 +604,7 @@
 													<Badge variant={getTypeVariant(meter.type)} class="text-xs px-2 py-0.5">
 														{meter.type}
 													</Badge>
-													<Badge class={`text-xs px-2 py-0.5 ${getStatusColor(meter.status)}`}>
+													<Badge class={`text-xs px-2 py-0.5 ${getStatusClasses(meter.status)}`}>
 														{meter.status}
 													</Badge>
 												</div>
@@ -615,7 +622,7 @@
 															>{formatReading(meter.latest_reading.value)}</span
 														>
 														<span class="text-xs text-gray-500">
-															{new Date(meter.latest_reading.date).toLocaleDateString()}
+															{formatDate(meter.latest_reading.date)}
 														</span>
 													</div>
 												{:else}

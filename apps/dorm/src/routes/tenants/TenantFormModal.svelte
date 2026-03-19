@@ -23,6 +23,8 @@
 	import ImageUploadWithCrop from '$lib/components/ui/ImageUploadWithCrop.svelte';
 	import BirthdayInput from '$lib/components/ui/birthday-input.svelte';
 	import { optimisticUpsertTenant } from '$lib/db/optimistic';
+	import { bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
+	import { getStatusClasses } from '$lib/utils/format';
 
 	type FormType = z.infer<typeof tenantFormSchema>;
 
@@ -74,112 +76,112 @@
 	// Custom submission handler to ensure proper timing
 	let isSubmitting = $state(false);
 
-	// Custom submit handler that ensures upload happens BEFORE form submission
+	// Custom submit handler — uses buffered mutation queue for instant UI
 	async function handleCustomSubmit(event: Event) {
 		event.preventDefault();
-		
-		if (isSubmitting) return; // Prevent double submission
+
+		if (isSubmitting) return;
 		isSubmitting = true;
 
-		console.log('🔄 Custom form submission started');
-		console.log('📤 Form data before upload:', {
-			profile_picture_url: $form.profile_picture_url,
-			hasSelectedNewImage,
-			profilePictureFile: profilePictureFile?.name
-		});
-		
 		try {
-			// STEP 1: Upload image first if there's a selected file
+			// STEP 1: Upload image first if there's a selected file (must complete before enqueue)
 			if (profilePictureFile && hasSelectedNewImage) {
 				uploadingImage = true;
-				console.log('📤 Starting image upload before form submission...');
-				
 				await uploadProfilePicture();
-				
-				console.log('✅ Image upload complete, form data after upload:', {
-					profile_picture_url: $form.profile_picture_url,
-					imageDisplayValue: imageDisplayValue?.substring(0, 50) + '...'
-				});
 				toast.success('Image uploaded successfully');
 				uploadingImage = false;
 			}
 
-			// STEP 2: Wait a bit to ensure DOM updates
+			// Wait briefly for DOM to reflect updated form values
 			await new Promise(resolve => setTimeout(resolve, 100));
 
-			console.log('🚀 Now submitting form to server with final data:', {
-				id: $form.id,
-				name: $form.name,
-				profile_picture_url: $form.profile_picture_url
-			});
-
-			// STEP 3: Now submit the form with updated data
+			// Capture form data before closing modal
 			const formElement = event.target as HTMLFormElement;
 			const formData = new FormData(formElement);
-			
-			// Log what's actually being sent
-			console.log('📋 FormData being sent:', {
-				profile_picture_url: formData.get('profile_picture_url'),
-				name: formData.get('name'),
-				id: formData.get('id')
-			});
+			const actionUrl = formElement.action;
 
-			const response = await fetch(formElement.action, {
-				method: 'POST',
-				body: formData
-			});
+			// Snapshot form values for optimistic write + callback
+			const formSnapshot = {
+				name: $form.name,
+				email: $form.email || null,
+				contact_number: $form.contact_number || null,
+				tenant_status: $form.tenant_status || 'PENDING',
+				emergency_contact: $form.emergency_contact || null,
+				profile_picture_url: $form.profile_picture_url || null,
+				address: $form.address || null,
+				school_or_workplace: $form.school_or_workplace || null,
+				facebook_name: $form.facebook_name || null,
+				birthday: $form.birthday || null
+			};
 
-			const result = await response.text();
-			
-			if (response.ok) {
-				// Optimistic write — update RxDB immediately so UI is instant
-				try {
-					const json = JSON.parse(result);
-					// For create: server returns tenantId in the response data
-					const tenantId = editMode ? $form.id : json?.data?.tenantId ?? json?.tenantId;
-					if (tenantId) {
-						await optimisticUpsertTenant({
-							id: Number(tenantId),
-							name: $form.name,
-							email: $form.email || null,
-							contact_number: $form.contact_number || null,
-							tenant_status: $form.tenant_status || 'PENDING',
-							emergency_contact: $form.emergency_contact || null,
-							profile_picture_url: $form.profile_picture_url || null,
-							address: $form.address || null,
-							school_or_workplace: $form.school_or_workplace || null,
-							facebook_name: $form.facebook_name || null,
-							birthday: $form.birthday || null
-						});
+			const isEdit = editMode;
+			const formId = $form.id;
+			const tenantRef = tenant;
+			const onUpdateCb = onTenantUpdate;
+
+			// STEP 2: For updates — write to RxDB FIRST (instant UI)
+			const optimisticWrite = isEdit && formId
+				? async () => {
+					await optimisticUpsertTenant({
+						id: Number(formId),
+						...formSnapshot
+					});
+					// Notify parent of update
+					if (onUpdateCb && tenantRef) {
+						onUpdateCb({ ...tenantRef, ...formSnapshot });
 					}
-				} catch { /* non-critical — background resync will fix it */ }
-
-				if (editMode && onTenantUpdate && tenant) {
-					const updatedTenant = {
-						...tenant,
-						name: $form.name,
-						email: $form.email,
-						contact_number: $form.contact_number,
-						tenant_status: $form.tenant_status,
-						profile_picture_url: $form.profile_picture_url
-					};
-					onTenantUpdate(updatedTenant);
 				}
+				: undefined;
 
-				// Reset states
-				reset();
-				profilePictureFile = null;
-				profilePicturePreviewUrl = null;
-				hasSelectedNewImage = false;
+			// STEP 3: Close modal + reset immediately
+			reset();
+			profilePictureFile = null;
+			profilePicturePreviewUrl = null;
+			hasSelectedNewImage = false;
+			onOpenChange(false);
+			toast.info(isEdit ? 'Saving changes...' : 'Creating tenant...');
 
-				toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
-				onOpenChange(false);
-			} else {
-				throw new Error('Form submission failed');
-			}
+			// STEP 4: Enqueue server action via buffered mutation
+			await bufferedMutation({
+				label: isEdit
+					? `Update Tenant: ${formSnapshot.name}`
+					: `Create Tenant: ${formSnapshot.name}`,
+				collection: 'tenants',
+				type: isEdit ? 'update' : 'create',
+				optimisticWrite,
+				serverAction: async () => {
+					const response = await fetch(actionUrl, {
+						method: 'POST',
+						body: formData
+					});
+					if (response.status === 409) {
+						throw new Error(CONFLICT_MESSAGE);
+					}
+					if (!response.ok) {
+						const text = await response.text();
+						throw new Error(text || `Server returned ${response.status}`);
+					}
+					return response.text().then((t) => {
+						try { return JSON.parse(t); } catch { return t; }
+					});
+				},
+				onSuccess: async (result) => {
+					// For creates: write the real doc to RxDB with server-assigned ID
+					if (!isEdit) {
+						const tenantId = result?.data?.tenantId ?? result?.tenantId;
+						if (tenantId) {
+							await optimisticUpsertTenant({
+								id: Number(tenantId),
+								...formSnapshot
+							});
+						}
+					}
+					toast.success(isEdit ? 'Tenant updated' : 'Tenant created');
+				}
+			});
 
 		} catch (error: any) {
-			console.error('❌ Form submission failed:', error);
+			console.error('Form submission failed:', error);
 			toast.error(`Failed to ${editMode ? 'update' : 'create'} tenant: ${error.message}`);
 		} finally {
 			isSubmitting = false;
@@ -191,61 +193,8 @@
 		validators: zodClient(tenantFormSchema),
 		validationMethod: 'onsubmit',
 		resetForm: true,
-		invalidateAll: false,
-		onResult: async ({ result }) => {
-			if (result.type === 'success') {
-				// Optimistic write — update RxDB immediately so UI is instant
-				const tenantId = editMode ? $form.id : (result.data as any)?.tenantId;
-				if (tenantId) {
-					await optimisticUpsertTenant({
-						id: Number(tenantId),
-						name: $form.name,
-						email: $form.email || null,
-						contact_number: $form.contact_number || null,
-						tenant_status: $form.tenant_status || 'PENDING',
-						emergency_contact: $form.emergency_contact || null,
-						profile_picture_url: $form.profile_picture_url || null,
-						address: $form.address || null,
-						school_or_workplace: $form.school_or_workplace || null,
-						facebook_name: $form.facebook_name || null,
-						birthday: $form.birthday || null
-					});
-				}
-
-				if (editMode && onTenantUpdate && tenant) {
-					const updatedTenant = {
-						...tenant,
-						name: $form.name,
-						email: $form.email,
-						contact_number: $form.contact_number,
-						tenant_status: $form.tenant_status,
-						profile_picture_url: $form.profile_picture_url
-					};
-					onTenantUpdate(updatedTenant);
-				}
-
-				// Reset states
-				reset();
-				profilePictureFile = null;
-				profilePicturePreviewUrl = null;
-				hasSelectedNewImage = false;
-
-				toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
-				onOpenChange(false);
-			} else if (result.type === 'failure') {
-				if (
-					result.data?.form?.errors?.email ||
-					result.data?.message?.includes('Duplicate email found')
-				) {
-					toast.error('Duplicate email found: A tenant with this email already exists');
-				} else {
-					toast.error(editMode ? 'Failed to update tenant' : 'Failed to create tenant');
-				}
-			}
-		},
-		onError: ({ result }) => {
-			toast.error(result.error?.message || 'An error occurred');
-		}
+		invalidateAll: false
+		// onResult not needed — handleCustomSubmit uses bufferedMutation instead
 	});
 
 	// Ensure emergency_contact is always initialized
@@ -352,21 +301,6 @@
 
 	// Convert ZodEnum to array of status options
 	let tenantStatusOptions = $derived(Object.values(TenantStatusEnum.Values));
-
-	function getStatusColor(status: string) {
-		switch (status) {
-			case 'ACTIVE':
-				return 'bg-green-100 text-green-800';
-			case 'PENDING':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'INACTIVE':
-				return 'bg-gray-100 text-gray-800';
-			case 'BLACKLISTED':
-				return 'bg-red-100 text-red-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
 
 	// Handle modal close with unsaved changes check
 	function handleModalClose(shouldClose: boolean) {
@@ -529,6 +463,7 @@
 			<!-- Hidden input for tenant ID in edit mode -->
 			{#if editMode && $form.id}
 				<input type="hidden" name="id" value={$form.id} />
+				<input type="hidden" name="_updated_at" value={tenant?.updated_at ?? ''} />
 			{/if}
 
 			<!-- Profile Picture -->
@@ -608,14 +543,14 @@
 						<input type="hidden" name="tenant_status" bind:value={$form.tenant_status} />
 						<Select.Root type="single" bind:value={$form.tenant_status}>
 							<Select.Trigger>
-								<Badge variant="outline" class={getStatusColor($form.tenant_status)}>
+								<Badge variant="outline" class={getStatusClasses($form.tenant_status)}>
 									{$form.tenant_status}
 								</Badge>
 							</Select.Trigger>
 							<Select.Content>
 								{#each tenantStatusOptions as status}
 									<Select.Item value={status}>
-										<Badge variant="outline" class={getStatusColor(status)}>
+										<Badge variant="outline" class={getStatusClasses(status)}>
 											{status}
 										</Badge>
 									</Select.Item>

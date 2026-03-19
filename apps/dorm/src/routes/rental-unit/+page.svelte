@@ -14,14 +14,23 @@
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from './formSchema';
 	import { Pencil, Trash2, Users, Tag, List, Plus, Search, Home, Building2 } from 'lucide-svelte';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import {
 		rentalUnitsStore,
 		propertiesStore,
 		floorsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import { resyncCollection } from '$lib/db/replication';
 	import { toast } from 'svelte-sonner';
+
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
 
 	// Enrich rental units with property and floor relationships
 	let rentalUnits = $derived(rentalUnitsStore.value.map((unit: any) => {
@@ -99,34 +108,79 @@
 		validationMethod: 'oninput',
 		dataType: 'json',
 		resetForm: true,
-		onError: ({ result }) => {
+		onSubmit: async ({ formData: fd }) => {
+			submitSeq++;
+			savedFormData = { ...$formData, _seq: submitSeq };
+			savedEditMode = editMode;
+			// Close modal immediately for snappy UX
+			showModal = false;
+			toast.info(editMode ? 'Saving unit...' : 'Creating unit...');
+			// For updates with a known ID, run the optimistic write right away
+			if (editMode && savedFormData?.id) {
+				rollback = await optimisticUpsertRentalUnit({
+					id: savedFormData.id,
+					name: savedFormData.name,
+					number: savedFormData.number,
+					capacity: savedFormData.capacity,
+					rental_unit_status: savedFormData.rental_unit_status,
+					base_rate: String(savedFormData.base_rate),
+					property_id: savedFormData.property_id ?? 0,
+					floor_id: savedFormData.floor_id ?? 0,
+					type: savedFormData.type,
+					amenities: savedFormData.amenities
+				});
+			}
+		},
+		onError: async ({ result }) => {
 			toast.error('Error saving rental unit');
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			resyncCollection('rental_units').catch((err) =>
+				console.warn('[RentalUnit] Resync after error:', err)
+			);
 		},
 		onResult: async ({ result }) => {
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				if (rollback) { await rollback(); rollback = null; }
+				resyncCollection('rental_units').catch(() => {});
+				savedFormData = null;
+				return;
+			}
+
 			if (result.type === 'success') {
-				toast.success(editMode ? 'Rental unit updated' : 'Rental unit created');
-				showModal = false;
-				// Optimistic upsert — the server already persisted, push into RxDB
-				const d = $formData;
-				if (d.id) {
+				const serverData = (result as any).data?.form?.data;
+				const fd = serverData ?? savedFormData;
+				rollback = null; // Success — discard snapshot
+				// For creates, apply optimistic upsert with server-assigned ID
+				if (!savedEditMode && fd?.id) {
 					await optimisticUpsertRentalUnit({
-						id: d.id,
-						name: d.name,
-						number: d.number,
-						capacity: d.capacity,
-						rental_unit_status: d.rental_unit_status,
-						base_rate: String(d.base_rate),
-						property_id: d.property_id ?? 0,
-						floor_id: d.floor_id ?? 0,
-						type: d.type,
-						amenities: d.amenities
+						id: fd.id,
+						name: fd.name,
+						number: fd.number,
+						capacity: fd.capacity,
+						rental_unit_status: fd.rental_unit_status,
+						base_rate: String(fd.base_rate),
+						property_id: fd.property_id ?? 0,
+						floor_id: fd.floor_id ?? 0,
+						type: fd.type,
+						amenities: fd.amenities
 					});
-				} else {
-					// For create, we don't have the new ID — resync to pick it up
-					resyncCollection('rental_units').catch((err) =>
-						console.warn('[RentalUnit] Background resync failed:', err)
-					);
+				} else if (!savedEditMode) {
+					bgResync('rental_units');
 				}
+				toast.success(savedEditMode ? 'Rental unit updated' : 'Rental unit created');
+				savedFormData = null;
+			} else if (result.type === 'failure' || result.type === 'error') {
+				toast.error('Failed to save rental unit');
+				// Instant rollback, then confirm with resync
+				if (rollback) { await rollback(); rollback = null; }
+				resyncCollection('rental_units').catch((err) =>
+					console.warn('[RentalUnit] Resync after failure:', err)
+				);
 			}
 		}
 	});
@@ -143,8 +197,11 @@
 		showModal = true;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	function handleEditClick(rentalUnit: any) {
 		editMode = true;
+		editUpdatedAt = rentalUnit.updated_at ?? null;
 		reset({
 			data: {
 				id: rentalUnit.id,
@@ -185,36 +242,27 @@
 		showDeleteDialog = false;
 		rentalUnitToDelete = null;
 
-		// Optimistic: remove from RxDB immediately
-		await optimisticDeleteRentalUnit(rentalUnit.id);
-
-		const deleteData = new FormData();
-		deleteData.append('id', String(rentalUnit.id));
-
-		try {
-			const result = await fetch('?/delete', {
-				method: 'POST',
-				body: deleteData
-			});
-
-			if (!result.ok) {
-				const resp = await result.json();
-				toast.error(resp.message || 'Failed to delete rental unit');
-				// Resync to restore the original state
-				resyncCollection('rental_units').catch((err) =>
-					console.warn('[RentalUnit] Resync after failed delete:', err)
-				);
-			} else {
+		await bufferedMutation({
+			label: 'Delete rental unit',
+			collection: 'rental_units',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteRentalUnit(rentalUnit.id);
+			},
+			serverAction: async () => {
+				const deleteData = new FormData();
+				deleteData.append('id', String(rentalUnit.id));
+				const result = await fetch('?/delete', { method: 'POST', body: deleteData });
+				if (!result.ok) {
+					const resp = await result.json().catch(() => ({}));
+					throw new Error(resp.message || 'Failed to delete rental unit');
+				}
+				return result;
+			},
+			onSuccess: async () => {
 				toast.success('Rental unit deleted');
 			}
-		} catch (error) {
-			console.error(error);
-			toast.error('An unexpected error occurred');
-			// Resync to restore the original state on network error
-			resyncCollection('rental_units').catch((err) =>
-				console.warn('[RentalUnit] Resync after error:', err)
-			);
-		}
+		});
 	}
 
 	function getStatusVariant(status: string) {
@@ -240,6 +288,7 @@
 </script>
 
 <div class="space-y-6">
+	<SyncErrorBanner collections={['rental_units', 'properties', 'floors']} />
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 		<div class="flex items-center gap-3">
@@ -287,14 +336,8 @@
 						{/each}
 					</div>
 				{:else if !selectedProperty}
-					<div class="flex flex-col items-center justify-center py-16 text-center">
-						<div class="bg-gray-100 p-4 rounded-full mb-4">
-							<Building2 class="w-8 h-8 text-gray-400" />
-						</div>
-						<h3 class="text-lg font-semibold text-gray-900">No Property Selected</h3>
-						<p class="text-muted-foreground max-w-sm mt-2">
-							Please select a property from the top navigation to manage its rental units.
-						</p>
+					<div class="p-6">
+						<EmptyState icon={Building2} title="No Property Selected" description="Select a property from the dropdown in the header to view rental units." />
 					</div>
 				{:else if filteredRentalUnits.length === 0}
 					<div class="flex flex-col items-center justify-center py-16 text-center">
@@ -457,6 +500,7 @@
 		<RentalUnitForm
 			data={formData_passthrough}
 			{editMode}
+			updatedAt={editUpdatedAt}
 			form={formData}
 			{errors}
 			{enhance}

@@ -86,11 +86,10 @@
 	<!-- Instructions -->
 	<div class="rounded-lg border bg-slate-50 p-3 space-y-1.5">
 		{#if tool === 'select'}
-			<p class="text-xs font-semibold text-blue-700">Select Walls</p>
+			<p class="text-xs font-semibold text-blue-700">Select & Assign</p>
 			<ul class="text-xs text-slate-600 space-y-0.5">
-				<li>Drag to draw a selection box</li>
-				<li>Walls inside the box get selected</li>
-				<li>Use the popup to delete them</li>
+				<li>Drag over walls to select & delete</li>
+				<li>Drag an empty area to assign a room</li>
 			</ul>
 		{:else if tool === 'draw'}
 			<p class="text-xs font-semibold text-slate-700">Draw Walls</p>
