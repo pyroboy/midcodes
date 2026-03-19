@@ -595,6 +595,7 @@ function createSyncStatusStore() {
 			flowDirection = 'idle';
 		} else if (p === 'complete') {
 			flowDirection = 'idle';
+			lastSuccessfulSyncAt = new Date();
 			// Only log summary once per sync cycle (guard against double setPhase('complete'))
 			if (!wasComplete) {
 				const syncedCount = collections.filter((c) => c.status === 'synced').length;

@@ -674,8 +674,8 @@
 		<!-- Tab content — min-h-0 is critical for flex overflow scroll -->
 		<div class="min-h-0 flex-1 overflow-y-auto pr-1">
 			{#if activeTab === 'collections'}
-				<!-- Check Counts + Retry All Failed -->
-				<div class="flex items-center justify-between px-3 py-1.5">
+				<!-- Actions + timestamps -->
+				<div class="px-3 py-1.5 space-y-1.5">
 					<div class="flex items-center gap-2">
 						<Button
 							variant="outline"
@@ -706,27 +706,39 @@
 							{/if}
 							Reconcile
 						</Button>
-						{#if syncStatus.neonCountsFetchedAt}
-							<span class="text-[10px] text-muted-foreground">
-								checked {new Date(syncStatus.neonCountsFetchedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-							</span>
+						{#if errorCollectionsList.length > 1}
+							<Button
+								variant="outline"
+								size="sm"
+								class="h-6 text-[11px] gap-1"
+								onclick={handleRetryAllFailed}
+								disabled={isRetryingAllFailed}
+							>
+								<RefreshCw class="w-3 h-3 {isRetryingAllFailed ? 'animate-spin' : ''}" />
+								Retry failed ({errorCollectionsList.length})
+							</Button>
 						{/if}
 						{#if syncStatus.neonCountsError}
 							<span class="text-[10px] text-red-500 truncate max-w-[120px]" title={syncStatus.neonCountsError}>{syncStatus.neonCountsError}</span>
 						{/if}
 					</div>
-					{#if errorCollectionsList.length > 1}
-						<Button
-							variant="outline"
-							size="sm"
-							class="h-6 text-[11px] gap-1"
-							onclick={handleRetryAllFailed}
-							disabled={isRetryingAllFailed}
-						>
-							<RefreshCw class="w-3 h-3 {isRetryingAllFailed ? 'animate-spin' : ''}" />
-							Retry all failed ({errorCollectionsList.length})
-						</Button>
-					{/if}
+					<!-- Compact timestamp row: synced + counted side by side -->
+					<div class="flex items-center gap-4 text-[10px]">
+						<div class="flex items-center gap-1.5">
+							<HardDrive class="w-3 h-3 text-muted-foreground/60" />
+							<div class="flex flex-col leading-none">
+								<span class="tabular-nums text-foreground font-medium">{syncStatus.lastSuccessfulSyncAt ? syncStatus.lastSuccessfulSyncAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</span>
+								<span class="text-muted-foreground">synced</span>
+							</div>
+						</div>
+						<div class="flex items-center gap-1.5">
+							<Cloud class="w-3 h-3 text-muted-foreground/60" />
+							<div class="flex flex-col leading-none">
+								<span class="tabular-nums text-foreground font-medium">{syncStatus.neonCountsFetchedAt ? new Date(syncStatus.neonCountsFetchedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</span>
+								<span class="text-muted-foreground">counted</span>
+							</div>
+						</div>
+					</div>
 				</div>
 				{#if lastReconcileResult && lastReconcileResult.status === 'ok'}
 					{@const r = lastReconcileResult}
@@ -772,13 +784,6 @@
 						{/if}
 					</div>
 				{/if}
-				<!-- Timestamp header — shows both sync and count times -->
-				<div class="flex items-center justify-between px-3 py-1 text-[10px] text-muted-foreground">
-					<span>Synced {syncStatus.lastSuccessfulSyncAt ? syncStatus.lastSuccessfulSyncAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'never'}</span>
-					{#if syncStatus.neonCountsFetchedAt}
-						<span>Counted {new Date(syncStatus.neonCountsFetchedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-					{/if}
-				</div>
 				<div class="space-y-0.5">
 					{#each syncStatus.collections as col (col.name)}
 						{@const Icon = getStatusIcon(col.status)}
@@ -810,7 +815,7 @@
 										{#if neonCount !== undefined && neonCount !== null}
 											{@const match = col.docCount === neonCount}
 											<span class="text-[10px] tabular-nums {match ? 'text-emerald-500' : 'text-amber-600'} font-medium">
-												{col.docCount}<span class="text-muted-foreground/60 mx-0.5">/</span>{neonCount}
+												{col.docCount}<span class="text-muted-foreground/50">/</span>{neonCount}
 											</span>
 											{#if !match}
 												<span class="text-[9px] text-amber-500 font-medium">⚠</span>
