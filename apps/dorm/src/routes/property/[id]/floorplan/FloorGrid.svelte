@@ -37,10 +37,50 @@
 		onAreaUpdate?: (item: { id: string; grid_x: number; grid_y: number; grid_w: number; grid_h: number; cells?: string[] }) => void;
 	} = $props();
 
-	let cellSize = $state(48);
-	let gridCols = $state(20);
-	let gridRows = $state(16);
+	// Persist grid dimensions per floor
+	function loadGridState() {
+		try {
+			const saved = localStorage.getItem(`floorplan-grid-${floorId}`);
+			if (saved) return JSON.parse(saved) as { cellSize: number; gridCols: number; gridRows: number };
+		} catch {}
+		return null;
+	}
+	const savedGrid = loadGridState();
+	let cellSize = $state(savedGrid?.cellSize ?? 48);
+	let gridCols = $state(savedGrid?.gridCols ?? 20);
+	let gridRows = $state(savedGrid?.gridRows ?? 16);
 	let cellSizeMeters = 1.0; // 1 cell = 1 meter
+
+	// Auto-expand grid to fit all existing items (walls + areas)
+	$effect(() => {
+		let maxCol = gridCols;
+		let maxRow = gridRows;
+		for (const item of items) {
+			if (item.deleted_at !== null) continue;
+			const right = item.grid_x + Math.max(item.grid_w, 1);
+			const bottom = item.grid_y + Math.max(item.grid_h, 1);
+			// Also check stored cells for cell-based areas
+			const cells = parseAreaCells(item);
+			if (cells) {
+				for (const key of cells) {
+					const [q, r] = key.split(',').map(Number);
+					if (q + 1 > maxCol - 2) maxCol = q + 4;
+					if (r + 1 > maxRow - 2) maxRow = r + 4;
+				}
+			}
+			if (right > maxCol - 2) maxCol = right + 4;
+			if (bottom > maxRow - 2) maxRow = bottom + 4;
+		}
+		if (maxCol > gridCols) gridCols = maxCol;
+		if (maxRow > gridRows) gridRows = maxRow;
+	});
+
+	// Save grid state on changes
+	$effect(() => {
+		try {
+			localStorage.setItem(`floorplan-grid-${floorId}`, JSON.stringify({ cellSize, gridCols, gridRows }));
+		} catch {}
+	});
 
 	// ─── Area cell helpers ──────────────────────────────────────────
 	function parseAreaCells(item: FloorLayoutItem): string[] | null {
@@ -892,54 +932,60 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="relative overflow-auto flex-1 bg-muted/30"
+	class="relative flex-1 min-h-0 bg-muted/30 overflow-hidden"
 	onkeydown={handleKeydown}
 	tabindex="-1"
 >
-	<!-- Zoom + Export -->
-	<div class="absolute top-2 right-2 z-20 flex gap-1">
-		<button
-			class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary disabled:opacity-40"
-			disabled={isExporting}
-			onclick={async () => {
-				if (!svgEl) return;
-				isExporting = true;
-				try {
-					const { exportFloorPlanPng } = await import('./exportPng');
-					await exportFloorPlanPng(svgEl, `floor-${floorId}.png`);
-				} finally {
-					isExporting = false;
-				}
-			}}
-		>
-			{isExporting ? 'Exporting...' : 'Export PNG'}
-		</button>
-		<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
-			onclick={() => (cellSize = Math.max(24, cellSize - 8))}>-</button>
-		<span class="px-2 py-1 text-xs text-muted-foreground">{cellSize}px</span>
-		<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
-			onclick={() => (cellSize = Math.min(96, cellSize + 8))}>+</button>
+	<!-- Overlay controls (absolute on non-scrolling parent — stays pinned) -->
+	<div class="absolute inset-x-0 top-0 z-30 pointer-events-none">
+		<!-- Zoom + Export -->
+		<div class="absolute top-2 right-2 pointer-events-auto flex gap-1">
+			<button
+				class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary disabled:opacity-40"
+				disabled={isExporting}
+				onclick={async () => {
+					if (!svgEl) return;
+					isExporting = true;
+					try {
+						const { exportFloorPlanPng } = await import('./exportPng');
+						await exportFloorPlanPng(svgEl, `floor-${floorId}.png`);
+					} finally {
+						isExporting = false;
+					}
+				}}
+			>
+				{isExporting ? 'Exporting...' : 'Export PNG'}
+			</button>
+			<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
+				onclick={() => (cellSize = Math.max(24, cellSize - 8))}>-</button>
+			<span class="px-2 py-1 text-xs text-muted-foreground">{cellSize}px</span>
+			<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
+				onclick={() => (cellSize = Math.min(96, cellSize + 8))}>+</button>
+		</div>
+
+		<!-- Edit Area Mode banner -->
+		{#if editAreaMode}
+			<div class="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-auto flex items-center gap-2 bg-background/95 backdrop-blur border rounded-lg shadow-lg px-4 py-2">
+				<span class="text-sm font-semibold">Edit Area</span>
+				<div class="flex rounded-md border overflow-hidden">
+					<button
+						class="px-2.5 py-1 text-xs font-medium transition-colors {editAreaTool === 'add' ? 'bg-green-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}"
+						onclick={() => (editAreaTool = 'add')}
+					>+ Add</button>
+					<button
+						class="px-2.5 py-1 text-xs font-medium transition-colors {editAreaTool === 'remove' ? 'bg-red-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}"
+						onclick={() => (editAreaTool = 'remove')}
+					>&minus; Remove</button>
+				</div>
+				<span class="text-xs text-muted-foreground">{editAreaCells.size} cells</span>
+				<button class="px-3 py-1 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90" onclick={commitEditArea}>Done</button>
+				<button class="px-3 py-1 rounded border text-xs hover:bg-secondary" onclick={cancelEditArea}>Cancel</button>
+			</div>
+		{/if}
 	</div>
 
-	<!-- Edit Area Mode banner -->
-	{#if editAreaMode}
-		<div class="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-background/95 backdrop-blur border rounded-lg shadow-lg px-4 py-2">
-			<span class="text-sm font-semibold">Edit Area</span>
-			<div class="flex rounded-md border overflow-hidden">
-				<button
-					class="px-2.5 py-1 text-xs font-medium transition-colors {editAreaTool === 'add' ? 'bg-green-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}"
-					onclick={() => (editAreaTool = 'add')}
-				>+ Add</button>
-				<button
-					class="px-2.5 py-1 text-xs font-medium transition-colors {editAreaTool === 'remove' ? 'bg-red-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}"
-					onclick={() => (editAreaTool = 'remove')}
-				>&minus; Remove</button>
-			</div>
-			<span class="text-xs text-muted-foreground">{editAreaCells.size} cells</span>
-			<button class="px-3 py-1 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90" onclick={commitEditArea}>Done</button>
-			<button class="px-3 py-1 rounded border text-xs hover:bg-secondary" onclick={cancelEditArea}>Cancel</button>
-		</div>
-	{/if}
+	<!-- Scrollable grid area (both axes) -->
+	<div class="overflow-scroll h-full w-full">
 
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
@@ -971,8 +1017,8 @@
 			{#if !roomOverlapsAssigned(room)}
 				{#each room.cells as cell (`${cell.q},${cell.r}`)}
 					<rect
-						x={cell.q * cellSize + 1} y={cell.r * cellSize + 1}
-						width={cellSize - 2} height={cellSize - 2}
+						x={cell.q * cellSize} y={cell.r * cellSize}
+						width={cellSize} height={cellSize}
 						{fill} opacity="0.4"
 					/>
 				{/each}
@@ -1021,14 +1067,18 @@
 				{@const areaCells = parseAreaCells(areaItem)}
 				{#if areaCells}
 					{@const aFill = ROOM_FILL_COLORS[areaItem.item_type] ?? ROOM_FILL_COLORS._unassigned}
+					{@const dragDx = areaPreview?.id === areaItem.id ? (areaPreview.grid_x - areaItem.grid_x) * cellSize : 0}
+					{@const dragDy = areaPreview?.id === areaItem.id ? (areaPreview.grid_y - areaItem.grid_y) * cellSize : 0}
+					<g transform="translate({dragDx},{dragDy})">
 					{#each areaCells as cellKey (`acf-${areaItem.id}-${cellKey}`)}
 						{@const [cq, cr] = cellKey.split(',').map(Number)}
 						<rect
-							x={cq * cellSize + 1} y={cr * cellSize + 1}
-							width={cellSize - 2} height={cellSize - 2}
+							x={cq * cellSize} y={cr * cellSize}
+							width={cellSize} height={cellSize}
 							fill={aFill} opacity="0.4"
 						/>
 					{/each}
+					</g>
 				{/if}
 			{/each}
 
@@ -1265,35 +1315,6 @@
 				/>
 			{/if}
 
-			<!-- SVG text labels for rooms (visible in PNG export, unassigned only) -->
-			{#each detectedRooms as room (`label-${room.id}`)}
-				{@const info = roomLabel(room)}
-				{#if !roomOverlapsAssigned(room)}
-				{@const cx = ((room.bounds.minQ + room.bounds.maxQ) / 2) * cellSize}
-				{@const cy = ((room.bounds.minR + room.bounds.maxR) / 2) * cellSize}
-				{@const rw = (room.bounds.maxQ - room.bounds.minQ) * cellSize}
-				{@const rh = (room.bounds.maxR - room.bounds.minR) * cellSize}
-				{#if rw > 36 && rh > 24}
-					<text
-						x={cx} y={cy - 4}
-						text-anchor="middle" dominant-baseline="middle"
-						font-size="11" font-family="system-ui, sans-serif"
-						fill={info.assigned ? '#1e293b' : '#94a3b8'}
-						font-weight={info.assigned ? '600' : '400'}
-					>
-						{info.text}
-					</text>
-					<text
-						x={cx} y={cy + 10}
-						text-anchor="middle" dominant-baseline="middle"
-						font-size="9" font-family="system-ui, sans-serif"
-						fill="#64748b"
-					>
-						{info.area}
-					</text>
-				{/if}
-				{/if}
-			{/each}
 		</svg>
 
 		<!-- Assigned area overlays -->
@@ -1313,7 +1334,7 @@
 			<div
 				class="absolute rounded-sm transition-all {isSelected ? 'ring-2 ring-blue-500 ring-offset-1 z-10' : 'cursor-pointer'}"
 				style="left: {ax}px; top: {ay}px; width: {aw}px; height: {ah}px;
-					background: {hasCells ? 'transparent' : aFill}; opacity: {hasCells ? 1 : (isSelected ? 0.5 : 0.3)};
+					background: {hasCells ? 'transparent' : aFill + (isSelected ? '80' : '4d')};
 					border: {hasCells && !isSelected ? 'none' : `2px ${isSelected ? 'solid' : 'dashed'} ${aFill}`};"
 				onclick={(e) => {
 					e.stopPropagation();
@@ -1610,5 +1631,6 @@
 				onClose={() => (dwPopup = null)}
 			/>
 		{/if}
+	</div>
 	</div>
 </div>

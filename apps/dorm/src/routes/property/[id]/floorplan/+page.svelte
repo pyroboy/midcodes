@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { floorLayoutItemsStore } from '$lib/stores/collections.svelte';
-	import { floorsStore, rentalUnitsStore } from '$lib/stores/collections.svelte';
+	import { floorsStore, rentalUnitsStore, tenantsStore, leasesStore, leaseTenantsStore } from '$lib/stores/collections.svelte';
 	import {
 		optimisticUpsertFloorLayoutItem,
 		optimisticDeleteFloorLayoutItem
@@ -67,6 +67,29 @@
 	let totalCount = $derived(
 		propertyUnits.filter((u: any) => u.floor_id === selectedFloorId).length
 	);
+
+	// Build rental_unit_id → tenant names map (for 3D popup)
+	let unitTenantsMap = $derived.by(() => {
+		const map = new Map<string, { name: string; status: string }[]>();
+		// Build lease_id → rental_unit_id
+		const leaseUnitMap = new Map<string, string>();
+		for (const lease of leasesStore.value) {
+			if (lease.rental_unit_id) leaseUnitMap.set(String(lease.id), String(lease.rental_unit_id));
+		}
+		// Build tenant_id → tenant
+		const tenantMap = new Map<string, any>();
+		for (const t of tenantsStore.value) tenantMap.set(String(t.id), t);
+		// Link via lease_tenants
+		for (const lt of leaseTenantsStore.value) {
+			const unitId = leaseUnitMap.get(String(lt.lease_id));
+			if (!unitId) continue;
+			const tenant = tenantMap.get(String(lt.tenant_id));
+			if (!tenant) continue;
+			if (!map.has(unitId)) map.set(unitId, []);
+			map.get(unitId)!.push({ name: tenant.name, status: tenant.status ?? 'active' });
+		}
+		return map;
+	});
 
 	// Use timestamp-based temp IDs to avoid collisions across page navigations
 	let tempIdCounter = $state(-Date.now());
@@ -325,15 +348,12 @@
 		}
 	}
 
-	async function confirmUnassignBroken() {
-		const count = brokenRooms.length;
-		for (const b of brokenRooms) {
-			await optimisticDeleteFloorLayoutItem(parseInt(b.id, 10));
-			pendingChanges = [...pendingChanges, { type: 'delete', id: b.id }];
-		}
-		showBrokenConfirm = false;
-		brokenRooms = [];
-		toast.info(`Unassigned ${count} broken room(s)`);
+	async function confirmUnassignBrokenSingle(id: string) {
+		await optimisticDeleteFloorLayoutItem(parseInt(id, 10));
+		pendingChanges = [...pendingChanges, { type: 'delete', id }];
+		brokenRooms = brokenRooms.filter((b) => b.id !== id);
+		if (brokenRooms.length === 0) showBrokenConfirm = false;
+		toast.info('Unassigned broken room');
 	}
 
 	function dismissBrokenConfirm() {
@@ -623,11 +643,25 @@
 	}
 </script>
 
+<svelte:head>
+	<style>
+		/* Override root layout: kill main scroll + padding so floorplan owns the full space */
+		main#main-content {
+			overflow: hidden !important;
+			padding: 0 !important;
+		}
+		main#main-content > div {
+			height: 100% !important;
+			max-width: none !important;
+		}
+	</style>
+</svelte:head>
+
 <svelte:window on:beforeunload={handleBeforeUnload} on:keydown={handleUndoKeydown} />
 
-<div class="flex flex-col h-screen overflow-hidden">
+<div class="flex flex-col h-full overflow-hidden">
 	<!-- Header -->
-	<div class="flex items-center gap-4 px-6 py-3 border-b bg-background">
+	<div class="flex items-center gap-4 px-6 py-3 border-b bg-background shrink-0">
 		<a href="/properties" class="text-muted-foreground hover:text-foreground text-sm">
 			&larr; Properties
 		</a>
@@ -732,7 +766,7 @@
 				onToolChange={(t) => (drawTool = t)}
 			/>
 
-			<div class="flex-1 overflow-hidden">
+			<div class="flex-1 min-h-0 overflow-hidden flex flex-col">
 				{#if !floorLayoutItemsStore.initialized}
 					<div class="h-full flex items-center justify-center text-muted-foreground">
 						Loading floor plan...
@@ -766,6 +800,7 @@
 					floors={propertyFloors}
 					allItems={floorLayoutItemsStore.value}
 					rentalUnits={propertyUnits}
+					{unitTenantsMap}
 					{selectedFloorId}
 					onUnitClick={(unitId) => {
 						console.log('Unit clicked:', unitId);
@@ -782,23 +817,25 @@
 				<p class="text-xs text-muted-foreground">
 					Removing walls broke {brokenRooms.length} room assignment{brokenRooms.length !== 1 ? 's' : ''}. These rooms are no longer enclosed:
 				</p>
-				<ul class="text-xs space-y-1 max-h-32 overflow-y-auto">
+				<ul class="text-xs space-y-1.5 max-h-40 overflow-y-auto">
 					{#each brokenRooms as b (b.id)}
-						<li class="px-2 py-1 bg-red-50 rounded text-red-700 border border-red-200">{b.label}</li>
+						<li class="flex items-center justify-between gap-2 px-2 py-1.5 bg-red-50 rounded border border-red-200">
+							<span class="text-red-700 truncate">{b.label}</span>
+							<button
+								class="shrink-0 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-medium hover:bg-red-700"
+								onclick={() => confirmUnassignBrokenSingle(b.id)}
+							>
+								Unassign
+							</button>
+						</li>
 					{/each}
 				</ul>
-				<div class="flex gap-2">
+				<div class="flex justify-end">
 					<button
-						class="flex-1 px-3 py-1.5 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700"
-						onclick={confirmUnassignBroken}
-					>
-						Unassign
-					</button>
-					<button
-						class="flex-1 px-3 py-1.5 rounded border text-xs hover:bg-secondary"
+						class="px-3 py-1.5 rounded border text-xs hover:bg-secondary"
 						onclick={dismissBrokenConfirm}
 					>
-						Keep anyway
+						Keep all
 					</button>
 				</div>
 			</div>

@@ -7,12 +7,14 @@
 		floors,
 		allItems,
 		rentalUnits,
+		unitTenantsMap,
 		selectedFloorId,
 		onUnitClick
 	}: {
 		floors: any[];
 		allItems: FloorLayoutItem[];
 		rentalUnits: any[];
+		unitTenantsMap: Map<string, { name: string; status: string }[]>;
 		selectedFloorId: string | null;
 		onUnitClick: (rentalUnitId: string) => void;
 	} = $props();
@@ -24,6 +26,7 @@
 			{floors}
 			{allItems}
 			{rentalUnits}
+			{unitTenantsMap}
 			{selectedFloorId}
 			{onUnitClick}
 		/>
