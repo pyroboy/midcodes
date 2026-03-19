@@ -83,9 +83,65 @@ const COLLECTIONS = [
 	'floor_layout_items'
 ];
 
-const MAX_LOG_ENTRIES = 50;
+const MAX_LOG_ENTRIES = 100;
 const NEON_USAGE_KEY = '__dorm_neon_usage';
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
+const LOG_DB_NAME = 'dorm_sync_logs';
+const LOG_STORE_NAME = 'entries';
+
+/** Open (or create) the IndexedDB database for persistent logs. */
+function openLogDb(): Promise<IDBDatabase> {
+	return new Promise((resolve, reject) => {
+		if (typeof indexedDB === 'undefined') return reject(new Error('No indexedDB'));
+		const req = indexedDB.open(LOG_DB_NAME, 1);
+		req.onupgradeneeded = () => {
+			const db = req.result;
+			if (!db.objectStoreNames.contains(LOG_STORE_NAME)) {
+				db.createObjectStore(LOG_STORE_NAME);
+			}
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+}
+
+/** Persist log entries to IndexedDB (fire-and-forget). */
+function persistLogs(entries: StatusLogEntry[]) {
+	openLogDb()
+		.then((db) => {
+			const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
+			tx.objectStore(LOG_STORE_NAME).put(entries.slice(0, MAX_LOG_ENTRIES), 'logs');
+			tx.oncomplete = () => db.close();
+			tx.onerror = () => db.close();
+		})
+		.catch(() => { /* IndexedDB unavailable — non-critical */ });
+}
+
+/** Load persisted log entries from IndexedDB. */
+function loadPersistedLogs(): Promise<StatusLogEntry[]> {
+	return openLogDb()
+		.then((db) => {
+			return new Promise<StatusLogEntry[]>((resolve) => {
+				const tx = db.transaction(LOG_STORE_NAME, 'readonly');
+				const req = tx.objectStore(LOG_STORE_NAME).get('logs');
+				req.onsuccess = () => { db.close(); resolve(req.result || []); };
+				req.onerror = () => { db.close(); resolve([]); };
+			});
+		})
+		.catch(() => []);
+}
+
+/** Clear all persisted logs from IndexedDB. */
+function clearPersistedLogs() {
+	openLogDb()
+		.then((db) => {
+			const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
+			tx.objectStore(LOG_STORE_NAME).delete('logs');
+			tx.oncomplete = () => db.close();
+			tx.onerror = () => db.close();
+		})
+		.catch(() => { /* non-critical */ });
+}
 
 function hydrateNeonUsage(): NeonUsageStats | null {
 	if (typeof localStorage === 'undefined') return null;
@@ -515,6 +571,12 @@ function createSyncStatusStore() {
 	// Deferred save: tracks unsaved local edits (e.g., floor plan changes awaiting Save)
 	let unsavedEdits = $state(0);
 
+	// Neon row counts (from /api/rxdb/counts)
+	let neonCounts = $state<Record<string, number> | null>(null);
+	let neonCountsLoading = $state(false);
+	let neonCountsError = $state<string | null>(null);
+	let neonCountsFetchedAt = $state<number | null>(null);
+
 	// Neon interaction tracking
 	let neonUsage = $state<NeonUsageStats>(
 		hydrateNeonUsage() ?? {
@@ -525,8 +587,20 @@ function createSyncStatusStore() {
 		}
 	);
 
-	// Status log (newest first)
+	// Status log (newest first) — persisted to IndexedDB
 	let logs = $state<StatusLogEntry[]>([]);
+	let logsHydrated = false;
+
+	// Hydrate logs from IndexedDB on first load (no top-level await — Safari bug)
+	if (typeof indexedDB !== 'undefined') {
+		loadPersistedLogs().then((persisted) => {
+			if (persisted.length > 0 && !logsHydrated) {
+				// Merge: keep any logs added during init, prepend them to persisted
+				logs = [...logs, ...persisted].slice(0, MAX_LOG_ENTRIES);
+			}
+			logsHydrated = true;
+		}).catch(() => { logsHydrated = true; });
+	}
 
 	function addLog(message: string, level: StatusLogEntry['level'] = 'info') {
 		const entry: StatusLogEntry = {
@@ -535,6 +609,13 @@ function createSyncStatusStore() {
 			level
 		};
 		logs = [entry, ...logs].slice(0, MAX_LOG_ENTRIES);
+		// Persist to IndexedDB (fire-and-forget)
+		persistLogs(logs);
+	}
+
+	function clearLogs() {
+		logs = [];
+		clearPersistedLogs();
 	}
 
 	function setPhase(p: SyncPhase) {
@@ -795,6 +876,65 @@ function createSyncStatusStore() {
 	}
 
 	/**
+	 * Fetch total row counts from Neon for all synced tables.
+	 * Cached for 30s to prevent rapid re-clicks. Pass force=true to bypass cache.
+	 */
+	/**
+	 * Fetch total row counts from Neon for all synced tables.
+	 * Also refreshes local RxDB counts (via callback) so the comparison is fresh-to-fresh.
+	 * Cached for 30s to prevent rapid re-clicks. Pass force=true to bypass cache.
+	 * @param refreshLocal Optional callback to refresh local RxDB doc counts before comparing.
+	 */
+	async function fetchNeonCounts(force?: boolean, refreshLocal?: () => Promise<Record<string, number>>) {
+		// Skip if cached and fresh (< 30s) unless forced
+		if (!force && neonCounts && neonCountsFetchedAt && Date.now() - neonCountsFetchedAt < 30_000) return;
+		neonCountsLoading = true;
+		neonCountsError = null;
+		try {
+			// Refresh local counts first so comparison is fresh-to-fresh
+			if (refreshLocal) {
+				await refreshLocal();
+				addLog('Local RxDB counts refreshed', 'info');
+			}
+
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 8000);
+			const res = await fetch('/api/rxdb/counts', { signal: controller.signal });
+			clearTimeout(timeout);
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({}));
+				throw new Error(body.error || `HTTP ${res.status}`);
+			}
+			const data = await res.json();
+			neonCounts = data.counts;
+			neonCountsFetchedAt = data.fetchedAt;
+
+			// Log per-collection match/mismatch
+			let matched = 0;
+			let mismatched = 0;
+			for (const col of collections) {
+				const neon = data.counts[col.name];
+				if (neon === undefined) continue;
+				if (col.docCount === neon) {
+					matched++;
+				} else {
+					mismatched++;
+				}
+			}
+			if (mismatched === 0) {
+				addLog(`Neon counts fetched (${data.latencyMs}ms) — all ${matched} collections match ✓`, 'success');
+			} else {
+				addLog(`Neon counts fetched (${data.latencyMs}ms) — ${mismatched} mismatch(es), ${matched} match`, 'warn');
+			}
+		} catch (err: any) {
+			neonCountsError = err?.name === 'AbortError' ? 'Timeout (8s)' : (err?.message || 'Failed to fetch counts');
+			addLog(`Neon counts failed: ${neonCountsError}`, 'error');
+		} finally {
+			neonCountsLoading = false;
+		}
+	}
+
+	/**
 	 * W9: Get the age of the oldest lastSyncedAt across given collection names.
 	 * Returns { age: string, stale: boolean } or null if none have synced.
 	 */
@@ -838,6 +978,10 @@ function createSyncStatusStore() {
 		get estimatedComputeSeconds() { return neonUsage.totalLatencyMs * 0.3 / 1000; },
 		get estimatedTransferKB() { return neonUsage.totalBytesReceived / 1024; },
 		get totalNeonQueries() { return neonUsage.pullCount + neonUsage.pushCount + neonUsage.healthCheckCount; },
+		get neonCounts() { return neonCounts; },
+		get neonCountsLoading() { return neonCountsLoading; },
+		get neonCountsError() { return neonCountsError; },
+		get neonCountsFetchedAt() { return neonCountsFetchedAt; },
 		get neonBilling() { return neonBilling; },
 		get neonBillingError() { return neonBillingError; },
 		get neonBillingLoading() { return neonBillingLoading; },
@@ -882,10 +1026,12 @@ function createSyncStatusStore() {
 		setNeonHealthDirect,
 		setRxdbHealth,
 		addLog,
+		clearLogs,
 		recordPull,
 		recordPush,
 		recordHealthCheck,
 		fetchNeonBilling,
+		fetchNeonCounts,
 		getCollectionAge,
 		markMutationResolved,
 		setVersionInfo,

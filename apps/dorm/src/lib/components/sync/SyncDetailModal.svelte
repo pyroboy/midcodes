@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
 	import { mutationQueue } from '$lib/stores/mutation-queue.svelte';
-	import { resyncAll, resyncCollection, pauseSync, resumeSync } from '$lib/db/replication';
+	import {
+		resyncAll,
+		resyncCollection,
+		pauseSync,
+		resumeSync,
+		reconcile,
+		refreshLocalCounts,
+		type ResyncResult,
+		type ReconcileResult
+	} from '$lib/db/replication';
 	import { getStorageTrend } from '$lib/db/storage-monitor';
 	import {
 		Dialog,
@@ -47,14 +56,23 @@
 
 	let { open = $bindable(false) } = $props();
 	let isResyncing = $state(false);
+	let isReconciling = $state(false);
+	let lastReconcileResult = $state<ReconcileResult | null>(null);
 	// W5: Per-collection retry state
 	let resyncingCollections = $state<Set<string>>(new Set());
 
 	async function handleResyncCollection(name: string) {
 		resyncingCollections = new Set([...resyncingCollections, name]);
 		try {
-			await resyncCollection(name);
-			toast.success(`${collectionLabels[name] || name} resynced`);
+			const result = await resyncCollection(name);
+			const label = collectionLabels[name] || name;
+			if (result.status === 'skipped' && result.reason === 'neon_down') {
+				toast.error(`Cannot resync ${label} — server is unreachable`);
+			} else if (result.status === 'skipped' && result.reason === 'not_started') {
+				toast.warning(`${label} sync not started yet — visit its page first`);
+			} else {
+				toast.success(`${label} resynced`);
+			}
 		} catch {
 			toast.error(`Failed to resync ${collectionLabels[name] || name}`);
 		} finally {
@@ -174,8 +192,16 @@
 	async function handleRetryAllFailed() {
 		isRetryingAllFailed = true;
 		try {
-			await Promise.all(errorCollectionsList.map((c) => resyncCollection(c.name)));
-			toast.success(`Retried ${errorCollectionsList.length} failed collection(s)`);
+			const results = await Promise.all(errorCollectionsList.map((c) => resyncCollection(c.name)));
+			const synced = results.filter((r) => r.status === 'ok').length;
+			const skipped = results.filter((r) => r.status === 'skipped').length;
+			if (skipped === results.length && results[0]?.reason === 'neon_down') {
+				toast.error('Cannot retry — server is unreachable');
+			} else if (skipped > 0) {
+				toast.warning(`Retried ${synced} collection(s), ${skipped} skipped`);
+			} else {
+				toast.success(`Retried ${synced} failed collection(s)`);
+			}
 		} catch {
 			toast.error('Some retries failed');
 		} finally {
@@ -187,13 +213,51 @@
 		isResyncing = true;
 		try {
 			syncStatus.addLog('Manual resync started', 'info');
-			syncStatus.checkNeonHealth();
-			await resyncAll();
-			toast.success('All collections resynced');
+			const result = await resyncAll();
+			if (result.status === 'skipped' && result.reason === 'neon_down') {
+				toast.error('Cannot resync — server is unreachable');
+			} else if (result.status === 'partial') {
+				toast.warning(`Partial resync: ${result.synced} synced, ${result.skipped} skipped`);
+			} else {
+				toast.success('All collections resynced');
+			}
 		} catch (err) {
 			toast.error('Resync failed');
 		} finally {
 			isResyncing = false;
+		}
+	}
+
+	async function handleReconcile() {
+		isReconciling = true;
+		lastReconcileResult = null;
+		try {
+			const result = await reconcile();
+			lastReconcileResult = result;
+
+			// Refresh Neon counts so the side-by-side display updates post-fix
+			await syncStatus.fetchNeonCounts(true, refreshLocalCounts);
+
+			if (result.status === 'skipped') {
+				toast.error(result.reason || 'Cannot reconcile');
+			} else if (result.status === 'error') {
+				toast.error(result.reason || 'Reconciliation failed');
+			} else if (result.verified && result.totalOrphansRemoved === 0 && result.totalMissingFetched === 0) {
+				toast.success('All collections verified — true mirror of server ✓');
+			} else if (result.verified) {
+				toast.success(
+					`Fixed ${result.totalOrphansRemoved} orphan(s), fetched ${result.totalMissingFetched} missing — verified ✓`
+				);
+			} else {
+				const unverified = result.collections.filter((c) => !c.verified).length;
+				toast.warning(
+					`Fixed ${result.totalOrphansRemoved} orphan(s), fetched ${result.totalMissingFetched} missing — ${unverified} still mismatched`
+				);
+			}
+		} catch {
+			toast.error('Reconciliation failed');
+		} finally {
+			isReconciling = false;
 		}
 	}
 
@@ -347,6 +411,17 @@
 				`Compute: ${syncStatus.neonBilling.compute.used} / ${syncStatus.neonBilling.compute.limit} ${syncStatus.neonBilling.compute.unit}`,
 				`Storage: ${syncStatus.neonBilling.storage.used} / ${syncStatus.neonBilling.storage.limit} ${syncStatus.neonBilling.storage.unit}`,
 				`Transfer: ${syncStatus.neonBilling.transfer.used} / ${syncStatus.neonBilling.transfer.limit} ${syncStatus.neonBilling.transfer.unit}`,
+				``
+			] : []),
+			...(syncStatus.neonCounts ? [
+				`=== Neon vs RxDB Counts ===`,
+				...syncStatus.collections.map((c) => {
+					const neon = syncStatus.neonCounts?.[c.name];
+					const diff = neon !== undefined ? c.docCount - neon : null;
+					const status = diff === null ? '?' : diff === 0 ? '✓' : `⚠ ${diff > 0 ? `+${diff} extra` : `${diff} missing`}`;
+					return `  ${c.name}: rxdb=${c.docCount} neon=${neon ?? '?'} ${status}`;
+				}),
+				`Checked at: ${syncStatus.neonCountsFetchedAt ? new Date(syncStatus.neonCountsFetchedAt).toLocaleString() : 'never'}`,
 				``
 			] : []),
 			`=== Collections ===`,
@@ -606,8 +681,48 @@
 		<!-- Tab content — min-h-0 is critical for flex overflow scroll -->
 		<div class="min-h-0 flex-1 overflow-y-auto pr-1">
 			{#if activeTab === 'collections'}
-				{#if errorCollectionsList.length > 1}
-					<div class="flex justify-end px-3 py-1.5">
+				<!-- Check Counts + Retry All Failed -->
+				<div class="flex items-center justify-between px-3 py-1.5">
+					<div class="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 text-[11px] gap-1"
+							onclick={() => syncStatus.fetchNeonCounts(true, refreshLocalCounts)}
+							disabled={syncStatus.neonCountsLoading}
+						>
+							{#if syncStatus.neonCountsLoading}
+								<Loader2 class="w-3 h-3 animate-spin" />
+							{:else}
+								<Cloud class="w-3 h-3" />
+							{/if}
+							Check Counts
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 text-[11px] gap-1"
+							onclick={handleReconcile}
+							disabled={isReconciling || syncStatus.paused}
+							title="Compare local data against server and fix any mismatches"
+						>
+							{#if isReconciling}
+								<Loader2 class="w-3 h-3 animate-spin" />
+							{:else}
+								<ArrowLeftRight class="w-3 h-3" />
+							{/if}
+							Reconcile
+						</Button>
+						{#if syncStatus.neonCountsFetchedAt}
+							<span class="text-[10px] text-muted-foreground">
+								checked {new Date(syncStatus.neonCountsFetchedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+							</span>
+						{/if}
+						{#if syncStatus.neonCountsError}
+							<span class="text-[10px] text-red-500 truncate max-w-[120px]" title={syncStatus.neonCountsError}>{syncStatus.neonCountsError}</span>
+						{/if}
+					</div>
+					{#if errorCollectionsList.length > 1}
 						<Button
 							variant="outline"
 							size="sm"
@@ -618,6 +733,50 @@
 							<RefreshCw class="w-3 h-3 {isRetryingAllFailed ? 'animate-spin' : ''}" />
 							Retry all failed ({errorCollectionsList.length})
 						</Button>
+					{/if}
+				</div>
+				{#if lastReconcileResult && lastReconcileResult.status === 'ok'}
+					{@const r = lastReconcileResult}
+					{@const drifted = r.collections.filter((c) => !c.inSync)}
+					{@const unverified = r.collections.filter((c) => !c.verified)}
+					{@const isFullyVerified = r.verified && unverified.length === 0}
+					<div class="mx-3 mb-2 px-3 py-2 rounded-md border space-y-1 {isFullyVerified ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'}">
+						<div class="flex items-center gap-1.5">
+							{#if isFullyVerified && drifted.length === 0}
+								<CheckCircle class="w-3.5 h-3.5 text-emerald-500" />
+								<span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">All {r.collections.length} collections verified — true mirror of server ✓</span>
+							{:else if isFullyVerified && drifted.length > 0}
+								<CheckCircle class="w-3.5 h-3.5 text-emerald-500" />
+								<span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+									Fixed {drifted.length} collection(s) and verified ✓ — {r.totalOrphansRemoved} orphan(s) removed, {r.totalMissingFetched} missing fetched
+								</span>
+							{:else}
+								<AlertTriangle class="w-3.5 h-3.5 text-amber-500" />
+								<span class="text-xs font-medium text-amber-700 dark:text-amber-400">
+									{#if drifted.length > 0}
+										Fixed {drifted.length} collection(s): {r.totalOrphansRemoved} orphan(s) removed, {r.totalMissingFetched} missing fetched —
+									{/if}
+									{unverified.length} collection(s) still mismatched after fix
+								</span>
+							{/if}
+						</div>
+						{#if drifted.length > 0}
+							{#each drifted as d}
+								<div class="text-[10px] pl-5 {d.verified ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
+									{collectionLabels[d.name] || d.name}: server {d.serverCount}, local had {d.localCount}
+									{#if d.orphansRemoved > 0} — removed {d.orphansRemoved}{/if}
+									{#if d.missingFetched > 0} — fetched {d.missingFetched}{/if}
+									{#if d.verified} — verified ✓{:else} — still mismatched ({d.verifiedLocalCount}/{d.verifiedServerCount}){/if}
+								</div>
+							{/each}
+						{/if}
+						{#if unverified.length > 0 && drifted.length === 0}
+							{#each unverified as u}
+								<div class="text-[10px] text-amber-600 dark:text-amber-400 pl-5">
+									{collectionLabels[u.name] || u.name}: local {u.verifiedLocalCount ?? u.localCount} vs server {u.verifiedServerCount ?? u.serverCount}
+								</div>
+							{/each}
+						{/if}
 					</div>
 				{/if}
 				<div class="space-y-0.5">
@@ -625,6 +784,7 @@
 						{@const Icon = getStatusIcon(col.status)}
 						{@const isExpanded = expandedCollection === col.name}
 						{@const hasError = col.status === 'error' && (col.parsedError || col.error)}
+						{@const hasMismatch = syncStatus.neonCounts !== null && syncStatus.neonCounts[col.name] !== undefined && col.docCount !== syncStatus.neonCounts[col.name]}
 						<div>
 							<button
 								type="button"
@@ -632,7 +792,11 @@
 								class="w-full flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 transition-colors cursor-pointer text-left"
 							>
 								<div class="flex items-center gap-2.5 min-w-0">
-									<Icon class="w-4 h-4 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
+									{#if hasMismatch && col.status === 'synced'}
+										<AlertTriangle class="w-4 h-4 flex-shrink-0 text-amber-500" />
+									{:else}
+										<Icon class="w-4 h-4 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
+									{/if}
 									<span class="text-sm truncate">{collectionLabels[col.name] || col.name}</span>
 								</div>
 								<div class="flex items-center gap-2 flex-shrink-0">
@@ -645,11 +809,23 @@
 										<!-- W12: Show pulled doc count during sync -->
 										<span class="text-[10px] text-blue-500 tabular-nums font-medium">↓ {syncStatus.pulledDocs[col.name]}</span>
 									{:else if col.docCount > 0}
-										<span class="text-[10px] text-muted-foreground tabular-nums">{col.docCount}</span>
+										{@const neonCount = syncStatus.neonCounts?.[col.name]}
+										{#if neonCount !== undefined && neonCount !== null}
+											{@const match = col.docCount === neonCount}
+											<span class="text-[10px] tabular-nums font-medium {match ? 'text-emerald-500' : 'text-amber-500'}">
+												{col.docCount}/{neonCount} {match ? '✓' : '⚠'}
+											</span>
+										{:else}
+											<span class="text-[10px] text-muted-foreground tabular-nums">{col.docCount}</span>
+										{/if}
 									{/if}
-									<Badge variant={getBadgeVariant(col.status)} class="text-[10px] px-1.5 py-0">
-										{col.status}
-									</Badge>
+									{#if hasMismatch && col.status === 'synced'}
+										<Badge variant="outline" class="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600">mismatch</Badge>
+									{:else}
+										<Badge variant={getBadgeVariant(col.status)} class="text-[10px] px-1.5 py-0">
+											{col.status}
+										</Badge>
+									{/if}
 									{#if col.status === 'error'}
 										<!-- W5: Per-collection retry button -->
 										<button
@@ -661,7 +837,7 @@
 											<RefreshCw class="w-3 h-3 text-red-500 hover:text-red-700 {resyncingCollections.has(col.name) ? 'animate-spin' : ''}" />
 										</button>
 									{/if}
-									{#if hasError}
+									{#if hasError || hasMismatch}
 										<ChevronDown class="w-3 h-3 text-muted-foreground transition-transform {isExpanded ? 'rotate-180' : ''}" />
 									{/if}
 								</div>
@@ -703,10 +879,28 @@
 								</div>
 							{/if}
 							{#if isExpanded && !hasError}
+								{@const neonCount = syncStatus.neonCounts?.[col.name]}
+								{@const hasCounts = neonCount !== undefined && neonCount !== null}
+								{@const diff = hasCounts ? col.docCount - neonCount : 0}
 								<div class="mx-3 mb-2 px-3 py-2 bg-muted/20 rounded-md space-y-1">
 									<div class="flex items-start gap-2">
-										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">Docs</span>
-										<span class="text-xs tabular-nums">{col.docCount.toLocaleString()}</span>
+										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">RxDB</span>
+										<span class="text-xs tabular-nums">{col.docCount.toLocaleString()} docs</span>
+									</div>
+									<div class="flex items-start gap-2">
+										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">Neon</span>
+										{#if hasCounts}
+											<span class="text-xs tabular-nums">{neonCount.toLocaleString()} docs</span>
+											{#if diff === 0}
+												<Badge variant="secondary" class="text-[9px] px-1 py-0 text-emerald-600">In sync</Badge>
+											{:else if diff > 0}
+												<Badge variant="outline" class="text-[9px] px-1 py-0 border-amber-300 text-amber-600">+{diff} extra</Badge>
+											{:else}
+												<Badge variant="outline" class="text-[9px] px-1 py-0 border-amber-300 text-amber-600">{diff} missing</Badge>
+											{/if}
+										{:else}
+											<span class="text-xs text-muted-foreground">—</span>
+										{/if}
 									</div>
 									<div class="flex items-start gap-2">
 										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">Synced</span>
@@ -718,6 +912,19 @@
 					{/each}
 				</div>
 			{:else if activeTab === 'logs'}
+				{#if syncStatus.logs.length > 0}
+					<div class="flex justify-end px-3 py-1">
+						<Button
+							variant="ghost"
+							size="sm"
+							class="h-6 text-[11px] gap-1 text-muted-foreground"
+							onclick={() => syncStatus.clearLogs()}
+						>
+							<Trash2 class="w-3 h-3" />
+							Clear logs
+						</Button>
+					</div>
+				{/if}
 				{#if syncStatus.logs.length === 0}
 					<div class="flex flex-col items-center justify-center py-8 text-muted-foreground">
 						<Info class="w-8 h-8 mb-2 opacity-40" />

@@ -35,7 +35,7 @@ import {
 	transformPenaltyConfig,
 	transformFloorLayoutItem
 } from '$lib/server/transforms';
-import { and, or, gt, eq, asc, sql } from 'drizzle-orm';
+import { and, or, gt, eq, asc, sql, inArray } from 'drizzle-orm';
 
 // Allowlist of collections + their Drizzle table + transform function
 const COLLECTIONS: Record<
@@ -167,6 +167,23 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 	const { table, transform, updatedAtCol, idCol } = config;
 
 	try {
+		// --- Targeted fetch mode: ?ids=1,2,3 returns specific rows by ID ---
+		const idsParam = url.searchParams.get('ids');
+		if (idsParam) {
+			const ids = idsParam.split(',').map(Number).filter((n) => !isNaN(n));
+			if (ids.length === 0) {
+				return json({ documents: [] });
+			}
+			// Cap at 500 to prevent abuse
+			const rows = await db
+				.select({ _all: table })
+				.from(table)
+				.where(inArray(idCol, ids.slice(0, 500)));
+			const documents = rows.map((r) => transform(r._all));
+			return json({ documents });
+		}
+
+		// --- Standard checkpoint-based pull ---
 		// Use COALESCE to handle NULL updated_at — treat NULL as epoch so rows are always included
 		const coalesced = sql`COALESCE(${updatedAtCol}, '1970-01-01T00:00:00Z'::timestamptz)`;
 		// IMPORTANT: Cast the checkpoint as a raw timestamptz string, NOT new Date().

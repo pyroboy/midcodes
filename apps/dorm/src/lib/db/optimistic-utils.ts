@@ -139,7 +139,7 @@ export function bgResync(collection: string) {
 							await restoreLostWalls(wallSnapshot);
 						}
 						console.log(`[Optimistic] Resync "${collection}" complete ✓`);
-						syncStatus.addLog(`Resync: ${collection} reconciled with Neon ✓`, 'success');
+						syncStatus.addLog(`Resync: ${collection} pulled from Neon ✓`, 'success');
 						syncStatus.markMutationResolved();
 					})
 					.catch((err) => {
