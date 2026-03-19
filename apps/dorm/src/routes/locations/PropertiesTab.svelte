@@ -18,9 +18,11 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { propertySchema, type Property } from '../properties/formSchema';
 	import { toast } from 'svelte-sonner';
-	import { Search, Building2 } from 'lucide-svelte';
+	import { Search, Building2, Pencil, Trash2, LayoutGrid } from 'lucide-svelte';
+	import { getStatusClasses } from '$lib/utils/format';
 	import { propertiesStore } from '$lib/stores/collections.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
+	import { bufferedMutation } from '$lib/db/optimistic-utils';
 
 	interface Props {
 		propertyForm: any;
@@ -54,6 +56,9 @@
 	let showDeleteDialog = $state(false);
 	let propertyToDelete = $state<Property | null>(null);
 
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+
 	const {
 		form: formData,
 		enhance,
@@ -67,13 +72,16 @@
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
+		onSubmit: () => {
+			savedFormData = { ...$formData };
+		},
 		onError: ({ result }) => {
 			toast.error('Error saving property');
 		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
 				const serverForm = (result as any).data?.form?.data;
-				const fd = serverForm ?? $formData;
+				const fd = serverForm ?? savedFormData;
 				toast.success(editMode ? 'Property updated' : 'Property created');
 				editMode = false;
 				showModal = false;
@@ -115,19 +123,6 @@
 		showModal = true;
 	}
 
-	function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
-		switch (status) {
-			case 'ACTIVE':
-				return 'secondary';
-			case 'INACTIVE':
-				return 'destructive';
-			case 'MAINTENANCE':
-				return 'outline';
-			default:
-				return 'default';
-		}
-	}
-
 	function handleDeleteProperty(property: Property) {
 		propertyToDelete = property;
 		showDeleteDialog = true;
@@ -137,27 +132,34 @@
 		if (!propertyToDelete) return;
 
 		const deletingId = propertyToDelete.id;
-		await optimisticDeleteProperty(deletingId);
-
 		showDeleteDialog = false;
 		propertyToDelete = null;
 
 		const deleteFormData = new FormData();
 		deleteFormData.append('id', String(deletingId));
 
-		const response = await fetch('?/propertyDelete', {
-			method: 'POST',
-			body: deleteFormData
+		await bufferedMutation({
+			label: `Delete Property #${deletingId}`,
+			collection: 'properties',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteProperty(deletingId);
+			},
+			serverAction: async () => {
+				const response = await fetch('?/propertyDelete', {
+					method: 'POST',
+					body: deleteFormData
+				});
+				if (!response.ok) throw new Error('Server rejected delete');
+				return response;
+			},
+			onSuccess: async () => {
+				toast.success('Property deleted');
+			},
+			onFailure: async () => {
+				toast.error('Failed to delete property');
+			}
 		});
-
-		if (!response.ok) {
-			const result = await response.json();
-			toast.error(`Failed to delete property: ${result.error || 'Unknown error'}`);
-			const { resyncCollection } = await import('$lib/db/replication');
-			resyncCollection('properties');
-		} else {
-			toast.success('Property deleted');
-		}
 	}
 
 	function handleCancel() {
@@ -214,25 +216,37 @@
 								<td class="px-6 py-4 hidden sm:table-cell">{property.address}</td>
 								<td class="px-6 py-4 hidden md:table-cell">{property.type}</td>
 								<td class="px-6 py-4">
-									<Badge variant={getStatusVariant(property.status)}>
+									<Badge class={getStatusClasses(property.status)}>
 										{property.status}
 									</Badge>
 								</td>
 								<td class="px-6 py-4">
 									<div class="flex items-center justify-end gap-2">
+										<a
+											href="/property/{property.id}/floorplan"
+											class="inline-flex items-center justify-center rounded-md h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors"
+											onclick={(e) => e.stopPropagation()}
+											title="Floor Plan"
+										>
+											<span class="sr-only">Floor Plan</span>
+											<LayoutGrid class="h-4 w-4" />
+										</a>
 										<Button
-											size="sm"
-											variant="outline"
+											size="icon"
+											variant="ghost"
 											onclick={(e) => { e.stopPropagation(); handlePropertyClick(property); }}
 										>
-											Edit
+											<span class="sr-only">Edit</span>
+											<Pencil class="h-4 w-4" />
 										</Button>
 										<Button
-											size="sm"
-											variant="destructive"
+											size="icon"
+											variant="ghost"
+											class="text-destructive hover:text-destructive"
 											onclick={(e) => { e.stopPropagation(); handleDeleteProperty(property); }}
 										>
-											Delete
+											<span class="sr-only">Delete</span>
+											<Trash2 class="h-4 w-4" />
 										</Button>
 									</div>
 								</td>

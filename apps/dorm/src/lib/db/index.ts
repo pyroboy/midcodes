@@ -3,6 +3,7 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
 import { RxDBCleanupPlugin } from 'rxdb/plugins/cleanup';
+import { RxDBLeaderElectionPlugin } from 'rxdb/plugins/leader-election';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import {
 	tenantSchema,
@@ -18,7 +19,8 @@ import {
 	paymentAllocationSchema,
 	expenseSchema,
 	budgetSchema,
-	penaltyConfigSchema
+	penaltyConfigSchema,
+	floorLayoutItemSchema
 } from './schemas';
 
 import { dev } from '$app/environment';
@@ -32,6 +34,7 @@ if (!pluginsRegistered) {
 	addRxPlugin(RxDBUpdatePlugin);
 	addRxPlugin(RxDBQueryBuilderPlugin);
 	addRxPlugin(RxDBCleanupPlugin);
+	addRxPlugin(RxDBLeaderElectionPlugin);
 	addRxPlugin(RxDBMigrationSchemaPlugin);
 	pluginsRegistered = true;
 }
@@ -46,21 +49,37 @@ if (dev) {
 	devModeReady = Promise.resolve();
 }
 
+// Shared collection config: identity migration + no auto-cleanup timer
+// (we call cleanup(0) explicitly in pruning.ts — the auto-timer crashes on HMR)
+const col = (schema: any) => ({
+	schema,
+	migrationStrategies: IDENTITY_MIGRATION,
+	cleanup: { minimumDeletedTime: Infinity, autoStart: false }
+});
+
+// New collections starting at version 0 — no migration strategy needed
+const col0 = (schema: any) => ({
+	schema,
+	migrationStrategies: {},
+	cleanup: { minimumDeletedTime: Infinity, autoStart: false }
+});
+
 const COLLECTIONS = {
-	tenants: { schema: tenantSchema, migrationStrategies: IDENTITY_MIGRATION },
-	leases: { schema: leaseSchema, migrationStrategies: IDENTITY_MIGRATION },
-	lease_tenants: { schema: leaseTenantSchema, migrationStrategies: IDENTITY_MIGRATION },
-	rental_units: { schema: rentalUnitSchema, migrationStrategies: IDENTITY_MIGRATION },
-	properties: { schema: propertySchema, migrationStrategies: IDENTITY_MIGRATION },
-	floors: { schema: floorSchema, migrationStrategies: IDENTITY_MIGRATION },
-	meters: { schema: meterSchema, migrationStrategies: IDENTITY_MIGRATION },
-	readings: { schema: readingSchema, migrationStrategies: IDENTITY_MIGRATION },
-	billings: { schema: billingSchema, migrationStrategies: IDENTITY_MIGRATION },
-	payments: { schema: paymentSchema, migrationStrategies: IDENTITY_MIGRATION },
-	payment_allocations: { schema: paymentAllocationSchema, migrationStrategies: IDENTITY_MIGRATION },
-	expenses: { schema: expenseSchema, migrationStrategies: IDENTITY_MIGRATION },
-	budgets: { schema: budgetSchema, migrationStrategies: IDENTITY_MIGRATION },
-	penalty_configs: { schema: penaltyConfigSchema, migrationStrategies: IDENTITY_MIGRATION }
+	tenants: col(tenantSchema),
+	leases: col(leaseSchema),
+	lease_tenants: col(leaseTenantSchema),
+	rental_units: col(rentalUnitSchema),
+	properties: col(propertySchema),
+	floors: col(floorSchema),
+	meters: col(meterSchema),
+	readings: col(readingSchema),
+	billings: col(billingSchema),
+	payments: col(paymentSchema),
+	payment_allocations: col(paymentAllocationSchema),
+	expenses: col(expenseSchema),
+	budgets: col(budgetSchema),
+	penalty_configs: col(penaltyConfigSchema),
+	floor_layout_items: col0(floorLayoutItemSchema)
 };
 
 // Store the singleton on globalThis to survive Vite's production code-splitting

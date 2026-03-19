@@ -15,7 +15,8 @@ import {
 	paymentAllocations,
 	expenses,
 	budgets,
-	penaltyConfigs
+	penaltyConfigs,
+	floorLayoutItems
 } from '$lib/server/schema';
 import {
 	transformTenant,
@@ -31,7 +32,8 @@ import {
 	transformPaymentAllocation,
 	transformExpense,
 	transformBudget,
-	transformPenaltyConfig
+	transformPenaltyConfig,
+	transformFloorLayoutItem
 } from '$lib/server/transforms';
 import { and, or, gt, eq, asc, sql } from 'drizzle-orm';
 
@@ -123,6 +125,12 @@ const COLLECTIONS: Record<
 		transform: transformPenaltyConfig,
 		updatedAtCol: penaltyConfigs.updatedAt,
 		idCol: penaltyConfigs.id
+	},
+	floor_layout_items: {
+		table: floorLayoutItems,
+		transform: transformFloorLayoutItem,
+		updatedAtCol: floorLayoutItems.updatedAt,
+		idCol: floorLayoutItems.id
 	}
 };
 
@@ -131,6 +139,14 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
 	if (!locals.user) {
 		throw error(401, 'Unauthorized');
 	}
+
+	// TODO [W4]: Multi-property scoping — currently unscoped (single-org deployment)
+	// When multi-property support is needed:
+	// 1. Add `property_id` to user session / locals (from user→property assignment table)
+	// 2. Add WHERE clause: `eq(table.propertyId, locals.propertyId)` to the query
+	// 3. Handle collections without propertyId (e.g., tenants) via join through leases
+	// 4. Add property_id to the replication checkpoint to invalidate on property switch
+	// 5. Client: pass property_id as query param, clear RxDB on property switch
 
 	const collectionName = params.collection;
 	const config = COLLECTIONS[collectionName];

@@ -648,6 +648,20 @@ export const automationJobStatusEnum = pgEnum('automation_job_status', [
 	'FAILED'
 ]);
 
+export const floorLayoutItemTypeEnum = pgEnum('floor_layout_item_type', [
+	'RENTAL_UNIT',
+	'CORRIDOR',
+	'BATHROOM',
+	'KITCHEN',
+	'COMMON_ROOM',
+	'STAIRWELL',
+	'ELEVATOR',
+	'STORAGE',
+	'OFFICE',
+	'CUSTOM',
+	'WALL'
+]);
+
 export const notifications = pgTable('notifications', {
 	id: serial('id').primaryKey(),
 	userId: text('user_id'),
@@ -673,6 +687,26 @@ export const automationLogs = pgTable('automation_logs', {
 	startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
 	completedAt: timestamp('completed_at', { withTimezone: true }),
 	error: text('error')
+});
+
+// --- FLOOR PLAN ---
+
+export const floorLayoutItems = pgTable('floor_layout_items', {
+	id: serial('id').primaryKey(),
+	floorId: integer('floor_id')
+		.notNull()
+		.references(() => floors.id),
+	rentalUnitId: integer('rental_unit_id').references(() => rentalUnit.id),
+	itemType: floorLayoutItemTypeEnum('item_type').notNull(),
+	gridX: integer('grid_x').notNull(),
+	gridY: integer('grid_y').notNull(),
+	gridW: integer('grid_w').notNull().default(2),
+	gridH: integer('grid_h').notNull().default(2),
+	label: text('label'),
+	color: text('color'),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+	deletedAt: timestamp('deleted_at', { withTimezone: true })
 });
 
 // --- BETTER AUTH TABLES ---

@@ -110,7 +110,7 @@ export const rentalUnitSchema: RxJsonSchema<any> = {
 		floor_id: { type: 'string', maxLength: 20 },
 		type: { type: 'string', maxLength: 30 },
 		amenities: { type: ['object', 'null'] },
-		number: { type: 'number', minimum: 0, maximum: 99999, multipleOf: 1 },
+		number: { type: 'number', minimum: 0, maximum: 999999, multipleOf: 1 },
 		deleted_at: { type: ['string', 'null'] },
 	},
 	required: ['id', 'name', 'capacity', 'rental_unit_status', 'base_rate', 'property_id', 'floor_id', 'type', 'number'],
@@ -354,4 +354,29 @@ export const penaltyConfigSchema: RxJsonSchema<any> = {
 	},
 	required: ['id', 'type', 'grace_period', 'penalty_percentage'],
 	indexes: ['type']
+};
+
+// ─── Floor Layout Items ────────────────────────────────────────────────────
+
+export const floorLayoutItemSchema: RxJsonSchema<any> = {
+	version: 0,
+	primaryKey: 'id',
+	type: 'object',
+	properties: {
+		id: { type: 'string', maxLength: 20 },
+		floor_id: { type: 'string', maxLength: 20 },
+		rental_unit_id: { type: ['string', 'null'] },
+		item_type: { type: 'string', maxLength: 30 },
+		grid_x: { type: 'number', minimum: -9999, maximum: 9999, multipleOf: 1 },
+		grid_y: { type: 'number', minimum: -9999, maximum: 9999, multipleOf: 1 },
+		grid_w: { type: 'number', minimum: 0, maximum: 999, multipleOf: 1 },
+		grid_h: { type: 'number', minimum: 0, maximum: 999, multipleOf: 1 },
+		label: { type: ['string', 'null'] },
+		color: { type: ['string', 'null'] },
+		created_at: { type: ['string', 'null'] },
+		updated_at: { type: ['string', 'null'] },
+		deleted_at: { type: ['string', 'null'] }
+	},
+	required: ['id', 'floor_id', 'item_type', 'grid_x', 'grid_y', 'grid_w', 'grid_h'],
+	indexes: ['floor_id', 'item_type']
 };

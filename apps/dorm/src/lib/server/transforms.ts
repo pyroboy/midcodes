@@ -255,3 +255,21 @@ export function transformPenaltyConfig(row: any) {
 		deleted_at: ts(row.deletedAt),
 	};
 }
+
+export function transformFloorLayoutItem(row: any) {
+	return {
+		id: sid(row.id),
+		floor_id: sid(row.floorId),
+		rental_unit_id: row.rentalUnitId != null ? sid(row.rentalUnitId) : null,
+		item_type: row.itemType,
+		grid_x: row.gridX,
+		grid_y: row.gridY,
+		grid_w: row.gridW,
+		grid_h: row.gridH,
+		label: row.label ?? null,
+		color: row.color ?? null,
+		created_at: ts(row.createdAt),
+		updated_at: ts(row.updatedAt),
+		deleted_at: ts(row.deletedAt)
+	};
+}

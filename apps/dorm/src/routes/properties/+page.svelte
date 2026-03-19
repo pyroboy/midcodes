@@ -19,10 +19,12 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { propertySchema, type Property } from './formSchema';
 	import { toast } from 'svelte-sonner';
-	import { Plus, Search, Building2 } from 'lucide-svelte';
+	import { Plus, Search, Building2, LayoutGrid } from 'lucide-svelte';
 	import { propertiesStore } from '$lib/stores/collections.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
+	import { bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 
 	// ─── RxDB reactive store ───────────────────────────────────────────
 	// propertiesStore singleton is sorted by name asc in collections.svelte.ts
@@ -50,6 +52,11 @@
 	let showDeleteDialog = $state(false);
 	let propertyToDelete = $state<Property | null>(null);
 
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
+
 	const {
 		form: formData,
 		enhance,
@@ -63,30 +70,67 @@
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
-		onError: ({ result }) => {
+		onSubmit: async () => {
+			submitSeq++;
+			savedFormData = { ...$formData, _seq: submitSeq };
+			const isEdit = editMode;
+			// Close modal immediately for instant feel
+			showModal = false;
+			toast.info(isEdit ? 'Saving property...' : 'Creating property...');
+			// For updates: optimistic write to RxDB now
+			if (isEdit && savedFormData.id) {
+				rollback = await optimisticUpsertProperty({
+					id: savedFormData.id,
+					name: savedFormData.name,
+					address: savedFormData.address,
+					type: savedFormData.type,
+					status: savedFormData.status
+				});
+			}
+		},
+		onError: async ({ result }) => {
 			toast.error('Error saving property');
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('properties'));
 		},
 		onResult: async ({ result }) => {
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				if (rollback) { await rollback(); rollback = null; }
+				import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('properties'));
+				return;
+			}
+
 			if (result.type === 'success') {
 				const serverForm = (result as any).data?.form?.data;
-				const fd = serverForm ?? $formData;
-				const action = editMode ? 'updated' : 'created';
+				const fd = serverForm ?? savedFormData;
+				const action = savedFormData && editMode ? 'updated' : 'created';
 				toast.success(editMode ? 'Property updated' : 'Property created');
 				syncStatus.addLog(`Server: property "${fd.name}" ${action} on Neon ✓`, 'success');
 				editMode = false;
-				showModal = false;
-				// Optimistic upsert into RxDB — UI updates instantly
-				await optimisticUpsertProperty({
-					id: fd.id!,
-					name: fd.name,
-					address: fd.address,
-					type: fd.type,
-					status: fd.status
-				});
+				rollback = null; // Success — discard snapshot
+				// For creates: optimistic upsert with server-assigned ID
+				if (fd?.id) {
+					await optimisticUpsertProperty({
+						id: fd.id,
+						name: fd.name,
+						address: fd.address,
+						type: fd.type,
+						status: fd.status
+					});
+				}
 				reset();
 			} else if (result.type === 'failure') {
 				console.error(`[Properties] Server: property form action failed`, result);
 				syncStatus.addLog(`Server: property "${$formData.name}" save failed`, 'error');
+				toast.error('Failed to save property');
+				// Instant rollback, then confirm with resync
+				if (rollback) { await rollback(); rollback = null; }
+				import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('properties'));
 			}
 		}
 	});
@@ -97,8 +141,11 @@
 		showModal = true;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	function handlePropertyClick(property: Property) {
 		editMode = true;
+		editUpdatedAt = property.updated_at ?? null;
 		$formData = {
 			id: property.id,
 			name: property.name,
@@ -133,42 +180,28 @@
 		const deletingId = propertyToDelete.id;
 		const deletingName = propertyToDelete.name;
 
-		// Optimistic delete — UI updates instantly
-		await optimisticDeleteProperty(deletingId);
-
 		showDeleteDialog = false;
 		propertyToDelete = null;
 
-		// POST to server for actual deletion
-		syncStatus.addLog(`Server: deleting property "${deletingName}" → sending to Neon...`, 'info');
 		const deleteFormData = new FormData();
 		deleteFormData.append('id', String(deletingId));
 
-		try {
-			const response = await fetch('?/delete', {
-				method: 'POST',
-				body: deleteFormData
-			});
-
-			if (response.ok) {
+		await bufferedMutation({
+			label: `Delete Property: ${deletingName}`,
+			collection: 'properties',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteProperty(deletingId);
+			},
+			serverAction: async () => {
+				const response = await fetch('?/delete', { method: 'POST', body: deleteFormData });
+				if (!response.ok) throw new Error('Server rejected delete');
+				return response;
+			},
+			onSuccess: async () => {
 				toast.success('Property deleted');
-				syncStatus.addLog(`Server: property "${deletingName}" deleted on Neon ✓`, 'success');
-			} else {
-				const result = await response.json();
-				console.error(`[Properties] Server: delete rejected:`, result);
-				syncStatus.addLog(`Server: property delete rejected — ${result.error || 'Unknown'}`, 'error');
-				toast.error(`Failed to delete property: ${result.error || 'Unknown error'}`);
-				// Resync will restore the property if server delete failed
-				const { resyncCollection } = await import('$lib/db/replication');
-				resyncCollection('properties');
 			}
-		} catch (error) {
-			console.error(`[Properties] Server: delete network error:`, error);
-			syncStatus.addLog(`Server: property delete failed — ${error instanceof Error ? error.message : 'Network error'}`, 'error');
-			toast.error(`Failed to delete property: ${error instanceof Error ? error.message : 'Network error'}`);
-			const { resyncCollection } = await import('$lib/db/replication');
-			resyncCollection('properties');
-		}
+		});
 	}
 
 	function handleCancel() {
@@ -179,6 +212,7 @@
 </script>
 
 <div class="space-y-6">
+	<SyncErrorBanner collections={['properties']} />
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 		<div class="flex items-center gap-3">
@@ -213,8 +247,8 @@
 				<thead>
 					<tr>
 						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</th>
-						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
+						<th class="hidden sm:table-cell px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</th>
+						<th class="hidden sm:table-cell px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</th>
 						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
 						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Actions</th>
 					</tr>
@@ -224,8 +258,8 @@
 						{#each Array(3) as _, i (i)}
 							<tr class="border-b">
 								<td class="px-6 py-4"><Skeleton class="h-4 w-32" /></td>
-								<td class="px-6 py-4"><Skeleton class="h-4 w-48" /></td>
-								<td class="px-6 py-4"><Skeleton class="h-4 w-20" /></td>
+								<td class="hidden sm:table-cell px-6 py-4"><Skeleton class="h-4 w-48" /></td>
+								<td class="hidden sm:table-cell px-6 py-4"><Skeleton class="h-4 w-20" /></td>
 								<td class="px-6 py-4"><Skeleton class="h-5 w-16 rounded-full" /></td>
 								<td class="px-6 py-4">
 									<div class="flex items-center justify-end gap-2">
@@ -239,8 +273,8 @@
 						{#each filteredProperties as property (property.id)}
 							<tr class="border-b hover:bg-muted/50 transition-colors cursor-pointer" onclick={() => handlePropertyClick(property)}>
 								<td class="px-6 py-4 font-medium">{property.name}</td>
-								<td class="px-6 py-4">{property.address}</td>
-								<td class="px-6 py-4">{property.type}</td>
+								<td class="hidden sm:table-cell px-6 py-4">{property.address}</td>
+								<td class="hidden sm:table-cell px-6 py-4">{property.type}</td>
 								<td class="px-6 py-4">
 									<Badge variant={getStatusVariant(property.status)}>
 										{property.status}
@@ -248,6 +282,14 @@
 								</td>
 								<td class="px-6 py-4">
 									<div class="flex items-center justify-end gap-2">
+										<a
+											href="/property/{property.id}/floorplan"
+											class="inline-flex items-center justify-center rounded-md text-sm font-medium h-8 px-3 border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+											onclick={(e) => e.stopPropagation()}
+										>
+											<LayoutGrid class="w-4 h-4 mr-1.5" />
+											Floor Plan
+										</a>
 										<Button
 											size="sm"
 											variant="outline"
@@ -303,6 +345,7 @@
 		</DialogHeader>
 		<PropertyForm
 			{editMode}
+			updatedAt={editUpdatedAt}
 			form={formData}
 			{errors}
 			{enhance}

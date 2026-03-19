@@ -1,0 +1,684 @@
+<script lang="ts">
+	import { floorLayoutItemsStore } from '$lib/stores/collections.svelte';
+	import { floorsStore, rentalUnitsStore } from '$lib/stores/collections.svelte';
+	import {
+		optimisticUpsertFloorLayoutItem,
+		optimisticDeleteFloorLayoutItem
+	} from '$lib/db/optimistic-floor-layout';
+	import { bufferedMutation } from '$lib/db/optimistic-utils';
+	import { syncStatus } from '$lib/stores/sync-status.svelte';
+	import FloorGrid from './FloorGrid.svelte';
+	import ItemSidebar from './ItemSidebar.svelte';
+	import FloorViewer3D from './FloorViewer3D.svelte';
+	import { Save, Undo2, Redo2, Loader2 } from 'lucide-svelte';
+	import { toast } from 'svelte-sonner';
+	import type { FloorLayoutItemType, DrawTool } from './types';
+	import { parseEdgeKey, itemsToWallSet, parseWallMeta, serializeWallMeta, type WallEdge, type WallStorageItem, type WallMeta } from './wallEngine';
+
+	let { data } = $props();
+	let propertyId = $derived(data.propertyId);
+
+	let viewMode = $state<'2d' | '3d'>('2d');
+	let selectedFloorId = $state<string | null>(null);
+	let drawTool = $state<DrawTool>('select');
+
+	// Floors for this property
+	let propertyFloors = $derived(
+		floorsStore.value
+			.filter((f: any) => f.property_id === String(propertyId))
+			.sort((a: any, b: any) => a.floor_number - b.floor_number)
+	);
+
+	$effect(() => {
+		if (propertyFloors.length > 0 && !selectedFloorId) {
+			selectedFloorId = propertyFloors[0].id;
+		}
+	});
+
+	let currentFloorItems = $derived(
+		floorLayoutItemsStore.value.filter((i: any) => i.floor_id === selectedFloorId)
+	);
+
+	let propertyUnits = $derived(
+		rentalUnitsStore.value.filter((u: any) => u.property_id === String(propertyId))
+	);
+
+	let rentalUnitsMap = $derived.by(() => {
+		const map = new Map<string, any>();
+		for (const u of propertyUnits) map.set(u.id, u);
+		return map;
+	});
+
+	let placedUnitIds = $derived(
+		new Set(
+			currentFloorItems
+				.filter((i: any) => i.item_type === 'RENTAL_UNIT' && i.rental_unit_id)
+				.map((i: any) => i.rental_unit_id)
+		)
+	);
+
+	let unplacedUnits = $derived(
+		propertyUnits.filter(
+			(u: any) => u.floor_id === selectedFloorId && !placedUnitIds.has(u.id)
+		)
+	);
+
+	let placedCount = $derived(placedUnitIds.size);
+	let totalCount = $derived(
+		propertyUnits.filter((u: any) => u.floor_id === selectedFloorId).length
+	);
+
+	// Use timestamp-based temp IDs to avoid collisions across page navigations
+	let tempIdCounter = $state(-Date.now());
+
+	// ─── Deferred Save Pattern ────────────────────────────────────────
+	// All edits write to RxDB locally (instant UI) but defer server sync
+	// until the user clicks Save. This prevents wall loss from premature resyncs.
+
+	type PendingChange =
+		| { type: 'wall_add'; walls: { floor_id: number; grid_x: number; grid_y: number; grid_w: number; grid_h: number }[] }
+		| { type: 'wall_remove'; ids: number[] }
+		| { type: 'upsert'; item: any }
+		| { type: 'delete'; id: string };
+
+	let pendingChanges = $state<PendingChange[]>([]);
+	let isSaving = $state(false);
+	let isDirty = $derived(pendingChanges.length > 0);
+
+	// ─── Undo / Redo ─────────────────────────────────────────────────
+
+	interface EditorSnapshot {
+		wallKeys: string[];
+		assignments: {
+			id: string;
+			item_type: string;
+			grid_x: number;
+			grid_y: number;
+			grid_w: number;
+			grid_h: number;
+			rental_unit_id: string | null;
+			label: string | null;
+			color: string | null;
+		}[];
+	}
+
+	const UNDO_LIMIT = 50;
+	let undoStack = $state<EditorSnapshot[]>([]);
+	let redoStack = $state<EditorSnapshot[]>([]);
+	let isApplyingSnapshot = $state(false);
+
+	function captureSnapshot(): EditorSnapshot {
+		const wallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const wallSet = itemsToWallSet(wallItems as unknown as WallStorageItem[]);
+		return {
+			wallKeys: [...wallSet],
+			assignments: currentFloorItems
+				.filter((i: any) => i.item_type !== 'WALL')
+				.map((i: any) => ({
+					id: i.id,
+					item_type: i.item_type,
+					grid_x: i.grid_x,
+					grid_y: i.grid_y,
+					grid_w: i.grid_w,
+					grid_h: i.grid_h,
+					rental_unit_id: i.rental_unit_id ?? null,
+					label: i.label ?? null,
+					color: i.color ?? null
+				}))
+		};
+	}
+
+	function pushUndo(snapshot: EditorSnapshot) {
+		if (isApplyingSnapshot) return;
+		undoStack = [...undoStack.slice(-UNDO_LIMIT + 1), snapshot];
+		redoStack = [];
+	}
+
+	async function applySnapshot(snapshot: EditorSnapshot) {
+		isApplyingSnapshot = true;
+		try {
+			// 1. Compute wall diff
+			const snapshotSet = new Set(snapshot.wallKeys);
+			const currentWallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+			const currentSet = itemsToWallSet(currentWallItems as unknown as WallStorageItem[]);
+
+			const toAdd: WallEdge[] = [];
+			const toRemove: WallEdge[] = [];
+
+			for (const key of snapshotSet) {
+				if (!currentSet.has(key)) toAdd.push(parseEdgeKey(key));
+			}
+			for (const key of currentSet) {
+				if (!snapshotSet.has(key)) toRemove.push(parseEdgeKey(key));
+			}
+
+			// 2. Apply wall changes
+			if (toRemove.length > 0) await handleWallRemove(toRemove);
+			if (toAdd.length > 0) await handleWallAdd(toAdd);
+
+			// 3. Apply assignment diff
+			const snapshotAssignKeys = new Set(
+				snapshot.assignments.map(
+					(a) => `${a.grid_x},${a.grid_y},${a.grid_w},${a.grid_h}`
+				)
+			);
+			const currentAssigns = currentFloorItems.filter((i: any) => i.item_type !== 'WALL');
+
+			// Remove assignments not in snapshot
+			for (const item of currentAssigns) {
+				const k = `${item.grid_x},${item.grid_y},${item.grid_w},${item.grid_h}`;
+				if (!snapshotAssignKeys.has(k)) {
+					await handleRoomClear(item.id);
+				}
+			}
+
+			// Upsert snapshot assignments
+			for (const a of snapshot.assignments) {
+				await handleRoomAssign({
+					roomId: `${a.grid_x},${a.grid_y}`,
+					cells: [],
+					bounds: {
+						minQ: a.grid_x,
+						minR: a.grid_y,
+						maxQ: a.grid_x + a.grid_w,
+						maxR: a.grid_y + a.grid_h
+					},
+					item_type: a.item_type as FloorLayoutItemType,
+					rental_unit_id: a.rental_unit_id ? parseInt(a.rental_unit_id, 10) : null,
+					label: a.label
+				});
+			}
+		} finally {
+			isApplyingSnapshot = false;
+		}
+	}
+
+	async function undo() {
+		if (undoStack.length === 0 || isSaving) return;
+		const current = captureSnapshot();
+		redoStack = [...redoStack, current];
+		const prev = undoStack[undoStack.length - 1];
+		undoStack = undoStack.slice(0, -1);
+		await applySnapshot(prev);
+	}
+
+	async function redo() {
+		if (redoStack.length === 0 || isSaving) return;
+		const current = captureSnapshot();
+		undoStack = [...undoStack.slice(-UNDO_LIMIT + 1), current];
+		const next = redoStack[redoStack.length - 1];
+		redoStack = redoStack.slice(0, -1);
+		await applySnapshot(next);
+	}
+
+	function handleUndoKeydown(e: KeyboardEvent) {
+		if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+			e.preventDefault();
+			undo();
+		}
+		if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') {
+			e.preventDefault();
+			redo();
+		}
+		if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+			e.preventDefault();
+			redo();
+		}
+	}
+
+	// Keep sync indicator in sync with unsaved floor plan edits
+	$effect(() => {
+		syncStatus.setUnsavedEdits(pendingChanges.length);
+		return () => syncStatus.setUnsavedEdits(0); // Clear on unmount
+	});
+
+	// ─── Local-only operations (no server calls) ──────────────────────
+
+	async function handleWallAdd(edges: WallEdge[]) {
+		if (edges.length === 0) return;
+		pushUndo(captureSnapshot());
+		const floorId = parseInt(selectedFloorId!, 10);
+
+		const walls = edges.map((edge) => ({
+			floor_id: floorId,
+			grid_x: edge.q,
+			grid_y: edge.r,
+			grid_w: edge.dir === 'N' ? 0 : 1,
+			grid_h: edge.dir === 'W' ? 0 : 1
+		}));
+
+		// Write to RxDB locally for instant display
+		for (const w of walls) {
+			const tempId = tempIdCounter--;
+			await optimisticUpsertFloorLayoutItem({
+				...w,
+				id: tempId,
+				item_type: 'WALL',
+				label: null,
+				color: null
+			});
+		}
+
+		// Queue for save
+		pendingChanges = [...pendingChanges, { type: 'wall_add', walls }];
+	}
+
+	async function handleWallRemove(edges: WallEdge[]) {
+		if (edges.length === 0) return;
+		pushUndo(captureSnapshot());
+		const wallItemsList = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const matchedIds: string[] = [];
+
+		for (const edge of edges) {
+			const matches = wallItemsList.filter((i: any) => {
+				if (edge.dir === 'N') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_w === 0;
+				if (edge.dir === 'W') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_h === 0;
+				return false;
+			});
+			for (const m of matches) matchedIds.push(m.id);
+		}
+
+		if (matchedIds.length === 0) return;
+
+		// Soft-delete locally
+		for (const id of matchedIds) {
+			await optimisticDeleteFloorLayoutItem(parseInt(id, 10));
+		}
+
+		// Track all deletions as unsaved changes
+		// Only real IDs (positive) need server calls; temp IDs are local-only
+		const realIds = matchedIds.filter((id) => parseInt(id, 10) > 0).map((id) => parseInt(id, 10));
+		pendingChanges = [...pendingChanges, { type: 'wall_remove', ids: realIds }];
+	}
+
+	async function handleRoomAssign(assignment: {
+		roomId: string;
+		cells: { q: number; r: number }[];
+		bounds: { minQ: number; minR: number; maxQ: number; maxR: number };
+		item_type: FloorLayoutItemType;
+		rental_unit_id: number | null;
+		label: string | null;
+	}) {
+		pushUndo(captureSnapshot());
+		const existing = currentFloorItems.find(
+			(i: any) =>
+				i.item_type !== 'WALL' &&
+				i.grid_x === assignment.bounds.minQ &&
+				i.grid_y === assignment.bounds.minR &&
+				i.grid_w === assignment.bounds.maxQ - assignment.bounds.minQ &&
+				i.grid_h === assignment.bounds.maxR - assignment.bounds.minR
+		);
+
+		const item = {
+			id: existing ? parseInt(existing.id, 10) : tempIdCounter--,
+			floor_id: parseInt(selectedFloorId!, 10),
+			rental_unit_id: assignment.rental_unit_id,
+			item_type: assignment.item_type,
+			grid_x: assignment.bounds.minQ,
+			grid_y: assignment.bounds.minR,
+			grid_w: assignment.bounds.maxQ - assignment.bounds.minQ,
+			grid_h: assignment.bounds.maxR - assignment.bounds.minR,
+			label: assignment.label,
+			color: null
+		};
+
+		await optimisticUpsertFloorLayoutItem(item);
+		pendingChanges = [...pendingChanges, { type: 'upsert', item }];
+	}
+
+	async function handleRoomClear(roomId: string) {
+		pushUndo(captureSnapshot());
+		const nonWallItems = currentFloorItems.filter((i: any) => i.item_type !== 'WALL');
+		for (const item of nonWallItems) {
+			await optimisticDeleteFloorLayoutItem(parseInt(item.id, 10));
+			pendingChanges = [...pendingChanges, { type: 'delete', id: item.id }];
+		}
+	}
+
+	// ─── Feature 2/3: Door & Window Meta Toggle ─────────────────────
+
+	async function handleWallMetaToggle(edge: WallEdge, kind: 'door' | 'window') {
+		const wallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const match = wallItems.find((i: any) => {
+			if (edge.dir === 'N') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_w === 0;
+			if (edge.dir === 'W') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_h === 0;
+			return false;
+		});
+		if (!match) return; // Only toggle on existing walls
+
+		pushUndo(captureSnapshot());
+
+		const currentMeta = parseWallMeta(match.label);
+		let newMeta: WallMeta;
+
+		if (kind === 'door') {
+			if (currentMeta.door) {
+				// Toggle off: remove door + swing keys
+				const { door: _d, swing: _s, ...rest } = currentMeta;
+				newMeta = rest;
+			} else {
+				// Toggle on: add door, also remove window if present
+				const { window: _w, sill: _si, ...rest } = currentMeta;
+				newMeta = { ...rest, door: 'single', swing: 'left' };
+			}
+		} else {
+			if (currentMeta.window) {
+				// Toggle off: remove window + sill keys
+				const { window: _w, sill: _si, ...rest } = currentMeta;
+				newMeta = rest;
+			} else {
+				// Toggle on: add window, also remove door if present
+				const { door: _d, swing: _s, ...rest } = currentMeta;
+				newMeta = { ...rest, window: 'standard', sill: 0.9 };
+			}
+		}
+
+		const newLabel = serializeWallMeta(newMeta);
+		const updated = { ...match, label: newLabel };
+
+		await optimisticUpsertFloorLayoutItem(updated);
+		pendingChanges = [...pendingChanges, { type: 'upsert', item: updated }];
+	}
+
+	// ─── Feature 7: Wall Color Change ────────────────────────────────
+
+	async function handleWallColorChange(edge: WallEdge, color: string | null) {
+		const wallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const match = wallItems.find((i: any) => {
+			if (edge.dir === 'N') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_w === 0;
+			if (edge.dir === 'W') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_h === 0;
+			return false;
+		});
+		if (!match) return;
+
+		const currentMeta = parseWallMeta(match.label);
+		let newMeta: WallMeta;
+
+		if (color) {
+			newMeta = { ...currentMeta, color };
+		} else {
+			// Remove color key via destructuring
+			const { color: _removed, ...rest } = currentMeta;
+			newMeta = rest;
+		}
+
+		const newLabel = serializeWallMeta(newMeta);
+		const updated = { ...match, label: newLabel };
+
+		await optimisticUpsertFloorLayoutItem(updated);
+		pendingChanges = [...pendingChanges, { type: 'upsert', item: updated }];
+	}
+
+	// ─── Save All Changes ─────────────────────────────────────────────
+
+	async function handleSave() {
+		if (!isDirty || isSaving) return;
+		isSaving = true;
+
+		try {
+			// Consolidate wall adds and removes
+			const allWallAdds: { floor_id: number; grid_x: number; grid_y: number; grid_w: number; grid_h: number }[] = [];
+			const allWallRemoveIds: number[] = [];
+			const upserts: any[] = [];
+			const deletes: string[] = [];
+
+			for (const change of pendingChanges) {
+				switch (change.type) {
+					case 'wall_add':
+						allWallAdds.push(...change.walls);
+						break;
+					case 'wall_remove':
+						allWallRemoveIds.push(...change.ids);
+						break;
+					case 'upsert':
+						upserts.push(change.item);
+						break;
+					case 'delete':
+						// Only delete items with real server IDs (positive)
+						if (parseInt(change.id, 10) > 0) deletes.push(change.id);
+						break;
+				}
+			}
+
+			// 1. Batch walls (single server call for all wall adds + removes)
+			if (allWallAdds.length > 0 || allWallRemoveIds.length > 0) {
+				const fd = new FormData();
+				fd.set('payload', JSON.stringify({ add: allWallAdds, removeIds: allWallRemoveIds }));
+
+				await bufferedMutation({
+					label: `Save ${allWallAdds.length} walls, remove ${allWallRemoveIds.length}`,
+					collection: 'floor_layout_items',
+					type: 'create',
+					serverAction: async () => {
+						const res = await fetch('?/batchWalls', { method: 'POST', body: fd });
+						if (!res.ok) throw new Error(`Wall batch save failed: ${res.status}`);
+						return res;
+					}
+				});
+			}
+
+			// 2. Room upserts
+			for (const item of upserts) {
+				const fd = buildItemFormData(item);
+				await bufferedMutation({
+					label: `Save ${item.item_type}`,
+					collection: 'floor_layout_items',
+					type: item.id > 0 ? 'update' : 'create',
+					serverAction: async () => {
+						const res = await fetch('?/upsertItem', { method: 'POST', body: fd });
+						if (!res.ok) throw new Error(`Upsert failed: ${res.status}`);
+						return res;
+					}
+				});
+			}
+
+			// 3. Deletes
+			for (const id of deletes) {
+				const fd = new FormData();
+				fd.set('id', id);
+				await bufferedMutation({
+					label: 'Delete item',
+					collection: 'floor_layout_items',
+					type: 'delete',
+					serverAction: async () => {
+						const res = await fetch('?/deleteItem', { method: 'POST', body: fd });
+						if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+						return res;
+					}
+				});
+			}
+
+			pendingChanges = [];
+			toast.success('Floor plan saved');
+		} catch (err: any) {
+			toast.error('Save failed', { description: err?.message || 'Server error' });
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	async function handleDiscard() {
+		if (!isDirty) return;
+		pendingChanges = [];
+		// Resync from server to revert local changes
+		const { resyncCollection } = await import('$lib/db/replication');
+		await resyncCollection('floor_layout_items');
+		toast.info('Changes discarded');
+	}
+
+	// ─── Helpers ───────────────────────────────────────────────────────
+
+	function buildItemFormData(item: any): FormData {
+		const fd = new FormData();
+		if (item.id && item.id > 0) fd.set('id', String(item.id));
+		fd.set('floor_id', String(item.floor_id));
+		if (item.rental_unit_id) fd.set('rental_unit_id', String(item.rental_unit_id));
+		fd.set('item_type', item.item_type);
+		fd.set('grid_x', String(item.grid_x));
+		fd.set('grid_y', String(item.grid_y));
+		fd.set('grid_w', String(item.grid_w));
+		fd.set('grid_h', String(item.grid_h));
+		if (item.label) fd.set('label', item.label);
+		if (item.color) fd.set('color', item.color);
+		return fd;
+	}
+
+	// Warn before leaving with unsaved changes
+	function handleBeforeUnload(e: BeforeUnloadEvent) {
+		if (isDirty) {
+			e.preventDefault();
+			e.returnValue = '';
+		}
+	}
+</script>
+
+<svelte:window on:beforeunload={handleBeforeUnload} on:keydown={handleUndoKeydown} />
+
+<div class="flex flex-col h-screen overflow-hidden">
+	<!-- Header -->
+	<div class="flex items-center gap-4 px-6 py-3 border-b bg-background">
+		<a href="/properties" class="text-muted-foreground hover:text-foreground text-sm">
+			&larr; Properties
+		</a>
+		<h1 class="text-lg font-semibold">Floor Plan</h1>
+
+		{#if propertyFloors.length > 0}
+			<div class="flex gap-1 ml-4">
+				{#each propertyFloors as floor (floor.id)}
+					<button
+						class="px-3 py-1.5 rounded text-sm font-medium transition-colors
+							{selectedFloorId === floor.id
+							? 'bg-primary text-primary-foreground'
+							: 'bg-secondary hover:bg-secondary/80'}"
+						onclick={() => (selectedFloorId = floor.id)}
+					>
+						Floor {floor.floor_number}
+						{#if floor.wing}<span class="opacity-70"> · {floor.wing}</span>{/if}
+					</button>
+				{/each}
+			</div>
+		{/if}
+
+		<!-- Undo / Redo -->
+		<div class="flex items-center gap-1 ml-4">
+			<button
+				onclick={undo}
+				disabled={undoStack.length === 0 || isSaving}
+				class="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-sm disabled:opacity-30"
+				title="Undo (Ctrl+Z)"
+			>
+				<Undo2 class="w-3.5 h-3.5" />
+			</button>
+			<button
+				onclick={redo}
+				disabled={redoStack.length === 0 || isSaving}
+				class="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-sm disabled:opacity-30"
+				title="Redo (Ctrl+Shift+Z)"
+			>
+				<Redo2 class="w-3.5 h-3.5" />
+			</button>
+		</div>
+
+		<!-- Save / Discard buttons -->
+		<div class="ml-auto flex items-center gap-2">
+			{#if isDirty}
+				<span class="text-xs text-amber-600 font-medium">
+					{pendingChanges.length} unsaved change{pendingChanges.length !== 1 ? 's' : ''}
+				</span>
+				<button
+					onclick={handleDiscard}
+					disabled={isSaving}
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border hover:bg-muted transition-colors disabled:opacity-50"
+				>
+					<Undo2 class="w-3.5 h-3.5" />
+					Discard
+				</button>
+			{/if}
+			<button
+				onclick={handleSave}
+				disabled={!isDirty || isSaving}
+				class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50
+					{isDirty
+					? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
+					: 'bg-muted text-muted-foreground'}"
+			>
+				{#if isSaving}
+					<Loader2 class="w-3.5 h-3.5 animate-spin" />
+					Saving...
+				{:else}
+					<Save class="w-3.5 h-3.5" />
+					Save
+				{/if}
+			</button>
+
+			<div class="ml-2 flex rounded-md border overflow-hidden">
+				<button
+					class="px-3 py-1.5 text-sm font-medium transition-colors
+						{viewMode === '2d' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-secondary'}"
+					onclick={() => (viewMode = '2d')}
+				>
+					2D Editor
+				</button>
+				<button
+					class="px-3 py-1.5 text-sm font-medium transition-colors
+						{viewMode === '3d' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-secondary'}"
+					onclick={() => (viewMode = '3d')}
+				>
+					3D View
+				</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Main content -->
+	<div class="flex flex-1 overflow-hidden">
+		{#if viewMode === '2d'}
+			<ItemSidebar
+				{unplacedUnits}
+				{placedCount}
+				{totalCount}
+				tool={drawTool}
+				onToolChange={(t) => (drawTool = t)}
+			/>
+
+			<div class="flex-1 overflow-hidden">
+				{#if !floorLayoutItemsStore.initialized}
+					<div class="h-full flex items-center justify-center text-muted-foreground">
+						Loading floor plan...
+					</div>
+				{:else if selectedFloorId}
+					<FloorGrid
+						items={currentFloorItems}
+						floorId={parseInt(selectedFloorId, 10)}
+						tool={drawTool}
+						{rentalUnitsMap}
+						{unplacedUnits}
+						onWallAdd={handleWallAdd}
+						onWallRemove={handleWallRemove}
+						onRoomAssign={handleRoomAssign}
+						onRoomClear={handleRoomClear}
+						onWallMetaToggle={handleWallMetaToggle}
+						onWallColorChange={handleWallColorChange}
+						onToolToggle={() => (drawTool = drawTool === 'draw' ? 'erase' : 'draw')}
+					/>
+				{:else}
+					<div class="h-full flex items-center justify-center text-muted-foreground">
+						No floors found. Add floors first.
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<div class="flex-1 overflow-hidden">
+				<FloorViewer3D
+					floors={propertyFloors}
+					allItems={floorLayoutItemsStore.value}
+					rentalUnits={propertyUnits}
+					{selectedFloorId}
+					onUnitClick={(unitId) => {
+						console.log('Unit clicked:', unitId);
+					}}
+				/>
+			</div>
+		{/if}
+	</div>
+</div>
