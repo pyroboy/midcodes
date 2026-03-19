@@ -89,10 +89,20 @@ const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 const LOG_DB_NAME = 'dorm_sync_logs';
 const LOG_STORE_NAME = 'entries';
 
-/** Open (or create) the IndexedDB database for persistent logs. */
-function openLogDb(): Promise<IDBDatabase> {
-	return new Promise((resolve, reject) => {
-		if (typeof indexedDB === 'undefined') return reject(new Error('No indexedDB'));
+/**
+ * Persistent log storage using IndexedDB.
+ * Uses a single shared connection and debounced writes to avoid contention
+ * from rapid addLog() calls during sync init.
+ */
+let logDbInstance: IDBDatabase | null = null;
+let logDbReady: Promise<IDBDatabase | null> | null = null;
+
+function getLogDb(): Promise<IDBDatabase | null> {
+	if (logDbInstance) return Promise.resolve(logDbInstance);
+	if (logDbReady) return logDbReady;
+	if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+
+	logDbReady = new Promise<IDBDatabase | null>((resolve) => {
 		const req = indexedDB.open(LOG_DB_NAME, 1);
 		req.onupgradeneeded = () => {
 			const db = req.result;
@@ -100,47 +110,75 @@ function openLogDb(): Promise<IDBDatabase> {
 				db.createObjectStore(LOG_STORE_NAME);
 			}
 		};
-		req.onsuccess = () => resolve(req.result);
-		req.onerror = () => reject(req.error);
+		req.onsuccess = () => { logDbInstance = req.result; resolve(req.result); };
+		req.onerror = () => { logDbReady = null; resolve(null); };
 	});
+	return logDbReady;
 }
 
-/** Persist log entries to IndexedDB (fire-and-forget). */
+/** Debounced persist — coalesces rapid addLog() calls into one write. */
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingLogs: StatusLogEntry[] | null = null;
+
 function persistLogs(entries: StatusLogEntry[]) {
-	openLogDb()
-		.then((db) => {
+	pendingLogs = entries;
+	if (persistTimer) return; // already scheduled
+	persistTimer = setTimeout(() => {
+		persistTimer = null;
+		const toWrite = pendingLogs;
+		pendingLogs = null;
+		if (!toWrite) return;
+		getLogDb().then((db) => {
+			if (!db) return;
+			try {
+				const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
+				tx.objectStore(LOG_STORE_NAME).put(toWrite.slice(0, MAX_LOG_ENTRIES), 'logs');
+			} catch { /* db may have been closed */ }
+		}).catch(() => {});
+	}, 500); // 500ms debounce — batches rapid log calls
+}
+
+/** Flush pending logs immediately (e.g., before page unload). */
+function flushLogs(entries: StatusLogEntry[]) {
+	if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+	pendingLogs = null;
+	getLogDb().then((db) => {
+		if (!db) return;
+		try {
 			const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
 			tx.objectStore(LOG_STORE_NAME).put(entries.slice(0, MAX_LOG_ENTRIES), 'logs');
-			tx.oncomplete = () => db.close();
-			tx.onerror = () => db.close();
-		})
-		.catch(() => { /* IndexedDB unavailable — non-critical */ });
+		} catch { /* non-critical */ }
+	}).catch(() => {});
 }
 
 /** Load persisted log entries from IndexedDB. */
 function loadPersistedLogs(): Promise<StatusLogEntry[]> {
-	return openLogDb()
-		.then((db) => {
-			return new Promise<StatusLogEntry[]>((resolve) => {
+	return getLogDb().then((db) => {
+		if (!db) return [];
+		return new Promise<StatusLogEntry[]>((resolve) => {
+			try {
 				const tx = db.transaction(LOG_STORE_NAME, 'readonly');
 				const req = tx.objectStore(LOG_STORE_NAME).get('logs');
-				req.onsuccess = () => { db.close(); resolve(req.result || []); };
-				req.onerror = () => { db.close(); resolve([]); };
-			});
-		})
-		.catch(() => []);
+				req.onsuccess = () => resolve(req.result || []);
+				req.onerror = () => resolve([]);
+			} catch {
+				resolve([]);
+			}
+		});
+	}).catch(() => []);
 }
 
 /** Clear all persisted logs from IndexedDB. */
 function clearPersistedLogs() {
-	openLogDb()
-		.then((db) => {
+	if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+	pendingLogs = null;
+	getLogDb().then((db) => {
+		if (!db) return;
+		try {
 			const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
 			tx.objectStore(LOG_STORE_NAME).delete('logs');
-			tx.oncomplete = () => db.close();
-			tx.onerror = () => db.close();
-		})
-		.catch(() => { /* non-critical */ });
+		} catch { /* non-critical */ }
+	}).catch(() => {});
 }
 
 function hydrateNeonUsage(): NeonUsageStats | null {
@@ -601,9 +639,16 @@ function createSyncStatusStore() {
 				logs = [...logs, ...persisted].slice(0, MAX_LOG_ENTRIES);
 			}
 			logsHydrated = true;
-			// Persist the merged result so future addLog calls append correctly
-			persistLogs(logs);
+			// Flush the merged result immediately (not debounced)
+			flushLogs(logs);
 		}).catch(() => { logsHydrated = true; });
+	}
+
+	// Flush pending logs before page unload so nothing is lost
+	if (typeof window !== 'undefined') {
+		window.addEventListener('beforeunload', () => {
+			flushLogs(logs);
+		});
 	}
 
 	function addLog(message: string, level: StatusLogEntry['level'] = 'info') {
