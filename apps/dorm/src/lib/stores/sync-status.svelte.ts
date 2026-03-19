@@ -86,99 +86,32 @@ const COLLECTIONS = [
 const MAX_LOG_ENTRIES = 100;
 const NEON_USAGE_KEY = '__dorm_neon_usage';
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
-const LOG_DB_NAME = 'dorm_sync_logs';
-const LOG_STORE_NAME = 'entries';
+const LOG_STORAGE_KEY = '__dorm_sync_logs';
 
 /**
- * Persistent log storage using IndexedDB.
- * Uses a single shared connection and debounced writes to avoid contention
- * from rapid addLog() calls during sync init.
+ * Persistent log storage using localStorage.
+ * Synchronous read/write — no race conditions, no debounce, no async gaps.
+ * 100 entries × ~100 bytes = ~10KB, well within localStorage's 5MB limit.
+ * IndexedDB was tried but its async nature made it impossible to reliably
+ * persist during page unload (beforeunload can't await async writes).
  */
-let logDbInstance: IDBDatabase | null = null;
-let logDbReady: Promise<IDBDatabase | null> | null = null;
-
-function getLogDb(): Promise<IDBDatabase | null> {
-	if (logDbInstance) return Promise.resolve(logDbInstance);
-	if (logDbReady) return logDbReady;
-	if (typeof indexedDB === 'undefined') return Promise.resolve(null);
-
-	logDbReady = new Promise<IDBDatabase | null>((resolve) => {
-		const req = indexedDB.open(LOG_DB_NAME, 1);
-		req.onupgradeneeded = () => {
-			const db = req.result;
-			if (!db.objectStoreNames.contains(LOG_STORE_NAME)) {
-				db.createObjectStore(LOG_STORE_NAME);
-			}
-		};
-		req.onsuccess = () => { logDbInstance = req.result; resolve(req.result); };
-		req.onerror = () => { logDbReady = null; resolve(null); };
-	});
-	return logDbReady;
-}
-
-/** Debounced persist — coalesces rapid addLog() calls into one write. */
-let persistTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingLogs: StatusLogEntry[] | null = null;
-
 function persistLogs(entries: StatusLogEntry[]) {
-	pendingLogs = entries;
-	if (persistTimer) return; // already scheduled
-	persistTimer = setTimeout(() => {
-		persistTimer = null;
-		const toWrite = pendingLogs;
-		pendingLogs = null;
-		if (!toWrite) return;
-		getLogDb().then((db) => {
-			if (!db) return;
-			try {
-				const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
-				tx.objectStore(LOG_STORE_NAME).put(toWrite.slice(0, MAX_LOG_ENTRIES), 'logs');
-			} catch { /* db may have been closed */ }
-		}).catch(() => {});
-	}, 500); // 500ms debounce — batches rapid log calls
+	if (typeof localStorage === 'undefined') return;
+	try {
+		localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_LOG_ENTRIES)));
+	} catch { /* quota exceeded — non-critical */ }
 }
 
-/** Flush pending logs immediately (e.g., before page unload). */
-function flushLogs(entries: StatusLogEntry[]) {
-	if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
-	pendingLogs = null;
-	getLogDb().then((db) => {
-		if (!db) return;
-		try {
-			const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
-			tx.objectStore(LOG_STORE_NAME).put(entries.slice(0, MAX_LOG_ENTRIES), 'logs');
-		} catch { /* non-critical */ }
-	}).catch(() => {});
+function loadPersistedLogs(): StatusLogEntry[] {
+	if (typeof localStorage === 'undefined') return [];
+	try {
+		return JSON.parse(localStorage.getItem(LOG_STORAGE_KEY) || '[]');
+	} catch { return []; }
 }
 
-/** Load persisted log entries from IndexedDB. */
-function loadPersistedLogs(): Promise<StatusLogEntry[]> {
-	return getLogDb().then((db) => {
-		if (!db) return [];
-		return new Promise<StatusLogEntry[]>((resolve) => {
-			try {
-				const tx = db.transaction(LOG_STORE_NAME, 'readonly');
-				const req = tx.objectStore(LOG_STORE_NAME).get('logs');
-				req.onsuccess = () => resolve(req.result || []);
-				req.onerror = () => resolve([]);
-			} catch {
-				resolve([]);
-			}
-		});
-	}).catch(() => []);
-}
-
-/** Clear all persisted logs from IndexedDB. */
 function clearPersistedLogs() {
-	if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
-	pendingLogs = null;
-	getLogDb().then((db) => {
-		if (!db) return;
-		try {
-			const tx = db.transaction(LOG_STORE_NAME, 'readwrite');
-			tx.objectStore(LOG_STORE_NAME).delete('logs');
-		} catch { /* non-critical */ }
-	}).catch(() => {});
+	if (typeof localStorage === 'undefined') return;
+	try { localStorage.removeItem(LOG_STORAGE_KEY); } catch {}
 }
 
 function hydrateNeonUsage(): NeonUsageStats | null {
@@ -625,31 +558,8 @@ function createSyncStatusStore() {
 		}
 	);
 
-	// Status log (newest first) — persisted to IndexedDB
-	let logs = $state<StatusLogEntry[]>([]);
-	let logsHydrated = false;
-
-	// Hydrate logs from IndexedDB on first load (no top-level await — Safari bug)
-	// CRITICAL: don't persist until hydration completes, or addLog() during init
-	// will overwrite the old persisted logs before we can read them.
-	if (typeof indexedDB !== 'undefined') {
-		loadPersistedLogs().then((persisted) => {
-			if (persisted.length > 0) {
-				// Merge: current session logs (newest) + persisted logs (older)
-				logs = [...logs, ...persisted].slice(0, MAX_LOG_ENTRIES);
-			}
-			logsHydrated = true;
-			// Flush the merged result immediately (not debounced)
-			flushLogs(logs);
-		}).catch(() => { logsHydrated = true; });
-	}
-
-	// Flush pending logs before page unload so nothing is lost
-	if (typeof window !== 'undefined') {
-		window.addEventListener('beforeunload', () => {
-			flushLogs(logs);
-		});
-	}
+	// Status log (newest first) — persisted to localStorage (synchronous)
+	let logs = $state<StatusLogEntry[]>(loadPersistedLogs());
 
 	function addLog(message: string, level: StatusLogEntry['level'] = 'info') {
 		const entry: StatusLogEntry = {
@@ -658,10 +568,7 @@ function createSyncStatusStore() {
 			level
 		};
 		logs = [entry, ...logs].slice(0, MAX_LOG_ENTRIES);
-		// Only persist after hydration to avoid overwriting old persisted logs
-		if (logsHydrated) {
-			persistLogs(logs);
-		}
+		persistLogs(logs);
 	}
 
 	function clearLogs() {
