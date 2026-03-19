@@ -592,13 +592,17 @@ function createSyncStatusStore() {
 	let logsHydrated = false;
 
 	// Hydrate logs from IndexedDB on first load (no top-level await — Safari bug)
+	// CRITICAL: don't persist until hydration completes, or addLog() during init
+	// will overwrite the old persisted logs before we can read them.
 	if (typeof indexedDB !== 'undefined') {
 		loadPersistedLogs().then((persisted) => {
-			if (persisted.length > 0 && !logsHydrated) {
-				// Merge: keep any logs added during init, prepend them to persisted
+			if (persisted.length > 0) {
+				// Merge: current session logs (newest) + persisted logs (older)
 				logs = [...logs, ...persisted].slice(0, MAX_LOG_ENTRIES);
 			}
 			logsHydrated = true;
+			// Persist the merged result so future addLog calls append correctly
+			persistLogs(logs);
 		}).catch(() => { logsHydrated = true; });
 	}
 
@@ -609,8 +613,10 @@ function createSyncStatusStore() {
 			level
 		};
 		logs = [entry, ...logs].slice(0, MAX_LOG_ENTRIES);
-		// Persist to IndexedDB (fire-and-forget)
-		persistLogs(logs);
+		// Only persist after hydration to avoid overwriting old persisted logs
+		if (logsHydrated) {
+			persistLogs(logs);
+		}
 	}
 
 	function clearLogs() {
@@ -835,6 +841,11 @@ function createSyncStatusStore() {
 		};
 		persistNeonUsage(neonUsage);
 		markPushing();
+		// Invalidate sync cache so next page load does a full pull
+		// (otherwise "Serving from cache" skips replication and misses the mutation)
+		if (typeof localStorage !== 'undefined') {
+			localStorage.removeItem('__dorm_last_server_ts');
+		}
 	}
 
 	function recordHealthCheck(latencyMs: number, bytesReceived: number) {
