@@ -100,6 +100,13 @@
 		floor_layout_items: 'Floor Plan Items'
 	};
 
+	const collectionGroups: { label: string; names: string[] }[] = [
+		{ label: 'Structure', names: ['properties', 'floors', 'rental_units', 'floor_layout_items'] },
+		{ label: 'Tenants & Leases', names: ['tenants', 'leases', 'lease_tenants'] },
+		{ label: 'Utilities', names: ['meters', 'readings', 'billings'] },
+		{ label: 'Finance', names: ['payments', 'payment_allocations', 'expenses', 'budgets', 'penalty_configs'] }
+	];
+
 	function getStatusIcon(status: string) {
 		switch (status) {
 			case 'synced': return CheckCircle;
@@ -683,6 +690,7 @@
 							class="h-6 text-[11px] gap-1"
 							onclick={() => syncStatus.fetchNeonCounts(true, refreshLocalCounts)}
 							disabled={syncStatus.neonCountsLoading}
+							title="Compare local doc counts against Neon server"
 						>
 							{#if syncStatus.neonCountsLoading}
 								<Loader2 class="w-3 h-3 animate-spin" />
@@ -735,7 +743,7 @@
 							<Cloud class="w-3 h-3 text-muted-foreground/60" />
 							<div class="flex flex-col leading-none">
 								<span class="tabular-nums text-foreground font-medium">{syncStatus.neonCountsFetchedAt ? new Date(syncStatus.neonCountsFetchedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</span>
-								<span class="text-muted-foreground">counted</span>
+								<span class="text-muted-foreground">server</span>
 							</div>
 						</div>
 					</div>
@@ -786,11 +794,17 @@
 				{/if}
 				{#if syncStatus.neonCounts}
 					<div class="flex items-center justify-end px-3 pt-1 text-[9px] text-muted-foreground tracking-wider uppercase">
-						<span>rxdb<span class="mx-0.5 opacity-40">/</span>neon</span>
+						<span>local<span class="mx-0.5 opacity-40">/</span>server</span>
 					</div>
 				{/if}
 				<div class="space-y-0.5">
-					{#each syncStatus.collections as col (col.name)}
+					{#each collectionGroups as group}
+						<div class="px-3 pt-2 pb-0.5 first:pt-0">
+							<span class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
+						</div>
+					{#each group.names as name (name)}
+						{@const col = syncStatus.collections.find((c) => c.name === name)}
+						{#if col}
 						{@const Icon = getStatusIcon(col.status)}
 						{@const isExpanded = expandedCollection === col.name}
 						{@const hasError = col.status === 'error' && (col.parsedError || col.error)}
@@ -825,7 +839,7 @@
 											{#if !match}
 												<span class="text-[9px] text-amber-500 font-medium">⚠</span>
 											{/if}
-										{:else if col.docCount > 0}
+										{:else}
 											<span class="text-[10px] text-muted-foreground tabular-nums">{col.docCount}</span>
 										{/if}
 									{/if}
@@ -885,33 +899,29 @@
 								{@const neonCount = syncStatus.neonCounts?.[col.name]}
 								{@const hasCounts = neonCount !== undefined && neonCount !== null}
 								{@const diff = hasCounts ? col.docCount - neonCount : 0}
-								<div class="mx-3 mb-2 px-3 py-2 bg-muted/20 rounded-md space-y-1">
-									<div class="flex items-start gap-2">
-										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">RxDB</span>
-										<span class="text-xs tabular-nums">{col.docCount.toLocaleString()} docs</span>
-									</div>
-									<div class="flex items-start gap-2">
-										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">Neon</span>
-										{#if hasCounts}
-											<span class="text-xs tabular-nums">{neonCount.toLocaleString()} docs</span>
-											{#if diff === 0}
-												<Badge variant="secondary" class="text-[9px] px-1 py-0 text-emerald-600">In sync</Badge>
-											{:else if diff > 0}
-												<Badge variant="outline" class="text-[9px] px-1 py-0 border-amber-300 text-amber-600">+{diff} extra</Badge>
-											{:else}
-												<Badge variant="outline" class="text-[9px] px-1 py-0 border-amber-300 text-amber-600">{diff} missing</Badge>
+								<div class="mx-3 mb-1 px-3 py-2 bg-muted/20 rounded-md">
+									<div class="flex items-center justify-between text-xs">
+										<div class="flex items-center gap-3 tabular-nums">
+											<span><span class="text-[10px] text-muted-foreground uppercase">local</span> {col.docCount.toLocaleString()}</span>
+											{#if hasCounts}
+												<span><span class="text-[10px] text-muted-foreground uppercase">server</span> {neonCount.toLocaleString()}</span>
 											{/if}
-										{:else}
-											<span class="text-xs text-muted-foreground">—</span>
+										</div>
+										{#if hasCounts}
+											{#if diff === 0}
+												<Badge variant="secondary" class="text-[9px] px-1.5 py-0 text-emerald-600">match</Badge>
+											{:else if diff > 0}
+												<Badge variant="outline" class="text-[9px] px-1.5 py-0 border-amber-300 text-amber-600">+{diff} extra locally</Badge>
+											{:else}
+												<Badge variant="outline" class="text-[9px] px-1.5 py-0 border-amber-300 text-amber-600">{Math.abs(diff)} missing locally</Badge>
+											{/if}
 										{/if}
-									</div>
-									<div class="flex items-start gap-2">
-										<span class="text-[10px] text-muted-foreground uppercase font-semibold w-12 flex-shrink-0">Synced</span>
-										<span class="text-xs">{col.lastSyncedAt ? formatTime(col.lastSyncedAt) : 'never'}</span>
 									</div>
 								</div>
 							{/if}
 						</div>
+						{/if}
+					{/each}
 					{/each}
 				</div>
 			{:else if activeTab === 'logs'}
