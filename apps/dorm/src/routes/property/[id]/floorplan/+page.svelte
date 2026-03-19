@@ -10,7 +10,7 @@
 	import FloorGrid from './FloorGrid.svelte';
 	import ItemSidebar from './ItemSidebar.svelte';
 	import FloorViewer3D from './FloorViewer3D.svelte';
-	import { Save, Undo2, Redo2, Loader2 } from 'lucide-svelte';
+	import { Save, Undo2, Redo2, Loader2, RefreshCw } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { FloorLayoutItemType, DrawTool } from './types';
 	import { parseEdgeKey, itemsToWallSet, detectRooms, parseWallMeta, serializeWallMeta, type WallEdge, type WallStorageItem, type WallMeta } from './wallEngine';
