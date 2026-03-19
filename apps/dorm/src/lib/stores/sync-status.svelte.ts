@@ -581,10 +581,8 @@ function createSyncStatusStore() {
 		if (p === 'syncing' && !startedAt) {
 			startedAt = Date.now();
 			flowDirection = 'pull';
-			addLog('Sync started', 'info');
 		} else if (p === 'initializing') {
 			flowDirection = 'idle';
-			addLog('Initializing...', 'info');
 		} else if (p === 'complete') {
 			flowDirection = 'idle';
 		} else if (p === 'error') {
@@ -622,14 +620,16 @@ function createSyncStatusStore() {
 			parsedError: null
 		});
 		lastSuccessfulSyncAt = now;
-		addLog(`${name} synced`, 'success');
-		// Check if all requested collections are done — idle (lazy, not yet requested) is ok
+		// Individual "X synced" not logged — summary below covers it.
+		// Errors still log individually via markError().
 		const allDone = collections.every((c) => c.status === 'synced' || c.status === 'idle');
 		const anySynced = collections.some((c) => c.status === 'synced');
 		if (allDone && anySynced && phase !== 'complete') {
 			phase = 'complete';
 			flowDirection = 'idle';
-			addLog('All collections synced', 'success');
+			const syncedCount = collections.filter((c) => c.status === 'synced').length;
+			const totalDocs = collections.reduce((sum, c) => sum + c.docCount, 0);
+			addLog(`Synced ${syncedCount}/${collections.length} collections (${totalDocs.toLocaleString()} docs)`, 'success');
 		}
 	}
 

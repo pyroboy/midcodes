@@ -110,13 +110,13 @@
 		// syncStatus.setNeonHealthDirect() after its own preflight fetch, avoiding a duplicate round-trip.
 		import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 			syncStatus.setPhase('initializing');
-			syncStatus.addLog('Network: ' + (navigator.onLine ? 'online' : 'offline'), navigator.onLine ? 'info' : 'warn');
+			// Session separator with route for context
+			const route = $page.url.pathname.split('/').filter(Boolean).slice(0, 2).join('/') || 'home';
+			syncStatus.addLog(`─── Page load (${route}) ───`, 'info');
 		});
 		import('$lib/db').then(({ getDb }) => {
 			import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-				syncStatus.setRxdbHealth('checking', 'Opening RxDB (IndexedDB/Dexie)...');
-				syncStatus.addLog('Storage: IndexedDB via Dexie adapter', 'info');
-				syncStatus.addLog('Schemas: v1 (14 collections, indexed)', 'info');
+				syncStatus.setRxdbHealth('checking');
 			});
 			const t0 = Date.now();
 			// F4: Wrap getDb() with a 30-second timeout
@@ -128,23 +128,23 @@
 			]).then((db) => {
 				const initMs = Date.now() - t0;
 				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-					syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
-					syncStatus.addLog(`RxDB opened in ${initMs}ms — ${Object.keys(db.collections).length} collections`, 'success');
+					syncStatus.setRxdbHealth('ok');
+					syncStatus.addLog(`RxDB ready (${initMs}ms, ${Object.keys(db.collections).length} collections)`, 'success');
 					// A2: Capture RxDB version
 					import('rxdb').then(({ RXDB_VERSION }) => syncStatus.setVersionInfo(RXDB_VERSION)).catch(() => {});
 					// F6: Clear reload-loop counter on successful init
 					sessionStorage.removeItem('__dorm_db_reset_v2');
 
-					// Log storage persistence status
+					// Log storage persistence only if NOT granted (warn-worthy)
 					navigator.storage?.persisted?.().then((persisted) => {
-						syncStatus.addLog(`Storage persistence: ${persisted ? 'granted' : 'not granted (data may be evicted)'}`, persisted ? 'info' : 'warn');
+						if (!persisted) syncStatus.addLog('Storage persistence not granted — data may be evicted', 'warn');
 					});
 				});
 				const t1 = Date.now();
 				return import('$lib/db/replication').then(({ startSync }) => startSync(db)).then(() => {
 					const syncMs = Date.now() - t1;
 					import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-						syncStatus.addLog(`Initial sync completed in ${syncMs}ms`, 'success');
+						syncStatus.addLog(`Sync completed in ${syncMs}ms`, 'success');
 
 						// B2: Stale checkpoint auto-resync — check every 10 min
 						// Guard against HMR creating duplicate intervals
