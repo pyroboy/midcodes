@@ -784,6 +784,11 @@
 						{/if}
 					</div>
 				{/if}
+				{#if syncStatus.neonCounts}
+					<div class="flex items-center justify-end px-3 pt-1 text-[9px] text-muted-foreground tracking-wider uppercase">
+						<span>rxdb<span class="mx-0.5 opacity-40">/</span>neon</span>
+					</div>
+				{/if}
 				<div class="space-y-0.5">
 					{#each syncStatus.collections as col (col.name)}
 						{@const Icon = getStatusIcon(col.status)}
