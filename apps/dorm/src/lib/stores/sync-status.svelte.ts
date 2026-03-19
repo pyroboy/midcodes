@@ -542,11 +542,20 @@ function createSyncStatusStore() {
 	// Deferred save: tracks unsaved local edits (e.g., floor plan changes awaiting Save)
 	let unsavedEdits = $state(0);
 
-	// Neon row counts (from /api/rxdb/counts)
-	let neonCounts = $state<Record<string, number> | null>(null);
+	// Neon row counts (from /api/rxdb/counts) — persisted to localStorage
+	const NEON_COUNTS_KEY = '__dorm_neon_counts';
+	function hydrateNeonCounts(): { counts: Record<string, number>; fetchedAt: number } | null {
+		if (typeof localStorage === 'undefined') return null;
+		try {
+			const raw = localStorage.getItem(NEON_COUNTS_KEY);
+			return raw ? JSON.parse(raw) : null;
+		} catch { return null; }
+	}
+	const cachedCounts = hydrateNeonCounts();
+	let neonCounts = $state<Record<string, number> | null>(cachedCounts?.counts ?? null);
 	let neonCountsLoading = $state(false);
 	let neonCountsError = $state<string | null>(null);
-	let neonCountsFetchedAt = $state<number | null>(null);
+	let neonCountsFetchedAt = $state<number | null>(cachedCounts?.fetchedAt ?? null);
 
 	// Neon interaction tracking
 	let neonUsage = $state<NeonUsageStats>(
@@ -874,6 +883,11 @@ function createSyncStatusStore() {
 			const data = await res.json();
 			neonCounts = data.counts;
 			neonCountsFetchedAt = data.fetchedAt;
+
+			// Persist to localStorage so counts survive refresh
+			try {
+				localStorage.setItem(NEON_COUNTS_KEY, JSON.stringify({ counts: neonCounts, fetchedAt: neonCountsFetchedAt }));
+			} catch { /* quota exceeded — non-critical */ }
 
 			// Log per-collection match/mismatch
 			let matched = 0;

@@ -413,30 +413,23 @@
 				`Transfer: ${syncStatus.neonBilling.transfer.used} / ${syncStatus.neonBilling.transfer.limit} ${syncStatus.neonBilling.transfer.unit}`,
 				``
 			] : []),
-			...(syncStatus.neonCounts ? [
-				`=== Neon vs RxDB Counts ===`,
-				...syncStatus.collections.map((c) => {
-					const neon = syncStatus.neonCounts?.[c.name];
-					const diff = neon !== undefined ? c.docCount - neon : null;
-					const status = diff === null ? '?' : diff === 0 ? '✓' : `⚠ ${diff > 0 ? `+${diff} extra` : `${diff} missing`}`;
-					return `  ${c.name}: rxdb=${c.docCount} neon=${neon ?? '?'} ${status}`;
-				}),
-				`Checked at: ${syncStatus.neonCountsFetchedAt ? new Date(syncStatus.neonCountsFetchedAt).toLocaleString() : 'never'}`,
-				``
-			] : []),
 			`=== Collections ===`,
+			`Last synced: ${syncStatus.dataAge || 'never'}${syncStatus.neonCountsFetchedAt ? ` | Last counted: ${new Date(syncStatus.neonCountsFetchedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : ''}`,
+			`  ${'Collection'.padEnd(22)} ${'RxDB'.padStart(5)}  ${'Neon'.padStart(5)}  Status`,
+			`  ${'─'.repeat(22)} ${'─'.repeat(5)}  ${'─'.repeat(5)}  ${'─'.repeat(20)}`,
 			...syncStatus.collections.map((c) => {
-				const parts = [`  ${c.name}: ${c.status}`];
-				if (c.docCount > 0) parts.push(`${c.docCount} docs`);
-				if (c.lastSyncedAt) parts.push(`synced ${formatTime(c.lastSyncedAt)}`);
+				const neon = syncStatus.neonCounts?.[c.name];
+				const rxdb = String(c.docCount).padStart(5);
+				const neonStr = neon !== undefined ? String(neon).padStart(5) : '    —';
+				let status: string = c.status;
+				if (c.status === 'synced' && neon !== undefined) {
+					const diff = c.docCount - neon;
+					status = diff === 0 ? '✓ synced' : `⚠ ${diff > 0 ? `+${diff} extra` : `${diff} missing`}`;
+				}
 				if (c.parsedError) {
-					parts.push(`ERROR [${c.parsedError.code || '?'}] ${c.parsedError.summary}`);
-					if (c.parsedError.url) parts.push(`docs: ${c.parsedError.url}`);
+					status = `ERROR [${c.parsedError.code || '?'}] ${c.parsedError.summary}`;
 				}
-				if (c.error && c.error !== c.parsedError?.summary) {
-					parts.push(`raw: ${c.error.slice(0, 300)}`);
-				}
-				return parts.join(' | ');
+				return `  ${(collectionLabels[c.name] || c.name).padEnd(22)} ${rxdb}  ${neonStr}  ${status}`;
 			}),
 			...(errCollections.length > 0 ? [
 				``,
@@ -779,6 +772,13 @@
 						{/if}
 					</div>
 				{/if}
+				<!-- Timestamp header — shows both sync and count times -->
+				<div class="flex items-center justify-between px-3 py-1 text-[10px] text-muted-foreground">
+					<span>Synced {syncStatus.lastSuccessfulSyncAt ? syncStatus.lastSuccessfulSyncAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'never'}</span>
+					{#if syncStatus.neonCountsFetchedAt}
+						<span>Counted {new Date(syncStatus.neonCountsFetchedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+					{/if}
+				</div>
 				<div class="space-y-0.5">
 					{#each syncStatus.collections as col (col.name)}
 						{@const Icon = getStatusIcon(col.status)}
@@ -789,42 +789,35 @@
 							<button
 								type="button"
 								onclick={() => expandedCollection = isExpanded ? null : col.name}
-								class="w-full flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 transition-colors cursor-pointer text-left"
+								class="w-full flex items-center justify-between py-1.5 px-3 rounded-md hover:bg-muted/30 transition-colors cursor-pointer text-left"
 							>
-								<div class="flex items-center gap-2.5 min-w-0">
+								<div class="flex items-center gap-2 min-w-0">
 									{#if hasMismatch && col.status === 'synced'}
-										<AlertTriangle class="w-4 h-4 flex-shrink-0 text-amber-500" />
+										<AlertTriangle class="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
 									{:else}
-										<Icon class="w-4 h-4 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
+										<Icon class="w-3.5 h-3.5 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
 									{/if}
-									<span class="text-sm truncate">{collectionLabels[col.name] || col.name}</span>
+									<span class="text-[13px] truncate">{collectionLabels[col.name] || col.name}</span>
 								</div>
-								<div class="flex items-center gap-2 flex-shrink-0">
+								<div class="flex items-center gap-1.5 flex-shrink-0">
 									{#if col.parsedError?.code}
 										<Badge variant="outline" class="text-[10px] px-1.5 py-0 font-mono border-red-300 text-red-600">{col.parsedError.code}</Badge>
-									{:else if col.lastSyncedAt && col.status !== 'error'}
-										<span class="text-xs text-muted-foreground tabular-nums">{formatTime(col.lastSyncedAt)}</span>
 									{/if}
 									{#if col.status === 'syncing' && (syncStatus.pulledDocs[col.name] || 0) > 0}
-										<!-- W12: Show pulled doc count during sync -->
 										<span class="text-[10px] text-blue-500 tabular-nums font-medium">↓ {syncStatus.pulledDocs[col.name]}</span>
-									{:else if col.docCount > 0}
+									{:else}
 										{@const neonCount = syncStatus.neonCounts?.[col.name]}
 										{#if neonCount !== undefined && neonCount !== null}
 											{@const match = col.docCount === neonCount}
-											<span class="text-[10px] tabular-nums font-medium {match ? 'text-emerald-500' : 'text-amber-500'}">
-												{col.docCount}/{neonCount} {match ? '✓' : '⚠'}
+											<span class="text-[10px] tabular-nums {match ? 'text-emerald-500' : 'text-amber-600'} font-medium">
+												{col.docCount}<span class="text-muted-foreground/60 mx-0.5">/</span>{neonCount}
 											</span>
-										{:else}
+											{#if !match}
+												<span class="text-[9px] text-amber-500 font-medium">⚠</span>
+											{/if}
+										{:else if col.docCount > 0}
 											<span class="text-[10px] text-muted-foreground tabular-nums">{col.docCount}</span>
 										{/if}
-									{/if}
-									{#if hasMismatch && col.status === 'synced'}
-										<Badge variant="outline" class="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600">mismatch</Badge>
-									{:else}
-										<Badge variant={getBadgeVariant(col.status)} class="text-[10px] px-1.5 py-0">
-											{col.status}
-										</Badge>
 									{/if}
 									{#if col.status === 'error'}
 										<!-- W5: Per-collection retry button -->
