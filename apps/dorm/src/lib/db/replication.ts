@@ -164,14 +164,17 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 			console.log(`[RxSync] Cache < ${Math.round(ageMs / 1000)}s old — serving from cache`);
 			syncStatus.addLog('Serving from cache (< 5 min old)', 'success');
 			syncStatus.setNeonHealthDirect('ok');
+			// Use updateCollection (not markSynced) to avoid premature allDone trigger.
+			// markSynced's auto-detection fires on the first collection because idle=done.
+			const now = new Date().toISOString();
 			for (const name of COLLECTIONS_TO_SYNC) {
 				const collection = (db as any)[name];
 				if (!collection) continue;
 				try {
 					const count = await countActiveDocs(collection);
-					syncStatus.markSynced(name, count);
+					syncStatus.updateCollection(name, { status: 'synced', docCount: count, lastSyncedAt: now, error: null, parsedError: null });
 				} catch {
-					syncStatus.markSynced(name, 0);
+					syncStatus.updateCollection(name, { status: 'synced', docCount: 0, lastSyncedAt: now, error: null, parsedError: null });
 				}
 			}
 			syncStatus.setPhase('complete');
@@ -198,15 +201,16 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 	if (maxUpdatedAt && cachedServerTs && maxUpdatedAt === cachedServerTs) {
 		console.log('[RxSync] Server unchanged — skipping all pulls');
 		syncStatus.addLog('Server unchanged — using cached data', 'success');
-		// Mark all collections as synced with their active (non-deleted) doc counts
+		// Use updateCollection (not markSynced) to set counts without premature allDone trigger
+		const now = new Date().toISOString();
 		for (const name of COLLECTIONS_TO_SYNC) {
 			const collection = (db as any)[name];
 			if (!collection) continue;
 			try {
 				const count = await countActiveDocs(collection);
-				syncStatus.markSynced(name, count);
+				syncStatus.updateCollection(name, { status: 'synced', docCount: count, lastSyncedAt: now, error: null, parsedError: null });
 			} catch {
-				syncStatus.markSynced(name, 0);
+				syncStatus.updateCollection(name, { status: 'synced', docCount: 0, lastSyncedAt: now, error: null, parsedError: null });
 			}
 		}
 		// W10: Persist sync time

@@ -577,6 +577,7 @@ function createSyncStatusStore() {
 	}
 
 	function setPhase(p: SyncPhase) {
+		const wasComplete = phase === 'complete';
 		phase = p;
 		if (p === 'syncing' && !startedAt) {
 			startedAt = Date.now();
@@ -585,6 +586,12 @@ function createSyncStatusStore() {
 			flowDirection = 'idle';
 		} else if (p === 'complete') {
 			flowDirection = 'idle';
+			// Only log summary once per sync cycle (guard against double setPhase('complete'))
+			if (!wasComplete) {
+				const syncedCount = collections.filter((c) => c.status === 'synced').length;
+				const totalDocs = collections.reduce((sum, c) => sum + c.docCount, 0);
+				addLog(`Synced ${syncedCount}/${collections.length} collections (${totalDocs.toLocaleString()} docs)`, 'success');
+			}
 		} else if (p === 'error') {
 			flowDirection = 'error';
 		}
@@ -620,16 +627,12 @@ function createSyncStatusStore() {
 			parsedError: null
 		});
 		lastSuccessfulSyncAt = now;
-		// Individual "X synced" not logged — summary below covers it.
-		// Errors still log individually via markError().
+		// Check if all collections are done — set phase to 'complete' which logs the summary.
+		// idle = lazy collection not yet accessed, counts as done.
 		const allDone = collections.every((c) => c.status === 'synced' || c.status === 'idle');
 		const anySynced = collections.some((c) => c.status === 'synced');
 		if (allDone && anySynced && phase !== 'complete') {
-			phase = 'complete';
-			flowDirection = 'idle';
-			const syncedCount = collections.filter((c) => c.status === 'synced').length;
-			const totalDocs = collections.reduce((sum, c) => sum + c.docCount, 0);
-			addLog(`Synced ${syncedCount}/${collections.length} collections (${totalDocs.toLocaleString()} docs)`, 'success');
+			setPhase('complete');
 		}
 	}
 
