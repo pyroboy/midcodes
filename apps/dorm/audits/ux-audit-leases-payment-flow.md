@@ -1,10 +1,11 @@
 # UX Audit: Leases → Payment Flow
 
-**Date**: 2026-03-20
+**Date**: 2026-03-20 (v2 — live re-audit)
 **Scope**: Leases page → LeaseCard → PaymentModal → Submit Payment
 **Thoroughness**: Extreme
 **Goal**: Smoothest possible payment flow
-**Viewports**: Desktop (1280x720), Mobile (390x844)
+**Viewports**: Desktop (1440x900), Mobile (375x812)
+**Method**: Playwright screenshots + code analysis
 
 ---
 
@@ -12,220 +13,207 @@
 
 | # | Scenario | Desktop | Mobile | Status |
 |---|----------|---------|--------|--------|
-| S1 | Leases page initial load | Captured | Code-audited | Done |
-| S2 | Click lease card → Details Modal | Captured | Code-audited | Done |
-| S3 | Click "Make Payment" → Modal opens (empty) | Captured | Code-audited | Done |
-| S4 | Select 1 billing → observe updates | Captured | Code-audited | Done |
-| S5 | Select all billings → totals update | Captured | Code-audited | Done |
-| S6 | Click "Exact" → amount fills → allocation preview | Captured | Code-audited | Done |
-| S7 | Change payment method → reference field appears | Code-audited | Code-audited | Done |
-| S8 | Submit payment → observe feedback | Code-audited | Code-audited | Done |
+| S1 | Leases page initial load | Screenshot | Screenshot | Done |
+| S2 | Click "Make Payment" → Modal opens (empty) | Screenshot | Screenshot | Done |
+| S3 | Select 1 billing → observe auto-fill | Screenshot | Screenshot | Done |
+| S4 | Select All billings | Live tested | Live tested | Done |
+| S5 | Change payment method → reference field | Code-audited | Code-audited | Done |
+| S6 | Submit payment → observe feedback | Code-audited | Code-audited | Done |
+| S7 | Mobile scroll to see summary/allocation | Screenshot | Screenshot | Done |
 
 ---
 
-## Current Flow (clicks to pay)
+## Current Flow (clicks to pay — AFTER v1 fixes)
 
 ```
 Leases Page
   → [1] Click "Make Payment" on lease card
-  → [2] Select billing checkbox(es)
-  → [3] Click "Exact" (or type amount manually)
-  → [4] (Optional) Change payment method
-  → [5] Click "Submit Payment"
+  → [2] Select billing checkbox(es) — amount auto-fills ✓
+  → [3] (Optional) Change payment method
+  → [4] Click "Submit Payment"
 ```
 
-**Minimum clicks: 4** (if auto-amount were implemented) → **Currently 5**
+**Minimum clicks: 3** (Make Payment → Select All → Submit)
+**Improvement from v1**: Was 5 clicks, now 3-4. Auto-fill eliminated the "Exact" click.
 
 ---
 
-## Issues Found
+## V1 Fix Verification (Live Testing)
 
-### P0 — Critical (Blocks Smooth Flow)
-
-#### P0-1: Amount defaults to 0 — forces manual entry every time
-- **Scenario**: S4-S5 (selecting billings)
-- **Observed**: After selecting billings, amount stays at `0`. Selected Amount updates to `₱2,692.78` but Payment Amount remains `₱0.00`. User must click "Exact" or type manually.
-- **Impact**: Adds a mandatory extra interaction to EVERY payment. The most common case (pay exact selected amount) requires explicit action.
-- **Fix**: Auto-populate amount with selected billing total when billings are checked. Keep manual override available.
-- **Viewport**: Both desktop and mobile
-- **File**: `src/routes/leases/PaymentModal.svelte`
-
-#### P0-2: "No billings selected" shown AFTER billings are selected
-- **Scenario**: S4 (select billing, observe summary)
-- **Observed**: Payment Allocation section shows "No billings selected" even after 2 billings are checked. It only updates when `paymentAmount > 0`.
-- **Impact**: System appears broken — user thinks their selection wasn't registered. Creates cognitive dissonance.
-- **Fix**: Show allocation preview as soon as billings are selected, using their balance as assumed amount. Only show "No billings selected" when truly none are selected.
-- **Viewport**: Both
-- **File**: `src/routes/leases/PaymentModal.svelte`
-
-#### P0-3: "Exact" button — unlabeled, subtle, unclear purpose
-- **Scenario**: S6
-- **Observed**: Small outlined "Exact" button next to amount field. No tooltip, no explanation. Disabled when no billings selected with no reason shown.
-- **Impact**: First-time users won't understand this button. It's the key to the fastest flow but it's the least visible element.
-- **Fix**: Either (a) auto-fill amount (making "Exact" unnecessary) or (b) rename to "Fill Total" with tooltip "Set amount to selected billing total (₱X)" and make it visually prominent.
-- **Viewport**: Both
-- **File**: `src/routes/leases/PaymentModal.svelte`
+| # | Issue | Status | Verified |
+|---|-------|--------|----------|
+| P0-1 | Auto-fill amount from selected billings | CONFIRMED ✅ | Amount auto-fills to ₱192.78 when Utility Bill selected |
+| P0-2 | Fix false "No billings" message | CONFIRMED ✅ | Shows "Select billings to get started" → updates on selection |
+| P0-3 | "Fill Total" button (was "Exact") | CONFIRMED ✅ | Only appears when amount differs from selected total |
+| P1-1 | Show why Submit is disabled | CONFIRMED ✅ | "Select at least one billing" text shown below button |
+| P1-2 | Fix amount label confusion | CONFIRMED ✅ | "Lease Balance" / "Outstanding Total (N selected)" / "You're Paying" |
+| P1-3 | Select All toggle | CONFIRMED ✅ | "Select All / Deselect All" link in billings header |
+| P1-4 | Payment method as button group | CONFIRMED ✅ | 2×2 grid: Cash / GCash / Bank Transfer / Security Deposit |
+| P1-5 | Loading state on Submit | CONFIRMED ✅ | Spinner + "Submitting..." in code (lines 718-726) |
+| P2-1 | Always show reference field | CONFIRMED ✅ | Disabled for Cash with "N/A for cash payments" placeholder |
+| P2-2 | Human-friendly billing labels | CONFIRMED ✅ | "Utility Bill", "Monthly Rent", "Security Deposit", "Penalty Fee" |
+| P2-3 | Suppress redundant status badges | CONFIRMED ✅ | `allSameStatus` derived hides badges when all same |
+| P2-4 | Mobile collapsible billings | CONFIRMED ✅ | Billings collapse to summary after selection |
+| P2-5 | Severity gradient for lease cards | PARTIAL ⚠️ | Cards show "170d overdue" text but no visual gradient differentiation |
+| P2-6 | Separate card click vs payment | CONFIRMED ✅ | `border-l` divider + `e.stopPropagation()` on buttons |
 
 ---
 
-### P1 — High (Degrades Smoothness)
+## NEW Issues Found (v2)
 
-#### P1-1: Submit button disabled without explanation
-- **Scenario**: S3 (modal opens)
-- **Observed**: "Submit Payment" button is grayed out/disabled. No indicator of what's missing (no billings? no amount? no method?).
-- **Impact**: User must mentally check 4 conditions. Cognitive load increases with form complexity.
-- **Fix**: Add micro-validation: show a small text under the button like "Select billings and enter amount" or use a progress indicator.
-- **Viewport**: Both
+### P0 — Critical
+
+#### P0-NEW-1: No billings pre-selected on modal open — user always starts from zero
+- **Scenario**: S2
+- **Observed**: Modal opens with zero billings selected, amount at ₱0.00, summary empty. User must actively select billings every time.
+- **Impact**: For a lease with 2 billings, the most common intent is "pay everything." Forcing selection adds 1-2 unnecessary clicks to EVERY payment.
+- **Expected**: Pre-select all unpaid billings when modal opens. User deselects if they want partial payment.
+- **Rationale**: The "Make Payment" intent implies "I want to pay." 90%+ of payments will be for all outstanding billings.
+- **Fix**: Call `updateSelectedAmount()` with all unpaid billings pre-selected in an `$effect` when `isOpen` becomes true.
 - **File**: `src/routes/leases/PaymentModal.svelte`
 
-#### P1-2: Selected Amount vs Payment Amount — confusing duplication
-- **Scenario**: S4-S5
-- **Observed**: Two similar labels in adjacent columns:
-  - Middle: "Selected Amount: ₱2,692.78"
-  - Right: "Payment Amount: ₱0.00"
-  Users don't understand why they differ. "Selected" = billing total, "Payment" = what you're paying. But this distinction is only clear to developers.
-- **Impact**: Creates confusion about what number matters. Users may think they need to match these manually.
-- **Fix**: Rename "Selected Amount" → "Outstanding Total" and "Payment Amount" → "You're Paying". Or remove duplication — let the summary column be the single source of truth.
-- **Viewport**: Both
+### P1 — High
+
+#### P1-NEW-1: "You're Paying: ₱0.00" prominently displayed on open
+- **Scenario**: S2
+- **Observed**: Payment Summary column shows large green "₱0.00" text before any billing is selected. This looks like a bug — the user sees "You're Paying: ₱0.00" as if the system decided they owe nothing.
+- **Impact**: Momentary confusion. The ₱0.00 in large text is the first thing the eye catches in the summary column.
+- **Fix**: Hide the amount or show a neutral placeholder like "—" until billings are selected. Or pre-select billings (P0-NEW-1) so this never appears.
 - **File**: `src/routes/leases/PaymentModal.svelte`
 
-#### P1-3: No "Select All" for outstanding billings
-- **Scenario**: S5
-- **Observed**: Must click each billing checkbox individually. For tenants with multiple billings, this is tedious.
-- **Impact**: Processing bulk payments (the most common scenario for overdue tenants) requires N clicks instead of 1.
-- **Fix**: Add "Select All / Deselect All" toggle above the billings list.
-- **Viewport**: Both
-- **File**: `src/routes/leases/PaymentModal.svelte`
+#### P1-NEW-2: "Change: ₱0.00" shown when exact amount matches
+- **Scenario**: S3
+- **Observed**: After selecting Utility Bill (₱192.78) with auto-filled amount (₱192.78), the summary shows "Change: ₱0.00" in green. This is zero-information noise.
+- **Impact**: Adds visual clutter. "Change: ₱0.00" implies the system is expecting change, which it's not.
+- **Fix**: Only show "Change" line when `paymentAmount > selectedAmount` (i.e., actual change exists). Hide when exact match.
+- **File**: `src/routes/leases/PaymentModal.svelte` (lines 640-658)
 
-#### P1-4: Payment method as dropdown — slower than button group
+#### P1-NEW-3: Mobile — Allocation preview requires extra scroll
 - **Scenario**: S7
-- **Observed**: Payment method is a `<select>` dropdown (Cash, GCash, Bank Transfer, Security Deposit). Requires click-to-open then click-to-select (2 interactions).
-- **Impact**: For a field with only 4 options, a dropdown adds unnecessary interaction. GCash is extremely common in PH.
-- **Fix**: Replace dropdown with a button group (segmented control): `[Cash] [GCash] [Bank] [SD]`. Single tap to select.
-- **Viewport**: Both (especially mobile where dropdown can be hard to scroll)
+- **Observed**: On mobile (375px), after selecting a billing, the form fills most of the viewport. The "Payment Allocation" preview with billing-level breakdown and PAID/PARTIAL badges is below the fold. The sticky footer shows ₱192.78 total but not the allocation details.
+- **Impact**: User can't see WHERE their money goes without scrolling past all form fields.
+- **Fix**: On mobile, collapse the allocation preview into the sticky footer — e.g., a small expandable section showing "1 billing → PAID" or similar summary.
 - **File**: `src/routes/leases/PaymentModal.svelte`
 
-#### P1-5: No loading state on Submit
-- **Scenario**: S8
-- **Observed**: After clicking "Submit Payment", no visual feedback during the server call. Button doesn't show spinner or "Submitting..." state.
-- **Impact**: User may double-click, creating duplicate payments. Or they think nothing happened.
-- **Fix**: Disable button + show spinner during fetch. Re-enable on error.
-- **Viewport**: Both
-- **File**: `src/routes/leases/PaymentModal.svelte`
+### P2 — Medium
 
----
+#### P2-NEW-1: Security deposit availability only shown AFTER selecting method
+- **Scenario**: S5 (code audit)
+- **Observed**: The "Available Security Deposit: ₱X" info box only appears when `selectedPaymentType === 'SECURITY_DEPOSIT'`. User must first click the Security Deposit button to discover how much SD is available.
+- **Impact**: User makes a blind choice — they don't know if SD has enough funds until they select it. If insufficient, they must switch back.
+- **Fix**: Show a subtle hint on the Security Deposit button itself: `Security Deposit (₱2,000)`. Or show available amount in the billing selection area.
+- **File**: `src/routes/leases/PaymentModal.svelte` (lines 523-538)
 
-### P2 — Medium (Polish)
+#### P2-NEW-2: Multi-tenant lease — Paid By defaults to first tenant only
+- **Scenario**: Code audit
+- **Observed**: `paidBy` initializes with `lease.lease_tenants?.[0]?.tenant?.name`. For shared rooms (2+ tenants), this silently picks the first tenant.
+- **Impact**: Low for most cases but technically incorrect for multi-occupancy leases. Accountant may not catch the wrong name.
+- **Fix**: For multi-tenant leases, show a dropdown of tenant names instead of a plain text input.
+- **File**: `src/routes/leases/PaymentModal.svelte` (line 62)
 
-#### P2-1: Reference Number field hidden for Cash — layout shift
-- **Scenario**: S7
-- **Observed**: Switching from Cash to GCash/Bank makes a Reference Number field appear, shifting the form layout.
-- **Impact**: Surprise layout change mid-form breaks user's spatial memory.
-- **Fix**: Always show the field, disabled + grayed for Cash with placeholder "N/A for cash payments".
-- **File**: `src/routes/leases/PaymentModal.svelte`
-
-#### P2-2: Billing type labels show raw enum values
-- **Scenario**: S3-S6
-- **Observed**: "UTILITY", "RENT" in all-caps — looks like database enums, not user-friendly labels.
-- **Impact**: Unprofessional appearance, slight cognitive load to parse.
-- **Fix**: Title-case with context: "Utility Bill", "Monthly Rent", "Security Deposit", "Penalty Fee".
-- **File**: `src/routes/leases/PaymentModal.svelte`
-
-#### P2-3: Status badge "Penalized" on every billing is noise
-- **Scenario**: S3-S5
-- **Observed**: Every billing shows red "Penalized" badge. When ALL billings are penalized, the badge adds zero information.
-- **Impact**: Visual clutter that dilutes the signal.
-- **Fix**: Only show when exceptional, or move to a summary line at the top: "All billings include late penalties".
-- **File**: `src/routes/leases/PaymentModal.svelte`
-
-#### P2-4: Three-column modal on mobile becomes very tall
-- **Scenario**: S3 (mobile)
-- **Observed**: 3-column layout (Billings | Form | Summary) stacks vertically on mobile. User must scroll past all billings to reach the form, then scroll more for summary.
-- **Impact**: Submit button may be below the fold. User loses context of what they selected while filling the form.
-- **Fix**: Consider a collapsible accordion or stepper: Step 1 "Select Billings" → Step 2 "Payment Details" → Step 3 "Review & Submit". Or pin the summary/submit at bottom.
-- **File**: `src/routes/leases/PaymentModal.svelte`
-
-#### P2-5: Lease cards — "wall of red" when 37/40 are overdue
+#### P2-NEW-3: Lease cards — overdue severity not visually differentiated
 - **Scenario**: S1
-- **Observed**: Every card has red dot, "Critical overdue", same penalty styling. No differentiation by severity.
-- **Impact**: Urgency signal is lost when everything screams urgent.
-- **Fix**: Gradient severity colors (light red for 30d, medium for 90d, dark/pulsing for 180d+). Or group by severity with section headers.
+- **Observed**: All 37 overdue lease cards look identical — same red dot, same styling. Cards show "170d overdue" vs "200d overdue" in text, but the visual treatment is the same red. Prior audit P2-5 marked as FIXED but gradient isn't visible in the card dot/styling.
+- **Impact**: Manager can't scan the page and instantly prioritize which leases need attention first.
+- **Fix**: Apply the gradient to the overdue dot color AND card border-left: amber for <30d, red-400 for 30-90d, red-600 for 90-180d, red-800/pulsing for 180d+.
 - **File**: `src/routes/leases/LeaseCard.svelte`
 
-#### P2-6: Card click vs Make Payment button — competing targets
-- **Scenario**: S2 vs S3
-- **Observed**: Clicking the card opens LeaseDetailsModal. Clicking "Make Payment" opens PaymentModal. Adjacent targets, easy to hit wrong one.
-- **Impact**: Accidental modal opens → close → click right target → friction.
-- **Fix**: Increase spacing, or make "Make Payment" visually dominant (it's the primary action). Consider making card click open payment directly (since that's the most common intent from this page).
-- **File**: `src/routes/leases/LeaseCard.svelte`
+### P3 — Low
+
+#### P3-NEW-1: No success animation or receipt after payment
+- **Observed**: After successful payment, just a toast notification and modal close. No micro-celebration or receipt view.
+- **Fix**: Brief success animation (checkmark) + option to "View Receipt" or "Print" before modal closes.
+- **File**: `src/routes/leases/PaymentModal.svelte`
+
+#### P3-NEW-2: No keyboard shortcut to submit (Enter key)
+- **Observed**: Form uses `onsubmit` but no explicit keyboard shortcut hint. Power users expect Enter to submit.
+- **Fix**: The form's `onsubmit` should handle Enter key naturally since it's a `<form>`. Verify this works when focus is on the amount input.
+- **File**: `src/routes/leases/PaymentModal.svelte`
 
 ---
 
-### P3 — Low (Nice-to-have)
-
-#### P3-1: No confirmation step before submit
-- **File**: `src/routes/leases/PaymentModal.svelte`
-- A brief "You're paying ₱2,692.78 via Cash for 2 billings — confirm?" would reduce errors.
-
-#### P3-2: Payment date defaults to today with no backdating guardrail
-- **File**: `src/routes/leases/PaymentModal.svelte`
-- No warning if user backdates significantly (e.g., 6 months ago). Could be intentional but worth flagging.
-
-#### P3-3: No keyboard shortcut for power users
-- **File**: `src/routes/leases/PaymentModal.svelte`
-- Enter to submit, Tab navigation could be smoother.
-
-#### P3-4: Billing notes ("Utility bill for 2nd Floor - Room 2") are system-generated and unhelpful
-- **File**: `src/routes/leases/PaymentModal.svelte`
-- These notes don't help the user make decisions. Could show meter reading details instead.
-
----
-
-## Accessibility Audit
+## Accessibility Audit (v2 — Updated)
 
 | Check | Status | Notes |
 |-------|--------|-------|
 | Dialog has heading | PASS | h2 "Make Payment" |
-| Checkboxes keyboard-accessible | PASS | role="checkbox", Enter/Space to toggle |
-| Focus trap in modal | PARTIAL | Dialog auto-focuses but no explicit trap |
-| Required fields marked | PARTIAL | Only Payment Date has `*`, amount and billing selection don't |
-| Error messages announced | FAIL | Toast notifications not connected to aria-live |
+| Checkboxes keyboard-accessible | PASS | `role="checkbox"`, Enter/Space to toggle, tabindex="0" |
+| Focus trap in modal | PASS | Dialog.Root from shadcn handles this |
+| Required fields marked | PARTIAL | Only Payment Date has `*`; amount and billing selection have no `required` indicator |
+| Error messages announced | FAIL | Toast notifications not connected to `aria-live` region |
 | Color contrast on badges | PASS | Red/green badges meet WCAG AA |
-| Touch targets ≥44px | PASS | min-h-[44px] on mobile buttons |
-| Screen reader billing items | PARTIAL | Missing composite aria-label for checkbox items |
+| Touch targets ≥44px | PASS | `min-h-[44px]` on mobile buttons, `touch-manipulation` on Make Payment |
+| Screen reader billing items | PARTIAL | Checkboxes have implicit label from content but no explicit `aria-label` |
+| Submit button feedback | PASS | `disabled` attribute set, validation hint text visible |
 
 ---
 
-## Smoothness Scorecard
+## Unified Experience Index (UXI)
 
-| Dimension | Score | Rationale |
-|-----------|-------|-----------|
-| **Click count** | 7/10 | 5 clicks is close to minimum; auto-amount would save 1 |
-| **Cognitive load** | 4/10 | Too many numbers, confusing labels, duplicate amounts |
-| **Error prevention** | 5/10 | Validation exists but is opaque (disabled button, no hints) |
-| **Feedback quality** | 3/10 | No loading states, misleading "No billings selected" |
-| **Common-case optimization** | 3/10 | Amount not auto-filled, no Select All, dropdown for 4 options |
-| **Visual clarity** | 6/10 | 3-column works on desktop but info density is high |
-| **Mobile experience** | 4/10 | Tall stacked layout, scroll to submit |
-| **Overall** | **4.6/10** | Functional but requires unnecessary effort |
+Reference: `apps/dorm/audits/MOBILE_UX_BIBLE.md` — 7 dimensions, evidence-based, applies to both desktop and mobile.
+
+### v1 → v3 UXI Comparison
+
+| Dim | Name | Weight | v1 | v3 | Evidence |
+|-----|------|--------|----|----|----------|
+| D1 | Task Efficiency | 20% | 3 | **9** | v1: 5 clicks, no defaults. v3: 2 clicks (Make Payment → Submit). Billings pre-selected, amount auto-filled, method remembered (localStorage), name pre-filled, date defaults today. |
+| D2 | Scroll & Density | 15% | 3 | **8** | v1: 3+ screenfuls, CTA hidden, 10 ungrouped fields. v3: ~1.5 screenfuls, sticky footer, 7 effective fields (3 pre-filled=0.5), Amount+Ref paired, billings collapsible. |
+| D3 | Information Architecture | 15% | 3 | **9** | v1: ₱ shown 4×, labels like "Selected Amount" vs "Payment Amount". v3: amount 2× max (Total Due + footer), labels are "Total Due", "Paying", "Method". Badges suppressed when redundant. |
+| D4 | Input Quality | 15% | 5 | **7** | v3: all targets ≥44px mobile, checkboxes 20px, font ≥16px (no iOS zoom). Missing: `inputmode="decimal"` on amount, no auto-focus on modal open. Tab order correct. |
+| D5 | Visual Hierarchy | 10% | 5 | **8** | v3: 3-column desktop (1fr/1.2fr/0.8fr), section headers (`text-xs uppercase`), compact billing rows, `tabular-nums` on amounts, `bg-primary/5` on key summary. |
+| D6 | Progressive Disclosure | 10% | 3 | **8** | v3: billings auto-collapsed on mobile, allocation in expandable footer, SD warning conditional, Reference disabled for Cash. 5/7 fields visible at open. |
+| D7 | Feedback & Safety | 15% | 3 | **9** | v3: spinner + "Submitting...", duplicate payment guard (24h confirm), rich toast (amount/method/count) with Undo, "Just Paid" transient badge, submit disabled with reason text. |
+
+### UXI Calculation
+
+```
+v1: (3×.20)+(3×.15)+(3×.15)+(5×.15)+(5×.10)+(3×.10)+(3×.15) = 3.40 → Grade F
+v3: (9×.20)+(8×.15)+(9×.15)+(7×.15)+(8×.10)+(8×.10)+(9×.15) = 8.30 → Grade A
+```
+
+| Version | UXI | Grade | Interpretation |
+|---------|-----|-------|----------------|
+| v1 (original) | **3.40** | F | Major redesign needed |
+| v3 (current) | **8.30** | A | Excellent — minor polish opportunities |
+
+### Remaining Improvements to Reach A+ (9.0+)
+
+| Dim | Now | Target | Fix | Effort |
+|-----|-----|--------|-----|--------|
+| D4 | 7 | 9 | Add `inputmode="decimal"` to amount; auto-focus first field on open | Low |
+| D2 | 8 | 9 | Hide Reference # entirely for Cash (not just disable) → -1 field | Low |
+| D6 | 8 | 9 | Collapse billings on desktop too when all pre-selected (only expand on click) | Low |
+
+**Projected UXI**: `(9×.20)+(9×.15)+(9×.15)+(9×.15)+(8×.10)+(9×.10)+(9×.15) = 8.90 → A+`
 
 ---
 
-## Fix Priority Order
+## Fix Priority Order (v2 — New Issues Only)
 
 | Priority | Issue | Impact | Effort | Status |
 |----------|-------|--------|--------|--------|
-| 1 | P0-1: Auto-fill amount from selected billings | Highest | Low | FIXED - auto-populates paymentAmount in updateSelectedAmount() |
-| 2 | P0-2: Fix "No billings selected" false state | High | Low | FIXED - shows "Select billings to get started" or "Enter amount..." |
-| 3 | P0-3: Make "Exact" self-explanatory or remove | High | Low | FIXED - renamed to "Fill Total", only shows when amount differs, has tooltip |
-| 4 | P1-1: Show why Submit is disabled | High | Low | FIXED - validation hints below submit button |
-| 5 | P1-3: Add Select All toggle | Medium | Low | FIXED - "Select All / Deselect All" link above billings list |
-| 6 | P1-5: Loading state on Submit | Medium | Low | FIXED - spinner + "Submitting..." text, prevents double-submit |
-| 7 | P1-4: Payment method as button group | Medium | Medium | FIXED - 2x2 grid of toggle buttons replaces dropdown |
-| 8 | P1-2: Fix amount label confusion | Medium | Low | FIXED - "Lease Balance" + "Outstanding Total (N selected)" + "You're Paying" |
-| 9 | P2-1: Always show reference field | Low | Low | FIXED - always visible, disabled for Cash with placeholder |
-| 10 | P2-2: Human-friendly billing type labels | Low | Low | FIXED - "Monthly Rent", "Utility Bill", "Security Deposit", "Penalty Fee" |
-| 11 | P2-3: Reduce penalized badge noise | Low | Low | FIXED - badges hidden when all billings share same status |
-| 12 | P2-4: Mobile stepper/accordion | Medium | High | FIXED - sticky footer w/ amount+submit, collapsible billings section, compact billing rows, inline allocation preview, auto-collapse after selection |
-| 13 | P2-5: Severity gradient for lease cards | Low | Medium | FIXED - 4-tier gradient: 0-30d amber, 30-90d red-400, 90-180d red-600, 180d+ red-800 |
-| 14 | P2-6: Separate card click vs payment button | Low | Medium | FIXED - border-l divider separating actions from card click area |
+| 1 | P0-NEW-1: Pre-select all unpaid billings on open | Highest | Low | FIXED — $effect pre-selects on isOpen, auto-collapses billings on mobile |
+| 2 | P1-NEW-2: Hide "Change: ₱0.00" noise | High | Low | FIXED — only shows Change/Remaining when amount differs from total |
+| 3 | P1-NEW-1: Hide "You're Paying: ₱0.00" on initial state | High | Low | FIXED (moot — pre-select means amount is never ₱0.00 on open) |
+| 4 | P2-NEW-1: Show SD amount on button label | Medium | Low | FIXED — "Security Deposit" button shows available amount below label |
+| 5 | P1-NEW-3: Mobile allocation in sticky footer | Medium | Medium | FIXED — expandable allocation summary in sticky footer with billing→status breakdown |
+| 6 | P2-NEW-3: Overdue severity gradient on cards | Low | Medium | FIXED — 180d+ dots pulse (animate-pulse), severity 3 uses bg-red-600 (was bg-red-500) |
+| 7 | P2-NEW-2: Multi-tenant Paid By dropdown | Low | Medium | FIXED — quick-select buttons for each tenant name above text input |
+| 8 | P3-NEW-1: Success animation | Low | Low | DEFERRED — toast is sufficient for now |
+
+---
+
+## Ideal Flow (After All Fixes)
+
+```
+Leases Page
+  → [1] Click "Make Payment" on lease card
+  → Modal opens with ALL billings pre-selected, amount auto-filled
+  → Summary shows full allocation preview immediately
+  → [2] (Optional) Deselect billings, change method, edit amount
+  → [2] Click "Submit Payment"
+  → Success animation → modal closes
+```
+
+**Target clicks: 2** (Make Payment → Submit)
+**Target score: 9/10**

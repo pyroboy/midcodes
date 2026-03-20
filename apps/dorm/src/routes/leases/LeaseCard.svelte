@@ -34,6 +34,7 @@
 	import { getSecurityDepositStatus } from '$lib/utils/lease';
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { getUtilityDisplayStatus } from '$lib/utils/lease-status';
+	import { justPaidMap } from './just-paid.svelte';
 
 	interface Props {
 		lease: Lease & { balanceStatus?: any };
@@ -44,6 +45,9 @@
 		onDelete: (event: Event, lease: Lease) => void;
 		onStatusChange: (id: string, status: string) => void;
 		onDataChange?: () => Promise<void>;
+		batchMode?: boolean;
+		isSelected?: boolean;
+		onBatchToggle?: () => void;
 	}
 
 	let {
@@ -54,7 +58,10 @@
 		onLeaseClick,
 		onDelete,
 		onStatusChange,
-		onDataChange
+		onDataChange,
+		batchMode = false,
+		isSelected = false,
+		onBatchToggle
 	}: Props = $props();
 
 	import { getStatusVariant } from '$lib/utils/format';
@@ -186,6 +193,18 @@
 		return getUtilityDisplayStatus(lease.balanceStatus);
 	});
 
+	// #2: Total due for "Pay ₱X" button label
+	let totalDue = $derived.by(() => {
+		if (!lease.billings?.length) return 0;
+		return lease.billings.reduce((sum: number, b: any) => {
+			if (b.status === 'PAID') return sum;
+			return sum + (b.amount + (b.penalty_amount || 0) - (b.paid_amount || 0));
+		}, 0);
+	});
+
+	// #5: "Just paid" transient badge
+	let justPaid = $derived(justPaidMap.get(String(lease.id)));
+
 	// [04] + [10]: Unified payment status color for left border and status dot
 	// P2-5: Severity gradient — more tiers so "wall of red" differentiates urgency
 	let paymentStatusColor = $derived.by(() => {
@@ -194,10 +213,10 @@
 		if (bs.hasOverdue) {
 			const days = bs.daysOverdue || 0;
 			if (days >= 180) {
-				return { border: 'border-l-red-800', dot: 'bg-red-700', label: `${days}d overdue`, severity: 4 };
+				return { border: 'border-l-red-800', dot: 'bg-red-700 animate-pulse', label: `${days}d overdue`, severity: 4 };
 			}
 			if (days >= 90) {
-				return { border: 'border-l-red-600', dot: 'bg-red-500', label: `${days}d overdue`, severity: 3 };
+				return { border: 'border-l-red-600', dot: 'bg-red-600', label: `${days}d overdue`, severity: 3 };
 			}
 			if (days >= 30) {
 				return { border: 'border-l-red-400', dot: 'bg-red-400', label: `${days}d overdue`, severity: 2 };
@@ -261,8 +280,14 @@
 	}
 </script>
 <Card.Root
-	class="group hover:shadow-lg transition-all duration-300 w-full border-0 bg-white/70 backdrop-blur-sm hover:bg-white/90 rounded-xl overflow-hidden cursor-pointer border-l-4 {paymentStatusColor.border}"
-	onclick={() => (showDetailsModal = true)}
+	class="group hover:shadow-lg transition-all duration-300 w-full border-0 bg-white/70 backdrop-blur-sm hover:bg-white/90 rounded-xl overflow-hidden cursor-pointer border-l-4 {paymentStatusColor.border} {batchMode && isSelected ? 'ring-2 ring-primary' : ''}"
+	onclick={() => {
+		if (batchMode && onBatchToggle) {
+			onBatchToggle();
+		} else {
+			showDetailsModal = true;
+		}
+	}}
 >
 	<Card.Content
 		class="py-2 px-4 sm:px-6 border-t border-b border-slate-200/40 hover:bg-slate-50/50 transition-colors duration-200"
@@ -274,11 +299,20 @@
 				<!-- Lease Name -->
 				<div class="flex-1 min-w-0">
 					<div class="flex items-center gap-1.5">
-						<!-- [10] Status dot reflecting payment status -->
-						<span class="w-2 h-2 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
+						{#if batchMode}
+							<input type="checkbox" checked={isSelected} class="h-4 w-4 flex-shrink-0" tabindex="-1" onclick={(e) => e.stopPropagation()} />
+						{:else}
+							<!-- [10] Status dot reflecting payment status -->
+							<span class="w-2 h-2 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
+						{/if}
 						<span class="text-sm sm:text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
 							{lease.name || `Lease #${lease.id}`}
 						</span>
+						{#if justPaid}
+							<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium animate-pulse flex-shrink-0">
+								Paid {formatCurrency(justPaid.amount)}
+							</span>
+						{/if}
 					</div>
 					<!-- [09] Lease expiry + [11] Security deposit badges -->
 					<div class="flex items-center gap-1.5 mt-0.5 ml-3.5">
@@ -406,11 +440,20 @@
 			<!-- Name -->
 			<div class="flex-shrink-0 min-w-0 w-56">
 				<div class="flex items-center gap-1.5">
-					<!-- [10] Status dot reflecting payment status -->
-					<span class="w-2.5 h-2.5 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
+					{#if batchMode}
+						<input type="checkbox" checked={isSelected} class="h-4 w-4 flex-shrink-0" tabindex="-1" onclick={(e) => e.stopPropagation()} />
+					{:else}
+						<!-- [10] Status dot reflecting payment status -->
+						<span class="w-2.5 h-2.5 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
+					{/if}
 					<span class="text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
 						{lease.name || `Lease #${lease.id}`}
 					</span>
+					{#if justPaid}
+						<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium animate-pulse flex-shrink-0">
+							Paid {formatCurrency(justPaid.amount)}
+						</span>
+					{/if}
 				</div>
 				<!-- [09] Lease expiry + [11] Security deposit badges -->
 				<div class="flex items-center gap-2 mt-0.5 ml-4">
@@ -645,7 +688,7 @@
 					class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-sm font-medium transition-colors h-9"
 				>
 					<CreditCard class="w-4 h-4 mr-2" />
-					Make Payment
+					{totalDue > 0 ? `Pay ${formatCurrency(totalDue)}` : 'Make Payment'}
 				</Button>
 			</div>
 		</div>
@@ -776,7 +819,7 @@
 						class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-sm font-medium transition-colors min-h-[44px] touch-manipulation"
 					>
 						<CreditCard class="w-4 h-4 mr-2" />
-						Make Payment
+						{totalDue > 0 ? `Pay ${formatCurrency(totalDue)}` : 'Make Payment'}
 					</Button>
 				</div>
 		</div>

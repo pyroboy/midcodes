@@ -1,9 +1,10 @@
 <script lang="ts">
 	import LeaseFormModal from './LeaseFormModal.svelte';
 	import LeaseList from './LeaseList.svelte';
+	import BatchPaymentModal from './BatchPaymentModal.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign, FileText, CircleDot } from 'lucide-svelte';
+	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign, FileText, CircleDot, CreditCard } from 'lucide-svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import type { z } from 'zod/v3';
 	import { leaseSchema } from './formSchema';
@@ -230,6 +231,25 @@
 	let showDeleteDialog = $state(false);
 	let leaseToDelete = $state<any>(null);
 
+	// #7: Batch payment mode
+	let batchMode = $state(false);
+	let selectedLeaseIds = $state<Set<number>>(new Set());
+	let showBatchModal = $state(false);
+
+	function handleBatchToggle(id: number) {
+		const next = new Set(selectedLeaseIds);
+		if (next.has(id)) {
+			next.delete(id);
+		} else {
+			if (next.size >= 10) {
+				toast.error('Maximum 10 leases per batch');
+				return;
+			}
+			next.add(id);
+		}
+		selectedLeaseIds = next;
+	}
+
 	// Single-pass: enrich with status + compute summary metrics together
 	let leasesAndMetrics = $derived.by(() => {
 		let paidInFull = 0;
@@ -300,6 +320,23 @@
 			}
 		});
 	});
+
+	// #7: Batch derived (must be after filteredLeases)
+	let batchLeases = $derived(
+		filteredLeases.filter((l: any) => selectedLeaseIds.has(l.id))
+	);
+
+	let batchTotal = $derived(
+		batchLeases.reduce((sum: number, l: any) => {
+			return (
+				sum +
+				(l.billings?.reduce((s: number, b: any) => {
+					if (b.status === 'PAID') return s;
+					return s + (b.amount + (b.penalty_amount || 0) - (b.paid_amount || 0));
+				}, 0) || 0)
+			);
+		}, 0)
+	);
 
 	// Resync relevant collections after server actions
 	async function refreshData() {
@@ -408,6 +445,18 @@
 					Leases Dashboard
 				</h1>
 				<div class="flex items-center gap-1 sm:gap-2">
+					<Button
+						onclick={() => {
+							batchMode = !batchMode;
+							if (!batchMode) selectedLeaseIds = new Set();
+						}}
+						variant={batchMode ? 'default' : 'outline'}
+						class="flex items-center justify-center gap-1 sm:gap-2 h-9 sm:h-9 min-h-[44px] px-2 sm:px-3 py-1 text-xs sm:text-sm {batchMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300'} shadow-sm"
+						disabled={isLoading || filteredLeases.length === 0}
+					>
+						<CreditCard class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+						<span class="hidden sm:inline">{batchMode ? 'Cancel Batch' : 'Pay Multiple'}</span>
+					</Button>
 					<Button
 						onclick={handlePrintAllLeases}
 						variant="outline"
@@ -644,6 +693,9 @@
 					on:delete={(event) => handleDeleteLease(event.detail)}
 					onStatusChange={handleStatusChange}
 					onDataChange={refreshData}
+					{batchMode}
+					{selectedLeaseIds}
+					onBatchToggle={handleBatchToggle}
 				/>
 			{/if}
 		</div>
@@ -660,6 +712,51 @@
 	onOpenChange={handleModalClose}
 	onDataChange={refreshData}
 />
+
+<!-- #7: Batch payment sticky bar -->
+{#if batchMode && selectedLeaseIds.size > 0}
+	<div class="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg safe-area-bottom">
+		<div class="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between gap-3">
+			<div class="text-sm">
+				<span class="font-semibold">{selectedLeaseIds.size}</span> lease{selectedLeaseIds.size !== 1 ? 's' : ''}
+				<span class="text-muted-foreground mx-1">&mdash;</span>
+				<span class="font-semibold tabular-nums">{formatCurrency(batchTotal)}</span>
+			</div>
+			<div class="flex items-center gap-2">
+				<Button
+					variant="outline"
+					onclick={() => { selectedLeaseIds = new Set(); }}
+					class="h-9 px-3 text-sm min-h-[44px] sm:min-h-0"
+				>
+					Clear
+				</Button>
+				<Button
+					onclick={() => { showBatchModal = true; }}
+					class="bg-green-600 hover:bg-green-700 text-white h-9 px-4 text-sm font-medium min-h-[44px] sm:min-h-0"
+				>
+					<CreditCard class="w-4 h-4 mr-2" />
+					Pay Selected
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- #7: Batch Payment Modal -->
+{#if showBatchModal}
+	<BatchPaymentModal
+		leases={batchLeases}
+		isOpen={showBatchModal}
+		onOpenChange={(open) => {
+			showBatchModal = open;
+			if (!open) {
+				batchMode = false;
+				selectedLeaseIds = new Set();
+			}
+		}}
+		onDataChange={refreshData}
+	/>
+{/if}
 
 <!-- Delete Confirmation Dialog -->
 <AlertDialog.Root bind:open={showDeleteDialog}>

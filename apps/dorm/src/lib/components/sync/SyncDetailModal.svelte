@@ -278,6 +278,78 @@
 	let copied = $state(false);
 	let expandedCollection = $state<string | null>(null);
 
+	// Collapsible groups — track which are manually toggled
+	let manualGroupToggles = $state<Record<string, boolean>>({});
+
+	type GroupStatus = {
+		state: 'error' | 'syncing' | 'mismatch' | 'synced' | 'idle';
+		errorCount: number;
+		mismatchCount: number;
+		syncingCount: number;
+		localTotal: number;
+		serverTotal: number | null;
+		hasServerCounts: boolean;
+	};
+
+	let groupStatuses = $derived.by(() => {
+		const map: Record<string, GroupStatus> = {};
+		for (const group of collectionGroups) {
+			let errorCount = 0;
+			let mismatchCount = 0;
+			let syncingCount = 0;
+			let idleCount = 0;
+			let localTotal = 0;
+			let serverTotal = 0;
+			let hasServerCounts = false;
+
+			for (const name of group.names) {
+				const col = syncStatus.collections.find((c) => c.name === name);
+				if (!col) continue;
+				localTotal += col.docCount;
+				const neon = syncStatus.neonCounts?.[name];
+				if (neon !== undefined && neon !== null) {
+					hasServerCounts = true;
+					serverTotal += neon;
+				}
+				if (col.status === 'error') errorCount++;
+				else if (col.status === 'syncing') syncingCount++;
+				else if (col.status === 'idle') idleCount++;
+				// Check mismatch even for synced collections
+				if (col.status === 'synced' && neon !== undefined && neon !== null && col.docCount !== neon) {
+					mismatchCount++;
+				}
+			}
+
+			let state: GroupStatus['state'];
+			if (errorCount > 0) state = 'error';
+			else if (syncingCount > 0) state = 'syncing';
+			else if (mismatchCount > 0) state = 'mismatch';
+			else if (idleCount === group.names.length) state = 'idle';
+			else state = 'synced';
+
+			map[group.label] = {
+				state,
+				errorCount,
+				mismatchCount,
+				syncingCount,
+				localTotal,
+				serverTotal: hasServerCounts ? serverTotal : null,
+				hasServerCounts
+			};
+		}
+		return map;
+	});
+
+	// Default all collapsed — expand only via manual toggle
+	function isGroupExpanded(label: string): boolean {
+		if (label in manualGroupToggles) return manualGroupToggles[label];
+		return false;
+	}
+
+	function toggleGroup(label: string) {
+		manualGroupToggles = { ...manualGroupToggles, [label]: !isGroupExpanded(label) };
+	}
+
 	// Live "since" timer — only ticks when modal is open
 	let now = $state(Date.now());
 	$effect(() => {
@@ -461,31 +533,33 @@
 </script>
 
 <Dialog bind:open>
-	<DialogContent class="sm:max-w-[520px] max-h-[85vh] flex flex-col overflow-hidden">
+	<DialogContent class="sm:max-w-[520px] max-h-[85vh] h-[85vh] sm:h-auto flex flex-col overflow-hidden p-3 sm:p-6 gap-1.5 sm:gap-4">
 		<DialogHeader class="flex-shrink-0">
-			<DialogTitle class="flex items-center gap-2">
-				<Database class="w-5 h-5" />
+			<DialogTitle class="flex items-center gap-2 text-base sm:text-lg">
+				<Database class="w-4 h-4 sm:w-5 sm:h-5" />
 				Data Sync Status
 			</DialogTitle>
-			<DialogDescription>
+			<DialogDescription class="text-xs sm:text-sm">
 				Local-first data powered by RxDB + Neon PostgreSQL
 			</DialogDescription>
 		</DialogHeader>
 
 		<!-- Service Health -->
-		<div class="flex items-center justify-between py-3 px-4 bg-muted/30 rounded-lg flex-shrink-0">
-			<div class="flex items-center gap-2.5">
+		<div class="py-2 sm:py-3 px-2 sm:px-4 bg-muted/30 rounded-lg flex-shrink-0">
+			<!-- Mobile: two rows. Desktop: single row -->
+			<!-- Row 1: Health pipeline visualization — always centered with labels -->
+			<div class="flex items-center justify-center gap-3 sm:gap-4">
 				{#if true}
 					{@const RxIcon = getHealthIcon(syncStatus.rxdbHealth)}
 					<div class="flex items-center gap-1.5">
 						<RxIcon class="w-3.5 h-3.5 {getHealthColor(syncStatus.rxdbHealth)} {syncStatus.rxdbHealth === 'checking' ? 'animate-spin' : ''}" />
 						<HardDrive class="w-4 h-4 text-muted-foreground" />
-						<span class="text-sm font-medium">IndexedDB</span>
+						<span class="text-[11px] sm:text-xs font-medium">Local</span>
 					</div>
 				{/if}
 				{#if true}
 					{@const FlowIcon = flowArrow.icon}
-					<div class="flex flex-col items-center min-w-[48px]">
+					<div class="flex flex-col items-center min-w-[40px]">
 						<FlowIcon class="w-4 h-4 {flowArrow.color} {flowArrow.animate ? 'animate-pulse' : ''}" />
 						<span class="text-[9px] {flowArrow.color} leading-none mt-0.5">{flowArrow.label}</span>
 					</div>
@@ -494,7 +568,7 @@
 					{@const NeonIcon = getHealthIcon(syncStatus.neonHealth)}
 					<div class="flex items-center gap-1.5">
 						<Cloud class="w-4 h-4 text-muted-foreground" />
-						<span class="text-sm font-medium">Neon</span>
+						<span class="text-[11px] sm:text-xs font-medium">Cloud</span>
 						<NeonIcon class="w-3.5 h-3.5 {getHealthColor(syncStatus.neonHealth)} {syncStatus.neonHealth === 'checking' ? 'animate-spin' : ''}" />
 						{#if syncStatus.neonLatency !== null && syncStatus.neonHealth === 'ok'}
 							<span class="text-[10px] text-muted-foreground tabular-nums">{syncStatus.neonLatency}ms</span>
@@ -502,14 +576,14 @@
 					</div>
 				{/if}
 			</div>
-			<div class="flex items-center gap-2">
+			<!-- Row 2: Controls — badges + action buttons -->
+			<div class="flex items-center justify-center gap-2 mt-2">
 				{#if syncStatus.paused}
 					<Badge variant="outline" class="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600">Paused</Badge>
 				{/if}
-				<Badge variant={syncStatus.phase === 'complete' && !syncStatus.hasErrors ? 'secondary' : syncStatus.phase === 'error' ? 'destructive' : 'default'}>
+				<Badge variant={syncStatus.phase === 'complete' && !syncStatus.hasErrors ? 'secondary' : syncStatus.phase === 'error' ? 'destructive' : 'default'} class="text-[10px] sm:text-xs">
 					{syncStatus.syncedCount}/{syncStatus.totalCount} synced
 				</Badge>
-				<!-- C1: Pause/Resume toggle -->
 				<Button
 					variant="ghost"
 					size="sm"
@@ -546,7 +620,7 @@
 					{/if}
 				</div>
 				{#each mutationQueue.items as mutation (mutation.id)}
-					<div class="flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-md">
+					<div class="flex items-center gap-1.5 sm:gap-2 px-2 py-1.5 bg-muted/40 rounded-md">
 						<!-- Type icon -->
 						{#if mutation.type === 'update'}
 							<Pencil class="w-3 h-3 text-blue-500 flex-shrink-0" />
@@ -556,7 +630,7 @@
 							<Trash2 class="w-3 h-3 text-red-500 flex-shrink-0" />
 						{/if}
 						<!-- Label -->
-						<span class="text-xs truncate flex-1">{mutation.label}</span>
+						<span class="text-[11px] sm:text-xs truncate flex-1">{mutation.label}</span>
 						<!-- Status badge -->
 						{#if mutation.status === 'queued'}
 							<Badge variant="outline" class="text-[10px] px-1.5 py-0">queued</Badge>
@@ -595,26 +669,26 @@
 		{#if errorSummary.length > 0 || (syncStatus.rxdbHealth === 'error' && syncStatus.rxdbError) || (syncStatus.neonHealth === 'error' && syncStatus.neonError)}
 			<div class="flex-shrink-0 space-y-1.5">
 				{#if syncStatus.rxdbHealth === 'error' && syncStatus.rxdbError}
-					<div class="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-950/20 rounded-md">
+					<div class="flex items-center gap-1.5 sm:gap-2 px-2 py-1.5 bg-red-50 dark:bg-red-950/20 rounded-md">
 						<XCircle class="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
 						<Badge variant="destructive" class="text-[10px] px-1.5 py-0 font-mono flex-shrink-0">RxDB</Badge>
-						<span class="text-xs text-red-600 dark:text-red-400 truncate">{syncStatus.rxdbError}</span>
+						<span class="text-[11px] sm:text-xs text-red-600 dark:text-red-400 truncate">{syncStatus.rxdbError}</span>
 					</div>
 				{/if}
 				{#if syncStatus.neonHealth === 'error' && syncStatus.neonError}
-					<div class="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-950/20 rounded-md">
+					<div class="flex items-center gap-1.5 sm:gap-2 px-2 py-1.5 bg-red-50 dark:bg-red-950/20 rounded-md">
 						<XCircle class="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
 						<Badge variant="destructive" class="text-[10px] px-1.5 py-0 font-mono flex-shrink-0">NEON</Badge>
-						<span class="text-xs text-red-600 dark:text-red-400 truncate">{syncStatus.neonError}</span>
+						<span class="text-[11px] sm:text-xs text-red-600 dark:text-red-400 truncate">{syncStatus.neonError}</span>
 					</div>
 				{/if}
 				{#each errorSummary as err}
-					<div class="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 rounded-md">
+					<div class="flex items-center gap-1.5 sm:gap-2 px-2 py-1.5 bg-amber-50 dark:bg-amber-950/20 rounded-md">
 						<AlertCircle class="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
 						{#if err.code}
 							<Badge variant="outline" class="text-[10px] px-1.5 py-0 font-mono border-amber-300 text-amber-700 dark:text-amber-400 flex-shrink-0">{err.code}</Badge>
 						{/if}
-						<span class="text-xs text-amber-800 dark:text-amber-300 truncate flex-1" title={err.summary}>{err.summary}</span>
+						<span class="text-[11px] sm:text-xs text-amber-800 dark:text-amber-300 truncate flex-1" title={err.summary}>{err.summary}</span>
 						{#if err.url}
 							<a href={err.url} target="_blank" rel="noopener" class="flex-shrink-0" title="View docs">
 								<ExternalLink class="w-3 h-3 text-amber-500 hover:text-amber-700" />
@@ -632,52 +706,53 @@
 		<div class="flex border-b flex-shrink-0 items-end">
 			<button
 				onclick={() => (activeTab = 'collections')}
-				class="flex-1 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer {activeTab === 'collections' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
+				class="flex-1 py-1.5 sm:py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors cursor-pointer {activeTab === 'collections' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
 			>
 				Collections
 			</button>
 			<button
 				onclick={() => (activeTab = 'logs')}
-				class="flex-1 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer {activeTab === 'logs' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
+				class="flex-1 py-1.5 sm:py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors cursor-pointer {activeTab === 'logs' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
 			>
 				Log
 				{#if syncStatus.logs.length > 0}
-					<span class="ml-1 text-[10px] text-muted-foreground tabular-nums">({syncStatus.logs.length})</span>
+					<span class="ml-0.5 sm:ml-1 text-[9px] sm:text-[10px] text-muted-foreground tabular-nums">({syncStatus.logs.length})</span>
 				{/if}
 			</button>
 			<button
 				onclick={() => (activeTab = 'system')}
-				class="flex-1 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer {activeTab === 'system' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
+				class="flex-1 py-1.5 sm:py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors cursor-pointer {activeTab === 'system' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
 			>
 				System
 			</button>
 			{#if syncStatus.logs.length > 0}
 				<button
 					onclick={copyLogs}
-					class="flex items-center gap-1 px-2 py-1.5 mb-0.5 rounded text-xs hover:bg-muted/50 transition-colors cursor-pointer {copied ? 'text-emerald-500' : 'text-muted-foreground'}"
+					class="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 mb-0.5 rounded text-[11px] sm:text-xs hover:bg-muted/50 transition-colors cursor-pointer {copied ? 'text-emerald-500' : 'text-muted-foreground'}"
 					title="Copy full diagnostics to clipboard"
 				>
 					{#if copied}
-						<Check class="w-3.5 h-3.5" />
-						Copied
+						<Check class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+						<span class="hidden sm:inline">Copied</span>
 					{:else}
-						<Copy class="w-3.5 h-3.5" />
-						Copy
+						<Copy class="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+						<span class="hidden sm:inline">Copy</span>
 					{/if}
 				</button>
 			{/if}
 		</div>
 
 		<!-- Tab content — min-h-0 is critical for flex overflow scroll -->
-		<div class="min-h-0 flex-1 overflow-y-auto pr-1">
+		<div class="min-h-0 flex-1 overflow-y-auto">
 			{#if activeTab === 'collections'}
-				<!-- Actions + timestamps -->
-				<div class="px-3 py-1.5 space-y-1.5">
-					<div class="flex items-center gap-2">
+				<!-- Actions toolbar + timestamps — centered on all screen sizes -->
+				<div class="py-2 space-y-2">
+					<!-- Action buttons row — centered -->
+					<div class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
 						<Button
 							variant="outline"
 							size="sm"
-							class="h-6 text-[11px] gap-1"
+							class="h-7 text-[11px] gap-1.5 px-2.5"
 							onclick={() => syncStatus.fetchNeonCounts(true, refreshLocalCounts)}
 							disabled={syncStatus.neonCountsLoading}
 							title="Compare local doc counts against Neon server"
@@ -692,7 +767,7 @@
 						<Button
 							variant="outline"
 							size="sm"
-							class="h-6 text-[11px] gap-1"
+							class="h-7 text-[11px] gap-1.5 px-2.5"
 							onclick={handleReconcile}
 							disabled={isReconciling || syncStatus.paused}
 							title="Compare local data against server and fix any mismatches"
@@ -708,20 +783,20 @@
 							<Button
 								variant="outline"
 								size="sm"
-								class="h-6 text-[11px] gap-1"
+								class="h-7 text-[11px] gap-1.5 px-2.5"
 								onclick={handleRetryAllFailed}
 								disabled={isRetryingAllFailed}
 							>
 								<RefreshCw class="w-3 h-3 {isRetryingAllFailed ? 'animate-spin' : ''}" />
-								Retry failed ({errorCollectionsList.length})
+								Retry ({errorCollectionsList.length})
 							</Button>
 						{/if}
-						{#if syncStatus.neonCountsError}
-							<span class="text-[10px] text-red-500 truncate max-w-[120px]" title={syncStatus.neonCountsError}>{syncStatus.neonCountsError}</span>
-						{/if}
 					</div>
-					<!-- Compact timestamp row: synced + counted side by side -->
-					<div class="flex items-center gap-4 text-[10px]">
+					{#if syncStatus.neonCountsError}
+						<p class="text-[10px] text-red-500 text-center truncate" title={syncStatus.neonCountsError}>{syncStatus.neonCountsError}</p>
+					{/if}
+					<!-- Timestamp row — centered -->
+					<div class="flex items-center justify-center gap-4 sm:gap-6 text-[10px]">
 						<div class="flex items-center gap-1.5">
 							<HardDrive class="w-3 h-3 text-muted-foreground/60" />
 							<div class="flex flex-col leading-none">
@@ -743,23 +818,23 @@
 					{@const drifted = r.collections.filter((c) => !c.inSync)}
 					{@const unverified = r.collections.filter((c) => !c.verified)}
 					{@const isFullyVerified = r.verified && unverified.length === 0}
-					<div class="mx-3 mb-2 px-3 py-2 rounded-md border space-y-1 {isFullyVerified ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'}">
-						<div class="flex items-center gap-1.5">
+					<div class="mb-2 px-2 sm:px-3 py-2 rounded-md border space-y-1 {isFullyVerified ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800'}">
+						<div class="flex items-start gap-1.5">
 							{#if isFullyVerified && drifted.length === 0}
-								<CheckCircle class="w-3.5 h-3.5 text-emerald-500" />
-								<span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">All {r.collections.length} collections verified — true mirror of server ✓</span>
+								<CheckCircle class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+								<span class="text-[11px] sm:text-xs font-medium text-emerald-700 dark:text-emerald-400">All {r.collections.length} collections verified — true mirror of server</span>
 							{:else if isFullyVerified && drifted.length > 0}
-								<CheckCircle class="w-3.5 h-3.5 text-emerald-500" />
-								<span class="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-									Fixed {drifted.length} collection(s) and verified ✓ — {r.totalOrphansRemoved} orphan(s) removed, {r.totalMissingFetched} missing fetched
+								<CheckCircle class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+								<span class="text-[11px] sm:text-xs font-medium text-emerald-700 dark:text-emerald-400">
+									Fixed {drifted.length} collection(s) — {r.totalOrphansRemoved} orphan(s) removed, {r.totalMissingFetched} missing fetched
 								</span>
 							{:else}
-								<AlertTriangle class="w-3.5 h-3.5 text-amber-500" />
-								<span class="text-xs font-medium text-amber-700 dark:text-amber-400">
+								<AlertTriangle class="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+								<span class="text-[11px] sm:text-xs font-medium text-amber-700 dark:text-amber-400">
 									{#if drifted.length > 0}
 										Fixed {drifted.length} collection(s): {r.totalOrphansRemoved} orphan(s) removed, {r.totalMissingFetched} missing fetched —
 									{/if}
-									{unverified.length} collection(s) still mismatched after fix
+									{unverified.length} collection(s) still mismatched
 								</span>
 							{/if}
 						</div>
@@ -782,120 +857,157 @@
 						{/if}
 					</div>
 				{/if}
-				{#if syncStatus.neonCounts}
-					<div class="flex items-center justify-end px-3 pt-1 text-[9px] text-muted-foreground tracking-wider uppercase">
-						<span>local<span class="mx-0.5 opacity-40">/</span>server</span>
-					</div>
-				{/if}
-				<div class="space-y-0.5">
+				<div class="space-y-1">
 					{#each collectionGroups as group}
-						<div class="px-3 pt-2 pb-0.5 first:pt-0">
-							<span class="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
-						</div>
-					{#each group.names as name (name)}
-						{@const col = syncStatus.collections.find((c) => c.name === name)}
-						{#if col}
-						{@const Icon = getStatusIcon(col.status)}
-						{@const isExpanded = expandedCollection === col.name}
-						{@const hasError = col.status === 'error' && (col.parsedError || col.error)}
-						{@const hasMismatch = syncStatus.neonCounts !== null && syncStatus.neonCounts[col.name] !== undefined && col.docCount !== syncStatus.neonCounts[col.name]}
-						<div>
-							<button
-								type="button"
-								onclick={() => expandedCollection = isExpanded ? null : col.name}
-								class="w-full flex items-center justify-between py-1.5 px-3 rounded-md hover:bg-muted/30 transition-colors cursor-pointer text-left"
-							>
-								<div class="flex items-center gap-2 min-w-0">
-									{#if hasMismatch && col.status === 'synced'}
-										<AlertTriangle class="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
-									{:else}
-										<Icon class="w-3.5 h-3.5 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
-									{/if}
-									<span class="text-[13px] truncate">{collectionLabels[col.name] || col.name}</span>
-								</div>
-								<div class="flex items-center gap-1.5 flex-shrink-0">
-									{#if col.parsedError?.code}
-										<Badge variant="outline" class="text-[10px] px-1.5 py-0 font-mono border-red-300 text-red-600">{col.parsedError.code}</Badge>
-									{/if}
-									{#if col.status === 'syncing' && (syncStatus.pulledDocs[col.name] || 0) > 0}
-										<span class="text-[10px] text-blue-500 tabular-nums font-medium">↓ {syncStatus.pulledDocs[col.name]}</span>
-									{:else}
-										{@const neonCount = syncStatus.neonCounts?.[col.name]}
-										{#if neonCount !== undefined && neonCount !== null}
-											{@const match = col.docCount === neonCount}
-											<span class="text-[10px] tabular-nums {match ? 'text-emerald-500' : 'text-amber-600'} font-medium">
-												{col.docCount}<span class="text-muted-foreground/50">/</span>{neonCount}
-											</span>
-											{#if !match}
-												<span class="text-[9px] text-amber-500 font-medium">⚠</span>
-											{/if}
-										{:else}
-											<span class="text-[10px] text-muted-foreground tabular-nums">{col.docCount}</span>
-										{/if}
-									{/if}
-									{#if col.status === 'error'}
-										<!-- W5: Per-collection retry button (span instead of button to avoid nested button) -->
-										<span
-											role="button"
-											tabindex="0"
-											onclick={(e) => { e.stopPropagation(); handleResyncCollection(col.name); }}
-											onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); handleResyncCollection(col.name); } }}
-											aria-disabled={resyncingCollections.has(col.name)}
-											class="p-0.5 rounded hover:bg-muted/50 transition-colors cursor-pointer {resyncingCollections.has(col.name) ? 'opacity-50 pointer-events-none' : ''}"
-											title="Retry {collectionLabels[col.name] || col.name}"
+						{@const gs = groupStatuses[group.label]}
+						{@const expanded = isGroupExpanded(group.label)}
+						<!-- Group header — clickable to collapse/expand -->
+						<button
+							type="button"
+							onclick={() => toggleGroup(group.label)}
+							class="w-full flex items-center justify-between py-1.5 px-1 sm:px-2 rounded-md hover:bg-muted/30 transition-colors cursor-pointer text-left"
+						>
+							<div class="flex items-center gap-1.5 min-w-0">
+								<ChevronDown class="w-3 h-3 text-muted-foreground transition-transform flex-shrink-0 {expanded ? '' : '-rotate-90'}" />
+								<!-- Group status icon -->
+								{#if gs.state === 'error'}
+									<AlertCircle class="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+								{:else if gs.state === 'syncing'}
+									<Loader2 class="w-3.5 h-3.5 text-blue-500 flex-shrink-0 animate-spin" />
+								{:else if gs.state === 'mismatch'}
+									<AlertTriangle class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+								{:else if gs.state === 'synced'}
+									<CheckCircle class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+								{:else}
+									<Circle class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+								{/if}
+								<span class="text-xs font-semibold uppercase tracking-wider {gs.state === 'error' ? 'text-red-600 dark:text-red-400' : gs.state === 'mismatch' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}">{group.label}</span>
+								<span class="text-[10px] text-muted-foreground/60">({group.names.length})</span>
+							</div>
+							<div class="flex items-center gap-1.5 flex-shrink-0">
+								<!-- Inline problem badges when collapsed -->
+								{#if !expanded && gs.errorCount > 0}
+									<Badge variant="destructive" class="text-[9px] px-1.5 py-0">{gs.errorCount} error{gs.errorCount > 1 ? 's' : ''}</Badge>
+								{/if}
+								{#if !expanded && gs.mismatchCount > 0 && gs.errorCount === 0}
+									<Badge variant="outline" class="text-[9px] px-1.5 py-0 border-amber-300 text-amber-600">{gs.mismatchCount} drift</Badge>
+								{/if}
+								<!-- Aggregate counts -->
+								{#if gs.hasServerCounts}
+									{@const match = gs.localTotal === gs.serverTotal}
+									<span class="text-[10px] tabular-nums {match ? 'text-emerald-500' : 'text-amber-600'} font-medium">
+										{gs.localTotal}<span class="text-muted-foreground/50">/</span>{gs.serverTotal}
+									</span>
+								{:else}
+									<span class="text-[10px] text-muted-foreground tabular-nums">{gs.localTotal}</span>
+								{/if}
+							</div>
+						</button>
+						<!-- Expanded: individual collections -->
+						{#if expanded}
+							<div class="pl-3 sm:pl-4 space-y-0">
+								{#each group.names as name (name)}
+									{@const col = syncStatus.collections.find((c) => c.name === name)}
+									{#if col}
+									{@const Icon = getStatusIcon(col.status)}
+									{@const isExpanded = expandedCollection === col.name}
+									{@const hasError = col.status === 'error' && (col.parsedError || col.error)}
+									{@const hasMismatch = syncStatus.neonCounts !== null && syncStatus.neonCounts[col.name] !== undefined && col.docCount !== syncStatus.neonCounts[col.name]}
+									<div>
+										<button
+											type="button"
+											onclick={() => expandedCollection = isExpanded ? null : col.name}
+											class="w-full flex items-center justify-between py-1 px-1 sm:px-2 rounded-md hover:bg-muted/30 transition-colors cursor-pointer text-left"
 										>
-											<RefreshCw class="w-3 h-3 text-red-500 hover:text-red-700 {resyncingCollections.has(col.name) ? 'animate-spin' : ''}" />
-										</span>
-									{/if}
-									{#if hasError}
-										<ChevronDown class="w-3 h-3 text-muted-foreground transition-transform {isExpanded ? 'rotate-180' : ''}" />
-									{/if}
-								</div>
-							</button>
-							{#if isExpanded && hasError}
-								<div class="mx-3 mb-2 px-3 py-2 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800 space-y-1.5">
-									{#if col.parsedError}
-										<div class="flex items-start gap-2">
-											<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">Code</span>
-											<div class="flex items-center gap-1.5">
-												<code class="text-xs font-mono text-red-600 dark:text-red-400">{col.parsedError.code || 'none'}</code>
-												{#if col.parsedError.isRxdb}
-													<Badge variant="outline" class="text-[9px] px-1 py-0 border-red-300 text-red-500">RxDB</Badge>
+											<div class="flex items-center gap-1.5 min-w-0">
+												{#if hasMismatch && col.status === 'synced'}
+													<AlertTriangle class="w-3 h-3 flex-shrink-0 text-amber-500" />
 												{:else}
-													<Badge variant="outline" class="text-[9px] px-1 py-0 border-amber-300 text-amber-600">HTTP</Badge>
+													<Icon class="w-3 h-3 flex-shrink-0 {getStatusColor(col.status)} {col.status === 'syncing' ? 'animate-spin' : ''}" />
+												{/if}
+												<span class="text-[11px] sm:text-xs truncate">{collectionLabels[col.name] || col.name}</span>
+											</div>
+											<div class="flex items-center gap-1.5 flex-shrink-0">
+												{#if col.parsedError?.code}
+													<Badge variant="outline" class="text-[9px] px-1 py-0 font-mono border-red-300 text-red-600">{col.parsedError.code}</Badge>
+												{/if}
+												{#if col.status === 'syncing' && (syncStatus.pulledDocs[col.name] || 0) > 0}
+													<span class="text-[10px] text-blue-500 tabular-nums font-medium">↓ {syncStatus.pulledDocs[col.name]}</span>
+												{:else}
+													{@const neonCount = syncStatus.neonCounts?.[col.name]}
+													{#if neonCount !== undefined && neonCount !== null}
+														{@const match = col.docCount === neonCount}
+														<span class="text-[10px] tabular-nums {match ? 'text-emerald-500' : 'text-amber-600'} font-medium">
+															{col.docCount}<span class="text-muted-foreground/50">/</span>{neonCount}
+														</span>
+													{:else}
+														<span class="text-[10px] text-muted-foreground tabular-nums">{col.docCount}</span>
+													{/if}
+												{/if}
+												{#if col.status === 'error'}
+													<span
+														role="button"
+														tabindex="0"
+														onclick={(e) => { e.stopPropagation(); handleResyncCollection(col.name); }}
+														onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); handleResyncCollection(col.name); } }}
+														aria-disabled={resyncingCollections.has(col.name)}
+														class="p-0.5 rounded hover:bg-muted/50 transition-colors cursor-pointer {resyncingCollections.has(col.name) ? 'opacity-50 pointer-events-none' : ''}"
+														title="Retry {collectionLabels[col.name] || col.name}"
+													>
+														<RefreshCw class="w-3 h-3 text-red-500 hover:text-red-700 {resyncingCollections.has(col.name) ? 'animate-spin' : ''}" />
+													</span>
+												{/if}
+												{#if hasError}
+													<ChevronDown class="w-3 h-3 text-muted-foreground transition-transform {isExpanded ? 'rotate-180' : ''}" />
 												{/if}
 											</div>
-										</div>
-										<div class="flex items-start gap-2">
-											<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">What</span>
-											<span class="text-xs text-red-700 dark:text-red-300">{col.parsedError.summary}</span>
-										</div>
-										{#if col.parsedError.url}
-											<div class="flex items-start gap-2">
-												<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">Docs</span>
-												<a href={col.parsedError.url} target="_blank" rel="noopener" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
-													{col.parsedError.url}
-													<ExternalLink class="w-3 h-3" />
-												</a>
+										</button>
+										{#if isExpanded && hasError}
+											<div class="ml-1 sm:ml-2 mb-1 px-2 sm:px-3 py-2 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800 space-y-1.5">
+												{#if col.parsedError}
+													<div class="flex items-start gap-1.5 sm:gap-2">
+														<span class="text-[10px] text-red-400 uppercase font-semibold w-10 sm:w-12 flex-shrink-0 pt-0.5">Code</span>
+														<div class="flex items-center gap-1.5">
+															<code class="text-[11px] sm:text-xs font-mono text-red-600 dark:text-red-400">{col.parsedError.code || 'none'}</code>
+															{#if col.parsedError.isRxdb}
+																<Badge variant="outline" class="text-[9px] px-1 py-0 border-red-300 text-red-500">RxDB</Badge>
+															{:else}
+																<Badge variant="outline" class="text-[9px] px-1 py-0 border-amber-300 text-amber-600">HTTP</Badge>
+															{/if}
+														</div>
+													</div>
+													<div class="flex items-start gap-1.5 sm:gap-2">
+														<span class="text-[10px] text-red-400 uppercase font-semibold w-10 sm:w-12 flex-shrink-0 pt-0.5">What</span>
+														<span class="text-[11px] sm:text-xs text-red-700 dark:text-red-300">{col.parsedError.summary}</span>
+													</div>
+													{#if col.parsedError.url}
+														<div class="flex items-start gap-1.5 sm:gap-2">
+															<span class="text-[10px] text-red-400 uppercase font-semibold w-10 sm:w-12 flex-shrink-0 pt-0.5">Docs</span>
+															<a href={col.parsedError.url} target="_blank" rel="noopener" class="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 break-all">
+																{col.parsedError.url}
+																<ExternalLink class="w-3 h-3 flex-shrink-0" />
+															</a>
+														</div>
+													{/if}
+												{/if}
+												{#if col.error}
+													<div class="flex items-start gap-1.5 sm:gap-2">
+														<span class="text-[10px] text-red-400 uppercase font-semibold w-10 sm:w-12 flex-shrink-0 pt-0.5">Raw</span>
+														<pre class="text-[10px] text-red-600/80 dark:text-red-400/80 font-mono break-all whitespace-pre-wrap">{col.error}</pre>
+													</div>
+												{/if}
 											</div>
 										{/if}
+									</div>
 									{/if}
-									{#if col.error}
-										<div class="flex items-start gap-2">
-											<span class="text-[10px] text-red-400 uppercase font-semibold w-12 flex-shrink-0 pt-0.5">Raw</span>
-											<pre class="text-[10px] text-red-600/80 dark:text-red-400/80 font-mono break-all whitespace-pre-wrap">{col.error}</pre>
-										</div>
-									{/if}
-								</div>
-							{/if}
-						</div>
+								{/each}
+							</div>
 						{/if}
-					{/each}
 					{/each}
 				</div>
 			{:else if activeTab === 'logs'}
 				{#if syncStatus.logs.length > 0}
-					<div class="flex justify-end px-3 py-1">
+					<div class="flex justify-end py-1">
 						<Button
 							variant="ghost"
 							size="sm"
@@ -916,10 +1028,10 @@
 					<div class="space-y-0.5">
 						{#each syncStatus.logs as log, i (i)}
 							{@const LogIcon = getLogIcon(log.level)}
-							<div class="flex items-start gap-2 py-1.5 px-3 rounded-md hover:bg-muted/20 transition-colors">
-								<LogIcon class="w-3.5 h-3.5 mt-0.5 flex-shrink-0 {getLogColor(log.level)}" />
-								<span class="text-xs text-muted-foreground tabular-nums whitespace-nowrap">{log.time}</span>
-								<span class="text-xs break-all {log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-600' : 'text-foreground'}" title={log.message}>{log.message}</span>
+							<div class="flex items-start gap-1.5 sm:gap-2 py-1 sm:py-1.5 px-1 sm:px-2 rounded-md hover:bg-muted/20 transition-colors">
+								<LogIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 mt-0.5 flex-shrink-0 {getLogColor(log.level)}" />
+								<span class="text-[10px] sm:text-xs text-muted-foreground tabular-nums whitespace-nowrap">{log.time}</span>
+								<span class="text-[10px] sm:text-xs break-all {log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-600' : 'text-foreground'}" title={log.message}>{log.message}</span>
 							</div>
 						{/each}
 					</div>
@@ -928,49 +1040,49 @@
 				<!-- System diagnostics tab -->
 				<div class="space-y-3 py-1">
 					<!-- Overview (compact — replaces redundant RxDB/Neon/Sync sections) -->
-					<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
-						<div class="flex justify-between text-xs">
-							<span class="text-muted-foreground">Versions</span>
-							<span>RxDB {syncStatus.rxdbVersion ? `v${syncStatus.rxdbVersion}` : '—'} · App v{syncStatus.appVersion}</span>
+					<div class="bg-muted/20 rounded-lg px-2.5 sm:px-3 py-2 space-y-1">
+						<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+							<span class="text-muted-foreground flex-shrink-0">Versions</span>
+							<span class="text-right">RxDB {syncStatus.rxdbVersion ? `v${syncStatus.rxdbVersion}` : '—'} · App v{syncStatus.appVersion}</span>
 						</div>
-						<div class="flex justify-between text-xs">
-							<span class="text-muted-foreground">Cached</span>
-							<span class="tabular-nums">{syncStatus.totalDocs.toLocaleString()} docs across {syncStatus.totalCount} collections</span>
+						<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+							<span class="text-muted-foreground flex-shrink-0">Cached</span>
+							<span class="tabular-nums text-right">{syncStatus.totalDocs.toLocaleString()} docs · {syncStatus.totalCount} collections</span>
 						</div>
 						{#if syncStatus.lastSuccessfulSyncAt}
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Last Sync</span>
-								<span>{syncStatus.dataAge} ({syncStatus.lastSuccessfulSyncAt.toLocaleTimeString()})</span>
+							<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+								<span class="text-muted-foreground flex-shrink-0">Last Sync</span>
+								<span class="text-right">{syncStatus.dataAge} ({syncStatus.lastSuccessfulSyncAt.toLocaleTimeString()})</span>
 							</div>
 						{/if}
 					</div>
 
 					<!-- Neon Usage (Session) -->
 					<div class="space-y-1.5">
-						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Neon Usage (Session)</h4>
-						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Last Interaction</span>
+						<h4 class="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Neon Usage (Session)</h4>
+						<div class="bg-muted/20 rounded-lg px-2.5 sm:px-3 py-2 space-y-1">
+							<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+								<span class="text-muted-foreground flex-shrink-0">Last Interaction</span>
 								{#if syncStatus.neonUsage.lastInteraction}
-									<span>{lastNeonAge} ({lastNeonLabel})</span>
+									<span class="text-right">{lastNeonAge} ({lastNeonLabel})</span>
 								{:else}
 									<span class="text-muted-foreground">none</span>
 								{/if}
 							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Session Queries</span>
-								<span class="tabular-nums">{syncStatus.totalNeonQueries} ({syncStatus.neonUsage.pullCount} pulls + {syncStatus.neonUsage.pushCount} pushes + {syncStatus.neonUsage.healthCheckCount} health)</span>
+							<div class="flex flex-col sm:flex-row sm:justify-between text-[11px] sm:text-xs gap-0 sm:gap-2">
+								<span class="text-muted-foreground flex-shrink-0">Session Queries</span>
+								<span class="tabular-nums sm:text-right">{syncStatus.totalNeonQueries} ({syncStatus.neonUsage.pullCount}p + {syncStatus.neonUsage.pushCount}w + {syncStatus.neonUsage.healthCheckCount}h)</span>
 							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Docs Received</span>
+							<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+								<span class="text-muted-foreground flex-shrink-0">Docs Received</span>
 								<span class="tabular-nums">{syncStatus.neonUsage.totalDocsReceived.toLocaleString()}</span>
 							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Data Received</span>
+							<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+								<span class="text-muted-foreground flex-shrink-0">Data Received</span>
 								<span class="tabular-nums">~{syncStatus.estimatedTransferKB.toFixed(1)} KB</span>
 							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Est. Compute</span>
+							<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+								<span class="text-muted-foreground flex-shrink-0">Est. Compute</span>
 								<span class="tabular-nums">~{syncStatus.estimatedComputeSeconds.toFixed(2)}s</span>
 							</div>
 						</div>
@@ -978,22 +1090,22 @@
 
 					<!-- Neon Billing (Real — from Management API) -->
 					<div class="space-y-1.5">
-						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Neon Billing (This Period)</h4>
-						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1.5">
+						<h4 class="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Neon Billing (This Period)</h4>
+						<div class="bg-muted/20 rounded-lg px-2.5 sm:px-3 py-2 space-y-1.5">
 							{#if syncStatus.neonBillingLoading}
-								<div class="flex items-center gap-2 text-xs text-muted-foreground">
+								<div class="flex items-center gap-2 text-[11px] sm:text-xs text-muted-foreground">
 									<Loader2 class="w-3 h-3 animate-spin" />
 									<span>Fetching billing data...</span>
 								</div>
 							{:else if syncStatus.neonBillingError}
-								<div class="text-xs text-red-500">{syncStatus.neonBillingError}</div>
+								<div class="text-[11px] sm:text-xs text-red-500">{syncStatus.neonBillingError}</div>
 							{:else if syncStatus.neonBilling}
 								{@const b = syncStatus.neonBilling}
 								<!-- Compute -->
 								<div class="space-y-0.5">
-									<div class="flex justify-between text-xs">
+									<div class="flex justify-between text-[11px] sm:text-xs gap-2">
 										<span class="text-muted-foreground">Compute</span>
-										<span class="tabular-nums font-medium">{b.compute.used} / {b.compute.limit} {b.compute.unit}</span>
+										<span class="tabular-nums font-medium text-right">{b.compute.used} / {b.compute.limit} {b.compute.unit}</span>
 									</div>
 									<div class="w-full bg-muted rounded-full h-1.5">
 										<div
@@ -1004,9 +1116,9 @@
 								</div>
 								<!-- Storage -->
 								<div class="space-y-0.5">
-									<div class="flex justify-between text-xs">
+									<div class="flex justify-between text-[11px] sm:text-xs gap-2">
 										<span class="text-muted-foreground">Storage</span>
-										<span class="tabular-nums font-medium">{b.storage.used} / {b.storage.limit} {b.storage.unit}</span>
+										<span class="tabular-nums font-medium text-right">{b.storage.used} / {b.storage.limit} {b.storage.unit}</span>
 									</div>
 									<div class="w-full bg-muted rounded-full h-1.5">
 										<div
@@ -1017,9 +1129,9 @@
 								</div>
 								<!-- Network Transfer -->
 								<div class="space-y-0.5">
-									<div class="flex justify-between text-xs">
-										<span class="text-muted-foreground">Network Transfer</span>
-										<span class="tabular-nums font-medium">{b.transfer.used} / {b.transfer.limit} {b.transfer.unit}</span>
+									<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+										<span class="text-muted-foreground">Transfer</span>
+										<span class="tabular-nums font-medium text-right">{b.transfer.used} / {b.transfer.limit} {b.transfer.unit}</span>
 									</div>
 									<div class="w-full bg-muted rounded-full h-1.5">
 										<div
@@ -1028,11 +1140,11 @@
 										></div>
 									</div>
 								</div>
-								<div class="text-[10px] text-muted-foreground text-right">
-									Cached {new Date(b.fetchedAt).toLocaleTimeString()} · refreshes on next open after 5 min
+								<div class="text-[9px] sm:text-[10px] text-muted-foreground text-right">
+									Cached {new Date(b.fetchedAt).toLocaleTimeString()} · refreshes after 5 min
 								</div>
 							{:else}
-								<div class="text-xs text-muted-foreground">No billing data yet</div>
+								<div class="text-[11px] sm:text-xs text-muted-foreground">No billing data yet</div>
 							{/if}
 						</div>
 					</div>
@@ -1040,16 +1152,16 @@
 
 					<!-- Device/Network Section -->
 					<div class="space-y-1.5">
-						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Device & Storage</h4>
-						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
-							<div class="flex justify-between text-xs">
+						<h4 class="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Device & Storage</h4>
+						<div class="bg-muted/20 rounded-lg px-2.5 sm:px-3 py-2 space-y-1">
+							<div class="flex justify-between text-[11px] sm:text-xs">
 								<span class="text-muted-foreground">Network</span>
 								<span class="{onlineStatus ? 'text-emerald-500' : 'text-red-500'} font-medium">{onlineStatus ? 'Online' : 'Offline'}</span>
 							</div>
 							{#if storageEstimate}
-								<div class="flex justify-between text-xs">
-									<span class="text-muted-foreground">Storage Used</span>
-									<span class="tabular-nums">{storageEstimate.usage} / {storageEstimate.quota} ({storageEstimate.percent})</span>
+								<div class="flex justify-between text-[11px] sm:text-xs gap-2">
+									<span class="text-muted-foreground flex-shrink-0">Storage</span>
+									<span class="tabular-nums text-right">{storageEstimate.usage} / {storageEstimate.quota} ({storageEstimate.percent})</span>
 								</div>
 								<div class="w-full bg-muted rounded-full h-1.5 mt-1">
 									<div
@@ -1059,8 +1171,8 @@
 								</div>
 							{/if}
 							{#if storageTrend}
-								<div class="flex justify-between text-xs">
-									<span class="text-muted-foreground">Storage Trend</span>
+								<div class="flex justify-between text-[11px] sm:text-xs">
+									<span class="text-muted-foreground">Trend</span>
 									<span class="flex items-center gap-1">
 										{#if storageTrend === 'growing'}
 											<TrendingUp class="w-3 h-3 text-amber-500" />
@@ -1075,8 +1187,8 @@
 									</span>
 								</div>
 							{/if}
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Multi-tab Sync</span>
+							<div class="flex justify-between text-[11px] sm:text-xs">
+								<span class="text-muted-foreground">Multi-tab</span>
 								<span>{typeof BroadcastChannel !== 'undefined' ? 'Active' : 'Unavailable'}</span>
 							</div>
 						</div>
@@ -1084,12 +1196,12 @@
 
 					<!-- Recovery Section -->
 					<div class="space-y-1.5">
-						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Recovery Options</h4>
-						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1.5">
-							<p class="text-[11px] text-muted-foreground">
+						<h4 class="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recovery Options</h4>
+						<div class="bg-muted/20 rounded-lg px-2.5 sm:px-3 py-2 space-y-1.5">
+							<p class="text-[10px] sm:text-[11px] text-muted-foreground">
 								If data appears stale or sync is stuck, try these in order:
 							</p>
-							<ol class="text-[11px] text-muted-foreground space-y-0.5 list-decimal pl-4">
+							<ol class="text-[10px] sm:text-[11px] text-muted-foreground space-y-0.5 list-decimal pl-4">
 								<li>Click <strong>Resync</strong> (refresh icon above)</li>
 								<li>Click <strong>Clear Data</strong> then <strong>Reload</strong></li>
 								<li>Append <code class="bg-muted px-1 rounded text-[10px]">?reset-db=1</code> to URL</li>
@@ -1102,16 +1214,16 @@
 
 		<!-- Actions footer -->
 		{#if syncStatus.hasErrors || syncStatus.rxdbHealth === 'error' || hasSchemaError}
-			<div class="flex items-center justify-between pt-3 border-t flex-shrink-0">
-				<span class="text-[11px] text-muted-foreground">
-					{hasSchemaError ? 'Schema mismatch — clear local data to fix' : 'Sync errors detected'}
+			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-3 border-t flex-shrink-0">
+				<span class="text-[10px] sm:text-[11px] text-muted-foreground">
+					{hasSchemaError ? 'Schema mismatch — clear local data' : 'Sync errors detected'}
 				</span>
-				<div class="flex items-center gap-2">
-					<Button variant="outline" size="sm" class="h-7 text-xs gap-1.5" onclick={clearSiteData}>
+				<div class="flex items-center gap-2 w-full sm:w-auto">
+					<Button variant="outline" size="sm" class="h-7 text-xs gap-1.5 flex-1 sm:flex-initial" onclick={clearSiteData}>
 						<Trash2 class="w-3 h-3" />
 						Clear Data
 					</Button>
-					<Button variant="outline" size="sm" class="h-7 text-xs gap-1.5" onclick={() => location.reload()}>
+					<Button variant="outline" size="sm" class="h-7 text-xs gap-1.5 flex-1 sm:flex-initial" onclick={() => location.reload()}>
 						<RotateCcw class="w-3 h-3" />
 						Reload
 					</Button>

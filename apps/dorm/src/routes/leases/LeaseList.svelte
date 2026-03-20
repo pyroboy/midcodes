@@ -12,9 +12,12 @@
 		tenantNameMap?: Map<string, any>;
 		onStatusChange: (id: string, status: string) => void;
 		onDataChange?: () => Promise<void>;
+		batchMode?: boolean;
+		selectedLeaseIds?: Set<number>;
+		onBatchToggle?: (id: number) => void;
 	}
 
-	let { leases = [], tenants = [], rentalUnits = [], tenantNameMap = new Map(), onStatusChange, onDataChange }: Props = $props();
+	let { leases = [], tenants = [], rentalUnits = [], tenantNameMap = new Map(), onStatusChange, onDataChange, batchMode = false, selectedLeaseIds = new Set(), onBatchToggle }: Props = $props();
 
 	interface FilterState {
 		search: string;
@@ -172,6 +175,9 @@
 					onDelete={handleDelete}
 					{onStatusChange}
 					{onDataChange}
+					{batchMode}
+					isSelected={selectedLeaseIds.has(lease.id)}
+					onBatchToggle={() => onBatchToggle?.(lease.id)}
 				/>
 			{/each}
 		</div>

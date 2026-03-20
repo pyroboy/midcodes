@@ -14,12 +14,8 @@ export default defineConfig({
     noExternal: []
   },
 	server: {
-		host: '127.0.0.1',
-		port: 5173,
-		hmr: {
-			port: 5173,
-			host: '127.0.0.1'
-		}
+		host: true, // Allow LAN access (mobile dev via 192.168.x.x)
+		port: 5173
 	},
 	optimizeDeps: {
 		exclude: [
