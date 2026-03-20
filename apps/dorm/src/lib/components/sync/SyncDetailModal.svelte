@@ -529,16 +529,6 @@
 			</div>
 		</div>
 
-		<!-- "Since" indicator — shows when no Neon interaction for >5 min -->
-		{#if syncStatus.neonUsage.lastInteraction && lastNeonAge && lastNeonAge !== 'just now' && !lastNeonAge.includes('just')}
-			{@const sinceSeconds = Math.floor((now - syncStatus.neonUsage.lastInteraction.timestamp) / 1000)}
-			{#if sinceSeconds >= 300}
-				<div class="text-[10px] text-muted-foreground text-center -mt-1">
-					No Neon push/pull since {lastNeonAge}
-				</div>
-			{/if}
-		{/if}
-
 		<!-- Pending Mutations Queue -->
 		{#if mutationQueue.items.length > 0}
 			<div class="flex-shrink-0 space-y-1">
@@ -844,17 +834,20 @@
 										{/if}
 									{/if}
 									{#if col.status === 'error'}
-										<!-- W5: Per-collection retry button -->
-										<button
+										<!-- W5: Per-collection retry button (span instead of button to avoid nested button) -->
+										<span
+											role="button"
+											tabindex="0"
 											onclick={(e) => { e.stopPropagation(); handleResyncCollection(col.name); }}
-											disabled={resyncingCollections.has(col.name)}
-											class="p-0.5 rounded hover:bg-muted/50 transition-colors cursor-pointer disabled:opacity-50"
+											onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); handleResyncCollection(col.name); } }}
+											aria-disabled={resyncingCollections.has(col.name)}
+											class="p-0.5 rounded hover:bg-muted/50 transition-colors cursor-pointer {resyncingCollections.has(col.name) ? 'opacity-50 pointer-events-none' : ''}"
 											title="Retry {collectionLabels[col.name] || col.name}"
 										>
 											<RefreshCw class="w-3 h-3 text-red-500 hover:text-red-700 {resyncingCollections.has(col.name) ? 'animate-spin' : ''}" />
-										</button>
+										</span>
 									{/if}
-									{#if hasError || hasMismatch}
+									{#if hasError}
 										<ChevronDown class="w-3 h-3 text-muted-foreground transition-transform {isExpanded ? 'rotate-180' : ''}" />
 									{/if}
 								</div>
@@ -893,30 +886,6 @@
 											<pre class="text-[10px] text-red-600/80 dark:text-red-400/80 font-mono break-all whitespace-pre-wrap">{col.error}</pre>
 										</div>
 									{/if}
-								</div>
-							{/if}
-							{#if isExpanded && !hasError}
-								{@const neonCount = syncStatus.neonCounts?.[col.name]}
-								{@const hasCounts = neonCount !== undefined && neonCount !== null}
-								{@const diff = hasCounts ? col.docCount - neonCount : 0}
-								<div class="mx-3 mb-1 px-3 py-2 bg-muted/20 rounded-md">
-									<div class="flex items-center justify-between text-xs">
-										<div class="flex items-center gap-3 tabular-nums">
-											<span><span class="text-[10px] text-muted-foreground uppercase">local</span> {col.docCount.toLocaleString()}</span>
-											{#if hasCounts}
-												<span><span class="text-[10px] text-muted-foreground uppercase">server</span> {neonCount.toLocaleString()}</span>
-											{/if}
-										</div>
-										{#if hasCounts}
-											{#if diff === 0}
-												<Badge variant="secondary" class="text-[9px] px-1.5 py-0 text-emerald-600">match</Badge>
-											{:else if diff > 0}
-												<Badge variant="outline" class="text-[9px] px-1.5 py-0 border-amber-300 text-amber-600">+{diff} extra locally</Badge>
-											{:else}
-												<Badge variant="outline" class="text-[9px] px-1.5 py-0 border-amber-300 text-amber-600">{Math.abs(diff)} missing locally</Badge>
-											{/if}
-										{/if}
-									</div>
 								</div>
 							{/if}
 						</div>
@@ -958,76 +927,22 @@
 			{:else}
 				<!-- System diagnostics tab -->
 				<div class="space-y-3 py-1">
-					<!-- RxDB Section -->
-					<div class="space-y-1.5">
-						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">RxDB (Client Database)</h4>
-						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Status</span>
-								<span class="{getHealthColor(syncStatus.rxdbHealth)} font-medium">{syncStatus.rxdbHealth}</span>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Storage Engine</span>
-								<span>IndexedDB (Dexie)</span>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Schema Version</span>
-								<span>v1</span>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">RxDB Version</span>
-								<span>{syncStatus.rxdbVersion ? `v${syncStatus.rxdbVersion}` : '—'}</span>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">App Version</span>
-								<span>v{syncStatus.appVersion}</span>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Collections</span>
-								<span>{syncStatus.totalCount}</span>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Total Cached Docs</span>
-								<span class="tabular-nums">{syncStatus.totalDocs.toLocaleString()}</span>
-							</div>
-							{#if syncStatus.rxdbError}
-								<div class="flex justify-between text-xs">
-									<span class="text-muted-foreground">Error</span>
-									<span class="text-red-500 truncate max-w-[200px]" title={syncStatus.rxdbError}>{syncStatus.rxdbError}</span>
-								</div>
-							{/if}
+					<!-- Overview (compact — replaces redundant RxDB/Neon/Sync sections) -->
+					<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
+						<div class="flex justify-between text-xs">
+							<span class="text-muted-foreground">Versions</span>
+							<span>RxDB {syncStatus.rxdbVersion ? `v${syncStatus.rxdbVersion}` : '—'} · App v{syncStatus.appVersion}</span>
 						</div>
-					</div>
-
-					<!-- Neon Section -->
-					<div class="space-y-1.5">
-						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Neon PostgreSQL (Server)</h4>
-						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Status</span>
-								<span class="{getHealthColor(syncStatus.neonHealth)} font-medium">{syncStatus.neonHealth}</span>
-							</div>
-							{#if syncStatus.neonLatency !== null}
-								<div class="flex justify-between text-xs">
-									<span class="text-muted-foreground">Latency</span>
-									<span class="tabular-nums">{syncStatus.neonLatency}ms</span>
-								</div>
-							{/if}
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Replication</span>
-								<span>Pull-only (checkpoint)</span>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Batch Size</span>
-								<span>200</span>
-							</div>
-							{#if syncStatus.neonError}
-								<div class="flex justify-between text-xs">
-									<span class="text-muted-foreground">Error</span>
-									<span class="text-red-500 truncate max-w-[200px]" title={syncStatus.neonError}>{syncStatus.neonError}</span>
-								</div>
-							{/if}
+						<div class="flex justify-between text-xs">
+							<span class="text-muted-foreground">Cached</span>
+							<span class="tabular-nums">{syncStatus.totalDocs.toLocaleString()} docs across {syncStatus.totalCount} collections</span>
 						</div>
+						{#if syncStatus.lastSuccessfulSyncAt}
+							<div class="flex justify-between text-xs">
+								<span class="text-muted-foreground">Last Sync</span>
+								<span>{syncStatus.dataAge} ({syncStatus.lastSuccessfulSyncAt.toLocaleTimeString()})</span>
+							</div>
+						{/if}
 					</div>
 
 					<!-- Neon Usage (Session) -->
@@ -1122,34 +1037,6 @@
 						</div>
 					</div>
 
-					<!-- Sync Section -->
-					<div class="space-y-1.5">
-						<h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">Sync Status</h4>
-						<div class="bg-muted/20 rounded-lg px-3 py-2 space-y-1">
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Phase</span>
-								<Badge variant={syncStatus.phase === 'complete' ? 'secondary' : syncStatus.phase === 'error' ? 'destructive' : 'default'} class="text-[10px] px-1.5 py-0">
-									{syncStatus.phase}
-								</Badge>
-							</div>
-							<div class="flex justify-between text-xs">
-								<span class="text-muted-foreground">Collections Synced</span>
-								<span class="tabular-nums">{syncStatus.syncedCount} / {syncStatus.totalCount}</span>
-							</div>
-							{#if syncStatus.lastSuccessfulSyncAt}
-								<div class="flex justify-between text-xs">
-									<span class="text-muted-foreground">Last Sync</span>
-									<span>{syncStatus.dataAge} ({syncStatus.lastSuccessfulSyncAt.toLocaleTimeString()})</span>
-								</div>
-							{/if}
-							{#if syncStatus.errorCollections.length > 0}
-								<div class="flex justify-between text-xs">
-									<span class="text-muted-foreground">Failed</span>
-									<span class="text-red-500">{syncStatus.errorCollections.map(c => collectionLabels[c.name] || c.name).join(', ')}</span>
-								</div>
-							{/if}
-						</div>
-					</div>
 
 					<!-- Device/Network Section -->
 					<div class="space-y-1.5">

@@ -1,4 +1,4 @@
-import { createRxDatabase, addRxPlugin, type RxDatabase } from 'rxdb';
+import { createRxDatabase, removeRxDatabase, addRxPlugin, type RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
@@ -113,32 +113,41 @@ export async function getDb(): Promise<RxDatabase> {
 			storage = wrappedValidateAjvStorage({ storage });
 		}
 
-		let db: RxDatabase;
-		try {
-			db = await createRxDatabase({
-				name: 'dorm_db',
+		const DB_NAME = 'dorm_db';
+
+		const createDb = async () => {
+			const db = await createRxDatabase({
+				name: DB_NAME,
 				storage,
 				eventReduce: true,
-				// ignoreDuplicate only works with dev-mode plugin loaded.
-				// In production, we rely on the globalThis promise cache to prevent duplicates.
 				ignoreDuplicate: dev
 			});
+
+			// Only add collections if not already present
+			if (Object.keys(db.collections).length === 0) {
+				await db.addCollections(COLLECTIONS);
+			}
+			return db;
+		};
+
+		let db: RxDatabase;
+		try {
+			db = await createDb();
 		} catch (err: any) {
-			// DB9: database already exists — reuse it
-			if (err?.code === 'DB9' || err?.message?.includes('already exists')) {
+			if (err?.code === 'COL23') {
+				// COL23: stale IndexedDB has ghost collections pushing total over
+				// the open-source 16-collection limit. Wipe and recreate fresh.
+				console.warn('[RxDB] COL23 — removing stale database and recreating');
+				await removeRxDatabase(DB_NAME, storage);
+				db = await createDb();
+			} else if (err?.code === 'DB9' || err?.message?.includes('already exists')) {
 				console.warn('[RxDB] Database already exists, attempting reuse');
-				// Try creating with ignoreDuplicate in dev, or just re-throw in prod
-				// The globalThis cache should prevent this, but as a safety net:
 				const existingCached = getCachedDb();
 				if (existingCached) return existingCached;
 				throw err;
+			} else {
+				throw err;
 			}
-			throw err;
-		}
-
-		// Only add collections if not already present
-		if (Object.keys(db.collections).length === 0) {
-			await db.addCollections(COLLECTIONS);
 		}
 
 		// Cache the resolved instance

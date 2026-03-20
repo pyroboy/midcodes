@@ -30,7 +30,7 @@
 	import type { Lease, Billing } from '$lib/types/lease';
 	import { printLeaseInvoice } from '$lib/utils/print';
 	import { getLeaseDisplayStatus } from '$lib/utils/lease-status';
-	import { formatCurrency, formatDate } from '$lib/utils/format';
+	import { formatCurrency, formatDate, formatLeaseStatus } from '$lib/utils/format';
 	import { getSecurityDepositStatus } from '$lib/utils/lease';
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { getUtilityDisplayStatus } from '$lib/utils/lease-status';
@@ -58,6 +58,7 @@
 	}: Props = $props();
 
 	import { getStatusVariant } from '$lib/utils/format';
+	import { toast } from 'svelte-sonner';
 	import { onMount } from 'svelte';
 
 	let showPaymentModal = $state(false);
@@ -65,7 +66,8 @@
 	let showSecurityDepositManager = $state(false);
 	let showEditModal = $state(false);
 	let showDetailsModal = $state(false);
-	let showActionsPopover = $state(false);
+	let showDesktopActions = $state(false);
+	let showMobileActions = $state(false);
 	let isMobile = $state(false);
 
 	// Use matchMedia instead of N resize listeners — single shared query
@@ -138,43 +140,41 @@
 		return latestMs > 0 ? new Date(latestMs) : null;
 	});
 
-	// Security deposit status with enhanced logic
+	// [11] Security deposit status — show consistently when a deposit billing exists
 	let securityDepositStatus = $derived.by(() => {
 		if (!$featureFlags.showSecurityDepositIndicator) {
 			return { show: false };
 		}
-		
+
 		const status = getSecurityDepositStatus(lease);
-		
-		// Only show indicator if there are security deposits and they're paid
-		if (!status.hasSecurityDeposit || !status.isFullyPaid) {
+
+		// Only hide if there are truly no security deposit billings
+		if (!status.hasSecurityDeposit) {
 			return { show: false };
 		}
-		
-		// Determine color based on usage
-		let bgColor: string;
+
+		// Determine color and tooltip based on status
 		let tooltip: string;
-		
+
 		switch (status.status) {
 			case 'fully-paid':
-				bgColor = 'bg-green-500';
-				tooltip = `Security Deposit Fully Paid (₱${status.totalPaid.toLocaleString()} available)`;
+				tooltip = `Security Deposit Fully Paid (${formatCurrency(status.totalPaid)} available)`;
 				break;
 			case 'partially-used':
-				bgColor = 'bg-orange-500';
-				tooltip = `Security Deposit Partially Used (₱${status.availableAmount.toLocaleString()} of ₱${status.totalPaid.toLocaleString()} available)`;
+				tooltip = `Security Deposit Partially Used (${formatCurrency(status.availableAmount)} of ${formatCurrency(status.totalPaid)} available)`;
 				break;
 			case 'fully-used':
-				bgColor = 'bg-red-500';
-				tooltip = `Security Deposit Fully Used (₱${status.totalPaid.toLocaleString()} used)`;
+				tooltip = `Security Deposit Fully Used (${formatCurrency(status.totalPaid)} used)`;
+				break;
+			case 'unpaid':
+				tooltip = `Security Deposit Unpaid`;
 				break;
 			default:
 				return { show: false };
 		}
-		
+
 		return {
 			show: true,
-			bgColor,
 			tooltip,
 			status: status.status
 		};
@@ -184,6 +184,42 @@
 	let utilityStatus = $derived.by(() => {
 		if (!lease.balanceStatus) return null;
 		return getUtilityDisplayStatus(lease.balanceStatus);
+	});
+
+	// [04] + [10]: Unified payment status color for left border and status dot
+	let paymentStatusColor = $derived.by(() => {
+		const bs = lease.balanceStatus;
+		if (!bs) return { border: 'border-l-slate-200', dot: 'bg-slate-300', label: 'No data' };
+		if (bs.hasOverdue) {
+			const days = bs.daysOverdue || 0;
+			if (days >= 90) {
+				return { border: 'border-l-red-600', dot: 'bg-red-500', label: 'Critical overdue' };
+			}
+			return { border: 'border-l-amber-500', dot: 'bg-amber-500', label: 'Overdue' };
+		}
+		if (bs.hasPartial) {
+			return { border: 'border-l-amber-400', dot: 'bg-amber-400', label: 'Partial' };
+		}
+		if (bs.hasPending) {
+			return { border: 'border-l-orange-400', dot: 'bg-orange-400', label: 'Pending' };
+		}
+		return { border: 'border-l-green-500', dot: 'bg-green-500', label: 'Paid' };
+	});
+
+	// [09]: Lease expiry info
+	let leaseExpiryInfo = $derived.by(() => {
+		if (!lease.end_date) return null;
+		const endDate = new Date(lease.end_date);
+		const now = new Date();
+		const diffMs = endDate.getTime() - now.getTime();
+		const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+		if (diffDays < 0) {
+			return { text: 'Expired', class: 'text-red-600 font-medium', urgent: true };
+		}
+		if (diffDays <= 30) {
+			return { text: `Expires in ${diffDays}d`, class: 'text-amber-600 font-medium', urgent: true };
+		}
+		return { text: formatDate(lease.end_date), class: 'text-slate-500', urgent: false };
 	});
 
 	async function handleStatusChange(newStatus: string) {
@@ -211,14 +247,14 @@
 			}
 		} catch (error) {
 			console.error('Error updating lease status:', error);
-			alert(
+			toast.error(
 				'Failed to update status: ' + (error instanceof Error ? error.message : 'Unknown error')
 			);
 		}
 	}
 </script>
 <Card.Root
-	class="group hover:shadow-lg transition-all duration-300 w-full border-0 bg-white/70 backdrop-blur-sm hover:bg-white/90 rounded-xl overflow-hidden cursor-pointer"
+	class="group hover:shadow-lg transition-all duration-300 w-full border-0 bg-white/70 backdrop-blur-sm hover:bg-white/90 rounded-xl overflow-hidden cursor-pointer border-l-4 {paymentStatusColor.border}"
 	onclick={() => (showDetailsModal = true)}
 >
 	<Card.Content
@@ -230,17 +266,25 @@
 			<div class="flex items-center justify-between">
 				<!-- Lease Name -->
 				<div class="flex-1 min-w-0">
-					<div class="flex items-center">
+					<div class="flex items-center gap-1.5">
+						<!-- [10] Status dot reflecting payment status -->
+						<span class="w-2 h-2 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
 						<span class="text-sm sm:text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
 							{lease.name || `Lease #${lease.id}`}
 						</span>
+					</div>
+					<!-- [09] Lease expiry + [11] Security deposit badges -->
+					<div class="flex items-center gap-1.5 mt-0.5 ml-3.5">
+						{#if leaseExpiryInfo}
+							<span class="text-[10px] {leaseExpiryInfo.class}">
+								{leaseExpiryInfo.urgent ? leaseExpiryInfo.text : `Ends ${leaseExpiryInfo.text}`}
+							</span>
+						{/if}
 						{#if securityDepositStatus.show}
-							<div 
-								class="inline-flex items-center justify-center w-3 h-3 {securityDepositStatus.bgColor} rounded-full ml-2 flex-shrink-0" 
-								title={securityDepositStatus.tooltip}
-							>
-								<Shield class="w-2 h-2 text-white" />
-							</div>
+							<span class="text-[10px] text-slate-500" title={securityDepositStatus.tooltip}>
+								<Shield class="w-2.5 h-2.5 inline-block -mt-px {securityDepositStatus.status === 'fully-paid' ? 'text-green-500' : securityDepositStatus.status === 'partially-used' ? 'text-orange-500' : securityDepositStatus.status === 'unpaid' ? 'text-slate-400' : 'text-red-500'}" />
+								SD
+							</span>
 						{/if}
 					</div>
 				</div>
@@ -353,18 +397,26 @@
 		<!-- Desktop Layout: Single Row -->
 		<div class="hidden lg:flex lg:items-center w-full gap-4">
 			<!-- Name -->
-			<div class="flex-shrink-0 min-w-0 w-48">
-				<div class="flex items-center">
+			<div class="flex-shrink-0 min-w-0 w-56">
+				<div class="flex items-center gap-1.5">
+					<!-- [10] Status dot reflecting payment status -->
+					<span class="w-2.5 h-2.5 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
 					<span class="text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
 						{lease.name || `Lease #${lease.id}`}
 					</span>
+				</div>
+				<!-- [09] Lease expiry + [11] Security deposit badges -->
+				<div class="flex items-center gap-2 mt-0.5 ml-4">
+					{#if leaseExpiryInfo}
+						<span class="text-xs {leaseExpiryInfo.class}">
+							{leaseExpiryInfo.urgent ? leaseExpiryInfo.text : `Ends ${leaseExpiryInfo.text}`}
+						</span>
+					{/if}
 					{#if securityDepositStatus.show}
-						<div 
-							class="inline-flex items-center justify-center w-4 h-4 {securityDepositStatus.bgColor} rounded-full ml-2 flex-shrink-0" 
-							title={securityDepositStatus.tooltip}
-						>
-							<Shield class="w-2.5 h-2.5 text-white" />
-						</div>
+						<span class="text-xs text-slate-500" title={securityDepositStatus.tooltip}>
+							<Shield class="w-3 h-3 inline-block -mt-px {securityDepositStatus.status === 'fully-paid' ? 'text-green-500' : securityDepositStatus.status === 'partially-used' ? 'text-orange-500' : securityDepositStatus.status === 'unpaid' ? 'text-slate-400' : 'text-red-500'}" />
+							SD
+						</span>
 					{/if}
 				</div>
 			</div>
@@ -467,7 +519,7 @@
 						<div
 							class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm cursor-pointer hover:bg-slate-200 active:bg-slate-300 transition-colors font-medium text-nowrap touch-manipulation h-9"
 						>
-							{lease.status?.toString() || 'INACTIVE'}
+							{formatLeaseStatus(lease.status?.toString() || 'INACTIVE')}
 							<ChevronDown class="w-3 h-3" />
 						</div>
 					</DropdownMenu.Trigger>
@@ -484,7 +536,7 @@
 										onSelect={() => handleStatusChange(status)}
 										class="px-3 py-2 text-sm"
 									>
-										{status}
+										{formatLeaseStatus(status)}
 									</DropdownMenu.RadioItem>
 								{/each}
 							</DropdownMenu.RadioGroup>
@@ -495,8 +547,8 @@
 
 			<!-- Action Buttons -->
 			<div class="flex items-center gap-2 flex-shrink-0">
-				<!-- Three-dots Popover -->
-				<Popover.Root bind:open={showActionsPopover}>
+				<!-- Three-dots Popover (Desktop) -->
+				<Popover.Root bind:open={showDesktopActions}>
 					<Popover.Trigger
 						class="h-9 w-9 hover:bg-slate-50 hover:text-slate-600 transition-colors rounded-md flex items-center justify-center border border-slate-200 hover:border-slate-300"
 						onclick={(e) => {
@@ -505,117 +557,74 @@
 					>
 						<MoreVertical class="w-4 h-4" />
 					</Popover.Trigger>
-					<Popover.Content 
-						class="w-auto p-3" 
-						side="top" 
-						align="center"
+					<Popover.Content
+						class="w-48 p-1"
+						side="top"
+						align="end"
 						sideOffset={8}
 					>
-						<div class="flex items-center gap-2 justify-center">
-							<!-- Edit Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										showEditModal = true;
-									}}
-									class="h-10 w-10 hover:bg-blue-50 hover:text-blue-600 transition-colors group/edit relative flex-shrink-0"
-								>
-									<Pencil
-										class="w-4 h-4 group-hover/edit:scale-110 transition-transform"
-									/>
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-										Edit Lease
-									</div>
-								</Button>
-							</div>
-
-							<!-- Rent Manager Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										showRentManager = true;
-									}}
-									class="h-10 w-10 hover:bg-purple-50 hover:text-purple-600 transition-colors group/rent relative flex-shrink-0"
-								>
-									<Home
-										class="w-4 h-4 group-hover/rent:scale-110 transition-transform"
-									/>
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-										Modify Rents
-									</div>
-								</Button>
-							</div>
-
-							<!-- Security Deposit Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										showSecurityDepositManager = true;
-									}}
-									class="h-10 w-10 hover:bg-orange-50 hover:text-orange-600 transition-colors group/security relative flex-shrink-0"
-								>
-									<Shield
-										class="w-4 h-4 group-hover/security:scale-110 transition-transform"
-									/>
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-										Modify Security Deposit
-									</div>
-								</Button>
-							</div>
-
-							<!-- Print Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										printLeaseInvoice(lease);
-									}}
-									class="h-10 w-10 hover:bg-gray-50 hover:text-gray-600 transition-colors group/print relative flex-shrink-0"
-								>
-									<Printer
-										class="w-4 h-4 group-hover/print:scale-110 transition-transform"
-									/>
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-										Print Statement
-									</div>
-								</Button>
-							</div>
-
-							<!-- Delete Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										onDelete(e, lease);
-									}}
-									class="h-10 w-10 hover:bg-red-50 hover:text-red-600 transition-colors group/delete relative flex-shrink-0"
-								>
-									<Trash2
-										class="w-4 h-4 group-hover/delete:scale-110 transition-transform"
-									/>
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-										Delete Lease
-									</div>
-								</Button>
-							</div>
+						<div class="flex flex-col">
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showDesktopActions = false;
+									showEditModal = true;
+								}}
+								class="h-9 w-full justify-start gap-2 px-3 hover:bg-blue-50 hover:text-blue-600 transition-colors text-sm font-normal"
+							>
+								<Pencil class="w-4 h-4 flex-shrink-0" />
+								Edit Lease
+							</Button>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showDesktopActions = false;
+									showRentManager = true;
+								}}
+								class="h-9 w-full justify-start gap-2 px-3 hover:bg-purple-50 hover:text-purple-600 transition-colors text-sm font-normal"
+							>
+								<Home class="w-4 h-4 flex-shrink-0" />
+								Modify Rents
+							</Button>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showDesktopActions = false;
+									showSecurityDepositManager = true;
+								}}
+								class="h-9 w-full justify-start gap-2 px-3 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm font-normal"
+							>
+								<Shield class="w-4 h-4 flex-shrink-0" />
+								Security Deposit
+							</Button>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showDesktopActions = false;
+									printLeaseInvoice(lease);
+								}}
+								class="h-9 w-full justify-start gap-2 px-3 hover:bg-gray-50 hover:text-gray-600 transition-colors text-sm font-normal"
+							>
+								<Printer class="w-4 h-4 flex-shrink-0" />
+								Print Statement
+							</Button>
+							<div class="h-px bg-slate-200 my-1"></div>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showDesktopActions = false;
+									onDelete(e, lease);
+								}}
+								class="h-9 w-full justify-start gap-2 px-3 hover:bg-red-50 hover:text-red-600 text-red-600 transition-colors text-sm font-normal"
+							>
+								<Trash2 class="w-4 h-4 flex-shrink-0" />
+								Delete Lease
+							</Button>
 						</div>
 					</Popover.Content>
 				</Popover.Root>
@@ -635,14 +644,14 @@
 		</div>
 
 		<!-- Mobile: Row 3 Status and Actions -->
-		<div class="lg:hidden flex items-center justify-between gap-1.5 sm:gap-2 flex-wrap w-full mt-1">
+		<div class="lg:hidden flex items-center justify-between gap-2 flex-wrap w-full mt-1">
 				<!-- Status Dropdown -->
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						<div
-							class="flex items-center justify-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-slate-100 text-slate-700 text-xs sm:text-sm cursor-pointer hover:bg-slate-200 active:bg-slate-300 transition-colors font-medium text-nowrap touch-manipulation h-8 sm:h-9"
+							class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs sm:text-sm cursor-pointer hover:bg-slate-200 active:bg-slate-300 transition-colors font-medium text-nowrap touch-manipulation min-h-[44px]"
 						>
-							{lease.status?.toString() || 'INACTIVE'}
+							{formatLeaseStatus(lease.status?.toString() || 'INACTIVE')}
 							<ChevronDown class="w-3 h-3" />
 						</div>
 					</DropdownMenu.Trigger>
@@ -659,7 +668,7 @@
 										onSelect={() => handleStatusChange(status)}
 										class="px-3 py-2 text-sm"
 									>
-										{status}
+										{formatLeaseStatus(status)}
 									</DropdownMenu.RadioItem>
 								{/each}
 							</DropdownMenu.RadioGroup>
@@ -668,133 +677,85 @@
 				</DropdownMenu.Root>
 
 				<!-- Action Buttons Container -->
-				<div class="flex items-center gap-1.5 sm:gap-2">
-					<!-- Three-dots Popover with Action Buttons -->
-					<Popover.Root bind:open={showActionsPopover}>
+				<div class="flex items-center gap-2">
+					<!-- Three-dots Popover with Action Buttons (Mobile) -->
+					<Popover.Root bind:open={showMobileActions}>
 						<Popover.Trigger
-							class="h-8 w-8 sm:h-9 sm:w-9 hover:bg-slate-50 hover:text-slate-600 transition-colors rounded-md flex items-center justify-center border border-slate-200 hover:border-slate-300"
+							class="h-11 w-11 hover:bg-slate-50 hover:text-slate-600 transition-colors rounded-md flex items-center justify-center border border-slate-200 hover:border-slate-300 touch-manipulation"
 							onclick={(e) => {
 								e.stopPropagation();
 							}}
 						>
 							<MoreVertical class="w-4 h-4" />
 						</Popover.Trigger>
-					<Popover.Content 
-						class="w-auto p-3 max-md:fixed max-md:left-1/2 max-md:-translate-x-1/2 max-md:top-1/2 max-md:-translate-y-1/2 max-md:z-50 max-md:w-fit max-md:min-w-max max-md:bg-white max-md:shadow-lg max-md:border max-md:rounded-lg" 
-						side="top" 
-						align="center"
+					<Popover.Content
+						class="w-52 p-1"
+						side="top"
+						align="end"
 						sideOffset={8}
 					>
-						<div class="flex items-center gap-2 justify-center max-md:gap-3">
-							<!-- Edit Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										showEditModal = true;
-									}}
-									class="h-10 w-10 max-md:h-12 max-md:w-12 hover:bg-blue-50 hover:text-blue-600 transition-colors group/edit relative flex-shrink-0"
-								>
-									<Pencil
-										class="w-4 h-4 max-md:w-5 max-md:h-5 group-hover/edit:scale-110 transition-transform"
-									/>
-									<!-- Desktop-only tooltip -->
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 hidden md:block">
-										Edit Lease
-									</div>
-								</Button>
-							</div>
-
-							<!-- Rent Manager Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										showRentManager = true;
-									}}
-									class="h-10 w-10 max-md:h-12 max-md:w-12 hover:bg-purple-50 hover:text-purple-600 transition-colors group/rent relative flex-shrink-0"
-								>
-									<Home
-										class="w-4 h-4 max-md:w-5 max-md:h-5 group-hover/rent:scale-110 transition-transform"
-									/>
-									<!-- Desktop-only tooltip -->
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 hidden md:block">
-										Modify Rents
-									</div>
-								</Button>
-							</div>
-
-							<!-- Security Deposit Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										showSecurityDepositManager = true;
-									}}
-									class="h-10 w-10 max-md:h-12 max-md:w-12 hover:bg-orange-50 hover:text-orange-600 transition-colors group/security relative flex-shrink-0"
-								>
-									<Shield
-										class="w-4 h-4 max-md:w-5 max-md:h-5 group-hover/security:scale-110 transition-transform"
-									/>
-									<!-- Desktop-only tooltip -->
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 hidden md:block">
-										Modify Security Deposit
-									</div>
-								</Button>
-							</div>
-
-							<!-- Print Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										printLeaseInvoice(lease);
-									}}
-									class="h-10 w-10 max-md:h-12 max-md:w-12 hover:bg-gray-50 hover:text-gray-600 transition-colors group/print relative flex-shrink-0"
-								>
-									<Printer
-										class="w-4 h-4 max-md:w-5 max-md:h-5 group-hover/print:scale-110 transition-transform"
-									/>
-									<!-- Desktop-only tooltip -->
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 hidden md:block">
-										Print Statement
-									</div>
-								</Button>
-							</div>
-
-							<!-- Delete Button -->
-							<div class="group/tooltip">
-								<Button
-									size="icon"
-									variant="ghost"
-									onclick={(e) => {
-										e.stopPropagation();
-										showActionsPopover = false;
-										onDelete(e, lease);
-									}}
-									class="h-10 w-10 max-md:h-12 max-md:w-12 hover:bg-red-50 hover:text-red-600 transition-colors group/delete relative flex-shrink-0"
-								>
-									<Trash2
-										class="w-4 h-4 max-md:w-5 max-md:h-5 group-hover/delete:scale-110 transition-transform"
-									/>
-									<!-- Desktop-only tooltip -->
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 hidden md:block">
-										Delete Lease
-									</div>
-								</Button>
-							</div>
+						<div class="flex flex-col">
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showMobileActions = false;
+									showEditModal = true;
+								}}
+								class="min-h-[44px] w-full justify-start gap-3 px-3 hover:bg-blue-50 hover:text-blue-600 transition-colors text-sm font-normal"
+							>
+								<Pencil class="w-4 h-4 flex-shrink-0" />
+								Edit Lease
+							</Button>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showMobileActions = false;
+									showRentManager = true;
+								}}
+								class="min-h-[44px] w-full justify-start gap-3 px-3 hover:bg-purple-50 hover:text-purple-600 transition-colors text-sm font-normal"
+							>
+								<Home class="w-4 h-4 flex-shrink-0" />
+								Modify Rents
+							</Button>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showMobileActions = false;
+									showSecurityDepositManager = true;
+								}}
+								class="min-h-[44px] w-full justify-start gap-3 px-3 hover:bg-orange-50 hover:text-orange-600 transition-colors text-sm font-normal"
+							>
+								<Shield class="w-4 h-4 flex-shrink-0" />
+								Security Deposit
+							</Button>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showMobileActions = false;
+									printLeaseInvoice(lease);
+								}}
+								class="min-h-[44px] w-full justify-start gap-3 px-3 hover:bg-gray-50 hover:text-gray-600 transition-colors text-sm font-normal"
+							>
+								<Printer class="w-4 h-4 flex-shrink-0" />
+								Print Statement
+							</Button>
+							<div class="h-px bg-slate-200 my-1"></div>
+							<Button
+								variant="ghost"
+								onclick={(e) => {
+									e.stopPropagation();
+									showMobileActions = false;
+									onDelete(e, lease);
+								}}
+								class="min-h-[44px] w-full justify-start gap-3 px-3 hover:bg-red-50 hover:text-red-600 text-red-600 transition-colors text-sm font-normal"
+							>
+								<Trash2 class="w-4 h-4 flex-shrink-0" />
+								Delete Lease
+							</Button>
 						</div>
 					</Popover.Content>
 					</Popover.Root>
@@ -805,7 +766,7 @@
 							e.stopPropagation();
 							showPaymentModal = true;
 						}}
-						class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 sm:py-2 text-sm font-medium transition-colors h-8 sm:h-9"
+						class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 text-sm font-medium transition-colors min-h-[44px] touch-manipulation"
 					>
 						<CreditCard class="w-4 h-4 mr-2" />
 						Make Payment

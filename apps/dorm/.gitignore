@@ -21,3 +21,17 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Test coverage
+coverage/
+
+# Claude Code artifacts
+.claude/skills/
+skills/
+
+# Playwright
+playwright.config.ts
+tests/
+
+# UX audit snapshots
+snapshot-*.yaml

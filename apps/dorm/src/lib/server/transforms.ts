@@ -33,7 +33,7 @@ export function transformTenant(row: any) {
 		address: row.address ?? null,
 		school_or_workplace: row.schoolOrWorkplace ?? null,
 		facebook_name: row.facebookName ?? null,
-		birthday: row.birthday ?? null
+		birthday: ts(row.birthday)
 	};
 }
 
@@ -42,8 +42,8 @@ export function transformLease(row: any) {
 		id: sid(row.id),
 		rental_unit_id: sid(row.rentalUnitId),
 		name: row.name,
-		start_date: row.startDate,
-		end_date: row.endDate,
+		start_date: ts(row.startDate),
+		end_date: ts(row.endDate),
 		rent_amount: row.rentAmount,
 		security_deposit: row.securityDeposit,
 		notes: row.notes ?? null,
@@ -137,7 +137,7 @@ export function transformReading(row: any) {
 		id: sid(row.id),
 		meter_id: sid(row.meterId),
 		reading: row.reading,
-		reading_date: row.readingDate,
+		reading_date: ts(row.readingDate),
 		meter_name: row.meterName ?? null,
 		rate_at_reading: row.rateAtReading ?? null,
 		previous_reading: row.previousReading ?? null,
@@ -159,8 +159,8 @@ export function transformBilling(row: any) {
 		paid_amount: row.paidAmount ?? null,
 		balance: row.balance,
 		status: row.status,
-		due_date: row.dueDate,
-		billing_date: row.billingDate,
+		due_date: ts(row.dueDate),
+		billing_date: ts(row.billingDate),
 		penalty_amount: row.penaltyAmount ?? null,
 		notes: row.notes ?? null,
 		meter_id: row.meterId != null ? sid(row.meterId) : null,

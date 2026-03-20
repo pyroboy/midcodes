@@ -3,24 +3,19 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-svelte';
 	import type { TenantResponse } from '$lib/types/tenant';
-	import { createEventDispatcher } from 'svelte';
 	import { getStatusClasses } from '$lib/utils/format';
 	import { getStatusIcon } from '$lib/utils/status-icons';
 
 	/* =====================================================
      PROPS & DATA INITIALIZATION
      ===================================================== */
-	let { tenants } = $props<{
+	interface Props {
 		tenants: TenantResponse[];
-	}>();
+		onEdit: (tenant: TenantResponse) => void;
+		onDelete: (tenant: TenantResponse) => void;
+	}
 
-	/* =====================================================
-     EVENT DISPATCHER
-     ===================================================== */
-	const dispatch = createEventDispatcher<{
-		edit: TenantResponse;
-		delete: TenantResponse;
-	}>();
+	let { tenants, onEdit, onDelete }: Props = $props();
 
 	/* =====================================================
      SORTING
@@ -46,38 +41,7 @@
 			sortDir = 'asc';
 		}
 	}
-
-	/* =====================================================
-     HELPER FUNCTIONS
-     ===================================================== */
-	function handleEdit(tenant: TenantResponse) {
-		dispatch('edit', tenant);
-	}
-
-	function handleDelete(tenant: TenantResponse) {
-		dispatch('delete', tenant);
-	}
 </script>
-
-<!--
-  Tenant Table Component
-  
-  A reusable table component for displaying tenant information in a structured format.
-  Supports edit and delete actions with event dispatching.
-  
-  @prop {TenantResponse[]} tenants - Array of tenant data to display
-  @event {CustomEvent<TenantResponse>} edit - Fired when edit button is clicked
-  @event {CustomEvent<TenantResponse>} delete - Fired when delete button is clicked
-  
-  @example
-  ```svelte
-  <TenantTable 
-    {tenants}
-    on:edit={handleEdit}
-    on:delete={handleDelete}
-  />
-  ```
--->
 
 <div class="overflow-x-auto">
 	<table class="w-full">
@@ -170,10 +134,10 @@
 					</td>
 					<td class="p-2 sm:p-4">
 						<div class="flex items-center justify-end gap-1 sm:gap-2">
-							<Button variant="outline" size="sm" onclick={() => handleEdit(tenant)} class="min-w-[44px] min-h-[44px] p-2 sm:px-3 sm:py-2">
+							<Button variant="outline" size="sm" onclick={() => onEdit(tenant)} class="min-w-[44px] min-h-[44px] p-2 sm:px-3 sm:py-2">
 								<Pencil class="h-3 w-3 sm:h-4 sm:w-4" />
 							</Button>
-							<Button variant="destructive" size="sm" onclick={() => handleDelete(tenant)} class="min-w-[44px] min-h-[44px] p-2 sm:px-3 sm:py-2">
+							<Button variant="destructive" size="sm" onclick={() => onDelete(tenant)} class="min-w-[44px] min-h-[44px] p-2 sm:px-3 sm:py-2">
 								<Trash2 class="h-3 w-3 sm:h-4 sm:w-4" />
 							</Button>
 						</div>

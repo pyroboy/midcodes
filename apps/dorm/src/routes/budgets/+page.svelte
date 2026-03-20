@@ -168,8 +168,7 @@
 		resetForm: true,
 		dataType: 'json',
 		onUpdate: ({ form }) => {
-			console.log('Form updated', form);
-		},
+			},
 		onSubmit: async () => {
 			// Capture current form data before submission
 			submitSeq++;
@@ -222,7 +221,6 @@
 				if ((result.data as any)?.conflict) {
 					toast.error(CONFLICT_MESSAGE, { duration: 6000 });
 				} else {
-					console.error('[Budgets] Server: budget form action failed', result);
 					toast.error('Failed to save budget');
 				}
 				// Instant rollback, then confirm with resync
@@ -383,10 +381,10 @@
 <div class="container mx-auto py-8 px-4">
 	<SyncErrorBanner collections={['budgets', 'properties']} />
 	<!-- Page Header -->
-	<div class="flex justify-between items-center mb-8 border-b pb-4">
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 border-b pb-4 gap-3">
 		<div>
-			<h1 class="text-3xl font-bold text-gray-800">Budget Planner</h1>
-			<p class="text-gray-600 mt-1">Manage and track your property renovation budgets</p>
+			<h1 class="text-2xl sm:text-3xl font-bold text-foreground">Budget Planner</h1>
+			<p class="text-muted-foreground mt-1">Manage and track your property renovation budgets</p>
 		</div>
 		<div class="flex items-center gap-2">
 			<Button onclick={refreshData} variant="outline" size="sm" class="flex items-center gap-1">
@@ -401,15 +399,15 @@
 	</div>
 
 	<!-- Compact Statistics Summary -->
-	<Card class="bg-white shadow-md border border-gray-200 rounded-lg overflow-hidden mb-8">
-		<div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200">
+	<Card class="bg-white shadow-md border border-border rounded-lg overflow-hidden mb-8">
+		<div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
 			<!-- Total Budget Column -->
 			<div class="p-4 flex items-center flex-1">
 				<div class="rounded-full bg-emerald-100 p-2 mr-3 flex-shrink-0">
 					<DollarSign class="h-5 w-5 text-emerald-600" />
 				</div>
 				<div>
-					<div class="text-sm font-medium text-gray-500 mb-0.5">Total Budget</div>
+					<div class="text-sm font-medium text-muted-foreground mb-0.5">Total Budget</div>
 					<div class="text-xl font-bold">{formatCurrency(statistics.totalPlannedBudget)}</div>
 				</div>
 			</div>
@@ -419,7 +417,7 @@
 				<div class="flex justify-between items-center mb-1">
 					<div class="flex items-center">
 						<PieChart class="h-4 w-4 text-blue-600 mr-1.5" />
-						<span class="text-sm font-medium text-gray-500">Distribution</span>
+						<span class="text-sm font-medium text-muted-foreground">Distribution</span>
 					</div>
 					{#if statistics.totalPlannedBudget > 0}
 						{@const allocatedPercentage = Math.min(
@@ -467,7 +465,7 @@
 						</span>
 					</div>
 				{:else}
-					<div class="text-xs text-gray-500">No planned budget</div>
+					<div class="text-xs text-muted-foreground">No planned budget</div>
 				{/if}
 			</div>
 
@@ -475,7 +473,7 @@
 			<div class="p-4 flex-1">
 				<div class="flex items-center mb-1.5">
 					<CalendarRange class="h-4 w-4 text-purple-600 mr-1.5" />
-					<span class="text-sm font-medium text-gray-500">Project Status</span>
+					<span class="text-sm font-medium text-muted-foreground">Project Status</span>
 				</div>
 
 				<div class="flex gap-3 mb-1.5">
@@ -503,10 +501,10 @@
 					)}
 					<div class="flex items-center gap-2">
 						<Progress value={completionPercentage} class="h-1.5 flex-1" />
-						<span class="text-xs text-gray-500">{completionPercentage}%</span>
+						<span class="text-xs text-muted-foreground">{completionPercentage}%</span>
 					</div>
 				{:else}
-					<div class="text-xs text-gray-500">No active projects</div>
+					<div class="text-xs text-muted-foreground">No active projects</div>
 				{/if}
 			</div>
 		</div>
@@ -539,14 +537,14 @@
 	<div class="mb-6">
 		{#if isLoading}
 			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
-				<RefreshCw class="h-12 w-12 mx-auto text-gray-400 animate-spin" />
-				<h3 class="mt-2 text-lg font-medium text-gray-900">Loading budgets...</h3>
+				<RefreshCw class="h-12 w-12 mx-auto text-muted-foreground animate-spin" />
+				<h3 class="mt-2 text-lg font-medium text-foreground">Loading budgets...</h3>
 			</div>
 		{:else if budgets.length === 0}
 			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
-				<DollarSign class="h-12 w-12 mx-auto text-gray-400" />
-				<h3 class="mt-2 text-lg font-medium text-gray-900">No budget projects</h3>
-				<p class="mt-1 text-sm text-gray-500">Get started by creating your first budget project.</p>
+				<DollarSign class="h-12 w-12 mx-auto text-muted-foreground" />
+				<h3 class="mt-2 text-lg font-medium text-foreground">No budget projects</h3>
+				<p class="mt-1 text-sm text-muted-foreground">Get started by creating your first budget project.</p>
 				<div class="mt-6">
 					<Button onclick={handleAddBudget} class="flex items-center gap-1 mx-auto">
 						<Plus class="h-4 w-4" />
@@ -597,7 +595,7 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Delete Budget</AlertDialog.Title>
 			<AlertDialog.Description>
-				Are you sure you want to delete this budget? This action cannot be undone.
+				Are you sure you want to delete this budget? It will be archived and removed from your active list.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

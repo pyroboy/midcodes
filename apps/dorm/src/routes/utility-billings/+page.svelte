@@ -355,7 +355,6 @@
 	}
 
 	function openTenantShareModal(meter: MeterData) {
-		console.log('Opening tenant share modal for:', meter);
 		// Create a new object to ensure reactivity
 		tenantShare.selectedReading = { ...meter };
 		tenantShare.selectedMeter = { ...meter };
@@ -366,7 +365,6 @@
 	}
 
 	function handleGeneratePreview(data: ShareData[]) {
-		console.log('Generating print preview with data:', data);
 		tenantShare.dataForPreview = data;
 		// Close the tenant share modal before opening the print preview
 		modals.tenantShare = false;
@@ -377,28 +375,22 @@
 	}
 
 	function handleBackToTenantShare() {
-		console.log('Navigating back to tenant share modal.');
 		modals.printPreview = false;
 		modals.tenantShare = true;
 	}
 
 	function handlePrint() {
 		// TODO: Implement printing functionality
-		console.log('Printing...');
 	}
 
 	async function handleSaveReadings(event: ReadingSaveEvent) {
 		const { readings, costPerUnit, readingDate } = event;
-		console.log('handleSaveReadings received:', { readings, costPerUnit, readingDate });
 
 		// Update the form state with the latest data from the modal
 		$form.readings_json = JSON.stringify(readings);
 		($form as any).cost_per_unit = costPerUnit;
 		$form.reading_date = readingDate;
 		$form.type = filters.type as typeof $form.type;
-
-		console.log('Form data being submitted:', $form);
-		console.log('Form readings_json:', $form.readings_json);
 
 		// Wait for the DOM to update with the new form values
 		await tick();
@@ -414,11 +406,10 @@
 		filters.searchQuery = '';
 	}
 
-	function handleExport(event: CustomEvent<ExportEvent>) {
-		const { format, fromDate, toDate } = event.detail;
-		console.log(`Exporting in ${format} format from ${fromDate} to ${toDate}`);
+	function handleExport(data: ExportEvent) {
+		const { format, fromDate, toDate } = data;
 		modals.export = false;
-		alert(`Export in ${format.toUpperCase()} format initiated!`);
+		toast.success(`Export in ${format.toUpperCase()} format initiated!`);
 	}
 
 	// Get utility billing types from data
@@ -428,8 +419,8 @@
 <div class="container mx-auto py-6">
 	<SyncErrorBanner collections={['meters', 'readings', 'billings', 'leases', 'properties', 'tenants', 'rental_units']} />
 	<!-- Page Header -->
-	<div class="flex justify-between items-center mb-4 border-b pb-4">
-		<h1 class="text-3xl font-bold">Utility Readings Management</h1>
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 border-b pb-4 gap-2">
+		<h1 class="text-2xl sm:text-3xl font-bold">Utility Readings Management</h1>
 
 		<div class="flex items-center gap-2"></div>
 	</div>
@@ -471,8 +462,8 @@
 							{#each group.readings as r}
 								<div class="p-2 border rounded text-sm">
 									<div class="flex items-center justify-between">
-										<span>Meter #{r.meter_id}</span>
-										<span class="text-gray-600">{r.reading}</span>
+										<span>{r.meters?.name || `Meter #${r.meter_id}`}</span>
+										<span class="text-gray-600">{r.reading}{r.meters?.type ? ` (${r.meters.type.charAt(0) + r.meters.type.slice(1).toLowerCase()})` : ''}</span>
 									</div>
 								</div>
 							{/each}
@@ -530,8 +521,8 @@
 		bind:fromDate
 		bind:toDate
 		bind:exportFormat
-		on:export={handleExport}
-		on:close={() => (modals.export = false)}
+		onexport={handleExport}
+		onclose={() => (modals.export = false)}
 	/>
 
 	<BillingPeriodsGraphModal
@@ -546,10 +537,10 @@
 	<div class="space-y-6 mt-6">
 		<!-- Readings Display Section -->
 		<div class="space-y-4">
-			<div class="flex items-center justify-between">
+			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 				<h2 class="text-xl font-semibold">Meter Readings</h2>
 
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-2 w-full sm:w-auto">
 					<!-- Graph Analysis button -->
 					<Button
 						variant="outline"

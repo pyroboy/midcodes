@@ -20,6 +20,7 @@
 	import { optimisticUpsertLease } from '$lib/db/optimistic-leases';
 	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import FormProgressIndicator from '$lib/components/ui/FormProgressIndicator.svelte';
 
 	let {
 		lease = null,
@@ -86,6 +87,40 @@
 		selectedTenants: getTenantIds(lease)
 	}))());
 
+	// [07] Progress indicator section tracking
+	let activeSection = $state(0);
+	const sectionIds = ['section-basic-info', 'section-tenants', 'section-notes'];
+
+	function scrollToSection(index: number) {
+		const el = document.getElementById(sectionIds[index]);
+		if (el) {
+			el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			activeSection = index;
+		}
+	}
+
+	// [14] Auto-fill rent from unit's base_rate when rental unit changes (only for new leases)
+	let previousUnitId = $state(0);
+	$effect(() => {
+		const unitId = formData.rental_unit_id;
+		if (unitId && unitId !== 0 && unitId !== previousUnitId) {
+			previousUnitId = unitId;
+			// Only auto-fill if not in edit mode OR if rent is still 0
+			if (!editMode || formData.rent_amount === 0) {
+				const unit = rentalUnits?.find((r: any) => r.id === unitId);
+				if (unit?.base_rate) {
+					const rate = parseFloat(unit.base_rate);
+					if (!isNaN(rate) && rate > 0) {
+						formData.rent_amount = rate;
+					}
+				}
+			}
+		}
+	});
+
+	// [05] Zero rent warning state
+	let showZeroRentWarning = $state(false);
+
 	// Auto-calculate end_date when start_date or terms change
 	$effect(() => {
 		if (formData.start_date && Number(formData.terms_month) > 0) {
@@ -148,6 +183,7 @@
 	// Validation
 	let validationErrors = $state<Record<string, string>>({});
 	let isFormValid = $state(false);
+	let showErrors = $state(false);
 
 	// Updated validation
 	$effect(() => {
@@ -187,8 +223,9 @@
 
 	// Get rental unit display name
 	let selectedRentalUnit = $derived.by(() => {
+		if (!formData.rental_unit_id || formData.rental_unit_id === 0) return 'Select a rental unit...';
 		const unit = rentalUnits?.find((r: any) => r.id === formData.rental_unit_id);
-		if (!unit) return 'Select a unit';
+		if (!unit) return 'Select a rental unit...';
 		const unitName = unit.name ?? 'Unnamed Unit';
 		const propertyName = unit.property?.name ?? 'No property';
 		return `${unitName} - ${propertyName}`;
@@ -218,6 +255,7 @@
 	// Form submission with use:enhance
 	const handleFormSubmit = () => {
 		if (!isFormValid) {
+			showErrors = true;
 			toast.error('Please fix the validation errors before submitting');
 			return;
 		}
@@ -242,6 +280,10 @@
 				selectedTenants: tenantIds
 			};
 			searchTerm = '';
+			showErrors = false;
+			showZeroRentWarning = false;
+			activeSection = 0;
+			previousUnitId = lease?.rental_unit?.id || 0;
 
 			// Set initial form data after form is populated
 			setTimeout(() => {
@@ -283,10 +325,23 @@
 			</DialogDescription>
 		</DialogHeader>
 
+		<FormProgressIndicator
+			sections={['Basic Info', 'Tenants', 'Notes']}
+			currentSection={activeSection}
+			onSectionClick={scrollToSection}
+		/>
+
 		<form
 			method="POST"
 			action={editMode ? '?/updateLease' : '?/create'}
 			use:enhance={() => {
+				// [05] Check for zero rent and show warning (non-blocking)
+				if (Number(formData.rent_amount) === 0) {
+					showZeroRentWarning = true;
+					// If this is the first time seeing the warning, show it but don't block
+					toast.warning('Monthly rent is set to 0. Verify this is intentional.', { duration: 4000 });
+				}
+
 				// Capture form snapshot before potential reset
 				submitSeq++;
 				savedFormData = { ...formData, _seq: submitSeq };
@@ -380,7 +435,7 @@
 			<input type="hidden" name="tenantIds" value={JSON.stringify(formData.selectedTenants)} />
 
 			<!-- Basic Information -->
-			<div class="space-y-4">
+			<div id="section-basic-info" class="space-y-4">
 				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
 					<Calendar class="w-4 h-4 text-slate-500" />
 					<h3 class="text-sm font-semibold text-slate-700">Basic Information</h3>
@@ -388,16 +443,16 @@
 
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<div class="space-y-2">
-						<Label for="name">Lease Name</Label>
+						<Label for="name">Lease Name <span class="text-red-500">*</span></Label>
 						<Input
 							id="name"
 							name="name"
 							type="text"
 							bind:value={formData.name}
-							class={validationErrors.name ? 'border-red-500' : ''}
+							class={showErrors && validationErrors.name ? 'border-red-500' : ''}
 							required
 						/>
-						{#if validationErrors.name}
+						{#if showErrors && validationErrors.name}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.name}
@@ -406,9 +461,9 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="rental_unit">Rental Unit</Label>
+						<Label for="rental_unit">Rental Unit <span class="text-red-500">*</span></Label>
 						<Select.Root type="single" bind:value={formData.rental_unit_id}>
-							<Select.Trigger class={validationErrors.rental_unit ? 'border-red-500' : ''}>
+							<Select.Trigger class={showErrors && validationErrors.rental_unit ? 'border-red-500' : ''}>
 								{selectedRentalUnit}
 							</Select.Trigger>
 							<Select.Content>
@@ -419,7 +474,7 @@
 								{/each}
 							</Select.Content>
 						</Select.Root>
-						{#if validationErrors.rental_unit}
+						{#if showErrors && validationErrors.rental_unit}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.rental_unit}
@@ -428,7 +483,7 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="rent_amount">Monthly Rent Amount</Label>
+						<Label for="rent_amount">Monthly Rent Amount <span class="text-red-500">*</span></Label>
 						<Input
 							id="rent_amount"
 							name="rent_amount"
@@ -437,9 +492,15 @@
 							min="0"
 							step="0.01"
 							placeholder="0.00"
-							class={validationErrors.rent_amount ? 'border-red-500' : ''}
+							class="{showErrors && validationErrors.rent_amount ? 'border-red-500' : ''} {Number(formData.rent_amount) === 0 && showZeroRentWarning ? 'border-amber-500' : ''}"
 						/>
-						{#if validationErrors.rent_amount}
+						{#if Number(formData.rent_amount) === 0}
+							<p class="text-xs text-amber-600 flex items-center gap-1">
+								<AlertCircle class="w-3 h-3" />
+								Rent is currently set to 0
+							</p>
+						{/if}
+						{#if showErrors && validationErrors.rent_amount}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.rent_amount}
@@ -458,7 +519,7 @@
 							id="start_date"
 							name="start_date"
 						/>
-						{#if validationErrors.start_date}
+						{#if showErrors && validationErrors.start_date}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.start_date}
@@ -475,9 +536,9 @@
 							bind:value={formData.terms_month}
 							min="1"
 							max="60"
-							class={validationErrors.terms_month ? 'border-red-500' : ''}
+							class={showErrors && validationErrors.terms_month ? 'border-red-500' : ''}
 						/>
-						{#if validationErrors.terms_month}
+						{#if showErrors && validationErrors.terms_month}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.terms_month}
@@ -494,7 +555,7 @@
 							name="end_date"
 						/>
 						<p class="text-xs text-gray-500">Automatically calculated from start date and terms</p>
-						{#if validationErrors.end_date}
+						{#if showErrors && validationErrors.end_date}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.end_date}
@@ -521,11 +582,11 @@
 			</div>
 
 			<!-- Tenant Management -->
-			<div class="space-y-2">
+			<div id="section-tenants" class="space-y-2">
 				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
 					<Users class="w-4 h-4 text-slate-500" />
 					<h3 class="text-sm font-semibold text-slate-700">
-						Tenant Management - selected ({formData.selectedTenants.length})
+						Tenant Management <span class="text-red-500">*</span> - selected ({formData.selectedTenants.length})
 					</h3>
 				</div>
 
@@ -584,7 +645,7 @@
 						{/each}
 					{/if}
 				</div>
-				{#if validationErrors.tenants}
+				{#if showErrors && validationErrors.tenants}
 					<p class="text-sm text-red-500 flex items-center gap-1">
 						<AlertCircle class="w-4 h-4" />
 						{validationErrors.tenants}
@@ -593,7 +654,7 @@
 			</div>
 
 			<!-- Notes -->
-			<div class="space-y-2">
+			<div id="section-notes" class="space-y-2">
 				<Label for="notes">Notes</Label>
 				<textarea
 					id="notes"

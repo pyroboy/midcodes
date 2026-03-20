@@ -2,9 +2,12 @@
 	import * as Card from '$lib/components/ui/card';
 	import type { Reading, Meter } from './types';
 
-	export let readings: Reading[] = [];
-	export let meters: Meter[] = [];
-	export let readingDates: string[] = [];
+	interface Props {
+		readings?: Reading[];
+		meters?: Meter[];
+		readingDates?: string[];
+	}
+	let { readings = [], meters = [], readingDates = [] }: Props = $props();
 
 	// Format date for display
 	function formatDate(dateString: string): string {
@@ -20,7 +23,10 @@
 		return new Set(
 			readings
 				.map((r: Reading) => {
-					const meter = meters.find((m: Meter) => m.id === r.meter_id);
+					// Try direct property from joined meter data first
+					if ((r as any).meters?.property_id) return (r as any).meters.property_id;
+					// Fallback to meters prop lookup with string coercion (RxDB IDs are strings)
+					const meter = meters.find((m: Meter) => String(m.id) === String(r.meter_id));
 					return meter?.property_id;
 				})
 				.filter(Boolean)
@@ -67,8 +73,8 @@
 					</p>
 				</div>
 			{:else}
-				<div class="col-span-4 text-center p-4 bg-gray-50 rounded-lg">
-					<p class="text-gray-500">No data available for the selected filters</p>
+				<div class="col-span-4 text-center p-4 bg-muted rounded-lg">
+					<p class="text-muted-foreground">No data available for the selected filters</p>
 				</div>
 			{/if}
 		</div>

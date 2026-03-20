@@ -2,7 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { paymentSchema, type UserRole } from './formSchema';
-import { transactionSchema } from '../transactions/schema';
+import { transactionSchema } from '../payment-history/schema';
 import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
 import {
 	calculatePenalty,

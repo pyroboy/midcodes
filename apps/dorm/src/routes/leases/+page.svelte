@@ -3,12 +3,12 @@
 	import LeaseList from './LeaseList.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign, FileText } from 'lucide-svelte';
+	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign, FileText, CircleDot } from 'lucide-svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import type { z } from 'zod/v3';
 	import { leaseSchema } from './formSchema';
 	import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
-	import { formatCurrency } from '$lib/utils/format';
+	import { formatCurrency, formatCompactCurrency } from '$lib/utils/format';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
 	import { printAllLeases } from '$lib/utils/print';
@@ -72,6 +72,17 @@
 			else billByLease.set(key, [b]);
 		}
 
+		const paymentMap = new Map<string, any>();
+		for (const p of paymentsStore.value) paymentMap.set(String(p.id), p);
+
+		const allocByBilling = new Map<string, any[]>();
+		for (const a of paymentAllocationsStore.value) {
+			const key = String(a.billing_id);
+			const arr = allocByBilling.get(key);
+			if (arr) arr.push(a);
+			else allocByBilling.set(key, [a]);
+		}
+
 		// Single pass over leases with O(1) lookups — sorted by updated_at desc
 		const sortedLeases = [...leasesStore.value].sort((a: any, b: any) => {
 			const aMs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
@@ -113,6 +124,15 @@
 				const bal = parseFloat(b.balance) || 0;
 				totalPaid += paidAmt;
 				totalBalance += bal;
+				const billingId = String(b.id);
+				const rawAllocs = allocByBilling.get(billingId) || [];
+				const allocations = rawAllocs.map((a: any) => ({
+					id: Number(a.id),
+					payment_id: a.payment_id,
+					billing_id: a.billing_id,
+					amount: parseFloat(a.amount) || 0,
+					payment: paymentMap.get(String(a.payment_id)) ?? null
+				}));
 				leaseBillings.push({
 					id: Number(b.id),
 					type: b.type,
@@ -124,7 +144,8 @@
 					due_date: b.due_date,
 					billing_date: b.billing_date,
 					penalty_amount: parseFloat(b.penalty_amount) || 0,
-					notes: b.notes
+					notes: b.notes,
+					allocations
 				});
 			}
 
@@ -283,11 +304,9 @@
 	// Resync relevant collections after server actions
 	async function refreshData() {
 		const collections = ['leases', 'lease_tenants', 'billings', 'payments', 'payment_allocations'];
-		console.log('[Leases] refreshData → resyncing:', collections.join(', '));
 		syncStatus.addLog('Leases: resyncing after server action...', 'info');
 		try {
 			await Promise.all(collections.map((c) => resyncCollection(c)));
-			console.log('[Leases] refreshData → all collections resynced ✓');
 			syncStatus.addLog('Leases: all collections resynced ✓', 'success');
 		} catch (err) {
 			console.warn('[Leases] refreshData resync failed:', err);
@@ -381,10 +400,10 @@
 		<SyncErrorBanner collections={['leases', 'tenants', 'lease_tenants', 'billings', 'payments', 'payment_allocations', 'rental_units']} />
 	</div>
 	<!-- Header Section with Integrated Stats -->
-	<div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
-		<div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
+	<div class="sm:sticky sm:top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
+		<div class="max-w-7xl mx-auto px-3 sm:px-4 py-1.5 sm:py-3">
 			<!-- Title and Action Buttons -->
-			<div class="flex items-center justify-between mb-2">
+			<div class="flex items-center justify-between mb-1 sm:mb-2">
 				<h1 class="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
 					Leases Dashboard
 				</h1>
@@ -392,7 +411,7 @@
 					<Button
 						onclick={handlePrintAllLeases}
 						variant="outline"
-						class="flex items-center justify-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 py-1 text-xs sm:text-sm border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm"
+						class="flex items-center justify-center gap-1 sm:gap-2 h-9 sm:h-9 min-h-[44px] px-2 sm:px-3 py-1 text-xs sm:text-sm border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm"
 						disabled={isLoading || filteredLeases.length === 0}
 					>
 						<Printer class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -400,7 +419,7 @@
 					</Button>
 					<Button
 						onclick={handleAddLease}
-						class="flex items-center justify-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+						class="flex items-center justify-center gap-1 sm:gap-2 h-9 sm:h-9 min-h-[44px] px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
 					>
 						<Plus class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
 						<span class="hidden sm:inline">Add Lease</span>
@@ -408,18 +427,18 @@
 				</div>
 			</div>
 			<!-- Responsive Summary Cards -->
-			<div class="flex flex-nowrap gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-1 sm:mx-0 scrollbar-hide">
+			<div class="flex flex-nowrap gap-1 sm:gap-2 overflow-x-auto pb-1.5 sm:pb-2 -mx-1 sm:mx-0 scrollbar-hide">
 				<!-- All Leases Card -->
 				<button
 				onclick={() => (activeFilter = 'all')}
 				aria-pressed={activeFilter === 'all'}
-				class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-blue-200 cursor-pointer {activeFilter === 'all' ? 'ring-2 ring-blue-500' : ''}"
+				class="flex-shrink-0 w-[72px] sm:w-28 min-w-[72px] sm:min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-1.5 sm:p-2 text-left transition-all duration-200 hover:shadow hover:border-blue-200 cursor-pointer {activeFilter === 'all' ? 'ring-2 ring-blue-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
 						<Skeleton class="h-3 w-10" />
 					{:else}
-						<div class="text-base sm:text-xl font-bold text-slate-800">{summaryMetrics.totalLeases}</div>
+						<div class="text-sm sm:text-xl font-bold text-slate-800">{summaryMetrics.totalLeases}</div>
 						<div class="flex items-center gap-1 text-slate-600 text-xs font-medium truncate">
 							<CircleDollarSign class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Total</span>
@@ -431,13 +450,13 @@
 				<button
 					onclick={() => (activeFilter = 'paid')}
 				aria-pressed={activeFilter === 'paid'}
-					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-green-200 cursor-pointer {activeFilter === 'paid' ? 'ring-2 ring-green-500' : ''}"
+					class="flex-shrink-0 w-[72px] sm:w-28 min-w-[72px] sm:min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-1.5 sm:p-2 text-left transition-all duration-200 hover:shadow hover:border-green-200 cursor-pointer {activeFilter === 'paid' ? 'ring-2 ring-green-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
 						<Skeleton class="h-3 w-10" />
 					{:else}
-						<div class="text-base sm:text-xl font-bold text-green-600">{summaryMetrics.paidInFull}</div>
+						<div class="text-sm sm:text-xl font-bold text-green-600">{summaryMetrics.paidInFull}</div>
 						<div class="flex items-center gap-1 text-xs font-medium text-green-600 truncate">
 							<Check class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Paid</span>
@@ -449,19 +468,22 @@
 				<button
 					onclick={() => (activeFilter = 'pending')}
 				aria-pressed={activeFilter === 'pending'}
-					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-yellow-200 cursor-pointer {activeFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}"
+					class="flex-shrink-0 w-[72px] sm:w-28 min-w-[72px] sm:min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-1.5 sm:p-2 text-left transition-all duration-200 hover:shadow hover:border-yellow-200 cursor-pointer {activeFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
 						<Skeleton class="h-3 w-12 mb-1" />
 						<Skeleton class="h-3 w-10" />
 					{:else}
-						<div class="text-base sm:text-xl font-bold text-yellow-600">{summaryMetrics.pendingCount}</div>
+						<div class="text-sm sm:text-xl font-bold text-yellow-600">{summaryMetrics.pendingCount}</div>
 						<div class="flex items-center gap-1 text-xs font-medium text-yellow-600 truncate">
 							<Clock class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Pending</span>
 						</div>
-						<span class="text-yellow-600 text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPending)}</span>
+						<span class="text-yellow-600 text-xs leading-tight font-medium block">
+							<span class="sm:hidden">{formatCompactCurrency(summaryMetrics.totalPending)}</span>
+							<span class="hidden sm:inline">{formatCurrency(summaryMetrics.totalPending)}</span>
+						</span>
 					{/if}
 				</button>
 
@@ -469,19 +491,24 @@
 				<button
 					onclick={() => (activeFilter = 'partial')}
 				aria-pressed={activeFilter === 'partial'}
-					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-amber-200 cursor-pointer {activeFilter === 'partial' ? 'ring-2 ring-amber-500' : ''}"
+					class="flex-shrink-0 w-[72px] sm:w-28 min-w-[72px] sm:min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-1.5 sm:p-2 text-left transition-all duration-200 hover:shadow hover:border-amber-200 cursor-pointer {activeFilter === 'partial' ? 'ring-2 ring-amber-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
 						<Skeleton class="h-3 w-12 mb-1" />
 						<Skeleton class="h-3 w-10" />
 					{:else}
-						<div class="text-base sm:text-xl font-bold text-amber-600">{summaryMetrics.partialCount}</div>
+						<div class="text-sm sm:text-xl font-bold text-amber-600">{summaryMetrics.partialCount}</div>
 						<div class="flex items-center gap-1 text-xs font-medium text-amber-600 truncate">
-							<AlertTriangle class="w-3 h-3 flex-shrink-0" />
+							<CircleDot class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Partial</span>
 						</div>
-						<span class="text-amber-600 text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPartial)}</span>
+						{#if summaryMetrics.totalPartial > 0}
+						<span class="text-amber-600 text-xs leading-tight font-medium block">
+							<span class="sm:hidden">{formatCompactCurrency(summaryMetrics.totalPartial)}</span>
+							<span class="hidden sm:inline">{formatCurrency(summaryMetrics.totalPartial)}</span>
+						</span>
+					{/if}
 					{/if}
 				</button>
 
@@ -489,19 +516,24 @@
 				<button
 					onclick={() => (activeFilter = 'overdue')}
 				aria-pressed={activeFilter === 'overdue'}
-					class="flex-shrink-0 w-24 sm:w-28 min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-red-200 cursor-pointer {activeFilter === 'overdue' ? 'ring-2 ring-red-500' : ''}"
+					class="flex-shrink-0 w-[72px] sm:w-28 min-w-[72px] sm:min-w-[96px] bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-1.5 sm:p-2 text-left transition-all duration-200 hover:shadow hover:border-red-200 cursor-pointer {activeFilter === 'overdue' ? 'ring-2 ring-red-500' : ''}"
 				>
 					{#if isLoading}
 						<Skeleton class="h-5 w-8 mb-1" />
 						<Skeleton class="h-3 w-12 mb-1" />
 						<Skeleton class="h-3 w-10" />
 					{:else}
-						<div class="text-base sm:text-xl font-bold text-red-600">{summaryMetrics.overdueCount}</div>
+						<div class="text-sm sm:text-xl font-bold text-red-600">{summaryMetrics.overdueCount}</div>
 						<div class="flex items-center gap-1 text-xs font-medium text-red-600 truncate">
 							<AlertTriangle class="w-3 h-3 flex-shrink-0" />
 							<span class="truncate">Overdue</span>
 						</div>
-						<span class="text-red-600 text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalOverdue)}</span>
+						{#if summaryMetrics.totalOverdue > 0}
+						<span class="text-red-600 text-xs leading-tight font-medium block">
+							<span class="sm:hidden">{formatCompactCurrency(summaryMetrics.totalOverdue)}</span>
+							<span class="hidden sm:inline">{formatCurrency(summaryMetrics.totalOverdue)}</span>
+						</span>
+					{/if}
 					{/if}
 				</button>
 			</div>
@@ -646,7 +678,7 @@
 						Outstanding Balance: {formatCurrency(leaseToDelete.balance)}
 					{/if}
 
-					This will archive the lease (soft delete), preserve all payment and billing history, maintain audit compliance, and remove from active lease list. This action cannot be undone.
+					This will archive the lease (soft delete), preserve all payment and billing history, maintain audit compliance, and remove from active lease list. The lease will be removed from the active list but all data is preserved.
 				{/if}
 			</AlertDialog.Description>
 		</AlertDialog.Header>

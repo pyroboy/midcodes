@@ -39,7 +39,8 @@ const ALL_SOFT_DELETE_COLLECTIONS = [
 	'payment_allocations',
 	'expenses',
 	'budgets',
-	'penalty_configs'
+	'penalty_configs',
+	'floor_layout_items'
 ];
 
 /**

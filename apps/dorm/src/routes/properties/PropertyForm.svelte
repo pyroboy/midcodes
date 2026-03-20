@@ -120,12 +120,10 @@
 		</div>
 
 		<div class="flex justify-end space-x-2">
+			<Button type="button" variant="outline" onclick={handleCancel}>Cancel</Button>
 			<Button type="submit">
 				{editMode ? 'Update' : 'Create'} Property
 			</Button>
-			{#if editMode}
-				<Button type="button" variant="destructive" onclick={handleCancel}>Cancel</Button>
-			{/if}
 		</div>
 	</div>
 </form>

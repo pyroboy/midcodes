@@ -164,7 +164,7 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 
 const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 	const connectSrc = dev
-		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* ws://localhost:* ws://127.0.0.1:*"
+		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*"
 		: "connect-src 'self' https://*.neon.tech";
 
 	const cspDirectives = [
@@ -200,8 +200,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const path = event.url.pathname;
 	const isUserLoggedIn = !!event.locals.user;
 
-	// 1. Handle API routes (except auth API and cron)
-	if (path.startsWith('/api') && !path.startsWith('/api/auth') && !path.startsWith('/api/cron')) {
+	// 1. Handle API routes (except auth API)
+	if (path.startsWith('/api') && !path.startsWith('/api/auth')) {
 		if (!isUserLoggedIn) {
 			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
 				status: 401,

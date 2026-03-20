@@ -1,12 +1,10 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog';
-	import { Badge } from '$lib/components/ui/badge';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import { Input } from '$lib/components/ui/input';
-	import { Pencil, Home, DollarSign, Clock, Copy } from 'lucide-svelte';
+	import { Pencil } from 'lucide-svelte';
 	import type { Lease } from '$lib/types/lease';
-	import { invalidateAll } from '$app/navigation';
-	import { getStatusVariant, formatCurrency } from '$lib/utils/format';
+	import { resyncCollection } from '$lib/db/replication';
+	import { formatLeaseStatus } from '$lib/utils/format';
 	import LeaseOverviewTab from './LeaseOverviewTab.svelte';
 	import LeaseBillingTab from './LeaseBillingTab.svelte';
 	import LeaseHistoryTab from './LeaseHistoryTab.svelte';
@@ -71,7 +69,7 @@
 			}
 			lease.name = editedName;
 			isEditingName = false;
-			await invalidateAll();
+			await resyncCollection('leases');
 		} catch (error) {
 			console.error('Error updating lease name:', error);
 			isEditingName = false;
@@ -92,9 +90,6 @@
 		// and can cause performance issues
 	}
 
-	function copyLeaseId() {
-		navigator.clipboard.writeText(lease.id.toString());
-	}
 </script>
 
 <Dialog.Root {open} {onOpenChange}>
@@ -133,15 +128,8 @@
 					{/if}
 
 					<div class="flex items-center gap-4 mt-3">
-						<button
-							onclick={copyLeaseId}
-							class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-						>
-							<span>ID: {lease.id}</span>
-							<Copy class="w-3 h-3" />
-						</button>
 						<div class="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded-md">
-							{lease.status?.toString() || 'INACTIVE'}
+							{formatLeaseStatus(lease.status?.toString() || '')}
 						</div>
 					</div>
 				</div>
@@ -162,9 +150,14 @@
 					<!-- Billing Column -->
 					<div class="space-y-4">
 						{#if overdueBillings.length > 0}
-							<span class="bg-gray-900 text-white text-xs px-1.5 py-0.5 rounded-full">
-								{overdueBillings.length}
-							</span>
+							<div class="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
+								<span class="bg-red-600 text-white text-xs font-medium px-1.5 py-0.5 rounded-full">
+									{overdueBillings.length}
+								</span>
+								<span class="text-sm text-red-700 font-medium">
+									overdue {overdueBillings.length === 1 ? 'billing' : 'billings'}
+								</span>
+							</div>
 						{/if}
 						<div class="bg-gray-50 rounded-lg p-4">
 							<LeaseBillingTab {lease} />

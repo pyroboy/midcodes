@@ -18,7 +18,7 @@
 	let derivedFloors = $derived(
 		selectedProperty
 			? data.floors
-					.filter((f: Floor) => f.property_id === selectedProperty?.id && f.status === 'ACTIVE')
+					.filter((f: Floor) => String(f.property_id) === String(selectedProperty?.id) && f.status === 'ACTIVE')
 					.map((f: Floor) => ({
 						value: f.id.toString(),
 						label: `Floor ${f.floor_number}${f.wing ? ` (${f.wing})` : ''}`
@@ -59,7 +59,7 @@
 	<!-- Ensure property ID is submitted -->
 	<input type="hidden" name="property_id" value={selectedProperty?.id || $form.property_id} />
 
-	<div class="grid grid-cols-2 gap-4">
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 		<!-- Floor Selection -->
 		<div class="space-y-2">
 			<Label for="floor_id">Floor *</Label>
@@ -107,7 +107,7 @@
 		</div>
 	</div>
 
-	<div class="grid grid-cols-2 gap-4">
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 		<!-- Number Input -->
 		<div class="space-y-2">
 			<Label for="number">Unit Number *</Label>
@@ -116,7 +116,9 @@
 				id="number"
 				name="number"
 				min="1"
-				bind:value={$form.number}
+				placeholder="e.g. 101"
+				value={$form.number || ''}
+				oninput={(e) => { const v = (e.target as HTMLInputElement).value; $form.number = v === '' ? 0 : Number(v); }}
 				class={$errors.number ? 'border-red-500' : ''}
 				{...constraints.number}
 			/>
@@ -144,7 +146,7 @@
 		</div>
 	</div>
 
-	<div class="grid grid-cols-2 gap-4">
+	<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 		<!-- Capacity -->
 		<div class="space-y-2">
 			<Label for="capacity">Capacity *</Label>
@@ -171,7 +173,9 @@
 				name="base_rate"
 				min="0"
 				step="0.01"
-				bind:value={$form.base_rate}
+				placeholder="e.g. 3500.00"
+				value={$form.base_rate || ''}
+				oninput={(e) => { const v = (e.target as HTMLInputElement).value; $form.base_rate = v === '' ? 0 : Number(v); }}
 				class={$errors.base_rate ? 'border-red-500' : ''}
 				{...constraints.base_rate}
 			/>

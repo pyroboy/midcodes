@@ -18,7 +18,7 @@
 		type MeterFormData,
 		meterFormSchema
 	} from './formSchema';
-	import { Loader2, Plus, Gauge, ChevronUp, ChevronDown } from 'lucide-svelte';
+	import { Loader2, Plus, Gauge, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-svelte';
 	import MeterForm from './MeterForm.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
@@ -34,7 +34,7 @@
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
 	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
-	import { getStatusClasses } from '$lib/utils/format';
+	import { getStatusClasses, formatEnumLabel } from '$lib/utils/format';
 
 	// Type definitions
 	interface Property {
@@ -446,7 +446,7 @@
 		selectedStatus = '';
 	}
 
-	// Utility functions
+	// Utility functions — [Fix 01] use "Unit" instead of "Rental_unit"
 	function getLocationDetails(meter: ExtendedMeterFormData): string {
 		if (!meter || !meter.location_type) return 'Unknown Location';
 
@@ -463,8 +463,8 @@
 				case 'RENTAL_UNIT':
 					const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
 					return unit
-						? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
-						: 'Unknown Rental_unit';
+						? `Unit ${unit.name || unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
+						: 'Unknown Unit';
 				default:
 					return 'Unknown Location';
 			}
@@ -487,7 +487,7 @@
 						: '';
 				case 'RENTAL_UNIT':
 					const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
-					return unit ? `Rental_unit ${unit.number}` : '';
+					return unit ? `Unit ${unit.name || unit.number}` : '';
 				default:
 					return '';
 			}
@@ -521,25 +521,32 @@
 			sortOrder = 'asc';
 		}
 	}
+
+	// [Fix 09] Build structured aria-label for screen readers
+	function getMeterAriaLabel(meter: ExtendedMeterFormData): string {
+		const parts = [
+			meter.name,
+			`${formatEnumLabel(meter.type)} meter`,
+			formatEnumLabel(meter.status)
+		];
+		const location = getDetailedLocationInfo(meter);
+		if (location) parts.push(location);
+		if (meter.latest_reading) {
+			parts.push(`reading ${formatReading(meter.latest_reading.value)} on ${new Date(meter.latest_reading.date).toLocaleDateString()}`);
+		} else {
+			parts.push('no readings yet');
+		}
+		return parts.join(', ');
+	}
 </script>
 
 <div class="space-y-6">
 	<SyncErrorBanner collections={['meters', 'readings', 'properties', 'floors', 'rental_units']} />
-	<!-- Error / Success Alerts -->
+	<!-- Error Alert (removed duplicate $message alert — [Fix 05/C5] toasts handle success) -->
 	{#if error}
 		<Alert.Root variant="destructive" class="fixed top-4 right-4 z-50 max-w-md">
 			<Alert.Title>Error</Alert.Title>
 			<Alert.Description>{error}</Alert.Description>
-		</Alert.Root>
-	{/if}
-
-	{#if $message && !error}
-		<Alert.Root
-			variant="default"
-			class="fixed top-4 right-4 z-50 max-w-md bg-green-50 border-green-200"
-		>
-			<Alert.Title class="text-green-800">Success</Alert.Title>
-			<Alert.Description class="text-green-700">{$message}</Alert.Description>
 		</Alert.Root>
 	{/if}
 
@@ -554,7 +561,8 @@
 				<p class="text-sm text-muted-foreground">Manage utility meters and readings</p>
 			</div>
 		</div>
-		<Button onclick={handleAddMeter} class="shadow-sm">
+		<!-- Desktop Add Meter button (hidden on mobile — FAB below) -->
+		<Button onclick={handleAddMeter} class="shadow-sm hidden sm:inline-flex">
 			<Plus class="w-4 h-4 mr-2" />
 			Add Meter
 		</Button>
@@ -591,7 +599,7 @@
 				<div>
 					<Select.Root type="single" value={selectedType} onValueChange={handleTypeChange}>
 						<Select.Trigger>
-							<span>{selectedType || 'All Types'}</span>
+							<span>{selectedType ? formatEnumLabel(selectedType) : 'All Types'}</span>
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="">All Types</Select.Item>
@@ -601,7 +609,7 @@
 										<span
 											class={`w-3 h-3 rounded-full mr-2 ${type === 'ELECTRICITY' ? 'bg-blue-500' : type === 'WATER' ? 'bg-cyan-500' : 'bg-purple-500'}`}
 										></span>
-										{type}
+										{formatEnumLabel(type)}
 									</div>
 								</Select.Item>
 							{/each}
@@ -611,7 +619,7 @@
 				<div>
 					<Select.Root type="single" value={selectedStatus} onValueChange={handleStatusChange}>
 						<Select.Trigger>
-							<span>{selectedStatus || 'All Statuses'}</span>
+							<span>{selectedStatus ? formatEnumLabel(selectedStatus) : 'All Statuses'}</span>
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="">All Statuses</Select.Item>
@@ -627,7 +635,7 @@
 														: 'bg-yellow-500'
 											}`}
 										></span>
-										{status}
+										{formatEnumLabel(status)}
 									</div>
 								</Select.Item>
 							{/each}
@@ -648,28 +656,28 @@
 		{/if}
 	</Card.Root>
 
-	<!-- Sort Buttons -->
+	<!-- Sort Buttons — [Fix 03] increased min-height for mobile touch targets -->
 	<div class="flex items-center justify-between text-sm text-gray-500 px-2">
 		<div class="flex space-x-1">
-			<Button variant="ghost" size="sm" class={sortBy === 'name' ? 'text-black font-medium' : ''} onclick={() => handleSort('name')}>
+			<Button variant="ghost" size="sm" class="min-h-[44px] sm:min-h-0 {sortBy === 'name' ? 'text-black font-medium' : ''}" onclick={() => handleSort('name')}>
 				Name
 				{#if sortBy === 'name'}
 					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
 				{/if}
 			</Button>
-			<Button variant="ghost" size="sm" class={sortBy === 'type' ? 'text-black font-medium' : ''} onclick={() => handleSort('type')}>
+			<Button variant="ghost" size="sm" class="min-h-[44px] sm:min-h-0 {sortBy === 'type' ? 'text-black font-medium' : ''}" onclick={() => handleSort('type')}>
 				Type
 				{#if sortBy === 'type'}
 					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
 				{/if}
 			</Button>
-			<Button variant="ghost" size="sm" class={sortBy === 'status' ? 'text-black font-medium' : ''} onclick={() => handleSort('status')}>
+			<Button variant="ghost" size="sm" class="min-h-[44px] sm:min-h-0 {sortBy === 'status' ? 'text-black font-medium' : ''}" onclick={() => handleSort('status')}>
 				Status
 				{#if sortBy === 'status'}
 					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
 				{/if}
 			</Button>
-			<Button variant="ghost" size="sm" class={sortBy === 'reading' ? 'text-black font-medium' : ''} onclick={() => handleSort('reading')}>
+			<Button variant="ghost" size="sm" class="min-h-[44px] sm:min-h-0 {sortBy === 'reading' ? 'text-black font-medium' : ''}" onclick={() => handleSort('reading')}>
 				Reading
 				{#if sortBy === 'reading'}
 					{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
@@ -685,27 +693,21 @@
 			<p class="text-center text-gray-500">Loading meters...</p>
 		</div>
 	{:else if groupedMeters.length === 0}
-		<div class="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-lg">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="40"
-				height="40"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="text-gray-400 mb-3"
-			>
-				<path d="M10.3 8.2c.7-.3 1.5-.4 2.3-.4h1.2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.5" />
-				<path d="M2.5 10a2.5 2.5 0 0 1 5 0c0 .5-.1 1-.3 1.5" />
-				<path
-					d="M7.8 15.2a5 5 0 0 0-2.3.4 2.5 2.5 0 0 0 3.4 1c.7-.3 1.5-.4 2.3-.4h1.2c.8 0 1.6.1 2.3.4a2.5 2.5 0 0 0 3.4-1 2.5 2.5 0 0 0-1-3.4 5 5 0 0 0-2.3-.4h-5.6z"
-				/>
-				<path d="M21.7 16.2a2.5 2.5 0 0 0-3.2-3.4" />
-			</svg>
-			<p class="text-center text-gray-500">No meters found</p>
+		<!-- [Fix 06] Empty state with guidance CTA -->
+		<div class="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-lg">
+			<Gauge class="w-10 h-10 text-gray-300 mb-4" />
+			{#if searchQuery || selectedType || selectedStatus}
+				<p class="text-center text-gray-500 mb-1">No meters match your filters</p>
+				<p class="text-center text-sm text-gray-400 mb-4">Try adjusting your search or clearing filters</p>
+				<Button variant="outline" size="sm" onclick={clearFilters}>Clear Filters</Button>
+			{:else}
+				<p class="text-center text-gray-500 mb-1">No meters found</p>
+				<p class="text-center text-sm text-gray-400 mb-4">Add your first meter to start tracking utility readings</p>
+				<Button onclick={handleAddMeter} size="sm">
+					<Plus class="w-4 h-4 mr-2" />
+					Add Meter
+				</Button>
+			{/if}
 		</div>
 	{:else}
 		<div class="space-y-6">
@@ -717,9 +719,11 @@
 							<Card.Root
 								class="hover:bg-gray-50 transition-colors"
 							>
+								<!-- [Fix 09] Structured aria-label for screen readers -->
 								<button
 									type="button"
 									class="w-full text-left cursor-pointer"
+									aria-label={getMeterAriaLabel(meter)}
 									onclick={() => handleEdit(meter)}
 								>
 									<Card.Content class="p-3">
@@ -727,11 +731,12 @@
 											<div class="flex flex-col">
 												<div class="flex items-center gap-2 mb-1">
 													<span class="font-medium">{meter.name}</span>
+													<!-- [Fix 02] Title case enum labels -->
 													<Badge variant={getTypeVariant(meter.type)} class="text-xs px-2 py-0.5">
-														{meter.type}
+														{formatEnumLabel(meter.type)}
 													</Badge>
 													<Badge class={`text-xs px-2 py-0.5 ${getStatusClasses(meter.status)}`}>
-														{meter.status}
+														{formatEnumLabel(meter.status)}
 													</Badge>
 												</div>
 												{#if getDetailedLocationInfo(meter)}
@@ -773,6 +778,16 @@
 	{/if}
 </div>
 
+<!-- [Fix 04] Mobile FAB — floating "Add Meter" button in thumb zone -->
+<button
+	type="button"
+	class="fixed bottom-6 right-6 z-40 sm:hidden flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-transform"
+	aria-label="Add Meter"
+	onclick={handleAddMeter}
+>
+	<Plus class="w-6 h-6" />
+</button>
+
 <!-- Meter Form Modal -->
 <Dialog bind:open={showModal}>
 	<DialogContent class="sm:max-w-[600px]">
@@ -783,6 +798,7 @@
 			</DialogDescription>
 		</DialogHeader>
 
+		<!-- [Fix 10] callback prop instead of on:cancel -->
 		<MeterForm
 			{editMode}
 			updatedAt={editUpdatedAt}
@@ -797,7 +813,7 @@
 			{enhance}
 			{constraints}
 			{submitting}
-			on:cancel={handleCancel}
+			oncancel={handleCancel}
 		/>
 	</DialogContent>
 </Dialog>

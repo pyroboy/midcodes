@@ -13,7 +13,7 @@
 	import SyncIndicator from '$lib/components/sync/SyncIndicator.svelte';
 	import { browser } from '$app/environment';
 	import { propertiesStore } from '$lib/stores/collections.svelte';
-	import GlobalPropertyViewer from '$lib/components/3d/GlobalPropertyViewer.svelte';
+	// GlobalPropertyViewer removed — 3D View button now links to /property/[id]/floorplan
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
@@ -41,7 +41,6 @@
 		LogOut,
 		User,
 		Box,
-		X,
 		ChevronRight,
 		Lightbulb,
 		MapPin,
@@ -53,7 +52,7 @@
 
 	let ready = $state(false);
 	let isAuthRoute = $state(false);
-	let show3DModel = $state(false);
+	// show3DModel removed — 3D View now links directly to floorplan page
 	// Persist across HMR — plain `let` resets on hot reload, causing duplicate sync cycles
 	let rxdbInitialized = (globalThis as any).__dorm_rxdb_initialized ?? false;
 
@@ -160,6 +159,30 @@
 								resyncCollection(name).catch(() => {});
 							}
 						}, STALE_CHECK_MS);
+					});
+					// Post-sync: run client-side automation (overdue, penalties, reminders)
+					import('$lib/db/client-automation').then(({ runClientAutomation }) => {
+						runClientAutomation().then((auto) => {
+							import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+								const parts: string[] = [];
+								if (auto.overdue.applied > 0) parts.push(`${auto.overdue.applied} overdue`);
+								if (auto.penalties.applied > 0) parts.push(`${auto.penalties.applied} penalties`);
+								if (auto.reminders.sent > 0) parts.push(`${auto.reminders.sent} reminders`);
+								if (parts.length > 0) {
+									syncStatus.addLog(`Automation: ${parts.join(', ')}`, 'success');
+								} else if (auto.overdue.detected > 0 || auto.penalties.detected > 0 || auto.reminders.detected > 0) {
+									syncStatus.addLog('Automation: all items already processed', 'info');
+								}
+								for (const err of auto.errors) {
+									syncStatus.addLog(`Automation error: ${err}`, 'warn');
+								}
+							});
+						}).catch((err) => {
+							console.warn('[Automation] Failed:', err);
+							import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+								syncStatus.addLog(`Automation failed: ${err?.message || err}`, 'warn');
+							});
+						});
 					});
 					// Post-sync: prune old records and check storage usage
 					import('$lib/db/pruning').then(({ pruneOldRecords }) => {
@@ -298,7 +321,8 @@
 		{
 			category: 'Finance',
 			links: [
-				{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+				{ href: '/payments', label: 'Payments', icon: CreditCard },
+				{ href: '/payment-history', label: 'Payment History', icon: ArrowLeftRight },
 				{ href: '/expenses', label: 'Expenses', icon: Receipt },
 				{ href: '/budgets', label: 'Budgets', icon: PiggyBank }
 			]
@@ -314,13 +338,17 @@
 	];
 
 	// Auto-expand the category containing the current page
-	let activeCategory = $derived.by(() => {
+	// Returns an array for type="multiple" accordion — always includes active category
+	let activeCategories = $derived.by(() => {
 		const pathname = $page.url.pathname;
-		if (pathname === '/') return ''; // Dashboard — don't expand any category
+		const allCategories = navigationLinks.map((g) => g.category);
+		// On dashboard, expand all so mobile users see everything
+		if (pathname === '/') return allCategories;
 		const match = navigationLinks.find((group) =>
 			group.links.some((link) => pathname.startsWith(link.href))
 		);
-		return match?.category ?? '';
+		// Always expand all categories so mobile drawer isn't mostly empty
+		return allCategories;
 	});
 </script>
 
@@ -386,6 +414,9 @@
 												$page.url.pathname === '/' && "bg-accent text-accent-foreground"
 											)}
 										>
+											{#snippet tooltipContent()}
+												Dashboard
+											{/snippet}
 											<LayoutDashboard class="h-5 w-5" />
 											<span>Dashboard</span>
 										</Sidebar.MenuButton>
@@ -410,6 +441,9 @@
 													: "hover:bg-muted"
 											)}
 										>
+											{#snippet tooltipContent()}
+												Locations
+											{/snippet}
 											<MapPin class={cn(
 												"h-5 w-5",
 												$page.url.pathname.startsWith('/locations')
@@ -437,6 +471,9 @@
 															: "hover:bg-muted"
 													)}
 												>
+													{#snippet tooltipContent()}
+														{link.label}
+													{/snippet}
 													<link.icon class={cn(
 														"h-4 w-4",
 														$page.url.pathname.startsWith(link.href)
@@ -455,14 +492,17 @@
 								<div class="border-t"></div>
 							</div>
 
-							<Accordion.Root type="single" value={activeCategory} class="w-full">
+							<Accordion.Root type="multiple" value={activeCategories} class="w-full">
 								{#each navigationLinks as group (group.category)}
 									<Accordion.Item value={group.category} class="border-b-0">
 										<Accordion.Trigger
-											class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 hover:no-underline hover:text-foreground transition-colors"
+											class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:no-underline hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90"
 											onmouseover={() => onSectionHover(group.links)}
 										>
-											{group.category}
+											<span class="flex items-center gap-1.5">
+												<ChevronRight class="h-3 w-3 shrink-0 transition-transform duration-200" />
+												{group.category}
+											</span>
 										</Accordion.Trigger>
 										<Accordion.Content class="pb-2 pt-0">
 											<Sidebar.Menu class="px-2">
@@ -483,6 +523,9 @@
 																		: "hover:bg-muted"
 																)}
 															>
+																{#snippet tooltipContent()}
+																	{link.label}
+																{/snippet}
 																<link.icon class={cn(
 																	"h-4 w-4",
 																	$page.url.pathname.startsWith(link.href)
@@ -560,22 +603,15 @@
 										<NotificationBell />
 										<SyncIndicator />
 
-										<!-- 3D Toggle Button moved here -->
-										{#if $featureFlags.enable3DView}
-											<Button
-												variant={show3DModel ? "secondary" : "outline"}
-												size="sm"
-												class="flex items-center gap-2 ml-2 border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
-												onclick={() => (show3DModel = !show3DModel)}
+										<!-- 3D View link to floorplan -->
+										{#if $featureFlags.enable3DView && $propertyStore.selectedPropertyId}
+											<a
+												href="/property/{$propertyStore.selectedPropertyId}/floorplan"
+												class="inline-flex items-center gap-2 ml-2 px-3 py-1.5 text-sm font-medium rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
 											>
-												{#if show3DModel}
-													<X class="w-4 h-4" />
-													Close 3D
-												{:else}
-													<Box class="w-4 h-4" />
-													3D View
-												{/if}
-											</Button>
+												<Box class="w-4 h-4" />
+												3D View
+											</a>
 										{/if}
 									</div>
 								{/if}
@@ -617,19 +653,7 @@
 								</div>
 							</main>
 
-							<!-- 3D Panel (Slides in from Right) -->
-							{#if data.user && $featureFlags.enable3DView}
-								<div 
-									class={cn(
-										"border-l bg-background transition-all duration-300 ease-in-out overflow-hidden flex flex-col",
-										show3DModel ? "w-[450px] opacity-100" : "w-0 opacity-0"
-									)}
-								>
-									{#if show3DModel}
-										<GlobalPropertyViewer />
-									{/if}
-								</div>
-							{/if}
+							<!-- 3D Panel removed — now links to /property/[id]/floorplan -->
 						</div>
 					</div>
 				</div>

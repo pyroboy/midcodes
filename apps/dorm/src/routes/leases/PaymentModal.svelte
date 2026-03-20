@@ -5,7 +5,7 @@
 	import { Label } from '$lib/components/ui/label';
 
 	import { Badge } from '$lib/components/ui/badge';
-	import { invalidateAll } from '$app/navigation';
+	import { resyncCollection } from '$lib/db/replication';
 	import { toast } from 'svelte-sonner';
 	import type { Billing } from '$lib/types/lease';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
@@ -63,7 +63,7 @@
 	let paidAt = $state(new Date().toISOString().split('T')[0]);
 
 	// Calculate available security deposit amount (based on paid_amount, not balance)
-	let availableSecurityDeposit = $derived(() => {
+	let availableSecurityDeposit = $derived.by(() => {
 		const securityBillings =
 			lease.billings?.filter((b: Billing) => b.type === 'SECURITY_DEPOSIT') || [];
 		const totalPaid = securityBillings.reduce((sum: number, b: Billing) => sum + b.paid_amount, 0);
@@ -121,7 +121,7 @@
 	// Add validation for security deposit payments
 	function validateSecurityDepositPayment() {
 		if (selectedPaymentType === 'SECURITY_DEPOSIT') {
-			const availableAmount = availableSecurityDeposit();
+			const availableAmount = availableSecurityDeposit;
 			if (paymentAmount > availableAmount) {
 				throw new Error(
 					`Payment amount exceeds available security deposit (${formatCurrency(availableAmount)})`
@@ -178,10 +178,13 @@
 			// It's safer to check for a successful response status before parsing JSON
 			if (response.ok) {
 				toast.success('Payment submitted successfully!');
+				await Promise.all([
+					resyncCollection('payments'),
+					resyncCollection('payment_allocations'),
+					resyncCollection('billings')
+				]);
 				if (onDataChange) {
 					await onDataChange();
-				} else {
-					await invalidateAll();
 				}
 				onOpenChange(false);
 			} else {
@@ -467,12 +470,12 @@
 							<div class="p-3 bg-blue-50 border border-blue-200 rounded-md">
 								<div class="text-sm text-blue-800">
 									<div class="font-medium">
-										Available Security Deposit: {formatCurrency(availableSecurityDeposit())}
+										Available Security Deposit: {formatCurrency(availableSecurityDeposit)}
 									</div>
 									<div class="text-xs text-blue-600 mt-1">
 										This is the amount you can use to pay other billings
 									</div>
-									{#if paymentAmount > availableSecurityDeposit()}
+									{#if paymentAmount > availableSecurityDeposit}
 										<div class="text-red-600 mt-1">
 											⚠️ Payment amount exceeds available security deposit
 										</div>
@@ -636,7 +639,7 @@
 						!selectedBillings.size ||
 						!paidAt ||
 						(selectedPaymentType === 'SECURITY_DEPOSIT' &&
-							paymentAmount > availableSecurityDeposit())}
+							paymentAmount > availableSecurityDeposit)}
 				>
 					Submit Payment
 				</Button>

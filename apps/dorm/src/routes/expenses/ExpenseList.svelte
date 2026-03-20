@@ -7,10 +7,9 @@
 	import * as Select from '$lib/components/ui/select';
 	import { Label } from '$lib/components/ui/label';
 	import { Edit, Trash2, Receipt, Wallet, Plus } from 'lucide-svelte';
-	import { getStatusClasses } from '$lib/utils/format';
+	import { formatCurrency, formatDate, humanizeExpenseType } from '$lib/utils/format';
 	import type { Expense } from './types';
 	import type { Property } from './types';
-	import type { PageData } from './$types';
 	import { months } from './schema';
 	import CapitalExpensesList from './CapitalExpensesList.svelte';
 	import OperationalExpensesList from './OperationalExpensesList.svelte';
@@ -44,34 +43,12 @@
 
 	let { expenses = [], properties }: Props = $props();
 
-
 	// Event dispatcher
 	const dispatch = createEventDispatcher<{
 		edit: Expense;
 		delete: number;
-		add: any;
 		refresh: any;
 	}>();
-
-	// Format currency
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP'
-		}).format(amount);
-	}
-
-	// Format date
-	function formatDate(dateString: string | null | undefined): string {
-		if (!dateString) return 'N/A';
-		const date = new Date(dateString);
-		return date.toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
-
 
 	// Get property name from property_id
 	function getPropertyName(property_id: number) {
@@ -87,18 +64,12 @@
 		capital: Expense[];
 	}
 
-	// State for filters and new expenses
+	// State for filters
 	const currentYear = new Date().getFullYear();
 	let years = $state(Array.from({ length: 5 }, (_, i) => currentYear - 2 + i));
 	let selectedYear = $state(currentYear.toString());
 	let selectedMonth = $state<Month>(months[new Date().getMonth()]);
 	let selectedProperty = $state<number | null>(null);
-
-	// New expense inputs
-	let newOperationalDesc = $state('');
-	let newOperationalAmount = $state('');
-	let newCapitalDesc = $state('');
-	let newCapitalAmount = $state('');
 
 	// Group expenses by month and type
 	function groupExpensesByMonthAndType(): MonthGroup[] {
@@ -114,7 +85,6 @@
 		};
 
 		if (!expenses || expenses.length === 0) {
-			// Return just the empty group for the selected month if no expenses
 			return Object.values(grouped);
 		}
 
@@ -126,20 +96,16 @@
 			const expenseYear = expenseDate.getFullYear().toString();
 			const expenseMonth = months[expenseDate.getMonth()];
 
-			// Filter by selected property if one is selected
 			const propertyMatch = !selectedProperty || expense.property_id === selectedProperty;
 
-			// If we're filtering by both year and month
 			if (selectedYear && selectedMonth) {
 				return expenseYear === selectedYear && expenseMonth === selectedMonth && propertyMatch;
 			}
 
-			// If we're only filtering by year
 			if (selectedYear) {
 				return expenseYear === selectedYear && propertyMatch;
 			}
 
-			// If no year/month filters, just filter by property if selected
 			return propertyMatch;
 		});
 
@@ -160,20 +126,9 @@
 				};
 			}
 
-			// Sort expenses into their respective categories
-			console.log(
-				'Processing expense:',
-				expense.id,
-				'Type:',
-				expense.type,
-				'Description:',
-				expense.description
-			);
 			if (isOperationalExpenseType(expense.type)) {
-				console.log('-> Categorized as OPERATIONAL');
 				grouped[expenseKey].operational.push(expense);
 			} else if (expense.type === 'CAPITAL') {
-				console.log('-> Categorized as CAPITAL');
 				grouped[expenseKey].capital.push(expense);
 			}
 		});
@@ -183,30 +138,6 @@
 	}
 
 	const groupedExpenses = $derived.by(() => groupExpensesByMonthAndType());
-
-	// Event handler for add expense event from expense list components
-	function handleAddExpense(event: CustomEvent<any>) {
-		const newExpense = event.detail;
-
-		console.log('Received new expense:', newExpense);
-
-		// Create new expense data based on the type
-		const completeExpense = {
-			property_id: selectedProperty,
-			amount: newExpense.amount,
-			description: newExpense.description,
-			type: newExpense.type,
-			expense_status: 'PENDING',
-			expense_date: new Date(parseInt(selectedYear), months.indexOf(selectedMonth), 15)
-				.toISOString()
-				.split('T')[0]
-		};
-
-		console.log('Complete expense to be dispatched:', completeExpense);
-
-		// Dispatch to parent component
-		dispatch('add', completeExpense);
-	}
 </script>
 
 <div class="space-y-6">
@@ -216,7 +147,7 @@
 			<CardTitle>Expense Filters</CardTitle>
 		</CardHeader>
 		<CardContent>
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
 				<div>
 					<Label for="property">Property</Label>
 					<Select.Root
@@ -290,12 +221,9 @@
 						size="sm"
 						class="w-full"
 						onclick={() => {
-							// Reset filters to defaults
 							selectedProperty = null;
 							selectedYear = currentYear.toString();
 							selectedMonth = months[new Date().getMonth()];
-
-							// Dispatch an event to refresh expenses with the current filters
 							dispatch('refresh', {
 								property_id: selectedProperty,
 								year: selectedYear,
@@ -325,25 +253,16 @@
 						expenses={monthGroup.operational}
 						{properties}
 						selectedPropertyId={selectedProperty}
-						on:add={(e) => handleAddExpense(e)}
-						on:delete={(e) => {
-							console.log(
-								'ExpenseList received delete event from OperationalExpensesList:',
-								e.detail
-							);
-							dispatch('delete', e.detail);
-						}}
+						on:edit={(e) => dispatch('edit', e.detail)}
+						on:delete={(e) => dispatch('delete', e.detail)}
 					/>
 
 					<CapitalExpensesList
 						expenses={monthGroup.capital}
 						{properties}
 						selectedPropertyId={selectedProperty}
-						on:add={(e) => handleAddExpense(e)}
-						on:delete={(e) => {
-							console.log('ExpenseList received delete event from CapitalExpensesList:', e.detail);
-							dispatch('delete', e.detail);
-						}}
+						on:edit={(e) => dispatch('edit', e.detail)}
+						on:delete={(e) => dispatch('delete', e.detail)}
 					/>
 				</div>
 			</div>

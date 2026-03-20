@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { run } from 'svelte/legacy';
-
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zod, zodClient } from 'sveltekit-superforms/adapters';
@@ -9,21 +7,33 @@
 	import Label from '$lib/components/ui/label/label.svelte';
 	import * as Select from '$lib/components/ui/select';
 	import { Badge } from '$lib/components/ui/badge';
-	import { createEventDispatcher } from 'svelte';
 	import { paymentSchema, type PaymentSchema } from './formSchema';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import { toast } from 'svelte-sonner';
+	import { formatCurrency } from '$lib/utils/format';
+	import { resyncCollection } from '$lib/db/replication';
+
+	// Format due_date as short month/year for billing context
+	function formatBillingPeriod(dateStr: string | null | undefined): string {
+		if (!dateStr) return '';
+		try {
+			const d = new Date(dateStr);
+			if (isNaN(d.getTime())) return '';
+			return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+		} catch {
+			return '';
+		}
+	}
 
 	interface Props {
 		data: any;
 		billings?: any[];
 		editMode?: boolean;
 		payment?: PaymentSchema | undefined;
+		onPaymentAdded?: () => void;
 	}
 
-	let { data, billings = [], editMode = false, payment = undefined }: Props = $props();
-
-	const dispatch = createEventDispatcher();
+	let { data, billings = [], editMode = false, payment = undefined, onPaymentAdded = () => {} }: Props = $props();
 	const rows = 3;
 
 	const { form, errors, enhance, submitting, reset } = superForm(defaults(zod(paymentSchema)), {
@@ -31,9 +41,13 @@
 		validators: zodClient(paymentSchema),
 		resetForm: true,
 		taintedMessage: null,
+		invalidateAll: false,
 		onResult: ({ result }) => {
 			if (result.type === 'success') {
-				dispatch('paymentAdded');
+				onPaymentAdded();
+				resyncCollection('payments');
+				resyncCollection('payment_allocations');
+				resyncCollection('billings');
 				reset();
 			}
 		}
@@ -54,17 +68,10 @@
 		}
 	}
 
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP'
-		}).format(amount);
-	}
-
 	function parseNumberInput(value: string): number {
 		return parseFloat(value) || 0;
 	}
-	run(() => {
+	$effect(() => {
 		if (payment && editMode) {
 			form.set({
 				...payment
@@ -74,6 +81,33 @@
 	let canEdit = $derived(data.isAdminLevel || data.isAccountant || data.isFrontdesk);
 	let canUpdateStatus = $derived(data.isAdminLevel || data.isAccountant);
 	let selectedBilling = $derived(billings.find((b) => b.id === $form.billing_id));
+
+	// Auto-fill intelligent defaults when a billing is selected
+	$effect(() => {
+		if (!selectedBilling || editMode) return;
+
+		// Auto-fill amount if still at default (0 or empty)
+		if (!$form.amount || $form.amount === 0) {
+			$form.amount = selectedBilling.balance ?? 0;
+		}
+
+		// Auto-fill paid_by if empty
+		if (!$form.paid_by) {
+			$form.paid_by = selectedBilling.lease?.name ?? '';
+		}
+
+		// Auto-fill paid_at if empty
+		if (!$form.paid_at) {
+			const now = new Date();
+			// Format as YYYY-MM-DDTHH:mm for datetime-local input
+			const year = now.getFullYear();
+			const month = String(now.getMonth() + 1).padStart(2, '0');
+			const day = String(now.getDate()).padStart(2, '0');
+			const hours = String(now.getHours()).padStart(2, '0');
+			const minutes = String(now.getMinutes()).padStart(2, '0');
+			$form.paid_at = `${year}-${month}-${day}T${hours}:${minutes}`;
+		}
+	});
 
 	// Overpayment prevention
 	function handleFormSubmit(event: Event) {
@@ -100,33 +134,22 @@
 	<!-- Billing Selection -->
 	<div class="space-y-2">
 		<Label for="billing_id">Billing</Label>
-		<!-- <Select.Root>
-      <Select.Trigger 
-        id="billing_id" 
-        disabled={!canEdit || editMode}
-        class="w-full"
-      >
-        <Select.Value>
-          {#if selectedBilling}
-            {selectedBilling.lease.name} - {selectedBilling.type} - {formatCurrency(selectedBilling.balance)}
-          {:else}
-            Select a billing
-          {/if}
-        </Select.Value>
-      </Select.Trigger>
-      <Select.Content>
-        <Select.Group>
-          {#each billings as billing}
-            <Select.Item 
-              value={billing.id} 
-              on:click={() => form.update($form => ({ ...$form, billing_id: billing.id }))}
-            >
-              {billing.lease.name} - {billing.type} - {formatCurrency(billing.balance)}
-            </Select.Item>
-          {/each}
-        </Select.Group>
-      </Select.Content>
-    </Select.Root> -->
+		<Select.Root type="single" name="billing_id" value={String($form.billing_id ?? '')} onValueChange={(v) => { $form.billing_id = Number(v); }} disabled={!canEdit || editMode}>
+			<Select.Trigger id="billing_id" class="w-full">
+				{#if selectedBilling}
+					{selectedBilling.lease?.name ?? 'Unknown'} - {selectedBilling.type}{#if formatBillingPeriod(selectedBilling.due_date)}{' '}({formatBillingPeriod(selectedBilling.due_date)}){/if} - {formatCurrency(selectedBilling.balance)}
+				{:else}
+					Select a billing
+				{/if}
+			</Select.Trigger>
+			<Select.Content>
+				{#each billings as billing}
+					<Select.Item value={String(billing.id)}>
+						{billing.lease?.name ?? 'Unknown'} - {billing.type}{#if formatBillingPeriod(billing.due_date)}{' '}({formatBillingPeriod(billing.due_date)}){/if} - {formatCurrency(billing.balance)}
+					</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
 		{#if $errors.billing_id}
 			<p class="text-sm text-destructive">{$errors.billing_id}</p>
 		{/if}
@@ -165,33 +188,22 @@
 	<!-- Payment Method -->
 	<div class="space-y-2">
 		<Label for="method">Payment Method</Label>
-		<!-- <Select.Root>
-      <Select.Trigger 
-        id="method"
-        disabled={!canEdit}
-        class="w-full"
-      >
-        <Select.Value>
-          {#if $form.method}
-            <Badge variant={getMethodBadgeVariant($form.method)}>{$form.method}</Badge>
-          {:else}
-            Select payment method
-          {/if}
-        </Select.Value>
-      </Select.Trigger>
-      <Select.Content>
-        <Select.Group>
-          {#each ['CASH', 'BANK', 'GCASH', 'OTHER'] as method}
-            <Select.Item 
-              value={method}
-              on:click={() => form.update($form => ({ ...$form, method }))}
-            >
-              <Badge variant={getMethodBadgeVariant(method)}>{method}</Badge>
-            </Select.Item>
-          {/each}
-        </Select.Group>
-      </Select.Content>
-    </Select.Root> -->
+		<Select.Root type="single" name="method" bind:value={$form.method} disabled={!canEdit}>
+			<Select.Trigger id="method" class="w-full">
+				{#if $form.method}
+					<Badge variant={getMethodBadgeVariant($form.method)}>{$form.method}</Badge>
+				{:else}
+					Select payment method
+				{/if}
+			</Select.Trigger>
+			<Select.Content>
+				{#each ['CASH', 'BANK', 'GCASH', 'OTHER'] as method}
+					<Select.Item value={method}>
+						<Badge variant={getMethodBadgeVariant(method)}>{method}</Badge>
+					</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
 		{#if $errors.method}
 			<p class="text-sm text-destructive">{$errors.method}</p>
 		{/if}

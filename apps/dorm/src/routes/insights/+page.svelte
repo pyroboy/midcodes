@@ -803,42 +803,39 @@
 	async function runAutomationJobs() {
 		runningJobs = true;
 		jobResult = null;
-		showJobResult = false;
+		showJobResult = true;
 		try {
-			const res = await fetch('/api/cron', {
-				method: 'POST',
-				headers: { Authorization: `Bearer ${cronSecret}` }
-			});
-			jobResult = await res.json();
-			showJobResult = true;
+			const { runClientAutomation } = await import('$lib/db/client-automation');
+			// Reset the once-per-session guard so manual trigger works
+			(globalThis as any).__dorm_automation_ran = false;
+			const auto = await runClientAutomation();
+			jobResult = {
+				ok: auto.errors.length === 0,
+				overdue: auto.overdue,
+				penalties: auto.penalties,
+				reminders: auto.reminders,
+				errors: auto.errors
+			};
 
-			if (res.ok && jobResult.ok) {
-				toast.success('Automation jobs completed successfully!');
-			} else if (res.ok) {
-				toast.warning('Automation jobs completed with some errors.');
+			if (auto.errors.length === 0) {
+				const parts: string[] = [];
+				if (auto.overdue.applied > 0) parts.push(`${auto.overdue.applied} overdue`);
+				if (auto.penalties.applied > 0) parts.push(`${auto.penalties.applied} penalties`);
+				if (auto.reminders.sent > 0) parts.push(`${auto.reminders.sent} reminders`);
+				toast.success(parts.length > 0 ? `Applied: ${parts.join(', ')}` : 'All items already up to date');
 			} else {
-				toast.error(jobResult.error || 'Failed to run automation jobs.');
+				toast.warning('Automation completed with some errors.');
 			}
 
-			// Reload page data to show new logs
 			await invalidateAll();
 		} catch (e) {
-			toast.error('Failed to connect to cron endpoint.');
+			toast.error('Automation failed.');
 			jobResult = { error: e instanceof Error ? e.message : String(e) };
-			showJobResult = true;
 		}
 		runningJobs = false;
 	}
 
-	// Prompt for CRON_SECRET — stored in memory only (never persisted client-side)
-	let cronSecret = $state('');
-	let showSecretInput = $state(false);
-
 	function handleRunClick() {
-		if (!cronSecret) {
-			showSecretInput = true;
-			return;
-		}
 		runAutomationJobs();
 	}
 
@@ -1414,31 +1411,6 @@
 				<div class="border-t p-4 space-y-4">
 					<!-- Run Jobs Button -->
 					<div class="flex items-center gap-3">
-						{#if showSecretInput}
-							<div class="flex items-center gap-2 flex-1">
-								<input
-									type="password"
-									bind:value={cronSecret}
-									placeholder="Enter CRON_SECRET"
-									class="flex-1 rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-									onkeydown={(e) => { if (e.key === 'Enter' && cronSecret) { showSecretInput = false; runAutomationJobs(); } }}
-								/>
-								<button
-									onclick={() => { if (cronSecret) { showSecretInput = false; runAutomationJobs(); } }}
-									disabled={!cronSecret}
-									class="inline-flex items-center gap-1 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
-								>
-									<Play class="h-3.5 w-3.5" />
-									Run
-								</button>
-								<button
-									onclick={() => showSecretInput = false}
-									class="text-sm text-muted-foreground hover:text-foreground"
-								>
-									Cancel
-								</button>
-							</div>
-						{:else}
 							<button
 								onclick={handleRunClick}
 								disabled={runningJobs}
@@ -1455,7 +1427,6 @@
 							<span class="text-xs text-muted-foreground">
 								Runs overdue detection, penalty calculation & reminders
 							</span>
-						{/if}
 					</div>
 
 					<!-- Last Run Result -->

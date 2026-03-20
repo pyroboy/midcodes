@@ -6,6 +6,14 @@
 
 import { mutationQueue, type PendingMutation } from '$lib/stores/mutation-queue.svelte';
 
+/** Clock-skew-safe age checks: treat negative ages (future timestamps) as invalid. */
+export function isFresh(ageMs: number, maxMs: number): boolean {
+	return ageMs >= 0 && ageMs < maxMs;
+}
+export function isStale(ageMs: number, thresholdMs: number): boolean {
+	return ageMs >= 0 && ageMs > thresholdMs;
+}
+
 export type ParsedError = {
 	code: string | null;       // e.g. 'VD2', 'SC34', 'DB9', 'HTTP 401'
 	summary: string;           // short human-readable summary
@@ -120,8 +128,8 @@ function hydrateNeonUsage(): NeonUsageStats | null {
 		const raw = localStorage.getItem(NEON_USAGE_KEY);
 		if (!raw) return null;
 		const data = JSON.parse(raw) as NeonUsageStats;
-		// Reset if session is >24h old
-		if (Date.now() - data.sessionStartedAt > SESSION_MAX_AGE_MS) return null;
+		// Reset if session is >24h old or clock-skewed (future timestamp).
+		if (!isFresh(Date.now() - data.sessionStartedAt, SESSION_MAX_AGE_MS)) return null;
 		return data;
 	} catch {
 		return null;
@@ -492,7 +500,7 @@ export function parseError(err: any): ParsedError {
 function formatAge(date: Date | null): string | null {
 	if (!date) return null;
 	const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-	if (seconds < 60) return 'just now';
+	if (seconds < 60) return 'just now'; // also covers negative (clock skew)
 	if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
 	if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
 	return `${Math.floor(seconds / 86400)}d ago`;
@@ -770,7 +778,7 @@ function createSyncStatusStore() {
 			.filter((c) => {
 				if (!c.lastSyncedAt) return false;
 				const ageMs = now - new Date(c.lastSyncedAt).getTime();
-				return ageMs > maxAgeMs;
+				return isStale(ageMs, maxAgeMs);
 			})
 			.map((c) => c.name);
 	}
@@ -833,8 +841,8 @@ function createSyncStatusStore() {
 	 * Cached server-side for 5 min. Called when modal opens on System tab.
 	 */
 	async function fetchNeonBilling() {
-		// Skip if already loaded and fresh (< 5 min)
-		if (neonBilling && Date.now() - neonBilling.fetchedAt < 5 * 60 * 1000) return;
+		// Skip if already loaded and fresh (< 5 min).
+		if (neonBilling && isFresh(Date.now() - (neonBilling.fetchedAt ?? 0), 5 * 60 * 1000)) return;
 		neonBillingLoading = true;
 		neonBillingError = null;
 		try {
@@ -853,17 +861,13 @@ function createSyncStatusStore() {
 
 	/**
 	 * Fetch total row counts from Neon for all synced tables.
-	 * Cached for 30s to prevent rapid re-clicks. Pass force=true to bypass cache.
-	 */
-	/**
-	 * Fetch total row counts from Neon for all synced tables.
 	 * Also refreshes local RxDB counts (via callback) so the comparison is fresh-to-fresh.
 	 * Cached for 30s to prevent rapid re-clicks. Pass force=true to bypass cache.
 	 * @param refreshLocal Optional callback to refresh local RxDB doc counts before comparing.
 	 */
 	async function fetchNeonCounts(force?: boolean, refreshLocal?: () => Promise<Record<string, number>>) {
-		// Skip if cached and fresh (< 30s) unless forced
-		if (!force && neonCounts && neonCountsFetchedAt && Date.now() - neonCountsFetchedAt < 30_000) return;
+		// Skip if cached and fresh (< 30s) unless forced.
+		if (!force && neonCounts && neonCountsFetchedAt && isFresh(Date.now() - neonCountsFetchedAt, 30_000)) return;
 		neonCountsLoading = true;
 		neonCountsError = null;
 		try {
@@ -928,7 +932,7 @@ function createSyncStatusStore() {
 		}
 		if (oldestTs === null) return null;
 		const ageMs = Date.now() - oldestTs;
-		const stale = ageMs > 5 * 60 * 1000; // > 5 min
+		const stale = isStale(ageMs, 5 * 60 * 1000);
 		const age = formatAge(new Date(oldestTs)) || 'just now';
 		return { age, stale, oldestMs: ageMs };
 	}

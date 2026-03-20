@@ -30,16 +30,16 @@
 		validators: zodClient(readingSubmissionSchema),
 		resetForm: false,
 		onResult: async ({ result }) => {
-			console.log('📥 Form submission result:', result);
+			console.log('Form submission result:', result);
 			if (result.type === 'success') {
-				console.log('✅ Submission successful, reloading data...');
+				console.log('Submission successful, reloading data...');
 				toast.success(result.data?.message || 'Readings saved successfully');
 				await invalidateAll();
-				console.log('🔄 Data invalidated, page should reload');
+				console.log('Data invalidated, page should reload');
 				reset();
 				// Clear field errors on success
 				fieldErrors = {};
-				console.log('🧹 Form reset and errors cleared');
+				console.log('Form reset and errors cleared');
 			} else if (result.type === 'failure') {
 				// Aggregate server-side errors for toast
 				const serverMessage = (result.data as any)?.error as string | undefined;
@@ -169,7 +169,7 @@
 
 		const baseline = getBaselineReading(meter);
 		if (num < baseline) {
-			fieldErrors[fieldName] = `Must be ≥ ${baseline.toLocaleString()}`;
+			fieldErrors[fieldName] = `Must be >= ${baseline.toLocaleString()}`;
 			return;
 		}
 
@@ -240,6 +240,58 @@
 		return parts.length > 0 ? parts : [{ type: 'text', content: error }];
 	}
 
+	// [03] Progress counter — reactive count of filled meters
+	let filledCount = $derived(
+		data.meters.filter((m) => {
+			const val = $form[`reading_${m.id}`];
+			return val !== undefined && val !== null && val !== '';
+		}).length
+	);
+
+	// [04] Floor grouping — group meters by floor
+	function getFloorLabel(meter: ElectricityMeter): string {
+		if (meter.floor) {
+			const ordinal = getOrdinal(meter.floor.floor_number);
+			const wing = meter.floor.wing ? ` — ${meter.floor.wing}` : '';
+			return `${ordinal} Floor${wing}`;
+		}
+		return 'Property-Level';
+	}
+
+	function getOrdinal(n: number): string {
+		const s = ['th', 'st', 'nd', 'rd'];
+		const v = n % 100;
+		return n + (s[(v - 20) % 10] || s[v] || s[0]);
+	}
+
+	let metersByFloor = $derived.by(() => {
+		const groups = new Map<string, ElectricityMeter[]>();
+		for (const meter of data.meters) {
+			const label = getFloorLabel(meter);
+			const existing = groups.get(label);
+			if (existing) {
+				existing.push(meter);
+			} else {
+				groups.set(label, [meter]);
+			}
+		}
+		return groups;
+	});
+
+	// [10] Keyboard navigation — Enter advances to next input
+	function handleInputKeydown(e: KeyboardEvent, meterId: number) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			const allInputs = Array.from(
+				document.querySelectorAll<HTMLInputElement>("input[type='number'][name^='reading_']")
+			);
+			const currentIndex = allInputs.findIndex((el) => el.name === `reading_${meterId}`);
+			if (currentIndex >= 0 && currentIndex < allInputs.length - 1) {
+				allInputs[currentIndex + 1].focus();
+			}
+		}
+	}
+
 	onMount(async () => {
 		await tick();
 		const firstInput = document.querySelector(
@@ -251,18 +303,38 @@
 	});
 </script>
 
-<div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
+<!-- [01]+[02] Minimal top navigation bar -->
+<nav class="bg-white border-b border-gray-200 sticky top-0 z-20">
+	<div class="container mx-auto px-3 sm:px-4 flex items-center h-14">
+		<a
+			href="/utility-billings"
+			class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors min-h-[44px] pr-3"
+		>
+			<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+			</svg>
+			Utility Billings
+		</a>
+		<span class="text-gray-300 mx-2">/</span>
+		<span class="text-sm font-semibold text-gray-900 truncate">Electricity Readings</span>
+		{#if data.property}
+			<span class="text-gray-300 mx-2 hidden sm:inline">/</span>
+			<span class="text-sm text-gray-500 truncate hidden sm:inline">{data.property.name}</span>
+		{/if}
+	</div>
+</nav>
 
+<div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8 pb-24 sm:pb-8">
 
 	<!-- Combined Date and Property Display -->
 		{#if data.date}
 			<div class="mb-6 sm:mb-8">
 				<div class="bg-white border-2 border-gray-300 rounded-lg py-4 sm:py-6 lg:py-8 px-16 sm:px-20 lg:px-24 shadow-md relative min-h-[80px] sm:min-h-[100px] lg:min-h-[120px]">
 					<!-- Previous Day Button -->
-					<div class="absolute left-6 top-1/2 transform -translate-y-1/2 z-10">
+					<div class="absolute left-4 top-1/2 transform -translate-y-1/2 z-10">
 						<a
 							href="/utility-input/electricity/{data.property?.id}/{getPreviousDate(data.date)}"
-							class="inline-flex items-center justify-center w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200 shadow-lg hover:shadow-xl border-2 border-white"
+							class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors duration-200 shadow-sm hover:shadow-md"
 							title="Previous Day"
 							aria-label="Go to previous day"
 						>
@@ -307,19 +379,16 @@
 	<!-- Message Display -->
 	{#if data.errors && data.errors.length > 0}
 		<div class="mb-8">
-			<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-blue-50 border-2 border-blue-300' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'} rounded-lg p-4 sm:p-6 shadow-md">
+			<div class="{data.errors.some(e => e.includes('Information:')) && !data.errors.some(e => e.includes('Warning')) ? 'bg-blue-50 border-2 border-blue-300' : data.errors.some(e => e.includes('Success')) && !data.errors.some(e => e.includes('Warning')) ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'} rounded-lg p-4 sm:p-6 shadow-md">
 				<div class="flex items-center mb-4">
-					<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-600' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-600' : 'text-red-600'} text-xl mr-3">
-						{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'ℹ️' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? '✅' : '⚠️'}
-					</div>
-					<h2 class="text-lg sm:text-xl font-bold {data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-800' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'}">
-						{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'Information' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'Success' : 'Error'}{data.errors.length > 1 ? 's' : ''} Detected
+					<h2 class="text-lg sm:text-xl font-bold {data.errors.some(e => e.includes('Information:')) && !data.errors.some(e => e.includes('Warning')) ? 'text-blue-800' : data.errors.some(e => e.includes('Success')) && !data.errors.some(e => e.includes('Warning')) ? 'text-green-800' : 'text-red-800'}">
+						{data.errors.some(e => e.includes('Information:')) && !data.errors.some(e => e.includes('Warning')) ? 'Information' : data.errors.some(e => e.includes('Success')) && !data.errors.some(e => e.includes('Warning')) ? 'Success' : 'Error'}{data.errors.length > 1 ? 's' : ''} Detected
 					</h2>
 				</div>
 				<div class="space-y-2">
 					{#each data.errors as error}
-						<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-blue-100 border-l-4 border-blue-500' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'} p-3 rounded">
-							<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-800' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'} text-sm sm:text-base whitespace-pre-line">
+						<div class="{data.errors.some(e => e.includes('Information:')) && !data.errors.some(e => e.includes('Warning')) ? 'bg-blue-100 border-l-4 border-blue-500' : data.errors.some(e => e.includes('Success')) && !data.errors.some(e => e.includes('Warning')) ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'} p-3 rounded">
+							<div class="{data.errors.some(e => e.includes('Information:')) && !data.errors.some(e => e.includes('Warning')) ? 'text-blue-800' : data.errors.some(e => e.includes('Success')) && !data.errors.some(e => e.includes('Warning')) ? 'text-green-800' : 'text-red-800'} text-sm sm:text-base whitespace-pre-line">
 								{#each parseErrorMessage(error) as part}
 									{#if part.type === 'link'}
 										<a href={part.href} class="text-blue-600 hover:text-blue-800 underline font-semibold">{part.content}</a>
@@ -349,98 +418,118 @@
 								<p class="text-sm sm:text-base text-gray-500">No active electricity meters found for this property.</p>
 							</div>
 						{:else}
-							<div class="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-								{#each data.meters as meter}
-									{@const consumption = getConsumption(meter, $form[`reading_${meter.id}`] as string)}
-									<div class="border border-gray-200 rounded-lg p-2 hover:shadow-md transition-shadow">
-									<div class="mb-1">
-										<h3 class="font-semibold text-gray-900 text-sm sm:text-base">{meter.name}</h3>
-									</div>
-
-									<!-- Reading Input Table -->
-									<div class="mt-1 border-t border-gray-100 pt-1">
-										<div class="flex items-center justify-center gap-3 text-xs sm:text-sm">
-											<!-- Previous Reading Section -->
-											<div class="flex items-center gap-2 flex-1">
-												<div class="flex-shrink-0">
-													<span class="text-xs font-medium text-gray-700" style="writing-mode: vertical-lr; text-orientation: mixed;">Previous</span>
-												</div>
-												<div class="text-gray-600">
-													<div class="text-xs text-gray-500 font-medium mb-0">
-														{#if meter.latest_reading}
-															{new Date(meter.latest_reading.date).toLocaleDateString('en-US', {
-																month: 'short',
-																day: 'numeric',
-																year: 'numeric'
-															})}
-														{:else}
-															Date
-														{/if}
-													</div>
-													{#if meter.latest_reading}
-														<span class="text-xl font-bold text-gray-900">{meter.latest_reading.value}</span>
-														<span class="text-xs text-gray-500 ml-1">kWh</span>
-													{:else}
-														<span class="text-orange-600 font-medium">No readings recorded</span>
-													{/if}
-												</div>
+							<!-- [04] Floor-grouped meters -->
+							{#each [...metersByFloor.entries()] as [floorLabel, floorMeters]}
+								<div class="mb-4 last:mb-0">
+									<h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide px-2 py-2 border-b border-gray-200 mb-2">
+										{floorLabel}
+										<span class="text-gray-400 font-normal ml-1">({floorMeters.length} meter{floorMeters.length > 1 ? 's' : ''})</span>
+									</h2>
+									<div class="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+										{#each floorMeters as meter}
+											{@const consumption = getConsumption(meter, $form[`reading_${meter.id}`] as string)}
+											<div class="border border-gray-200 rounded-lg p-2 hover:shadow-md transition-shadow">
+											<div class="mb-1">
+												<h3 class="font-semibold text-gray-900 text-sm sm:text-base">{meter.name}</h3>
 											</div>
 
-											<!-- Vertical Divider -->
-											<div class="flex items-center justify-center">
-												<div class="h-16 w-px bg-gray-300"></div>
-											</div>
-
-											<!-- Current Reading Section -->
-											<div class="flex items-center gap-2 flex-1">
-												<div class="flex-shrink-0">
-													<span class="text-xs font-medium text-gray-700" style="writing-mode: vertical-lr; text-orientation: mixed;">Current</span>
-												</div>
-												<div class="w-full">
-													<div class="flex justify-between items-baseline mb-1">
-														<div class="text-xs text-gray-500 font-medium">
-															{new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+											<!-- Reading Input Table -->
+											<div class="mt-1 border-t border-gray-100 pt-1">
+												<div class="flex items-center justify-center gap-3 text-xs sm:text-sm">
+													<!-- Previous Reading Section -->
+													<div class="flex-1">
+														<div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Previous</div>
+														<div class="text-gray-600">
+															<div class="text-xs text-gray-500 font-medium mb-0">
+																{#if meter.latest_reading}
+																	{new Date(meter.latest_reading.date).toLocaleDateString('en-US', {
+																		month: 'short',
+																		day: 'numeric',
+																		year: 'numeric'
+																	})}
+																{:else}
+																	Date
+																{/if}
+															</div>
+															{#if meter.latest_reading}
+																<span class="text-xl font-bold text-gray-900">{meter.latest_reading.value}</span>
+																<span class="text-xs text-gray-500 ml-1">kWh</span>
+															{:else}
+																<span class="text-orange-600 font-medium">No readings recorded</span>
+															{/if}
 														</div>
-														{#if consumption}
-															<span
-																class="text-xs font-bold px-1.5 py-0.5 rounded {consumption.status === 'negative' ? 'bg-red-100 text-red-700' : consumption.status === 'high' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}"
-															>
-																{consumption.value > 0 ? '+' : ''}{consumption.value.toFixed(2)} used
-															</span>
-														{/if}
 													</div>
 
-													<div class="flex items-baseline relative">
-														<input
-															type="number"
-															inputmode="decimal"
-															name={`reading_${meter.id}`}
-															bind:value={$form[`reading_${meter.id}`]}
-															placeholder={meter.latest_reading ? (meter.latest_reading.value.toString().includes('.') ? '000.00' : '0000.00') : '0000.00'}
-															step="0.01"
-															class={getInputClass(meter.id)}
-															oninput={(e) => validateField(meter, (e.target as HTMLInputElement).value, `reading_${meter.id}`)}
-														/>
-														<span class="text-xs text-gray-500 ml-1 absolute right-0 bottom-2">kWh</span>
+													<!-- Vertical Divider -->
+													<div class="flex items-center justify-center">
+														<div class="h-16 w-px bg-gray-300"></div>
 													</div>
-													{#if fieldErrors[`reading_${meter.id}`]}
-														<p class="mt-1 text-xs text-red-600">{fieldErrors[`reading_${meter.id}`]}</p>
-													{/if}
+
+													<!-- Current Reading Section -->
+													<div class="flex-1">
+														<div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Current</div>
+														<div class="w-full">
+															<div class="flex justify-between items-baseline mb-1">
+																<div class="text-xs text-gray-500 font-medium">
+																	{new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+																</div>
+																{#if consumption}
+																	<span
+																		class="text-xs font-bold px-1.5 py-0.5 rounded {consumption.status === 'negative' ? 'bg-red-100 text-red-700' : consumption.status === 'high' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}"
+																	>
+																		{consumption.value > 0 ? '+' : ''}{consumption.value.toFixed(2)} used
+																	</span>
+																{/if}
+															</div>
+
+															<div class="flex items-baseline relative">
+																<input
+																	type="number"
+																	inputmode="decimal"
+																	name={`reading_${meter.id}`}
+																	bind:value={$form[`reading_${meter.id}`]}
+																	placeholder="Enter reading"
+																	step="0.01"
+																	class={getInputClass(meter.id)}
+																	oninput={(e) => validateField(meter, (e.target as HTMLInputElement).value, `reading_${meter.id}`)}
+																	onkeydown={(e) => handleInputKeydown(e, meter.id)}
+																/>
+																<span class="text-xs text-gray-500 ml-1 absolute right-0 bottom-2">kWh</span>
+															</div>
+															{#if fieldErrors[`reading_${meter.id}`]}
+																<p class="mt-1 text-xs text-red-600">{fieldErrors[`reading_${meter.id}`]}</p>
+															{/if}
+														</div>
+													</div>
 												</div>
 											</div>
 										</div>
-									</div>
+									{/each}
 								</div>
-							{/each}
-						</div>
+							</div>
+						{/each}
 					{/if}
 
-					<div class="flex justify-end mt-4 p-2">
+					<!-- [03] Progress counter + desktop Save button -->
+					<div class="hidden sm:flex justify-between items-center mt-4 p-2">
+						<div class="text-sm text-gray-500">
+							<span class="font-semibold text-gray-700">{filledCount}</span> of <span class="font-semibold text-gray-700">{data.meters.length}</span> meters filled
+						</div>
 						<button type="submit" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-white text-sm font-medium shadow hover:bg-blue-700 disabled:opacity-50" disabled={$submitting}>
 							{$submitting ? 'Saving...' : 'Save Readings'}
 						</button>
 					</div>
 				</div>
+			</div>
+
+			<!-- [06] Sticky bottom bar for mobile with progress + Save -->
+			<div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-3 flex items-center justify-between z-30 sm:hidden">
+				<div class="text-sm text-gray-500">
+					<span class="font-semibold text-gray-700">{filledCount}</span> / <span class="font-semibold text-gray-700">{data.meters.length}</span> filled
+				</div>
+				<button type="submit" class="inline-flex items-center rounded-md bg-blue-600 px-5 py-2.5 text-white text-sm font-medium shadow hover:bg-blue-700 disabled:opacity-50 min-h-[44px]" disabled={$submitting}>
+					{$submitting ? 'Saving...' : 'Save Readings'}
+				</button>
 			</div>
 		</form>
 	{/if}

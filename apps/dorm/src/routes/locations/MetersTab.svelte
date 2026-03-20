@@ -34,7 +34,7 @@
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
 	import { bgResync } from '$lib/db/optimistic-utils';
-	import { getStatusClasses, formatDate } from '$lib/utils/format';
+	import { getStatusClasses, formatDate, getMeterUnit } from '$lib/utils/format';
 
 	// Type definitions
 	interface Property {
@@ -58,7 +58,7 @@
 		updated_at: string | null;
 		property: Property | null;
 	}
-	interface Rental_unit {
+	interface RentalUnit {
 		id: number;
 		name: string;
 		number: number;
@@ -375,10 +375,10 @@
 					? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
 					: 'Unknown Floor';
 			case 'RENTAL_UNIT':
-				const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
+				const unit = rentalUnitData?.find((r: RentalUnit) => r.id === meter.rental_unit_id);
 				return unit
-					? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
-					: 'Unknown Rental_unit';
+					? `Rental Unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
+					: 'Unknown Rental Unit';
 			default:
 				return 'Unknown Location';
 		}
@@ -396,8 +396,8 @@
 					? `Floor ${floor.floor_number}${floor.wing ? `, Wing ${floor.wing}` : ''}`
 					: '';
 			case 'RENTAL_UNIT':
-				const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
-				return unit ? `Rental_unit ${unit.number}` : '';
+				const unit = rentalUnitData?.find((r: RentalUnit) => r.id === meter.rental_unit_id);
+				return unit ? `Rental Unit ${unit.number}` : '';
 			default:
 				return '';
 		}
@@ -619,7 +619,7 @@
 												{#if meter.latest_reading}
 													<div class="flex flex-col items-end">
 														<span class="font-medium"
-															>{formatReading(meter.latest_reading.value)}</span
+															>{formatReading(meter.latest_reading.value)}{getMeterUnit(meter.type) ? ` ${getMeterUnit(meter.type)}` : ''}</span
 														>
 														<span class="text-xs text-gray-500">
 															{formatDate(meter.latest_reading.date)}
@@ -673,7 +673,7 @@
 			actionCreate="?/meterCreate"
 			actionUpdate="?/meterUpdate"
 			actionDelete="?/meterDelete"
-			on:cancel={handleCancel}
+			oncancel={handleCancel}
 		/>
 	</DialogContent>
 </Dialog>

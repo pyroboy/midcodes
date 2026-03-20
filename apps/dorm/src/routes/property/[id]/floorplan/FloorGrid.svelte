@@ -1332,6 +1332,8 @@
 				: (areaItem.label ?? ITEM_TYPE_LABELS[areaItem.item_type] ?? areaItem.item_type)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
+				role="button"
+				tabindex="0"
 				class="absolute rounded-sm transition-all {isSelected ? 'ring-2 ring-blue-500 ring-offset-1 z-10' : 'cursor-pointer'}"
 				style="left: {ax}px; top: {ay}px; width: {aw}px; height: {ah}px;
 					background: {hasCells ? 'transparent' : aFill + (isSelected ? '80' : '4d')};
@@ -1344,6 +1346,18 @@
 						clearSelection();
 						selectedAreaId = areaItem.id;
 						areaPopupPos = { x: ax + aw / 2, y: ay + ah + 8 };
+					}
+				}}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						if (selectedAreaId === areaItem.id) {
+							clearSelection();
+						} else {
+							clearSelection();
+							selectedAreaId = areaItem.id;
+							areaPopupPos = { x: ax + aw / 2, y: ay + ah + 8 };
+						}
 					}
 				}}
 				onmousedown={(e) => {

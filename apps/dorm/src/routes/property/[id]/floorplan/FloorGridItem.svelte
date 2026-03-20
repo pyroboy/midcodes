@@ -28,6 +28,8 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+	role="button"
+	tabindex="0"
 	class="absolute rounded border-2 cursor-pointer select-none overflow-hidden
 		flex items-center justify-center text-xs font-medium
 		transition-shadow hover:shadow-md
@@ -40,6 +42,7 @@
 		height: {item.grid_h * cellSize - 2}px;
 	"
 	onclick={() => onSelect()}
+	onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
 	draggable="true"
 	ondragstart={(e) => onDragStart(item, e)}
 >

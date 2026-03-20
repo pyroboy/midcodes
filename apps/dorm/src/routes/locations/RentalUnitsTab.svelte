@@ -13,7 +13,7 @@
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from '../rental-unit/formSchema';
 	import { Pencil, Trash2, Users, Tag, List, Search, Home, Building2 } from 'lucide-svelte';
-	import { getStatusClasses, formatCurrency } from '$lib/utils/format';
+	import { getStatusClasses, formatCurrency, humanizeType } from '$lib/utils/format';
 	import {
 		rentalUnitsStore,
 		propertiesStore,
@@ -316,7 +316,7 @@
 									<span
 										class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-700"
 									>
-										{unit.type}
+										{humanizeType(unit.type)}
 									</span>
 								</div>
 								<div class="text-left hidden sm:block">

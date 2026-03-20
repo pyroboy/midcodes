@@ -18,11 +18,25 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { propertySchema, type Property } from '../properties/formSchema';
 	import { toast } from 'svelte-sonner';
-	import { Search, Building2, Pencil, Trash2, LayoutGrid } from 'lucide-svelte';
-	import { getStatusClasses } from '$lib/utils/format';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Search, Building2, Pencil, Trash2, LayoutGrid, Ellipsis } from 'lucide-svelte';
 	import { propertiesStore } from '$lib/stores/collections.svelte';
 	import { optimisticUpsertProperty, optimisticDeleteProperty } from '$lib/db/optimistic-properties';
 	import { bufferedMutation } from '$lib/db/optimistic-utils';
+	import { humanizeType } from '$lib/utils/format';
+
+	function getStatusColor(status: string): string {
+		switch (status?.toUpperCase()) {
+			case 'ACTIVE':
+				return 'bg-green-100 text-green-800 border-green-200';
+			case 'INACTIVE':
+				return 'bg-red-100 text-red-800 border-red-200';
+			case 'MAINTENANCE':
+				return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+			default:
+				return 'bg-gray-100 text-gray-800 border-gray-200';
+		}
+	}
 
 	interface Props {
 		propertyForm: any;
@@ -51,6 +65,7 @@
 
 	let editMode = $state(false);
 	let showModal = $state(false);
+	let editUpdatedAt = $state<string | null>(null);
 
 	// Delete confirmation dialog state
 	let showDeleteDialog = $state(false);
@@ -79,6 +94,11 @@
 			toast.error('Error saving property');
 		},
 		onResult: async ({ result }) => {
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				toast.error('This property was modified by someone else. Please refresh and try again.', { duration: 6000 });
+				import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('properties'));
+				return;
+			}
 			if (result.type === 'success') {
 				const serverForm = (result as any).data?.form?.data;
 				const fd = serverForm ?? savedFormData;
@@ -113,6 +133,7 @@
 
 	function handlePropertyClick(property: Property) {
 		editMode = true;
+		editUpdatedAt = property.updated_at ?? null;
 		$formData = {
 			id: property.id,
 			name: property.name,
@@ -180,14 +201,102 @@
 		/>
 	</div>
 
-	<!-- Content Table -->
-	<Card.Root class="overflow-hidden">
+	<!-- Mobile Card View -->
+	<div class="sm:hidden space-y-3">
+		{#if isLoading}
+			{#each Array(3) as _, i (i)}
+				<Card.Root>
+					<Card.Content class="p-4">
+						<div class="flex items-start justify-between">
+							<div class="space-y-1.5 flex-1">
+								<Skeleton class="h-4 w-32" />
+								<Skeleton class="h-3 w-48" />
+								<Skeleton class="h-5 w-16 rounded-full" />
+							</div>
+							<Skeleton class="h-8 w-8 rounded-md" />
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{/each}
+		{:else if filteredProperties?.length > 0}
+			{#each filteredProperties as property (property.id)}
+				<Card.Root
+					class="cursor-pointer hover:bg-muted/50 transition-colors"
+					onclick={() => handlePropertyClick(property)}
+				>
+					<Card.Content class="p-4">
+						<div class="flex items-start justify-between">
+							<div class="space-y-1.5 flex-1 min-w-0">
+								<p class="font-medium truncate">{property.name}</p>
+								<p class="text-sm text-muted-foreground truncate">{property.address}</p>
+								<Badge class={getStatusColor(property.status)}>
+									{property.status}
+								</Badge>
+							</div>
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<button
+											{...props}
+											class="inline-flex items-center justify-center rounded-md h-8 w-8 shrink-0 ml-2 hover:bg-accent hover:text-accent-foreground transition-colors"
+											onclick={(e: MouseEvent) => e.stopPropagation()}
+										>
+											<span class="sr-only">Actions</span>
+											<Ellipsis class="h-4 w-4" />
+										</button>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="end">
+									<DropdownMenu.Item onclick={() => handlePropertyClick(property)}>
+										<Pencil class="mr-2 h-4 w-4" />
+										Edit
+									</DropdownMenu.Item>
+									<DropdownMenu.Item>
+										<a href="/property/{property.id}/floorplan" class="flex items-center w-full" onclick={(e: MouseEvent) => e.stopPropagation()}>
+											<LayoutGrid class="mr-2 h-4 w-4" />
+											Floor Plan
+										</a>
+									</DropdownMenu.Item>
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item
+										class="text-destructive focus:text-destructive"
+										onclick={() => handleDeleteProperty(property)}
+									>
+										<Trash2 class="mr-2 h-4 w-4" />
+										Delete
+									</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{/each}
+		{:else}
+			<div class="flex flex-col items-center py-16">
+				<div class="bg-muted p-4 rounded-full mb-4">
+					<Building2 class="w-8 h-8 text-muted-foreground" />
+				</div>
+				<h3 class="text-lg font-semibold text-foreground">No Properties Found</h3>
+				<p class="text-muted-foreground max-w-sm mt-2 text-center">
+					{searchQuery
+						? 'No properties match your search criteria.'
+						: 'Get started by adding your first property.'}
+				</p>
+				{#if !searchQuery}
+					<Button variant="outline" class="mt-4" onclick={handleAddProperty}>Add Property</Button>
+				{/if}
+			</div>
+		{/if}
+	</div>
+
+	<!-- Desktop Content Table -->
+	<Card.Root class="overflow-hidden hidden sm:block">
 		<Card.Content class="p-0">
 			<table class="w-full text-sm text-left">
 				<thead>
 					<tr>
 						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Address</th>
+						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Address</th>
 						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Type</th>
 						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
 						<th class="px-6 py-3 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Actions</th>
@@ -198,7 +307,7 @@
 						{#each Array(3) as _, i (i)}
 							<tr class="border-b">
 								<td class="px-6 py-4"><Skeleton class="h-4 w-32" /></td>
-								<td class="px-6 py-4 hidden sm:table-cell"><Skeleton class="h-4 w-48" /></td>
+								<td class="px-6 py-4"><Skeleton class="h-4 w-48" /></td>
 								<td class="px-6 py-4 hidden md:table-cell"><Skeleton class="h-4 w-20" /></td>
 								<td class="px-6 py-4"><Skeleton class="h-5 w-16 rounded-full" /></td>
 								<td class="px-6 py-4">
@@ -213,10 +322,10 @@
 						{#each filteredProperties as property (property.id)}
 							<tr class="border-b hover:bg-muted/50 transition-colors cursor-pointer" onclick={() => handlePropertyClick(property)}>
 								<td class="px-6 py-4 font-medium">{property.name}</td>
-								<td class="px-6 py-4 hidden sm:table-cell">{property.address}</td>
-								<td class="px-6 py-4 hidden md:table-cell">{property.type}</td>
+								<td class="px-6 py-4">{property.address}</td>
+								<td class="px-6 py-4 hidden md:table-cell">{humanizeType(property.type)}</td>
 								<td class="px-6 py-4">
-									<Badge class={getStatusClasses(property.status)}>
+									<Badge class={getStatusColor(property.status)}>
 										{property.status}
 									</Badge>
 								</td>
@@ -256,10 +365,10 @@
 						<tr>
 							<td colspan="5" class="px-6 py-16 text-center">
 								<div class="flex flex-col items-center">
-									<div class="bg-gray-100 p-4 rounded-full mb-4">
-										<Building2 class="w-8 h-8 text-gray-400" />
+									<div class="bg-muted p-4 rounded-full mb-4">
+										<Building2 class="w-8 h-8 text-muted-foreground" />
 									</div>
-									<h3 class="text-lg font-semibold text-gray-900">No Properties Found</h3>
+									<h3 class="text-lg font-semibold text-foreground">No Properties Found</h3>
 									<p class="text-muted-foreground max-w-sm mt-2">
 										{searchQuery
 											? 'No properties match your search criteria.'
@@ -289,6 +398,7 @@
 		</DialogHeader>
 		<PropertyForm
 			{editMode}
+			updatedAt={editUpdatedAt}
 			form={formData}
 			{errors}
 			{enhance}
@@ -310,7 +420,7 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Delete Property</AlertDialog.Title>
 			<AlertDialog.Description>
-				Are you sure you want to delete property "{propertyToDelete?.name}"? This action cannot be undone.
+				Are you sure you want to delete property "{propertyToDelete?.name}"? This property will be archived and removed from your active list.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

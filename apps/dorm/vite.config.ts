@@ -1,8 +1,14 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	test: {
+		include: ['src/**/*.test.ts'],
+		environment: 'node',
+		testTimeout: 15_000,
+		hookTimeout: 10_000
+	},
   ssr: {
     external: ['style-to-object', 'runed'],
     noExternal: []

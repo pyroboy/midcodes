@@ -4,16 +4,11 @@
 	import {
 		Pencil,
 		Trash2,
-		MoreHorizontal,
-		Calendar,
 		Phone,
-		Mail,
-		User,
-		DollarSign,
-		Home
+		Mail
 	} from 'lucide-svelte';
 	import type { TenantResponse } from '$lib/types/tenant';
-	import { formatCurrency, getStatusClasses } from '$lib/utils/format';
+	import { getStatusClasses } from '$lib/utils/format';
 	import { getStatusIcon } from '$lib/utils/status-icons';
 
 	interface Props {
@@ -24,40 +19,11 @@
 
 	let { tenant, onEdit, onDelete }: Props = $props();
 
-	let showMoreOptions = $state(false);
-
-	function getBalanceStatus(balance: number | null | undefined): string {
-		if (!balance || balance <= 0) return 'bg-green-100 text-green-800 border-green-200';
-		return 'bg-red-100 text-red-800 border-red-200';
-	}
 </script>
 
 <div
-	class="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group relative flex flex-col h-full"
+	class="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col h-full"
 >
-	<div
-		class="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-	>
-		<Button
-			variant="ghost"
-			size="icon"
-			onclick={() => onEdit(tenant)}
-			class="h-8 w-8 bg-white/80 backdrop-blur-sm hover:bg-white border border-slate-200"
-			aria-label="Edit tenant"
-		>
-			<Pencil class="h-3.5 w-3.5 text-slate-600" />
-		</Button>
-		<Button
-			variant="ghost"
-			size="icon"
-			onclick={() => onDelete(tenant)}
-			class="h-8 w-8 bg-white/80 backdrop-blur-sm hover:bg-white border border-slate-200"
-			aria-label="Delete tenant"
-		>
-			<Trash2 class="h-3.5 w-3.5 text-red-500" />
-		</Button>
-	</div>
-
 	<div class="flex-grow p-6 text-center">
 		<div class="flex justify-center relative mb-4">
 			<div class="relative w-40 h-40">
@@ -159,5 +125,24 @@
 				No active leases
 			</div>
 		{/if}
+	</div>
+
+	<div class="border-t border-slate-200 px-4 py-3 flex items-center gap-2">
+		<Button
+			variant="outline"
+			onclick={() => onEdit(tenant)}
+			class="w-full h-11 text-sm font-medium text-slate-700"
+		>
+			<Pencil class="h-4 w-4 mr-1.5" />
+			Edit
+		</Button>
+		<Button
+			variant="outline"
+			onclick={() => onDelete(tenant)}
+			class="w-full h-11 text-sm font-medium text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+		>
+			<Trash2 class="h-4 w-4 mr-1.5" />
+			Delete
+		</Button>
 	</div>
 </div>

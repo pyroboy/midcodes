@@ -7,6 +7,7 @@ import { db } from '$lib/server/db';
 import { properties } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 import { cache } from '$lib/services/cache';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 export const actions: Actions = {
 	propertyCreate: async ({ request }) => {
@@ -34,16 +35,21 @@ export const actions: Actions = {
 	},
 
 	propertyUpdate: async ({ request }: RequestEvent) => {
-		const form = await superValidate(request, zod(propertySchema));
+		const rawFormData = await request.formData();
+		const lockTs = extractLockTimestamp(rawFormData);
+		const form = await superValidate(rawFormData, zod(propertySchema));
 		if (!form.valid) return fail(400, { form });
 
 		const propertyData = preparePropertyData(form.data);
 
 		try {
-			await db
-				.update(properties)
-				.set({ ...propertyData, updatedAt: new Date() })
-				.where(eq(properties.id, form.data.id!));
+			const result = await optimisticLockUpdate(
+				db, properties, properties.id, form.data.id!, properties.updatedAt, lockTs,
+				{ ...propertyData, updatedAt: new Date() }
+			);
+			if (result.conflict) {
+				return fail(409, { form, conflict: true, message: result.message });
+			}
 		} catch (err: any) {
 			console.error('Error updating property:', err);
 			return fail(500, { form, error: 'Failed to update property' });

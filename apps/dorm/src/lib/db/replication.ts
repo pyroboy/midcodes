@@ -1,7 +1,10 @@
 import { replicateRxCollection, type RxReplicationState } from 'rxdb/plugins/replication';
 import type { RxDatabase } from 'rxdb';
-import { syncStatus } from '$lib/stores/sync-status.svelte';
+// firstValueFrom/filter/skip removed — replaced by awaitInSync() which handles the race correctly
+import { syncStatus, isFresh } from '$lib/stores/sync-status.svelte';
 import { mutationQueue } from '$lib/stores/mutation-queue.svelte';
+
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** Result of a resync operation — callers can inspect to show appropriate UI feedback. */
 export type ResyncResult = {
@@ -160,7 +163,7 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 		: null;
 	if (lastSyncTime && lastKnownTs) {
 		const ageMs = Date.now() - Number(lastSyncTime);
-		if (ageMs < 5 * 60 * 1000) {
+		if (isFresh(ageMs, 5 * 60 * 1000)) {
 			console.log(`[RxSync] Cache < ${Math.round(ageMs / 1000)}s old — serving from cache`);
 			syncStatus.addLog('Serving from cache (< 5 min old)', 'success');
 			syncStatus.setNeonHealthDirect('ok');
@@ -360,6 +363,17 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 		replications.set(name, repl);
 	}
 
+	// Re-sync previously-started lazy collections when server data has changed.
+	// Without this, lazy collections only pull once (on first page access) and
+	// never refresh on startup — new server records are invisible until reconcile.
+	for (const name of LAZY_COLLECTIONS) {
+		const repl = replications.get(name);
+		if (!repl) continue; // not started yet — will sync on first page access
+		syncStatus.markSyncing(name);
+		repl.reSync();
+		// No await needed — existing active$/error$ subscribers handle completion
+	}
+
 	return replications;
 }
 
@@ -409,8 +423,18 @@ export async function resyncCollection(name: string): Promise<ResyncResult> {
 
 	const promise = (async () => {
 		syncStatus.markSyncing(name);
-		await repl.reSync();
-		await repl.awaitInSync();
+		// reSync() is synchronous — it just flags the internal state machine.
+		// We need to wait for the pull cycle to complete (active$ goes false).
+		//
+		// Previous approach used skip(1) + filter(true) + filter(false) which
+		// raced: if the pull completed before skip(1) subscribed, firstValueFrom
+		// threw "no elements in sequence". Instead, use awaitInSync() which
+		// internally waits for the correct state, wrapped in a safety timeout.
+		repl.reSync();
+		await Promise.race([
+			repl.awaitInSync(),
+			delay(30_000) // safety: don't hang forever if pull never activates
+		]);
 	})().finally(() => {
 		inFlightResyncs.delete(name);
 	});
@@ -483,6 +507,19 @@ export async function ensureCollectionSynced(name: string): Promise<void> {
 	});
 
 	replications.set(name, repl);
+
+	// Wait for the initial pull to complete before returning.
+	// Without this, callers get an empty collection because the pull
+	// hasn't finished yet (lazy collections are accessed on first page visit).
+	try {
+		await Promise.race([
+			repl.awaitInSync(),
+			delay(30_000)
+		]);
+	} catch {
+		// Don't throw — the collection is registered and will eventually sync
+		syncStatus.addLog(`Lazy sync for ${name} timed out — will retry`, 'warn');
+	}
 }
 
 /**
@@ -495,7 +532,7 @@ export async function resyncAll(): Promise<ResyncResult> {
 	);
 	const synced = results.filter((r) => r.status === 'ok').length;
 	const skipped = results.filter((r) => r.status === 'skipped').length;
-	if (skipped === results.length) return { status: 'skipped', reason: results[0]?.reason, synced: 0, skipped };
+	if (results.length > 0 && skipped === results.length) return { status: 'skipped', reason: results[0]?.reason, synced: 0, skipped };
 	if (skipped > 0) return { status: 'partial', synced, skipped };
 	return { status: 'ok', synced, skipped: 0 };
 }
@@ -550,8 +587,8 @@ export type ReconcileResult = {
 };
 
 /**
- * Targeted reconciliation: compares ALL local RxDB IDs against ALL server IDs per collection.
- * No deleted_at filter — the pull endpoint sends all rows, so RxDB must mirror everything.
+ * Targeted reconciliation: compares active (non-deleted) local RxDB IDs against active server IDs.
+ * Both sides filter deleted_at IS NULL — only active records are compared.
  * Fixes: removes orphans (local-only), fetches missing (server-only) by exact ID.
  * After fixing, runs a verification pass to confirm local is a true mirror of server.
  */

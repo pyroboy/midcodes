@@ -53,18 +53,6 @@
 	let isSubmitting = $state(false);
 	let allowBackdating = $state(false);
 
-		// Debug effect to monitor state changes
-	$effect(() => {
-		console.log('🔍 Modal state changed:', {
-			open,
-			propertyId: property?.id,
-			propertyName: property?.name,
-			utilityType
-		});
-	});
-
-
-
 	// Calculate recommended date ranges based on backdating toggle with enhanced constraints
 	let dateConstraints = $derived.by(() => {
 		// Set maximum date to at least 31 days from now

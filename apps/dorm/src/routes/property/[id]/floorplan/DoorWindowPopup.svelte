@@ -38,15 +38,23 @@
 		{ value: 'bay', label: 'Bay', desc: 'Projects outward' }
 	];
 
-	// Local state
+	// Local state — intentionally captures initial prop values (popup doesn't re-open with new meta)
+	// svelte-ignore state_referenced_locally
 	let doorType = $state<DoorType>(meta.door ?? 'single');
+	// svelte-ignore state_referenced_locally
 	let swingDir = $state<SwingDir>(meta.swing ?? 'left');
+	// svelte-ignore state_referenced_locally
 	let openDir = $state<OpenDir>(meta.openDir ?? 'inward');
+	// svelte-ignore state_referenced_locally
 	let doorWidth = $state(meta.doorWidth ?? 80);
 
+	// svelte-ignore state_referenced_locally
 	let windowType = $state<WindowType>(meta.window ?? 'fixed');
+	// svelte-ignore state_referenced_locally
 	let sillHeight = $state(meta.sill ?? 0.9);
+	// svelte-ignore state_referenced_locally
 	let windowWidth = $state(meta.windowWidth ?? 100);
+	// svelte-ignore state_referenced_locally
 	let windowHeight = $state(meta.windowHeight ?? 120);
 
 	// Build and apply immediately on every change

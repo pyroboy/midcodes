@@ -6,6 +6,9 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import ConsolidatedPrintModal from './ConsolidatedPrintModal.svelte';
 	import type { Reading, Meter, Property, MeterData, Filters, ShareData, Lease, Tenant } from './types';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import { formatEnumLabel } from '$lib/utils/format';
 	import { slide } from 'svelte/transition';
 
 	// Props (Svelte 5 style)
@@ -25,6 +28,18 @@
 	let filters = $state({
 		period: new Date().toISOString().slice(0, 7),
 		search: ''
+	});
+
+	// Smart period default: use latest period with data
+	let periodInitialized = false;
+	$effect(() => {
+		if (!periodInitialized && props.readings.length > 0) {
+			const periods = [...new Set(props.readings.map((r: Reading) => r.period).filter(Boolean))].sort();
+			if (periods.length > 0) {
+				filters.period = periods[periods.length - 1] as string;
+			}
+			periodInitialized = true;
+		}
 	});
 
 	// Selection state
@@ -303,7 +318,7 @@
 			case 'CABLE':
 				return 'bg-green-100 text-green-800';
 			default:
-				return 'bg-gray-100 text-gray-800';
+				return 'bg-muted text-foreground';
 		}
 	}
 
@@ -344,56 +359,56 @@
 
 <div class="space-y-4">
 	<!-- Filters -->
-	<div class="flex flex-wrap gap-4 items-end">
-		<div>
-			<label for="period-filter" class="block text-sm font-medium mb-1">Period</label>
-			<input
+	<div class="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
+		<div class="w-full sm:w-auto">
+			<Label for="period-filter" class="text-sm font-medium mb-1">Period</Label>
+			<Input
 				id="period-filter"
 				type="month"
-				class="border rounded px-3 py-2"
+				class="w-full"
 				bind:value={filters.period}
 			/>
 		</div>
-		<div class="flex-1">
-			<label for="search-filter" class="block text-sm font-medium mb-1">Search</label>
-			<input
+		<div class="w-full sm:w-auto sm:flex-1">
+			<Label for="search-filter" class="text-sm font-medium mb-1">Search</Label>
+			<Input
 				id="search-filter"
 				type="text"
 				placeholder="Search meters..."
-				class="w-full border rounded px-3 py-2"
+				class="w-full"
 				bind:value={filters.search}
 			/>
 		</div>
-		
+
 		<!-- PROMINENT SELECT ALL BILLED BUTTON -->
-		<div class="flex gap-2 items-center">
-			<Button
-				variant="default"
-				size="default"
-				onclick={() => selectAllBilledReadings()}
-				class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2"
-				disabled={billedReadings.length === 0}
-			>
-				<!-- @ts-ignore - allBilledSelected is a Svelte 5 derived value -->
-				{#if allBilledSelected && billedReadings.length > 0}
-					DESELECT ALL BILLED ({billedReadings.length})
-				{:else}
-					SELECT ALL BILLED ({billedReadings.length})
-				{/if}
-			</Button>
-
-			{#if selectedIds.length > 0}
+		{#if billedReadings.length > 0}
+			<div class="flex gap-2 items-center">
 				<Button
-					variant="outline"
+					variant="default"
 					size="default"
-					onclick={() => (consolidatedOpen = true)}
-					class="border-blue-600 text-blue-700 hover:bg-blue-50"
+					onclick={() => selectAllBilledReadings()}
+					class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2"
 				>
-					Print Selected ({selectedIds.length})
+					<!-- @ts-ignore - allBilledSelected is a Svelte 5 derived value -->
+					{#if allBilledSelected && billedReadings.length > 0}
+						DESELECT ALL BILLED ({billedReadings.length})
+					{:else}
+						SELECT ALL BILLED ({billedReadings.length})
+					{/if}
 				</Button>
-			{/if}
 
-		</div>
+				{#if selectedIds.length > 0}
+					<Button
+						variant="outline"
+						size="default"
+						onclick={() => (consolidatedOpen = true)}
+						class="border-blue-600 text-blue-700 hover:bg-blue-50"
+					>
+						Print Selected ({selectedIds.length})
+					</Button>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Consolidated print modal. Build input groups from selected readings -->
@@ -411,10 +426,74 @@
 
 	<!-- Table -->
 	{#if filteredReadings.length === 0}
-		<div class="bg-gray-50 rounded-md p-6 text-center">
-			<p class="text-gray-500">No readings found with the current filters.</p>
+		<div class="bg-muted/50 rounded-lg p-8 text-center space-y-3">
+			<div class="bg-muted rounded-full w-12 h-12 mx-auto flex items-center justify-center">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+			</div>
+			<p class="text-muted-foreground font-medium">No readings found</p>
+			<p class="text-sm text-muted-foreground">Try adjusting the period or search filters above.</p>
 		</div>
 	{:else}
+		<!-- Mobile card view -->
+		<div class="sm:hidden space-y-3">
+			{#each filteredReadings as reading (reading.id)}
+				<div class="border rounded-lg p-4 space-y-3 {selectedIds.includes(reading.id) ? 'ring-2 ring-blue-500 bg-blue-50/50' : ''}">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							{#if isBilledForPeriod(reading)}
+								<Checkbox
+									checked={selectedIds.includes(reading.id)}
+									onCheckedChange={() => toggleReadingSelection(reading.id)}
+									onclick={(e) => e.stopPropagation()}
+									aria-label="Select reading for {reading.meters?.name || 'Unknown Meter'}"
+									class="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
+								/>
+							{/if}
+							<span class="font-medium">{reading.meters?.name || 'Unknown Meter'}</span>
+						</div>
+						{#if reading.meters?.type}
+							<span class="px-2 py-1 text-xs rounded-full {getUtilityColorClass(reading.meters.type)}">
+								{formatEnumLabel(reading.meters.type)}
+							</span>
+						{/if}
+					</div>
+
+					<div class="grid grid-cols-2 gap-2 text-sm">
+						<div>
+							<span class="text-muted-foreground">Previous</span>
+							<p class="font-medium">{formatNumber(reading.previous_reading)}</p>
+						</div>
+						<div>
+							<span class="text-muted-foreground">Current</span>
+							<p class="font-medium">{formatNumber(reading.reading)}</p>
+						</div>
+						<div>
+							<span class="text-muted-foreground">Consumption</span>
+							<p class="font-medium">{formatNumber(reading.consumption)} {reading.meters?.type ? getUnitLabel(reading.meters.type) : ''}</p>
+						</div>
+						<div>
+							<span class="text-muted-foreground">Cost</span>
+							<p class="font-medium">{formatCurrency(reading.cost)}</p>
+						</div>
+					</div>
+
+					<div class="flex items-center justify-between pt-2 border-t">
+						<div class="flex items-center gap-2 text-sm">
+							{#if reading.days_diff}
+								<span class="{getDaysDiffColorClass(reading.days_diff)} font-medium">{reading.days_diff} days</span>
+							{/if}
+							{#if isBilledForPeriod(reading)}
+								<span class="text-xs text-green-600">✓ Billed</span>
+							{/if}
+						</div>
+						<Button variant="ghost" size="sm" onclick={(e) => handleShareClick(e as MouseEvent, reading)}>Bill</Button>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<!-- Desktop table view -->
+		<div class="hidden sm:block">
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
@@ -433,9 +512,9 @@
 			</Table.Header>
 			<Table.Body>
 				{#each filteredReadings as reading (reading.id)}
-					<Table.Row class="cursor-pointer hover:bg-gray-50" role="button" tabindex={0}>
+					<Table.Row class="cursor-pointer hover:bg-muted" role="button" tabindex={0}>
 						<Table.Cell class="w-12">
-							<Checkbox 
+							<Checkbox
 								checked={selectedIds.includes(reading.id)}
 								disabled={!isBilledForPeriod(reading)}
 								onCheckedChange={() => toggleReadingSelection(reading.id)}
@@ -453,13 +532,13 @@
 											reading.meters.type
 										)}"
 									>
-										{reading.meters.type}
+										{formatEnumLabel(reading.meters.type)}
 									</span>
 								{/if}
 							</div>
 						</Table.Cell>
 						<Table.Cell>
-							{reading.meters?.type || '-'}
+							{reading.meters?.type ? formatEnumLabel(reading.meters.type) : '-'}
 						</Table.Cell>
 						<Table.Cell>
 							{#if props.meterLastBilledDates && props.meterLastBilledDates[String(reading.meter_id)]}
@@ -488,7 +567,7 @@
 									{#if reading.isMonthEnd}
 										<span class="text-green-600" title="Reading near end of month">✅</span>
 									{:else}
-										<span class="text-gray-400" title="Month in progress">⏳</span>
+										<span class="text-muted-foreground" title="Month in progress">⏳</span>
 									{/if}
 								</div>
 								<div class="text-xs text-muted-foreground">{formatDate(reading.reading_date)}</div>
@@ -529,5 +608,6 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
+		</div>
 	{/if}
 </div>

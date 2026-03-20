@@ -8,7 +8,6 @@
 	import { Label } from '$lib/components/ui/label';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import { Receipt, Wallet, Plus, X } from 'lucide-svelte';
-	import type { PageData } from './$types';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import type { z } from 'zod/v3';
 	import { expenseSchema, expenseTypeEnum, expenseStatusEnum, months } from './schema';
@@ -20,10 +19,12 @@
 		amount: string;
 	}
 
+	import { humanizeExpenseType } from '$lib/utils/format';
+
 	// Props using Svelte 5 runes
 	let {
 		open = false,
-		data,
+		properties = [],
 		editMode = false,
 		updatedAt = null,
 		form,
@@ -33,7 +34,7 @@
 		submitting
 	} = $props<{
 		open?: boolean;
-		data: PageData;
+		properties?: Array<{ id: number; name: string }>;
 		editMode?: boolean;
 		updatedAt?: string | null;
 		form: any;
@@ -187,7 +188,7 @@
 			<div class="mt-4">
 				<form
 					method="POST"
-					action={editMode ? '?/update' : '?/create'}
+					action="?/upsert"
 					use:enhance={(e: any) => {
 						prepareSubmission();
 						return enhance(e);
@@ -209,15 +210,15 @@
 						>
 							<Select.Trigger class="w-full">
 								<span
-									>{data.properties?.find((p: any) => p.id === form.property_id)?.name ||
+									>{properties.find((p: { id: number; name: string }) => p.id === form.property_id)?.name ||
 										'Select a property'}</span
 								>
 							</Select.Trigger>
 							<Select.Content>
 								<Select.Group>
 									<Select.Item value="">None</Select.Item>
-									{#if data.properties}
-										{#each data.properties as property}
+									{#if properties.length}
+										{#each properties as property}
 											<Select.Item value={property.id.toString()}>{property.name}</Select.Item>
 										{/each}
 									{/if}
@@ -284,12 +285,12 @@
 											onValueChange={(e: any) => (operationalExpenseType = e)}
 										>
 											<Select.Trigger class="w-full">
-												<span>{operationalExpenseType}</span>
+												<span>{humanizeExpenseType(operationalExpenseType)}</span>
 											</Select.Trigger>
 											<Select.Content>
 												<Select.Group>
 													{#each operationalExpenseTypes as type}
-														<Select.Item value={type}>{type}</Select.Item>
+														<Select.Item value={type}>{humanizeExpenseType(type)}</Select.Item>
 													{/each}
 												</Select.Group>
 											</Select.Content>

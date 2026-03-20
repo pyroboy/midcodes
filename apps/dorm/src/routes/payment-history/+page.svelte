@@ -9,9 +9,9 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import type { Transaction } from './types';
-	import TransactionList from './TransactionList.svelte';
-	import TransactionFormModal from './TransactionFormModal.svelte';
-	import TransactionDetailsModal from './TransactionDetailsModal.svelte';
+	import PaymentHistoryList from './PaymentHistoryList.svelte';
+	import PaymentHistoryFormModal from './PaymentHistoryFormModal.svelte';
+	import PaymentHistoryDetailsModal from './PaymentHistoryDetailsModal.svelte';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import {
 		paymentsStore,
@@ -362,7 +362,7 @@
 	<SyncErrorBanner collections={['payments', 'billings', 'leases', 'lease_tenants', 'tenants', 'payment_allocations']} />
 	<!-- Page Header -->
 	<div class="flex justify-between items-center mb-6 border-b pb-4">
-		<h1 class="text-3xl font-bold">Transaction Management</h1>
+		<h1 class="text-3xl font-bold">Payment History</h1>
 	</div>
 
 	<!-- Summary Stats -->
@@ -426,7 +426,7 @@
 	</form>
 
 	<!-- Transaction List -->
-	<TransactionList
+	<PaymentHistoryList
 		{transactions}
 		on:edit={handleEditTransaction}
 		on:delete={handleDeleteTransaction}
@@ -438,18 +438,18 @@
 
 	<!-- Modals -->
 	{#if showFormModal}
-		<TransactionFormModal
+		<PaymentHistoryFormModal
 			open={showFormModal}
 			data={formDefaults}
 			editMode={!!selectedTransaction}
 			transaction={selectedTransaction}
 			onClose={handleCloseFormModal}
 			onCancel={handleCloseFormModal}
-		/> 
+		/>
 	{/if}
 
 	{#if showDetailsModal && selectedTransaction}
-		<TransactionDetailsModal
+		<PaymentHistoryDetailsModal
 			open={showDetailsModal}
 			transaction={selectedTransaction}
 			on:close={handleCloseDetailsModal}

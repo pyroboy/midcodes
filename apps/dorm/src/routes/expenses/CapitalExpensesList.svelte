@@ -2,11 +2,10 @@
 	import { createEventDispatcher } from 'svelte';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Building2, Plus } from 'lucide-svelte';
+	import { Building2, Pencil, Trash2 } from 'lucide-svelte';
+	import { formatCurrency } from '$lib/utils/format';
 	import type { Expense } from './types';
 	import type { Property } from './types';
-	import ExpenseCard from './ExpenseCard.svelte';
 
 	// Props
 	interface Props {
@@ -26,54 +25,16 @@
 	// Create event dispatcher
 	const dispatch = createEventDispatcher<{
 		delete: number;
-		add: any;
+		edit: Expense;
 	}>();
 
 	// Calculate total expenses
 	let totalExpenses = $derived.by(() => {
 		let total = 0;
 		for (const expense of expenses) {
-			total += expense.amount || 0;
+			total += parseFloat(String(expense.amount)) || 0;
 		}
 		return total;
-	});
-
-	// Format currency
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP'
-		}).format(amount);
-	}
-
-	// Input fields
-	let newDesc = $state('');
-	let newAmount = $state('');
-
-	// Handle delete event from child component
-	function handleDelete(event: CustomEvent<number>) {
-		console.log('CapitalExpensesList received delete event for ID:', event.detail);
-		dispatch('delete', event.detail);
-	}
-
-	// Handle adding a new expense
-	function handleAdd() {
-		if (!newDesc || !newAmount || !selectedPropertyId) return;
-
-		dispatch('add', {
-			description: newDesc,
-			amount: parseFloat(newAmount),
-			type: 'CAPITAL'
-		});
-
-		// Reset inputs
-		newDesc = '';
-		newAmount = '';
-	}
-
-	// Check if form is valid
-	let isFormValid = $derived.by(() => {
-		return !!newDesc && !!newAmount && !!selectedPropertyId;
 	});
 </script>
 
@@ -88,9 +49,45 @@
 		{#if expenses.length === 0}
 			<p class="text-gray-500 text-center py-2">No capital expenses</p>
 		{:else}
-			<div class="space-y-4">
+			<div class="space-y-2">
 				{#each expenses as expense (expense.id)}
-					<ExpenseCard {expense} variant="capital" on:delete={handleDelete} />
+					<div class="border rounded-lg p-3 bg-white">
+						<div class="flex justify-between items-center gap-2">
+							<div class="flex-1 min-w-0">
+								<h3 class="font-medium truncate">{expense.description}</h3>
+								{#if expense.expense_date}
+									<p class="text-xs text-muted-foreground">{expense.expense_date}</p>
+								{/if}
+							</div>
+							<p class="text-base font-bold text-blue-700 whitespace-nowrap">
+								{formatCurrency(parseFloat(String(expense.amount)) || 0)}
+							</p>
+							<div class="flex items-center gap-1 shrink-0">
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8 text-muted-foreground hover:text-primary"
+									onclick={() => dispatch('edit', expense)}
+									aria-label="Edit expense"
+								>
+									<Pencil class="h-4 w-4" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="h-8 w-8 text-muted-foreground hover:text-red-600"
+									onclick={() => {
+										if (expense.id !== undefined) {
+											dispatch('delete', expense.id);
+										}
+									}}
+									aria-label="Delete expense"
+								>
+									<Trash2 class="h-4 w-4" />
+								</Button>
+							</div>
+						</div>
+					</div>
 				{/each}
 
 				<div class="mt-2 flex justify-end items-center p-2 border-t">
@@ -100,46 +97,5 @@
 				</div>
 			</div>
 		{/if}
-
-		<!-- Add New Capital Expense -->
-		<div class="border-t pt-4 mt-2">
-			<h3 class="font-medium mb-2">Add New Capital Expense</h3>
-			{#if !selectedPropertyId}
-				<p class="text-amber-600 text-sm mb-2">Please select a property first</p>
-			{/if}
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-				<div class="md:col-span-2">
-					<Input
-						value={newDesc}
-						placeholder="Expense Description"
-						class="bg-white"
-						oninput={(e) => (newDesc = (e.target as HTMLInputElement).value)}
-						disabled={!selectedPropertyId}
-					/>
-				</div>
-				<div class="flex gap-2">
-					<div class="relative flex-grow">
-						<span class="absolute left-3 top-2 text-gray-500">₱</span>
-						<Input
-							type="number"
-							value={newAmount}
-							placeholder="0.00"
-							class="pl-8 bg-white"
-							oninput={(e) => (newAmount = (e.target as HTMLInputElement).value)}
-							disabled={!selectedPropertyId}
-						/>
-					</div>
-					<Button
-						variant="default"
-						class="bg-blue-600 hover:bg-blue-700"
-						onclick={handleAdd}
-						disabled={!newDesc || !newAmount || !selectedPropertyId}
-					>
-						<Plus class="h-4 w-4 mr-1" />
-						Add
-					</Button>
-				</div>
-			</div>
-		</div>
 	</CardContent>
 </Card>

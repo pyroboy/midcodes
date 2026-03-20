@@ -32,6 +32,49 @@ async function snapshotWalls(): Promise<WallSnapshot[]> {
 	}
 }
 
+/**
+ * Remove temp-ID docs (negative IDs) that have been replaced by real server records.
+ * A temp doc is only removed when a matching real record exists locally
+ * (same floor_id + item_type + grid position), so unsaved or unsynced items survive.
+ */
+/** Build a position signature for matching temp docs against real server records. */
+function layoutSignature(doc: any): string {
+	return JSON.stringify([doc.floor_id, doc.item_type, doc.grid_x, doc.grid_y, doc.grid_w, doc.grid_h]);
+}
+
+async function cleanupReplacedTempIds(collectionName: string): Promise<void> {
+	try {
+		const db = await getDb();
+		const col = (db as any)[collectionName];
+		if (!col) return;
+		const allDocs = await col.find({ selector: { deleted_at: { $eq: null } } }).exec();
+
+		// Build signature set of real (server) records
+		const realSignatures = new Set<string>();
+		const tempDocs: { id: string; sig: string }[] = [];
+
+		for (const doc of allDocs) {
+			const sig = layoutSignature(doc);
+			if (Number(doc.id) > 0) {
+				realSignatures.add(sig);
+			} else {
+				tempDocs.push({ id: doc.id, sig });
+			}
+		}
+
+		// Only remove temp docs whose real counterpart was pulled from the server
+		const toRemove = tempDocs.filter((t) => realSignatures.has(t.sig));
+		if (toRemove.length === 0) return;
+
+		await col.bulkRemove(toRemove.map((t) => t.id));
+		const kept = tempDocs.length - toRemove.length;
+		console.log(`[TempCleanup] Removed ${toRemove.length} replaced temp doc(s) from ${collectionName}${kept > 0 ? `, kept ${kept} unsynced` : ''}`);
+		syncStatus.addLog(`Cleanup: removed ${toRemove.length} replaced temp doc(s) from ${collectionName}${kept > 0 ? ` (${kept} unsaved kept)` : ''}`, 'info');
+	} catch (err) {
+		console.warn(`[TempCleanup] Failed for ${collectionName}:`, err);
+	}
+}
+
 async function restoreLostWalls(preSnapshot: WallSnapshot[]): Promise<void> {
 	try {
 		const db = await getDb();
@@ -137,6 +180,10 @@ export function bgResync(collection: string) {
 						// Restore any walls lost during resync
 						if (wallSnapshot && wallSnapshot.length > 0) {
 							await restoreLostWalls(wallSnapshot);
+						}
+						// Clean up temp-ID docs only if real server records exist for them
+						if (collection === 'floor_layout_items') {
+							await cleanupReplacedTempIds('floor_layout_items');
 						}
 						console.log(`[Optimistic] Resync "${collection}" complete ✓`);
 						syncStatus.addLog(`Resync: ${collection} pulled from Neon ✓`, 'success');

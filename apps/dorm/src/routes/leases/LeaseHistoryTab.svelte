@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Clock, Receipt } from 'lucide-svelte';
 	import type { Lease, Billing } from '$lib/types/lease';
-	import { formatCurrency, formatDate } from '$lib/utils/format';
+	import { formatCurrency, formatDate, formatBillingType } from '$lib/utils/format';
 
 	interface Props {
 		lease: Lease;
@@ -38,7 +38,7 @@
 											{formatCurrency(allocation.amount)}
 										</div>
 										<div class="text-sm text-gray-500">
-											Payment for {billing.type} • {formatDate(allocation.payment.paid_at)}
+											Payment for {formatBillingType(billing.type)} • {formatDate(allocation.payment.paid_at)}
 										</div>
 										{#if allocation.payment.method === 'SECURITY_DEPOSIT'}
 											<span
@@ -57,7 +57,7 @@
 								</div>
 								<div class="text-right space-y-1">
 									<div class="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-										{billing.type}
+										{formatBillingType(billing.type)}
 									</div>
 									<div class="text-xs text-gray-500">
 										Due: {formatDate(billing.due_date)}

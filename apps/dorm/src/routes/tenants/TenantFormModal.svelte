@@ -56,11 +56,28 @@
 	// Sync imageDisplayValue with form and preview state
 	$effect(() => {
 		imageDisplayValue = profilePicturePreviewUrl || $form.profile_picture_url || null;
-		console.log('📸 Image display value updated:', imageDisplayValue?.substring(0, 50) + '...');
 	});
 
 	// Unsaved changes confirmation dialog state
 	let showUnsavedDialog = $state(false);
+	let scrollProgress = $state(0);
+	let dialogContentRef: HTMLElement | null = $state(null);
+
+	$effect(() => {
+		if (!open) {
+			scrollProgress = 0;
+			return;
+		}
+		const el = dialogContentRef;
+		if (!el) return;
+		function onScroll() {
+			if (!el) return;
+			const maxScroll = el.scrollHeight - el.clientHeight;
+			scrollProgress = maxScroll > 0 ? (el.scrollTop / maxScroll) * 100 : 0;
+		}
+		el.addEventListener('scroll', onScroll, { passive: true });
+		return () => el.removeEventListener('scroll', onScroll);
+	});
 
 	// Track form changes to prevent accidental exits
 	let initialFormData = $state<string>('');
@@ -206,12 +223,6 @@
 
 	// Handle cropped image from ImageUploadWithCrop - DEFERRED MODE
 	function handleCropReady(file: File, previewUrl: string) {
-		console.log('🎯 Crop ready received:', { 
-			file: file.name, 
-			size: file.size, 
-			previewUrl: previewUrl.substring(0, 50) + '...'
-		});
-
 		// Clean up previous preview URL
 		if (profilePicturePreviewUrl && profilePicturePreviewUrl !== previewUrl) {
 			URL.revokeObjectURL(profilePicturePreviewUrl);
@@ -224,28 +235,18 @@
 		
 		// Manually update the bound value to ensure immediate display
 		imageDisplayValue = previewUrl;
-		
-		console.log('✅ Image ready for upload on form save, imageDisplayValue updated to:', imageDisplayValue?.substring(0, 50) + '...');
 	}
 
 	// Legacy handler - not used with onCropReady
 	function handleProfilePictureUpload(file: File) {
 		// This won't be called when using onCropReady
-		console.log('Legacy upload handler called - this should not happen with deferred mode');
 	}
 
 	// Actual upload function called during form submission
 	async function uploadProfilePicture(): Promise<void> {
 		if (!profilePictureFile) {
-			console.log('⚠️ No profile picture file to upload');
 			return;
 		}
-
-		console.log('📤 Starting image upload:', {
-			fileName: profilePictureFile.name,
-			fileSize: profilePictureFile.size,
-			fileType: profilePictureFile.type
-		});
 
 		const formData = new FormData();
 		formData.append('file', profilePictureFile);
@@ -257,31 +258,21 @@
 
 		if (!response.ok) {
 			const error = await response.json();
-			console.error('❌ Upload failed:', error);
 			throw new Error(error.message || 'Upload failed');
 		}
 
 		const result = await response.json();
-		console.log('✅ Upload successful:', {
-			secure_url: result.secure_url,
-			previousUrl: $form.profile_picture_url
-		});
-		
+
 		$form.profile_picture_url = result.secure_url;
-		
+
 		// Force update of the hidden input field
 		const hiddenInput = document.querySelector('input[name="profile_picture_url"]') as HTMLInputElement;
 		if (hiddenInput) {
 			hiddenInput.value = result.secure_url;
-			console.log('🎯 Hidden input forcibly updated to:', hiddenInput.value);
 		}
-		
-		console.log('✅ Form profile_picture_url updated to:', $form.profile_picture_url);
 	}
 
 	function handleProfilePictureRemove() {
-		console.log('🗑️ Removing profile picture');
-		
 		// Clean up preview URL if exists
 		if (profilePicturePreviewUrl) {
 			URL.revokeObjectURL(profilePicturePreviewUrl);
@@ -291,8 +282,6 @@
 		$form.profile_picture_url = null;
 		profilePictureFile = null;
 		hasSelectedNewImage = true; // Mark as changed for unsaved changes detection
-		
-		console.log('✅ Profile picture removed');
 	}
 
 	function handleProfilePictureError(error: string) {
@@ -304,7 +293,7 @@
 
 	// Handle modal close with unsaved changes check
 	function handleModalClose(shouldClose: boolean) {
-		if (shouldClose && hasUnsavedChanges) {
+		if (!shouldClose && hasUnsavedChanges) {
 			showUnsavedDialog = true;
 			return;
 		}
@@ -313,7 +302,7 @@
 
 	function confirmDiscardChanges() {
 		showUnsavedDialog = false;
-		onOpenChange(true);
+		onOpenChange(false);
 	}
 
 	// Reset form when modal opens/closes or tenant changes
@@ -321,9 +310,6 @@
 		if (open) {
 			if (editMode && tenant) {
 				// Edit mode - populate with existing tenant data
-				console.log('🔄 Edit mode - Tenant data:', tenant);
-				console.log('🔄 Edit mode - Emergency contact:', tenant.emergency_contact);
-
 				$form = {
 					id: tenant.id,
 					name: tenant.name || '',
@@ -406,13 +392,6 @@
 				};
 			}
 
-			// Reset image states when opening modal (but don't reset if we have a fresh crop)
-			console.log('🔄 Modal opened - resetting image states', { 
-				editMode, 
-				tenantImage: tenant?.profile_picture_url,
-				hasNewCrop: hasSelectedNewImage && profilePicturePreviewUrl
-			});
-			
 			// Only reset if we don't have a fresh cropped image
 			if (!hasSelectedNewImage || !profilePicturePreviewUrl) {
 				profilePictureFile = null;
@@ -421,8 +400,6 @@
 					URL.revokeObjectURL(profilePicturePreviewUrl);
 					profilePicturePreviewUrl = null;
 				}
-			} else {
-				console.log('🎯 Preserving cropped image - not resetting image states');
 			}
 
 			// Set initial form data after form is populated
@@ -442,7 +419,7 @@
 </script>
 
 <Dialog {open} onOpenChange={handleModalClose}>
-	<DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+	<DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" bind:ref={dialogContentRef}>
 		<DialogHeader>
 			<div class="flex items-center gap-2">
 				{#if editMode}
@@ -458,6 +435,13 @@
 					: 'Create a new tenant and add their contact information.'} Click save when you're done.
 			</DialogDescription>
 		</DialogHeader>
+
+		<div class="h-0.5 w-full bg-slate-200 rounded-full overflow-hidden -mb-2">
+			<div
+				class="h-full bg-primary transition-[width] duration-150 ease-out"
+				style="width: {scrollProgress}%"
+			></div>
+		</div>
 
 		<form method="POST" action={editMode ? '?/update' : '?/create'} onsubmit={handleCustomSubmit} class="space-y-6">
 			<!-- Hidden input for tenant ID in edit mode -->

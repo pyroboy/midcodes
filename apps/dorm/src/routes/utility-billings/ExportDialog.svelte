@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Button } from '$lib/components/ui/button';
@@ -7,18 +6,26 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import type { ExportEvent } from './types';
 
-	export let open: boolean = false;
-	export let fromDate: string = '';
-	export let toDate: string = '';
-	export let exportFormat: string = 'csv';
+	interface Props {
+		open?: boolean;
+		fromDate?: string;
+		toDate?: string;
+		exportFormat?: string;
+		onexport?: (data: ExportEvent) => void;
+		onclose?: () => void;
+	}
 
-	const dispatch = createEventDispatcher<{
-		close: void;
-		export: ExportEvent;
-	}>();
+	let {
+		open = $bindable(false),
+		fromDate = $bindable(''),
+		toDate = $bindable(''),
+		exportFormat = $bindable('csv'),
+		onexport,
+		onclose
+	}: Props = $props();
 
 	function handleExport(): void {
-		dispatch('export', {
+		onexport?.({
 			format: exportFormat,
 			fromDate,
 			toDate
@@ -26,7 +33,7 @@
 	}
 
 	function handleClose(): void {
-		dispatch('close');
+		onclose?.();
 	}
 </script>
 

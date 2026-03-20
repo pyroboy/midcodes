@@ -31,10 +31,12 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	if (propertySlug && !errorDetails.length) {
 		console.log(`Looking for property with slug: "${propertySlug}"`);
 
+		// Support both numeric ID and name-based lookup for URL consistency
+		const isNumericId = /^\d+$/.test(propertySlug);
 		const propertyResult = await db
 			.select({ id: properties.id, name: properties.name, status: properties.status })
 			.from(properties)
-			.where(eq(properties.name, propertySlug))
+			.where(isNumericId ? eq(properties.id, Number(propertySlug)) : eq(properties.name, propertySlug))
 			.limit(1);
 
 		const propertyData = propertyResult[0];
@@ -50,7 +52,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	}
 
 	// Helper function to generate future date links
-	function generateFutureDateLinks(propSlug: string, currentDate: string) {
+	function generateFutureDateLinks(propId: number, currentDate: string) {
 		const serverToday = new Date().toISOString().split('T')[0];
 		const todayObj = new Date(serverToday);
 
@@ -71,7 +73,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		if (isCurrentViewingDate) {
 			futureDates.push(`${label} *(current)*`);
 		} else {
-			futureDates.push(`[${label}](/utility-input/electricity/${propSlug}/${tomorrowStr})`);
+			futureDates.push(`[${label}](/utility-input/electricity/${propId}/${tomorrowStr})`);
 		}
 
 		if (futureDates.length > 0) {
@@ -112,7 +114,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 			existingReadingsCount = validReadings.length;
 
 			if (existingReadingsCount > 0) {
-				const futureDateLinks = generateFutureDateLinks(property.name, date);
+				const futureDateLinks = generateFutureDateLinks(property.id, date);
 				const displayDate = new Date(date).toLocaleDateString('en-US', {
 					weekday: 'long',
 					year: 'numeric',
@@ -248,7 +250,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 				const nextDayFormatted = nextDay.toLocaleDateString('en-US', {
 					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
-				const validDateUrl = `/utility-input/electricity/${propertySlug}/${dateString}`;
+				const validDateUrl = `/utility-input/electricity/${property!.id}/${dateString}`;
 				const validDateButton = `[Next Reading Date: ${nextDayFormatted}](${validDateUrl})`;
 
 				const today = new Date();
@@ -256,7 +258,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 				const todayFormatted = today.toLocaleDateString('en-US', {
 					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
-				const todayButton = `[Today's Date: ${todayFormatted}](/utility-input/electricity/${propertySlug}/${todayString})`;
+				const todayButton = `[Today's Date: ${todayFormatted}](/utility-input/electricity/${property!.id}/${todayString})`;
 
 				errorDetails.push(
 					`Date Restriction\n\nYou requested: ${requestedFormatted}\nLast reading: ${lastReadingFormatted}\n\nCannot access dates before your most recent meter reading.\n\n${validDateButton}\n\n${todayButton}`
