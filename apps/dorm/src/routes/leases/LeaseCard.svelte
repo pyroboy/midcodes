@@ -187,23 +187,30 @@
 	});
 
 	// [04] + [10]: Unified payment status color for left border and status dot
+	// P2-5: Severity gradient — more tiers so "wall of red" differentiates urgency
 	let paymentStatusColor = $derived.by(() => {
 		const bs = lease.balanceStatus;
-		if (!bs) return { border: 'border-l-slate-200', dot: 'bg-slate-300', label: 'No data' };
+		if (!bs) return { border: 'border-l-slate-200', dot: 'bg-slate-300', label: 'No data', severity: 0 };
 		if (bs.hasOverdue) {
 			const days = bs.daysOverdue || 0;
-			if (days >= 90) {
-				return { border: 'border-l-red-600', dot: 'bg-red-500', label: 'Critical overdue' };
+			if (days >= 180) {
+				return { border: 'border-l-red-800', dot: 'bg-red-700', label: `${days}d overdue`, severity: 4 };
 			}
-			return { border: 'border-l-amber-500', dot: 'bg-amber-500', label: 'Overdue' };
+			if (days >= 90) {
+				return { border: 'border-l-red-600', dot: 'bg-red-500', label: `${days}d overdue`, severity: 3 };
+			}
+			if (days >= 30) {
+				return { border: 'border-l-red-400', dot: 'bg-red-400', label: `${days}d overdue`, severity: 2 };
+			}
+			return { border: 'border-l-amber-500', dot: 'bg-amber-500', label: `${days}d overdue`, severity: 1 };
 		}
 		if (bs.hasPartial) {
-			return { border: 'border-l-amber-400', dot: 'bg-amber-400', label: 'Partial' };
+			return { border: 'border-l-amber-400', dot: 'bg-amber-400', label: 'Partial', severity: 0 };
 		}
 		if (bs.hasPending) {
-			return { border: 'border-l-orange-400', dot: 'bg-orange-400', label: 'Pending' };
+			return { border: 'border-l-orange-400', dot: 'bg-orange-400', label: 'Pending', severity: 0 };
 		}
-		return { border: 'border-l-green-500', dot: 'bg-green-500', label: 'Paid' };
+		return { border: 'border-l-green-500', dot: 'bg-green-500', label: 'Paid', severity: 0 };
 	});
 
 	// [09]: Lease expiry info
@@ -545,8 +552,8 @@
 				</DropdownMenu.Root>
 			</div>
 
-			<!-- Action Buttons -->
-			<div class="flex items-center gap-2 flex-shrink-0">
+			<!-- Action Buttons — visually separated from card click area -->
+			<div class="flex items-center gap-2 flex-shrink-0 pl-3 border-l border-slate-200/60">
 				<!-- Three-dots Popover (Desktop) -->
 				<Popover.Root bind:open={showDesktopActions}>
 					<Popover.Trigger
@@ -676,8 +683,8 @@
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 
-				<!-- Action Buttons Container -->
-				<div class="flex items-center gap-2">
+				<!-- Action Buttons Container — visually separated -->
+				<div class="flex items-center gap-2 pl-2 border-l border-slate-200/60">
 					<!-- Three-dots Popover with Action Buttons (Mobile) -->
 					<Popover.Root bind:open={showMobileActions}>
 						<Popover.Trigger

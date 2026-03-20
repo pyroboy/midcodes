@@ -283,25 +283,24 @@
 	}
 
 	// Format number with appropriate decimal places
-	function formatNumber(value: number | null | undefined): string {
+	function formatNumber(value: number | string | null | undefined): string {
 		if (value === null || value === undefined) return '-';
-
-		if (value === Math.floor(value)) {
-			return value.toString();
-		}
-		return value.toFixed(2);
+		const num = typeof value === 'string' ? parseFloat(value) : value;
+		if (isNaN(num)) return '-';
+		return num === Math.floor(num) ? num.toString() : num.toFixed(2);
 	}
 
 	// Format currency with peso sign
-	function formatCurrency(amount: number | null | undefined): string {
+	function formatCurrency(amount: number | string | null | undefined): string {
 		if (amount === null || amount === undefined) return '-';
-
+		const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+		if (isNaN(num)) return '-';
 		return new Intl.NumberFormat('en-PH', {
 			style: 'currency',
 			currency: 'PHP',
 			minimumFractionDigits: 2,
 			maximumFractionDigits: 2
-		}).format(amount);
+		}).format(num);
 	}
 
 	// Get utility color class

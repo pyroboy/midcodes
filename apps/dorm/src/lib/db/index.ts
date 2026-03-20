@@ -3,7 +3,6 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
 import { RxDBCleanupPlugin } from 'rxdb/plugins/cleanup';
-import { RxDBLeaderElectionPlugin } from 'rxdb/plugins/leader-election';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import {
 	tenantSchema,
@@ -34,7 +33,6 @@ if (!pluginsRegistered) {
 	addRxPlugin(RxDBUpdatePlugin);
 	addRxPlugin(RxDBQueryBuilderPlugin);
 	addRxPlugin(RxDBCleanupPlugin);
-	addRxPlugin(RxDBLeaderElectionPlugin);
 	addRxPlugin(RxDBMigrationSchemaPlugin);
 	pluginsRegistered = true;
 }
@@ -115,12 +113,29 @@ export async function getDb(): Promise<RxDatabase> {
 
 		const DB_NAME = 'dorm_db';
 
+		// UT8: crypto.subtle is unavailable in insecure contexts (HTTP on mobile).
+		// Provide a JS-only fallback hash so RxDB works over LAN/HTTP dev servers.
+		const hasSubtle = typeof globalThis.crypto?.subtle?.digest === 'function';
+		const hashFunction = hasSubtle
+			? undefined // use RxDB default (crypto.subtle)
+			: async (input: string) => {
+					// Simple djb2-based hash — not cryptographic, but RxDB only needs
+					// consistent hashing for internal change detection, not security.
+					let h = 5381;
+					for (let i = 0; i < input.length; i++) {
+						h = ((h << 5) + h + input.charCodeAt(i)) >>> 0;
+					}
+					return String(h.toString(16).padStart(8, '0'));
+				};
+
 		const createDb = async () => {
 			const db = await createRxDatabase({
 				name: DB_NAME,
 				storage,
 				eventReduce: true,
-				ignoreDuplicate: dev
+				multiInstance: false,
+				ignoreDuplicate: dev,
+				...(hashFunction ? { hashFunction } : {})
 			});
 
 			// Only add collections if not already present

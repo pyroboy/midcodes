@@ -61,6 +61,16 @@
 	let referenceNumber = $state('');
 	let paidBy = $state((() => lease.lease_tenants?.[0]?.tenant?.name || '')());
 	let paidAt = $state(new Date().toISOString().split('T')[0]);
+	let isSubmitting = $state(false);
+	let mobileBillingsExpanded = $state(true);
+
+	// Human-friendly billing type labels
+	const billingTypeLabels: Record<string, string> = {
+		RENT: 'Monthly Rent',
+		UTILITY: 'Utility Bill',
+		SECURITY_DEPOSIT: 'Security Deposit',
+		PENALTY: 'Penalty Fee'
+	};
 
 	// Calculate available security deposit amount (based on paid_amount, not balance)
 	let availableSecurityDeposit = $derived.by(() => {
@@ -85,6 +95,14 @@
 		return totalPaid - amountUsed;
 	});
 
+	let canSubmit = $derived(
+		paymentAmount > 0 &&
+		selectedBillings.size > 0 &&
+		!!paidAt &&
+		!(selectedPaymentType === 'SECURITY_DEPOSIT' && paymentAmount > availableSecurityDeposit) &&
+		!isSubmitting
+	);
+
 	function toggleBilling(billingId: number) {
 		const newSelected = new Set(selectedBillings);
 		if (newSelected.has(billingId)) {
@@ -107,8 +125,12 @@
 					0
 				) || 0;
 
-		if (selectedBillings.size === 0) {
-			paymentAmount = 0;
+		// P0-1 fix: Auto-fill amount to match selected billing total
+		paymentAmount = selectedAmount;
+
+		// Auto-collapse billings on mobile after first selection to reveal form
+		if (selectedBillings.size > 0 && window.innerWidth < 1024) {
+			mobileBillingsExpanded = false;
 		}
 	}
 
@@ -147,6 +169,8 @@
 
 	async function handleSubmit(event: Event) {
 		event.preventDefault();
+		if (isSubmitting) return;
+		isSubmitting = true;
 		try {
 			if (!paymentAmount || paymentAmount <= 0)
 				throw new Error('Payment amount must be greater than zero.');
@@ -214,6 +238,8 @@
 			toast.error('Payment Failed', {
 				description: errorMessage
 			});
+		} finally {
+			isSubmitting = false;
 		}
 	}
 
@@ -288,6 +314,14 @@
 		if (!isOpen) return [];
 		return sortBillingsByDueDate(lease.billings);
 	});
+
+	// P2-3: Check if all unpaid billings share the same status — suppress individual badges when redundant
+	let allSameStatus = $derived.by(() => {
+		const unpaid = sortedBillings.filter((b: Billing) => b.status !== 'PAID');
+		if (unpaid.length <= 1) return false;
+		const statuses = new Set(unpaid.map((b: Billing) => getDisplayStatus(b)));
+		return statuses.size === 1;
+	});
 	let paymentAllocation = $derived.by(() => {
 		if (!isOpen) return [];
 		return calculatePaymentAllocation(paymentAmount, lease.billings || [], selectedBillings);
@@ -330,20 +364,64 @@
 </script>
 
 <Dialog.Root open={isOpen} {onOpenChange}>
-	<Dialog.Content class="sm:max-w-[1000px]">
-		<Dialog.Header>
+	<Dialog.Content class="sm:max-w-[1000px] max-h-[90dvh] flex flex-col overflow-hidden p-0">
+		<Dialog.Header class="px-4 pt-4 pb-2 sm:px-6 sm:pt-6 flex-shrink-0">
 			<Dialog.Title>Make Payment</Dialog.Title>
 			<Dialog.Description>
 				Enter payment details for lease {lease?.name || `#${lease?.id}`}
 			</Dialog.Description>
 		</Dialog.Header>
 
-		<form onsubmit={handleSubmit} class="space-y-6">
-			<div class="grid grid-cols-3 gap-4">
+		<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0">
+			<!-- Scrollable content area -->
+			<div class="flex-1 overflow-y-auto px-4 sm:px-6 pb-2">
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 				<!-- Billings List -->
-				<div class="border-r pr-4">
-					<h3 class="font-medium mb-2">Outstanding Billings</h3>
-					<div class="space-y-2 max-h-[400px] overflow-y-auto">
+				<div class="lg:border-r lg:pr-4">
+					<!-- Mobile: collapsible billings header -->
+					<div class="flex items-center justify-between mb-2">
+						<button
+							type="button"
+							class="font-medium flex items-center gap-1.5 lg:pointer-events-none"
+							onclick={() => { mobileBillingsExpanded = !mobileBillingsExpanded; }}
+						>
+							<svg class="w-4 h-4 transition-transform lg:hidden {mobileBillingsExpanded ? 'rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+							Outstanding Billings
+							{#if selectedBillings.size > 0}
+								<span class="text-xs text-primary font-normal lg:hidden">({selectedBillings.size} selected)</span>
+							{/if}
+						</button>
+						{#if sortedBillings.filter((b: Billing) => b.status !== 'PAID').length > 1}
+							<button
+								type="button"
+								class="text-xs text-primary hover:underline font-medium"
+								onclick={() => {
+									const unpaid = sortedBillings.filter((b: Billing) => b.status !== 'PAID');
+									if (selectedBillings.size === unpaid.length) {
+										selectedBillings = new Set();
+									} else {
+										selectedBillings = new Set(unpaid.map((b: Billing) => b.id));
+									}
+									updateSelectedAmount();
+									resetInvalidPaymentType();
+								}}
+							>
+								{selectedBillings.size === sortedBillings.filter((b: Billing) => b.status !== 'PAID').length ? 'Deselect All' : 'Select All'}
+							</button>
+						{/if}
+					</div>
+
+					<!-- Mobile: collapsed summary when billings are selected and section is collapsed -->
+					{#if !mobileBillingsExpanded && selectedBillings.size > 0}
+						<div class="lg:hidden p-2.5 rounded-lg bg-primary/5 border border-primary/20 mb-2">
+							<div class="flex justify-between items-center text-sm">
+								<span>{selectedBillings.size} billing{selectedBillings.size > 1 ? 's' : ''} selected</span>
+								<span class="font-semibold">{formatCurrency(selectedAmount)}</span>
+							</div>
+						</div>
+					{/if}
+
+					<div class="space-y-2 max-h-[300px] lg:max-h-[400px] overflow-y-auto {!mobileBillingsExpanded ? 'hidden lg:block' : ''}">
 						{#if sortedBillings.filter((b: Billing) => b.status !== 'PAID').length > 0}
 							{#each sortedBillings.filter((b: Billing) => b.status !== 'PAID') as billing (billing.id)}
 								{@const displayStatus = getDisplayStatus(billing)}
@@ -363,7 +441,29 @@
 									aria-checked={selectedBillings.has(billing.id)}
 									tabindex="0"
 								>
-									<div class="flex items-start gap-3">
+									<!-- Mobile: compact billing row -->
+									<div class="flex items-center gap-3 lg:hidden">
+										<input
+											type="checkbox"
+											checked={selectedBillings.has(billing.id)}
+											class="h-5 w-5 flex-shrink-0"
+											tabindex="-1"
+										/>
+										<div class="flex-1 min-w-0">
+											<div class="flex justify-between items-center">
+												<span class="font-medium text-sm truncate">{billingTypeLabels[billing.type] || billing.type}</span>
+												<span class="font-semibold text-sm ml-2 flex-shrink-0">{formatCurrency(billing.amount + (billing.penalty_amount || 0) - billing.paid_amount)}</span>
+											</div>
+											<div class="flex justify-between items-center mt-0.5">
+												<span class="text-xs text-muted-foreground">Due: {formatDate(billing.due_date ?? '')}</span>
+												{#if !allSameStatus}
+													<span class="text-[10px] px-1.5 py-0.5 rounded {statusColors[displayStatus]}">{displayStatus.toLowerCase()}</span>
+												{/if}
+											</div>
+										</div>
+									</div>
+									<!-- Desktop: full billing detail -->
+									<div class="hidden lg:flex items-start gap-3">
 										<input
 											type="checkbox"
 											checked={selectedBillings.has(billing.id)}
@@ -373,7 +473,7 @@
 										<div class="flex-grow">
 											<div class="flex justify-between items-start">
 												<div>
-													<span class="font-medium">{billing.type}</span>
+													<span class="font-medium">{billingTypeLabels[billing.type] || billing.type}</span>
 													<div class="text-sm text-muted-foreground">
 														Due: {formatDate(billing.due_date ?? '')}
 														{#if billing.penalty_amount > 0}
@@ -383,12 +483,14 @@
 														{/if}
 													</div>
 												</div>
-												<Badge
-													variant="outline"
-													class={`capitalize ${statusColors[displayStatus]}`}
-												>
-													{displayStatus.toLowerCase()}
-												</Badge>
+												{#if !allSameStatus}
+													<Badge
+														variant="outline"
+														class={`capitalize ${statusColors[displayStatus]}`}
+													>
+														{displayStatus.toLowerCase()}
+													</Badge>
+												{/if}
 											</div>
 
 											<div class="mt-2 space-y-1 text-sm">
@@ -438,31 +540,35 @@
 					<div class="space-y-4">
 						<!-- Balance Display -->
 						<div class="flex justify-between items-center py-2 px-3 bg-muted rounded-md">
-							<span>Current Balance:</span>
+							<span class="text-sm text-muted-foreground">Lease Balance</span>
 							<span class="font-semibold text-lg">
 								{formatCurrency(lease.balance)}
 							</span>
 						</div>
-						<div class="flex justify-between items-center py-2 px-3 bg-muted rounded-md">
-							<span>Selected Amount:</span>
-							<span class="font-semibold text-lg">
-								{formatCurrency(selectedAmount)}
-							</span>
-						</div>
-						<!-- Payment Type Select -->
+						{#if selectedBillings.size > 0}
+							<div class="flex justify-between items-center py-2 px-3 bg-primary/5 border border-primary/20 rounded-md">
+								<span class="text-sm">Outstanding Total <span class="text-muted-foreground">({selectedBillings.size} selected)</span></span>
+								<span class="font-semibold text-lg">
+									{formatCurrency(selectedAmount)}
+								</span>
+							</div>
+						{/if}
+						<!-- Payment Method Button Group -->
 						<div>
-							<Label for="payment-type">Payment Method</Label>
-							<select
-								id="payment-type"
-								bind:value={selectedPaymentType}
-								class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-							>
+							<Label>Payment Method</Label>
+							<div class="grid grid-cols-2 gap-1.5 mt-1.5">
 								{#each availablePaymentTypes as type}
-									<option value={type.value}>
-										{type.value === 'SECURITY_DEPOSIT' ? 'Security Deposit' : type.label}
-									</option>
+									<button
+										type="button"
+										class="px-3 py-2 text-sm rounded-md border transition-colors {selectedPaymentType === type.value
+											? 'bg-primary text-primary-foreground border-primary'
+											: 'bg-background border-input hover:bg-muted'}"
+										onclick={() => { selectedPaymentType = type.value; }}
+									>
+										{type.label}
+									</button>
 								{/each}
-							</select>
+							</div>
 						</div>
 
 						<!-- Security Deposit Info -->
@@ -527,39 +633,48 @@
 									min="0.01"
 									step="0.01"
 								/>
-								<Button
-									type="button"
-									variant="outline"
-									onclick={setExactAmount}
-									disabled={!selectedAmount}
-								>
-									Exact
-								</Button>
+								{#if selectedAmount > 0 && paymentAmount !== selectedAmount}
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onclick={setExactAmount}
+										title="Reset to selected billing total ({formatCurrency(selectedAmount)})"
+									>
+										Fill Total
+									</Button>
+								{/if}
 							</div>
+							{#if paymentAmount > 0 && selectedAmount > 0 && paymentAmount !== selectedAmount}
+								<p class="text-xs text-muted-foreground mt-1">
+									{paymentAmount < selectedAmount
+										? `Partial payment — ${formatCurrency(selectedAmount - paymentAmount)} will remain unpaid`
+										: `Overpayment — ${formatCurrency(paymentAmount - selectedAmount)} change`}
+								</p>
+							{/if}
 						</div>
 
 						<!-- Reference Number -->
-						{#if selectedPaymentType !== 'CASH'}
-							<div>
-								<Label for="reference">Reference Number</Label>
-								<Input
-									id="reference"
-									bind:value={referenceNumber}
-									placeholder="e.g., Transaction ID"
-								/>
-							</div>
-						{/if}
+						<div>
+							<Label for="reference">Reference Number</Label>
+							<Input
+								id="reference"
+								bind:value={referenceNumber}
+								placeholder={selectedPaymentType === 'CASH' ? 'N/A for cash payments' : 'e.g., Transaction ID'}
+								disabled={selectedPaymentType === 'CASH'}
+							/>
+						</div>
 					</div>
 				</div>
 
-				<!-- Payment Summary -->
-				<div class="border-l pl-4">
+				<!-- Payment Summary — hidden on mobile (shown in sticky footer), visible on desktop -->
+				<div class="hidden lg:block lg:border-l lg:pl-4">
 					<h3 class="font-medium mb-2">Payment Summary</h3>
 					<div class="space-y-4">
 						<!-- Total Amount -->
 						<div class="p-3 bg-muted rounded-lg space-y-2">
 							<div class="flex justify-between items-center">
-								<span>Payment Amount:</span>
+								<span>You're Paying:</span>
 								<span
 									class="font-semibold text-lg {getPaymentAmountStyle(
 										paymentAmount,
@@ -601,17 +716,15 @@
 							<h4 class="text-sm font-medium">Payment Allocation:</h4>
 							{#if paymentAllocation.length > 0}
 								{#each paymentAllocation as { billing_id, amount, new_status }}
+									{@const matchedBilling = lease.billings?.find((b: Billing) => b.id === billing_id)}
 									<div class="p-2 border rounded">
 										<div class="flex justify-between items-start">
 											<div>
 												<div class="font-medium">
-													{lease.billings?.find((b: Billing) => b.id === billing_id)?.type}
+													{billingTypeLabels[matchedBilling?.type || ''] || matchedBilling?.type || ''}
 												</div>
 												<div class="text-sm text-muted-foreground">
-													Due: {formatDate(
-														lease.billings?.find((b: Billing) => b.id === billing_id)?.due_date ??
-															''
-													)}
+													Due: {formatDate(matchedBilling?.due_date ?? '')}
 												</div>
 											</div>
 											<div class="text-right">
@@ -623,26 +736,112 @@
 										</div>
 									</div>
 								{/each}
+							{:else if selectedBillings.size > 0}
+								<p class="text-sm text-muted-foreground">Enter an amount to see allocation preview</p>
 							{:else}
-								<p class="text-sm text-muted-foreground">No billings selected</p>
+								<p class="text-sm text-muted-foreground">Select billings to get started</p>
 							{/if}
 						</div>
 					</div>
 				</div>
 			</div>
 
-			<!-- Submit Button Row -->
-			<div class="border-t pt-4 flex justify-end gap-2">
+			<!-- Mobile: inline allocation preview (before sticky footer, inside scroll area) -->
+			<div class="lg:hidden">
+				{#if paymentAllocation.length > 0}
+					<div class="space-y-1.5 mt-3">
+						<h4 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Allocation Preview</h4>
+						{#each paymentAllocation as { billing_id, amount, new_status }}
+							{@const matchedBilling = lease.billings?.find((b: Billing) => b.id === billing_id)}
+							<div class="flex justify-between items-center p-2 bg-muted/50 rounded text-sm">
+								<span class="truncate">{billingTypeLabels[matchedBilling?.type || ''] || matchedBilling?.type || ''}</span>
+								<div class="flex items-center gap-2 flex-shrink-0">
+									<span class="font-medium">{formatCurrency(amount)}</span>
+									<span class="text-[10px] px-1.5 py-0.5 rounded {new_status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">{new_status}</span>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+			</div><!-- end scrollable content -->
+
+			<!-- Desktop: Submit Button Row -->
+			<div class="hidden lg:flex border-t pt-4 pb-4 px-6 items-center justify-between gap-2 flex-shrink-0">
+				{#if !canSubmit && !isSubmitting}
+					<p class="text-xs text-muted-foreground">
+						{#if !selectedBillings.size}
+							Select at least one billing
+						{:else if !paymentAmount || paymentAmount <= 0}
+							Enter a payment amount
+						{:else if !paidAt}
+							Select a payment date
+						{:else if selectedPaymentType === 'SECURITY_DEPOSIT' && paymentAmount > availableSecurityDeposit}
+							Amount exceeds available security deposit
+						{/if}
+					</p>
+				{:else}
+					<div></div>
+				{/if}
 				<Button
 					type="submit"
-					disabled={!paymentAmount ||
-						!selectedBillings.size ||
-						!paidAt ||
-						(selectedPaymentType === 'SECURITY_DEPOSIT' &&
-							paymentAmount > availableSecurityDeposit)}
+					disabled={!canSubmit}
 				>
-					Submit Payment
+					{#if isSubmitting}
+						<svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						Submitting...
+					{:else}
+						Submit Payment
+					{/if}
 				</Button>
+			</div>
+
+			<!-- Mobile: Sticky footer with amount + submit -->
+			<div class="lg:hidden flex-shrink-0 border-t bg-background px-4 py-3 safe-area-bottom">
+				<div class="flex items-center justify-between gap-3">
+					<div class="min-w-0">
+						{#if !canSubmit && !isSubmitting}
+							<p class="text-xs text-muted-foreground truncate">
+								{#if !selectedBillings.size}
+									Select billings
+								{:else if !paymentAmount || paymentAmount <= 0}
+									Enter amount
+								{:else if !paidAt}
+									Select date
+								{:else if selectedPaymentType === 'SECURITY_DEPOSIT' && paymentAmount > availableSecurityDeposit}
+									Exceeds deposit
+								{/if}
+							</p>
+						{:else}
+							<div class="text-sm font-semibold {getPaymentAmountStyle(paymentAmount, getTotalAllocationsNeeded())}">
+								{formatCurrency(paymentAmount)}
+							</div>
+							{#if paymentAmount > 0 && paymentAmount < getTotalAllocationsNeeded()}
+								<p class="text-[10px] text-yellow-600">Partial — {formatCurrency(getTotalAllocationsNeeded() - paymentAmount)} remains</p>
+							{:else if paymentAmount > 0 && paymentAmount > getTotalAllocationsNeeded() && getTotalAllocationsNeeded() > 0}
+								<p class="text-[10px] text-green-600">{formatCurrency(paymentAmount - getTotalAllocationsNeeded())} change</p>
+							{/if}
+						{/if}
+					</div>
+					<Button
+						type="submit"
+						disabled={!canSubmit}
+						class="min-h-[44px] px-6 flex-shrink-0"
+					>
+						{#if isSubmitting}
+							<svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+							Submitting...
+						{:else}
+							Submit Payment
+						{/if}
+					</Button>
+				</div>
 			</div>
 		</form>
 	</Dialog.Content>
