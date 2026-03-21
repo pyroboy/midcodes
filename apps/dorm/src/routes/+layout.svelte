@@ -322,7 +322,6 @@
 			category: 'Finance',
 			links: [
 				{ href: '/payments', label: 'Payments', icon: CreditCard },
-				{ href: '/payment-history', label: 'Payment History', icon: ArrowLeftRight },
 				{ href: '/expenses', label: 'Expenses', icon: Receipt },
 				{ href: '/budgets', label: 'Budgets', icon: PiggyBank }
 			]
@@ -582,35 +581,40 @@
 					</Sidebar.Root>
 
 					<!-- Flex container for Main Content + 3D Panel -->
-					<div class="flex flex-1 min-w-0 flex-col h-screen">
+					<div class="flex flex-1 min-w-0 flex-col h-dvh">
 						<!-- Header -->
 						<div
-							class="flex items-center justify-between p-4 md:p-6 border-b bg-background/95 backdrop-blur shrink-0"
+							class="flex items-center justify-between px-3 py-2 md:px-6 md:py-4 border-b bg-background/95 backdrop-blur shrink-0 min-h-[48px]"
 						>
-							<div class="flex items-center gap-4">
+							<div class="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
 								<Sidebar.Trigger />
 
 								{#if data.user}
-									<div class="flex items-center gap-2">
+									<div class="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
 										<!-- W11: Offline indicator -->
 										{#if !onlineStatus.value}
-											<div class="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md">
-												<WifiOff class="w-3.5 h-3.5 text-red-500" />
-												<span class="text-xs font-medium text-red-600 dark:text-red-400">Offline</span>
+											<div class="flex items-center gap-1 px-1.5 py-0.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md flex-shrink-0">
+												<WifiOff class="w-3 h-3 text-red-500" />
+												<span class="text-xs font-medium text-red-600 dark:text-red-400 hidden sm:inline">Offline</span>
 											</div>
 										{/if}
-										<PropertySelector />
-										<NotificationBell />
-										<SyncIndicator />
+										<div class="min-w-0 flex-shrink">
+											<PropertySelector />
+										</div>
+										<div class="flex items-center gap-1 flex-shrink-0">
+											<NotificationBell />
+											<SyncIndicator />
+										</div>
 
-										<!-- 3D View link to floorplan -->
+										<!-- 3D View quick access — icon on mobile, full button on desktop -->
 										{#if $featureFlags.enable3DView && $propertyStore.selectedPropertyId}
 											<a
-												href="/property/{$propertyStore.selectedPropertyId}/floorplan"
-												class="inline-flex items-center gap-2 ml-2 px-3 py-1.5 text-sm font-medium rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
+												href="/property/{$propertyStore.selectedPropertyId}/floorplan?view=3d"
+												class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:gap-2 sm:ml-1 sm:px-3 sm:py-1.5 text-sm font-medium rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors flex-shrink-0"
+												aria-label="3D View"
 											>
 												<Box class="w-4 h-4" />
-												3D View
+												<span class="hidden sm:inline">3D View</span>
 											</a>
 										{/if}
 									</div>

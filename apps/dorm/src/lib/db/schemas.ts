@@ -359,7 +359,7 @@ export const penaltyConfigSchema: RxJsonSchema<any> = {
 // ─── Floor Layout Items ────────────────────────────────────────────────────
 
 export const floorLayoutItemSchema: RxJsonSchema<any> = {
-	version: 0,
+	version: 1,
 	primaryKey: 'id',
 	type: 'object',
 	properties: {

@@ -13,18 +13,19 @@ import { syncStatus } from '$lib/stores/sync-status.svelte';
 import { mutationQueue } from '$lib/stores/mutation-queue.svelte';
 import { toast } from 'svelte-sonner';
 
-// ─── Wall Integrity Protection ──────────────────────────────────────────────
-// Snapshots all WALL items before a floor_layout_items resync. After resync,
-// restores any walls that were lost (present before, missing after).
-// This prevents pull replication from accidentally dropping optimistic walls.
+// ─── Layout Integrity Protection (M1: protects ALL items, not just walls) ────
+// Snapshots all active floor_layout_items before a resync. After resync,
+// restores any items that were lost (present before, missing after).
+// This prevents pull replication from accidentally dropping optimistic writes
+// for walls, room assignments, and all other item types.
 
-type WallSnapshot = Record<string, any>;
+type LayoutItemSnapshot = Record<string, any>;
 
-async function snapshotWalls(): Promise<WallSnapshot[]> {
+async function snapshotLayoutItems(): Promise<LayoutItemSnapshot[]> {
 	try {
 		const db = await getDb();
 		const allDocs = await db.floor_layout_items.find({
-			selector: { item_type: 'WALL', deleted_at: { $eq: null } }
+			selector: { deleted_at: { $eq: null } }
 		}).exec();
 		return allDocs.map((doc: any) => doc.toJSON(true));
 	} catch {
@@ -35,12 +36,17 @@ async function snapshotWalls(): Promise<WallSnapshot[]> {
 /**
  * Remove temp-ID docs (negative IDs) that have been replaced by real server records.
  * A temp doc is only removed when a matching real record exists locally
- * (same floor_id + item_type + grid position), so unsaved or unsynced items survive.
+ * (same floor_id + item_type + grid position) AND the real record's updated_at
+ * is within 5 minutes of the temp doc's (M2: reduces false positives from
+ * overlapping items at the same position).
  */
 /** Build a position signature for matching temp docs against real server records. */
 function layoutSignature(doc: any): string {
 	return JSON.stringify([doc.floor_id, doc.item_type, doc.grid_x, doc.grid_y, doc.grid_w, doc.grid_h]);
 }
+
+/** Max age difference (ms) between temp and real doc to consider them a match. */
+const TEMP_MATCH_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
 async function cleanupReplacedTempIds(collectionName: string): Promise<void> {
 	try {
@@ -49,21 +55,34 @@ async function cleanupReplacedTempIds(collectionName: string): Promise<void> {
 		if (!col) return;
 		const allDocs = await col.find({ selector: { deleted_at: { $eq: null } } }).exec();
 
-		// Build signature set of real (server) records
-		const realSignatures = new Set<string>();
-		const tempDocs: { id: string; sig: string }[] = [];
+		// Build signature map of real (server) records with their updated_at
+		const realRecords = new Map<string, number>(); // sig -> updated_at epoch
+		const tempDocs: { id: string; sig: string; updatedAt: number }[] = [];
 
 		for (const doc of allDocs) {
 			const sig = layoutSignature(doc);
+			const docTs = doc.updated_at ? new Date(doc.updated_at).getTime() : 0;
 			if (Number(doc.id) > 0) {
-				realSignatures.add(sig);
+				// Keep the most recent real record's timestamp per signature
+				const existing = realRecords.get(sig);
+				if (!existing || docTs > existing) {
+					realRecords.set(sig, docTs);
+				}
 			} else {
-				tempDocs.push({ id: doc.id, sig });
+				tempDocs.push({ id: doc.id, sig, updatedAt: docTs });
 			}
 		}
 
-		// Only remove temp docs whose real counterpart was pulled from the server
-		const toRemove = tempDocs.filter((t) => realSignatures.has(t.sig));
+		// Only remove temp docs whose real counterpart exists AND was created
+		// within a reasonable time window (prevents false positives from
+		// unrelated items that happen to share the same grid position)
+		const toRemove = tempDocs.filter((t) => {
+			const realTs = realRecords.get(t.sig);
+			if (realTs === undefined) return false;
+			// If either timestamp is 0 (missing), fall back to signature-only match
+			if (realTs === 0 || t.updatedAt === 0) return true;
+			return Math.abs(realTs - t.updatedAt) < TEMP_MATCH_WINDOW_MS;
+		});
 		if (toRemove.length === 0) return;
 
 		await col.bulkRemove(toRemove.map((t) => t.id));
@@ -75,30 +94,72 @@ async function cleanupReplacedTempIds(collectionName: string): Promise<void> {
 	}
 }
 
-async function restoreLostWalls(preSnapshot: WallSnapshot[]): Promise<void> {
+async function restoreLostItems(preSnapshot: LayoutItemSnapshot[]): Promise<void> {
 	try {
 		const db = await getDb();
 		let restored = 0;
 
-		for (const wall of preSnapshot) {
-			const current = await db.floor_layout_items.findOne(wall.id).exec();
+		for (const item of preSnapshot) {
+			const current = await db.floor_layout_items.findOne(item.id).exec();
 			if (!current) {
-				// Wall doc was completely removed — re-insert it
-				await db.floor_layout_items.upsert(wall);
+				// Item was completely removed — re-insert it
+				await db.floor_layout_items.upsert(item);
 				restored++;
-			} else if (current.deleted_at !== null && wall.deleted_at === null) {
-				// Wall was soft-deleted by resync but was alive before — restore it
+			} else if (current.deleted_at !== null && item.deleted_at === null) {
+				// Item was soft-deleted by resync but was alive before — restore it
 				await current.incrementalPatch({ deleted_at: null, updated_at: new Date().toISOString() });
 				restored++;
 			}
 		}
 
 		if (restored > 0) {
-			console.warn(`[WallGuard] Restored ${restored} wall(s) lost during resync`);
-			syncStatus.addLog(`WallGuard: restored ${restored} wall(s) lost during resync`, 'warn');
+			console.warn(`[LayoutGuard] Restored ${restored} item(s) lost during resync`);
+			syncStatus.addLog(`LayoutGuard: restored ${restored} item(s) lost during resync`, 'warn');
 		}
 	} catch (err) {
-		console.warn('[WallGuard] Failed to restore walls:', err);
+		console.warn('[LayoutGuard] Failed to restore items:', err);
+	}
+}
+
+/**
+ * Deduplication guard: after resync + restore, detect duplicate items at the
+ * same grid position with the same type. Keeps the real (positive) ID and
+ * removes the temp (negative) duplicate.
+ */
+async function deduplicateLayoutItems(): Promise<void> {
+	try {
+		const db = await getDb();
+		const allDocs = await db.floor_layout_items.find({
+			selector: { deleted_at: { $eq: null } }
+		}).exec();
+
+		// Group by position signature
+		const groups = new Map<string, { id: string; isTemp: boolean }[]>();
+		for (const doc of allDocs) {
+			const sig = layoutSignature(doc);
+			if (!groups.has(sig)) groups.set(sig, []);
+			groups.get(sig)!.push({ id: doc.id, isTemp: Number(doc.id) < 0 });
+		}
+
+		const toRemove: string[] = [];
+		for (const [, items] of groups) {
+			if (items.length <= 1) continue;
+			// If both real and temp exist at same position, remove the temp(s)
+			const hasReal = items.some((i) => !i.isTemp);
+			if (hasReal) {
+				for (const item of items) {
+					if (item.isTemp) toRemove.push(item.id);
+				}
+			}
+		}
+
+		if (toRemove.length > 0) {
+			await db.floor_layout_items.bulkRemove(toRemove);
+			console.log(`[Dedup] Removed ${toRemove.length} duplicate temp item(s)`);
+			syncStatus.addLog(`Dedup: removed ${toRemove.length} duplicate temp item(s)`, 'info');
+		}
+	} catch (err) {
+		console.warn('[Dedup] Failed:', err);
 	}
 }
 
@@ -169,21 +230,22 @@ export function bgResync(collection: string) {
 			console.log(`[Optimistic] Resync "${collection}" → pulling from Neon...`);
 			syncStatus.addLog(`Resync: pulling ${collection} from Neon...`, 'info');
 
-			// Wall integrity protection: snapshot WALL items before resync so we can restore any lost
-			const wallGuard = collection === 'floor_layout_items'
-				? snapshotWalls()
+			// Layout integrity protection: snapshot ALL items before resync so we can restore any lost
+			const layoutGuard = collection === 'floor_layout_items'
+				? snapshotLayoutItems()
 				: Promise.resolve(null);
 
-			wallGuard.then((wallSnapshot) => {
+			layoutGuard.then((layoutSnapshot) => {
 				resyncCollection(collection)
 					.then(async () => {
-						// Restore any walls lost during resync
-						if (wallSnapshot && wallSnapshot.length > 0) {
-							await restoreLostWalls(wallSnapshot);
+						// Restore any items lost during resync (walls, rooms, etc.)
+						if (layoutSnapshot && layoutSnapshot.length > 0) {
+							await restoreLostItems(layoutSnapshot);
 						}
-						// Clean up temp-ID docs only if real server records exist for them
+						// Clean up temp-ID docs and deduplicate after resync
 						if (collection === 'floor_layout_items') {
 							await cleanupReplacedTempIds('floor_layout_items');
+							await deduplicateLayoutItems();
 						}
 						console.log(`[Optimistic] Resync "${collection}" complete ✓`);
 						syncStatus.addLog(`Resync: ${collection} pulled from Neon ✓`, 'success');

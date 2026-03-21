@@ -55,13 +55,6 @@ const col = (schema: any) => ({
 	cleanup: { minimumDeletedTime: Infinity, autoStart: false }
 });
 
-// New collections starting at version 0 — no migration strategy needed
-const col0 = (schema: any) => ({
-	schema,
-	migrationStrategies: {},
-	cleanup: { minimumDeletedTime: Infinity, autoStart: false }
-});
-
 const COLLECTIONS = {
 	tenants: col(tenantSchema),
 	leases: col(leaseSchema),
@@ -77,7 +70,7 @@ const COLLECTIONS = {
 	expenses: col(expenseSchema),
 	budgets: col(budgetSchema),
 	penalty_configs: col(penaltyConfigSchema),
-	floor_layout_items: col0(floorLayoutItemSchema)
+	floor_layout_items: col(floorLayoutItemSchema)
 };
 
 // Store the singleton on globalThis to survive Vite's production code-splitting
