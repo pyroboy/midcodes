@@ -6,26 +6,40 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Label } from '$lib/components/ui/label';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-	import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
-	import { format } from 'date-fns';
-	import { CalendarIcon, Building, DollarSign, Tag, Clock } from 'lucide-svelte';
+	import { Building, DollarSign, Tag, Clock, Loader2, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
+	import { browser } from '$app/environment';
 	import type { Budget, Property } from './types';
 	import { budgetCategoryEnum, budgetStatusEnum } from './schema';
+
+	// Autofocus project name input on mount
+	let nameInputRef = $state<HTMLInputElement | null>(null);
+	$effect(() => {
+		if (nameInputRef && browser) {
+			setTimeout(() => nameInputRef?.focus(), 150);
+		}
+	});
 
 	// Get enum values as arrays
 	const budgetCategories = Object.values(budgetCategoryEnum.enum);
 	const budgetStatuses = Object.values(budgetStatusEnum.enum);
 
+	// [P0-1] Humanize enum labels
+	function humanizeEnum(value: string): string {
+		return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bAnd\b/g, 'and');
+	}
+
 	// Props using Svelte 5 $props rune
 	let {
 		budget,
 		properties = [],
-		editMode = false
+		editMode = false,
+		isSubmitting = false
 	} = $props<{
 		budget: Budget | null;
 		properties: Property[];
 		editMode: boolean;
+		isSubmitting?: boolean;
 	}>();
 
 	// Event dispatcher
@@ -57,6 +71,9 @@
 		created_at: budget?.created_at || new Date().toISOString(),
 		updated_at: budget?.updated_at || new Date().toISOString()
 	} as Budget))());
+
+	// Progressive disclosure for description and dates
+	let showOptional = $state(!!(budget?.project_description || budget?.start_date || budget?.end_date));
 
 	// Handle form submission
 	function handleSubmit() {
@@ -103,7 +120,7 @@
 						onValueChange={(value: string) => handleChange('property_id', parseInt(value, 10))}
 					>
 						<Select.Trigger
-							class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+							class="w-full min-h-[44px] border-gray-300 focus:border-blue-500 focus:ring-blue-500"
 						>
 							<span
 								>{properties.find((p: Property) => p.id === formData.property_id)?.name ||
@@ -128,23 +145,44 @@
 						value={formData.project_name}
 						onchange={(e) => handleChange('project_name', e.currentTarget.value)}
 						placeholder="Enter project name"
-						class="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+						class="min-h-[44px] border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+						bind:ref={nameInputRef}
 						required
 					/>
 				</div>
 
-				<!-- Project Description -->
-				<div class="space-y-2">
-					<Label for="project_description" class="font-medium text-gray-700">Description</Label>
-					<Textarea
-						id="project_description"
-						value={formData.project_description || ''}
-						onchange={(e) => handleChange('project_description', e.currentTarget.value)}
-						placeholder="Enter project description"
-						class="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-						rows={3}
-					/>
-				</div>
+				<!-- Collapsible optional: Description & Dates -->
+				<div class="border rounded-lg overflow-hidden">
+					<button
+						type="button"
+						class="flex items-center justify-between w-full px-4 py-2.5 text-left bg-muted/30 hover:bg-muted/50 transition-colors"
+						onclick={() => showOptional = !showOptional}
+					>
+						<span class="text-sm text-muted-foreground">
+							Description & Dates
+							{#if formData.project_description || formData.start_date || formData.end_date}
+								<span class="text-primary">(has content)</span>
+							{/if}
+						</span>
+						{#if showOptional}
+							<ChevronUp class="h-4 w-4 text-muted-foreground" />
+						{:else}
+							<ChevronDown class="h-4 w-4 text-muted-foreground" />
+						{/if}
+					</button>
+					{#if showOptional}
+						<div class="p-4 space-y-4">
+							<div class="space-y-2">
+								<Label for="project_description" class="font-medium text-gray-700">Description</Label>
+								<Textarea
+									id="project_description"
+									value={formData.project_description || ''}
+									onchange={(e) => handleChange('project_description', e.currentTarget.value)}
+									placeholder="Enter project description"
+									class="min-h-[44px] border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+									rows={2}
+								/>
+							</div>
 
 				<div class="grid grid-cols-2 gap-4">
 					<!-- Project Category -->
@@ -159,14 +197,14 @@
 							onValueChange={(value: string) => handleChange('project_category', value)}
 						>
 							<Select.Trigger
-								class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+								class="w-full min-h-[44px] border-gray-300 focus:border-blue-500 focus:ring-blue-500"
 							>
-								<span>{formData.project_category || 'Select a category'}</span>
+								<span>{formData.project_category ? humanizeEnum(formData.project_category) : 'Select a category'}</span>
 							</Select.Trigger>
 							<Select.Content>
 								<Select.Group>
 									{#each budgetCategories as category}
-										<Select.Item value={category}>{category}</Select.Item>
+										<Select.Item value={category}>{humanizeEnum(category)}</Select.Item>
 									{/each}
 								</Select.Group>
 							</Select.Content>
@@ -185,14 +223,14 @@
 							onValueChange={(value: string) => handleChange('status', value)}
 						>
 							<Select.Trigger
-								class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+								class="w-full min-h-[44px] border-gray-300 focus:border-blue-500 focus:ring-blue-500"
 							>
-								<span>{formData.status || 'Select a status'}</span>
+								<span>{formData.status ? humanizeEnum(formData.status) : 'Select a status'}</span>
 							</Select.Trigger>
 							<Select.Content>
 								<Select.Group>
 									{#each budgetStatuses as status}
-										<Select.Item value={status}>{status}</Select.Item>
+										<Select.Item value={status}>{humanizeEnum(status)}</Select.Item>
 									{/each}
 								</Select.Group>
 							</Select.Content>
@@ -209,85 +247,68 @@
 					<Input
 						id="planned_amount"
 						type="number"
+						inputmode="decimal"
 						value={formData.planned_amount}
 						onchange={(e) => handleChange('planned_amount', parseFloat(e.currentTarget.value))}
 						min="0"
 						step="0.01"
 						placeholder="0.00"
-						class="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+						class="min-h-[44px] border-gray-300 focus:border-blue-500 focus:ring-blue-500"
 						required
 					/>
 				</div>
 
-				<!-- Date Range -->
-				<div class="grid grid-cols-2 gap-4 pt-1 border-t border-gray-200">
-					<div class="space-y-2">
-						<Label for="start_date" class="font-medium text-gray-700">Start Date</Label>
-						<Popover>
-							<PopoverTrigger>
-								<Button variant="outline" class="w-full pl-3 text-left font-normal border-gray-300">
-									{formData.start_date
-										? format(new Date(formData.start_date), 'PPP')
-										: 'Select start date'}
-									<CalendarIcon class="ml-auto h-4 w-4 opacity-50" />
-								</Button>
-							</PopoverTrigger>
-							<PopoverContent class="w-auto p-0" align="start">
-								<div class="p-4">
+							<!-- Date Range -->
+							<div class="grid grid-cols-2 gap-4">
+								<div class="space-y-2">
+									<Label for="start_date" class="font-medium text-gray-700">Start Date</Label>
 									<Input
 										type="date"
+										class="min-h-[44px] border-gray-300"
 										value={formData.start_date
 											? new Date(formData.start_date).toISOString().split('T')[0]
 											: ''}
 										onchange={(e) => {
-											const date: string = e.currentTarget.value;
-											if (date) {
-												handleChange('start_date', new Date(date).toISOString());
-											}
+											const date = e.currentTarget.value;
+											if (date) handleChange('start_date', new Date(date).toISOString());
 										}}
 									/>
 								</div>
-							</PopoverContent>
-						</Popover>
-					</div>
-
-					<div class="space-y-2">
-						<Label for="end_date" class="font-medium text-gray-700">End Date</Label>
-						<Popover>
-							<PopoverTrigger>
-								<Button variant="outline" class="w-full pl-3 text-left font-normal border-gray-300">
-									{formData.end_date
-										? format(new Date(formData.end_date), 'PPP')
-										: 'Select end date'}
-									<CalendarIcon class="ml-auto h-4 w-4 opacity-50" />
-								</Button>
-							</PopoverTrigger>
-							<PopoverContent class="w-auto p-0" align="start">
-								<div class="p-4">
+								<div class="space-y-2">
+									<Label for="end_date" class="font-medium text-gray-700">End Date</Label>
 									<Input
 										type="date"
+										class="min-h-[44px] border-gray-300"
 										value={formData.end_date
 											? new Date(formData.end_date).toISOString().split('T')[0]
 											: ''}
 										onchange={(e) => {
-											const date: string = e.currentTarget.value;
-											if (date) {
-												handleChange('end_date', new Date(date).toISOString());
-											}
+											const date = e.currentTarget.value;
+											if (date) handleChange('end_date', new Date(date).toISOString());
 										}}
 									/>
 								</div>
-							</PopoverContent>
-						</Popover>
-					</div>
+							</div>
+						</div>
+					{/if}
 				</div>
 			</div>
 
-			<Dialog.Footer class="flex justify-end gap-2 pt-4 border-t mt-2">
-				<Button variant="outline" onclick={handleClose} class="border-gray-300">Cancel</Button>
-				<Button onclick={handleSubmit} class="bg-blue-600 hover:bg-blue-700 text-white">
-					{editMode ? 'Update Project' : 'Create Project'}
-				</Button>
+			<Dialog.Footer class="flex justify-end gap-2 pt-4 border-t mt-2 sticky bottom-0 bg-background pb-1 sm:static sm:pb-0">
+				<Button variant="outline" onclick={handleClose} class="min-h-[44px] border-gray-300">Cancel</Button>
+				<div class="flex flex-col items-end gap-1">
+					<Button onclick={handleSubmit} class="min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white" disabled={isSubmitting || !formData.project_name || !formData.property_id}>
+						{#if isSubmitting}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Saving...
+						{:else}
+							{editMode ? 'Update Project' : 'Create Project'}
+						{/if}
+					</Button>
+					{#if !isSubmitting && (!formData.project_name || !formData.property_id)}
+						<span class="text-xs text-muted-foreground">Fill name and property</span>
+					{/if}
+				</div>
 			</Dialog.Footer>
 		</Dialog.Content>
 	</Dialog.Portal>

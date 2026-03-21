@@ -16,4 +16,6 @@ export function markJustPaid(leaseId: string, amount: number) {
 	}, 8000);
 }
 
-export const justPaidMap = $derived(justPaid.map);
+export function getJustPaidMap() {
+	return justPaid.map;
+}

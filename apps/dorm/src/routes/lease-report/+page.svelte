@@ -78,11 +78,11 @@
 
 			<!-- Action Buttons -->
 			<div class="flex space-x-2 no-print">
-				<Button variant="outline" size="sm" onclick={handlePrint}>
+				<Button variant="outline" size="sm" class="min-h-[44px]" onclick={handlePrint}>
 					<Printer class="mr-2 h-4 w-4" />
 					Print
 				</Button>
-				<Button variant="outline" size="sm" onclick={handleExport}>
+				<Button variant="outline" size="sm" class="min-h-[44px]" onclick={handleExport}>
 					<ArrowDownToLine class="mr-2 h-4 w-4" />
 					Export
 				</Button>

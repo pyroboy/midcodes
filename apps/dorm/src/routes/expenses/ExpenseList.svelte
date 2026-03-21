@@ -1,13 +1,10 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Input } from '$lib/components/ui/input';
+	import { Card, CardContent } from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
 	import { Label } from '$lib/components/ui/label';
-	import { Edit, Trash2, Receipt, Wallet, Plus } from 'lucide-svelte';
-	import { formatCurrency, formatDate, humanizeExpenseType } from '$lib/utils/format';
+	import { formatCurrency, humanizeExpenseType } from '$lib/utils/format';
 	import type { Expense } from './types';
 	import type { Property } from './types';
 	import { months } from './schema';
@@ -50,11 +47,20 @@
 		refresh: any;
 	}>();
 
-	// Get property name from property_id
+	// [P3-14] Capitalize helper
+	function capitalize(s: string): string {
+		return s.charAt(0).toUpperCase() + s.slice(1);
+	}
+
+	// [P1-6] Get property name via Map for O(1) lookup
+	let propMap = $derived.by(() => {
+		const m = new Map<number, string>();
+		if (properties) for (const p of properties) m.set(p.id, p.name);
+		return m;
+	});
+
 	function getPropertyName(property_id: number) {
-		if (!properties) return 'Unknown';
-		const property = properties.find((p) => p.id === property_id);
-		return property ? property.name : 'Unknown';
+		return propMap.get(property_id) || 'Unknown';
 	}
 
 	// Define the MonthGroup interface for better typing
@@ -64,12 +70,47 @@
 		capital: Expense[];
 	}
 
-	// State for filters
+	// State for filters — remember via localStorage (D1)
+	const FILTER_KEY = 'dorm:expenses:filters';
 	const currentYear = new Date().getFullYear();
 	let years = $state(Array.from({ length: 5 }, (_, i) => currentYear - 2 + i));
-	let selectedYear = $state(currentYear.toString());
-	let selectedMonth = $state<Month>(months[new Date().getMonth()]);
-	let selectedProperty = $state<number | null>(null);
+
+	function loadSavedFilters() {
+		try {
+			const saved = localStorage.getItem(FILTER_KEY);
+			if (saved) return JSON.parse(saved);
+		} catch {}
+		return null;
+	}
+
+	const saved = loadSavedFilters();
+	let selectedYear = $state(saved?.year ?? currentYear.toString());
+	let selectedMonth = $state<Month>(
+		saved?.month && isValidMonth(saved.month) ? saved.month : months[new Date().getMonth()]
+	);
+	let selectedProperty = $state<number | null>(saved?.property ?? null);
+
+	// Persist filter changes
+	$effect(() => {
+		try {
+			localStorage.setItem(FILTER_KEY, JSON.stringify({
+				year: selectedYear,
+				month: selectedMonth,
+				property: selectedProperty
+			}));
+		} catch {}
+	});
+
+	// Pagination (D2) — 20 items per page per category
+	const PAGE_SIZE = 20;
+	let currentPage = $state(1);
+
+	// Reset page when filters change
+	$effect(() => {
+		// Read filter values to create dependency
+		void selectedYear; void selectedMonth; void selectedProperty;
+		currentPage = 1;
+	});
 
 	// Group expenses by month and type
 	function groupExpensesByMonthAndType(): MonthGroup[] {
@@ -141,13 +182,10 @@
 </script>
 
 <div class="space-y-6">
-	<!-- Filters -->
+	<!-- Filters — compact, no separate title -->
 	<Card class="bg-white shadow-md">
-		<CardHeader class="pb-2">
-			<CardTitle>Expense Filters</CardTitle>
-		</CardHeader>
-		<CardContent>
-			<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+		<CardContent class="p-4">
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 				<div>
 					<Label for="property">Property</Label>
 					<Select.Root
@@ -203,12 +241,12 @@
 						}}
 					>
 						<Select.Trigger class="w-full">
-							<span>{selectedMonth.charAt(0).toUpperCase() + selectedMonth.slice(1)}</span>
+							<span>{capitalize(selectedMonth)}</span>
 						</Select.Trigger>
 						<Select.Content>
 							{#each months as month}
 								<Select.Item value={month}
-									>{month.charAt(0).toUpperCase() + month.slice(1)}</Select.Item
+									>{capitalize(month)}</Select.Item
 								>
 							{/each}
 						</Select.Content>
@@ -243,8 +281,7 @@
 		{#each Object.values(groupedExpenses) as monthGroup (monthGroup.date.toISOString())}
 			<div class="space-y-4 mb-8">
 				<h3 class="text-xl font-semibold border-b pb-2">
-					{months[monthGroup.date.getMonth()].charAt(0).toUpperCase() +
-						months[monthGroup.date.getMonth()].slice(1)}
+					{capitalize(months[monthGroup.date.getMonth()])}
 					{monthGroup.date.getFullYear()}
 				</h3>
 

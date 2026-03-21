@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { T, useThrelte, useTask } from '@threlte/core';
 	import { OrbitControls, HTML, interactivity } from '@threlte/extras';
-	import { Vector3, MeshStandardMaterial, BoxGeometry, Shape, ExtrudeGeometry, DoubleSide, CustomBlending, AddEquation, OneFactor, OneMinusSrcAlphaFactor, Color, BufferGeometry, Float32BufferAttribute, Uint16BufferAttribute } from 'three';
+	import { Vector3, MeshStandardMaterial, BoxGeometry, Shape, ExtrudeGeometry, DoubleSide, CustomBlending, AddEquation, OneFactor, OneMinusSrcAlphaFactor, Color, BufferGeometry, Float32BufferAttribute, Uint16BufferAttribute, CanvasTexture, SpriteMaterial, LinearFilter } from 'three';
+	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
 	import type { FloorLayoutItem } from './types';
 	import { ITEM_TYPE_LABELS } from './types';
@@ -33,10 +34,61 @@
 
 	function areaLabel(item: FloorLayoutItem): string {
 		if (item.item_type === 'RENTAL_UNIT' && item.rental_unit_id) {
-			const unit = rentalUnits.find((u: any) => u.id === item.rental_unit_id);
+			const unit = rentalUnits.find((u: any) => String(u.id) === String(item.rental_unit_id));
 			return unit?.name ?? 'Rental Unit';
 		}
-		return item.label ?? ITEM_TYPE_LABELS[item.item_type] ?? item.item_type;
+		// Avoid showing raw numeric IDs as labels — fall back to type label
+		const raw = item.label ?? ITEM_TYPE_LABELS[item.item_type] ?? item.item_type;
+		if (/^\d{6,}$/.test(raw)) return ITEM_TYPE_LABELS[item.item_type] ?? item.item_type;
+		return raw;
+	}
+
+	/** Clamp grid dimensions to prevent oversized rooms in 3D */
+	const MAX_GRID_DIM = 12;
+	function clampDim(val: number): number {
+		return Math.min(Math.max(val, 1), MAX_GRID_DIM);
+	}
+
+	/** Detect mobile/touch device where HTML overlay labels may not render */
+	const isMobile = browser && (
+		/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+		(navigator.maxTouchPoints > 0 && window.innerWidth < 1024)
+	);
+
+	/** Create a canvas-based sprite texture for 3D text labels (mobile fallback) */
+	const spriteTexCache = new Map<string, SpriteMaterial>();
+	function getSpriteLabelMat(text: string): SpriteMaterial {
+		let mat = spriteTexCache.get(text);
+		if (mat) return mat;
+		const canvas = document.createElement('canvas');
+		const ctx = canvas.getContext('2d')!;
+		const fontSize = 48;
+		ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+		const metrics = ctx.measureText(text);
+		const padding = 24;
+		canvas.width = Math.ceil(metrics.width + padding * 2);
+		canvas.height = fontSize + padding * 2;
+		// Redraw after resize
+		ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+		ctx.fillStyle = 'rgba(255,255,255,0.92)';
+		const r = 12;
+		const w = canvas.width, h = canvas.height;
+		ctx.beginPath();
+		ctx.moveTo(r, 0); ctx.lineTo(w - r, 0); ctx.quadraticCurveTo(w, 0, w, r);
+		ctx.lineTo(w, h - r); ctx.quadraticCurveTo(w, h, w - r, h);
+		ctx.lineTo(r, h); ctx.quadraticCurveTo(0, h, 0, h - r);
+		ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+		ctx.closePath();
+		ctx.fill();
+		ctx.fillStyle = '#1e293b';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillText(text, w / 2, h / 2);
+		const tex = new CanvasTexture(canvas);
+		tex.minFilter = LinearFilter;
+		mat = new SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+		spriteTexCache.set(text, mat);
+		return mat;
 	}
 
 	/** Offset a polygon outward by `dist` — intersects adjacent offset edges for clean right-angle corners */
@@ -383,8 +435,8 @@
 			for (const item of items) {
 				minX = Math.min(minX, item.grid_x);
 				minZ = Math.min(minZ, item.grid_y);
-				maxX = Math.max(maxX, item.grid_x + item.grid_w);
-				maxZ = Math.max(maxZ, item.grid_y + item.grid_h);
+				maxX = Math.max(maxX, item.grid_x + clampDim(item.grid_w));
+				maxZ = Math.max(maxZ, item.grid_y + clampDim(item.grid_h));
 			}
 			map.set(floorId, {
 				minX: minX * CELL - SLAB_PAD,
@@ -420,8 +472,8 @@
 		}
 		if (hexColor) return hexColor;
 		const status = occupancyMap.get(item.rental_unit_id ?? '');
-		if (status === 'OCCUPIED') return '#f87171'; // red-400
-		if (status === 'RESERVED') return '#facc15'; // yellow-400
+		if (status === 'OCCUPIED') return '#60a5fa'; // blue-400
+		if (status === 'RESERVED') return '#fbbf24'; // amber-400
 		return '#4ade80'; // green-400
 	}
 
@@ -568,6 +620,9 @@
 		glassMat.dispose(); slabSelectedMat.dispose(); slabDefaultMat.dispose();
 		wallMatCache.forEach((m) => m.dispose());
 		floorMatCache.forEach((m) => m.dispose());
+		// Dispose sprite label textures
+		spriteTexCache.forEach((m) => { m.map?.dispose(); m.dispose(); });
+		spriteTexCache.clear();
 		// Dispose shared geometries
 		handleGeomH.dispose(); handleGeomV.dispose(); handleGeomSmallH.dispose();
 		cellTileGeom.dispose();
@@ -1016,11 +1071,11 @@
 				{/if}
 			{/if}
 		{:else}
-			<!-- Rectangle-based area -->
+			<!-- Rectangle-based area (dimensions clamped to prevent oversized cubes) -->
 			{@const x = item.grid_x * CELL}
 			{@const z = item.grid_y * CELL}
-			{@const w = item.grid_w * CELL}
-			{@const d = item.grid_h * CELL}
+			{@const w = clampDim(item.grid_w) * CELL}
+			{@const d = clampDim(item.grid_h) * CELL}
 			{@const rectOutlineBase = [[x, z], [x + w, z], [x + w, z + d], [x, z + d]] as [number, number][]}
 			{@const rectOutlineOffset = offsetPoly(rectOutlineBase, 0.3)}
 			<!-- Expanded floor tile (bleeds past walls) -->
@@ -1089,8 +1144,8 @@
 				<!-- Laser edge wall for rectangle -->
 				{@const rx = item.grid_x * CELL}
 				{@const rz = item.grid_y * CELL}
-				{@const rw = item.grid_w * CELL}
-				{@const rd = item.grid_h * CELL}
+				{@const rw = clampDim(item.grid_w) * CELL}
+				{@const rd = clampDim(item.grid_h) * CELL}
 				{@const rectOutline = offsetPoly([[rx, rz], [rx + rw, rz], [rx + rw, rz + rd], [rx, rz + rd]] as [number, number][], 0.3)}
 				{@const laserTarget = isSel ? 4.5 : (isHovered ? 0.75 : 0)}
 					{@const laserBase = animatedVal(`laser-h-${item.id}`, laserTarget)}
@@ -1127,70 +1182,86 @@
 		<!-- Floating label -->
 		{@const label = areaLabel(item)}
 		{#if label}
-			{@const lx = (item.grid_x + item.grid_w / 2) * CELL}
-			{@const lz = (item.grid_y + item.grid_h / 2) * CELL}
-			<HTML position.x={lx} position.y={yBase + 3.2} position.z={lz} center pointerEvents="auto">
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="flex flex-col items-center select-none cursor-pointer"
-					style="pointer-events: auto;"
-					role="button"
-					tabindex="-1"
-					onpointerenter={() => { labelHovered = true; hoveredItemId = item.id; invalidate(); }}
-					onpointerleave={() => { labelHovered = false; if (hoveredItemId === item.id) { hoveredItemId = null; invalidate(); } }}
-					onpointerdown={() => {
-						selectedItemId = selectedItemId === item.id ? null : item.id;
-						_anyAnimating = true;
-						if (isUnit && item.rental_unit_id) onUnitClick(item.rental_unit_id);
-						invalidate();
-					}}
-				>
-					<!-- GPS pin shape via SVG -->
-					<svg width="auto" height="64" viewBox="0 0 120 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-lg hover:drop-shadow-xl transition-all" style="min-width: max-content;">
-						<!-- Pin body: rounded rectangle + pointed bottom -->
-						<path d="M8 0 H112 Q120 0 120 8 V30 Q120 38 112 38 H68 L60 54 L52 38 H8 Q0 38 0 30 V8 Q0 0 8 0Z" fill="rgba(255,255,255,0.95)" />
-						<!-- Label text -->
-						<text x="60" y="23" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="700" font-family="system-ui, -apple-system, sans-serif" fill="#1e293b">{label}</text>
-					</svg>
+			{@const lx = (item.grid_x + clampDim(item.grid_w) / 2) * CELL}
+			{@const lz = (item.grid_y + clampDim(item.grid_h) / 2) * CELL}
 
-					<!-- Tenant popup (shown when selected + is rental unit) -->
-					{#if isSel && isUnit && item.rental_unit_id}
-						{@const tenants = unitTenantsMap.get(String(item.rental_unit_id)) ?? []}
-						{@const unit = rentalUnits.find((u) => String(u.id) === String(item.rental_unit_id))}
-						<div class="mt-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl px-3 py-2.5 min-w-[160px] max-w-[220px] text-left" style="pointer-events: auto;">
-							{#if unit}
-								<div class="flex items-center justify-between mb-1.5">
-									<span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Unit Info</span>
-									<span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium
-										{unit.rental_unit_status === 'OCCUPIED' ? 'bg-red-100 text-red-700' :
-										 unit.rental_unit_status === 'RESERVED' ? 'bg-yellow-100 text-yellow-700' :
-										 'bg-green-100 text-green-700'}">
-										{unit.rental_unit_status ?? 'VACANT'}
-									</span>
-								</div>
-								<div class="text-[11px] text-slate-600 mb-1">Cap. {unit.capacity} · {unit.type}</div>
-							{/if}
-							{#if tenants.length > 0}
-								<div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1 {unit ? 'border-t pt-1.5 mt-1' : ''}">
-									Tenants ({tenants.length})
-								</div>
-								<div class="space-y-1">
-									{#each tenants as tenant}
-										<div class="flex items-center gap-1.5">
-											<div class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shrink-0">
-												{tenant.name.charAt(0).toUpperCase()}
+			{#if isMobile}
+				<!-- Sprite-based label fallback for mobile (HTML overlay unreliable) -->
+				{@const spriteMat = getSpriteLabelMat(label)}
+				{@const spriteAspect = (spriteMat.map?.image?.width ?? 120) / (spriteMat.map?.image?.height ?? 64)}
+				<T.Sprite
+					position.x={lx}
+					position.y={yBase + 3.2}
+					position.z={lz}
+					material={spriteMat}
+					scale.x={spriteAspect * 1.2}
+					scale.y={1.2}
+					dispose={false}
+				/>
+			{:else}
+				<HTML position.x={lx} position.y={yBase + 3.2} position.z={lz} center pointerEvents="auto">
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						class="flex flex-col items-center select-none cursor-pointer"
+						style="pointer-events: auto;"
+						role="button"
+						tabindex="-1"
+						onpointerenter={() => { labelHovered = true; hoveredItemId = item.id; invalidate(); }}
+						onpointerleave={() => { labelHovered = false; if (hoveredItemId === item.id) { hoveredItemId = null; invalidate(); } }}
+						onpointerdown={() => {
+							selectedItemId = selectedItemId === item.id ? null : item.id;
+							_anyAnimating = true;
+							if (isUnit && item.rental_unit_id) onUnitClick(item.rental_unit_id);
+							invalidate();
+						}}
+					>
+						<!-- GPS pin shape via SVG -->
+						<svg width="auto" height="64" viewBox="0 0 120 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-lg hover:drop-shadow-xl transition-all" style="min-width: max-content;">
+							<!-- Pin body: rounded rectangle + pointed bottom -->
+							<path d="M8 0 H112 Q120 0 120 8 V30 Q120 38 112 38 H68 L60 54 L52 38 H8 Q0 38 0 30 V8 Q0 0 8 0Z" fill="rgba(255,255,255,0.95)" />
+							<!-- Label text -->
+							<text x="60" y="23" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="700" font-family="system-ui, -apple-system, sans-serif" fill="#1e293b">{label}</text>
+						</svg>
+
+						<!-- Tenant popup (shown when selected + is rental unit) -->
+						{#if isSel && isUnit && item.rental_unit_id}
+							{@const tenants = unitTenantsMap.get(String(item.rental_unit_id)) ?? []}
+							{@const unit = rentalUnits.find((u) => String(u.id) === String(item.rental_unit_id))}
+							<div class="mt-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl px-3 py-2.5 min-w-[160px] max-w-[220px] text-left" style="pointer-events: auto;">
+								{#if unit}
+									<div class="flex items-center justify-between mb-1.5">
+										<span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Unit Info</span>
+										<span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium
+											{unit.rental_unit_status === 'OCCUPIED' ? 'bg-blue-100 text-blue-700' :
+											 unit.rental_unit_status === 'RESERVED' ? 'bg-amber-100 text-amber-700' :
+											 'bg-green-100 text-green-700'}">
+											{unit.rental_unit_status ?? 'VACANT'}
+										</span>
+									</div>
+									<div class="text-[11px] text-slate-600 mb-1">Cap. {unit.capacity} · {unit.type}</div>
+								{/if}
+								{#if tenants.length > 0}
+									<div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1 {unit ? 'border-t pt-1.5 mt-1' : ''}">
+										Tenants ({tenants.length})
+									</div>
+									<div class="space-y-1">
+										{#each tenants as tenant}
+											<div class="flex items-center gap-1.5">
+												<div class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shrink-0">
+													{tenant.name.charAt(0).toUpperCase()}
+												</div>
+												<span class="text-xs text-slate-800 truncate">{tenant.name}</span>
 											</div>
-											<span class="text-xs text-slate-800 truncate">{tenant.name}</span>
-										</div>
-									{/each}
-								</div>
-							{:else}
-								<div class="text-[11px] text-slate-400 italic {unit ? 'border-t pt-1.5 mt-1' : ''}">No tenants assigned</div>
-							{/if}
-						</div>
-					{/if}
-				</div>
-			</HTML>
+										{/each}
+									</div>
+								{:else}
+									<div class="text-[11px] text-slate-400 italic {unit ? 'border-t pt-1.5 mt-1' : ''}">No tenants assigned</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				</HTML>
+			{/if}
 		{/if}
 	{/each}
 {/each}

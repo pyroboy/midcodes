@@ -84,7 +84,7 @@
 						onValueChange={(v) => ($form.startMonth = v)}
 						value={$form.startMonth}
 					>
-						<SelectTrigger class="w-full" data-error={!!$errors.startMonth}>
+						<SelectTrigger class="w-full min-h-[44px]" data-error={!!$errors.startMonth}>
 							<span>
 								{$form.startMonth
 									? (monthOptions.find(m => m.value === $form.startMonth)?.label ?? 'Select month')
@@ -111,7 +111,7 @@
 						onValueChange={(v) => ($form.monthCount = v)}
 						value={$form.monthCount}
 					>
-						<SelectTrigger class="w-full" data-error={!!$errors.monthCount}>
+						<SelectTrigger class="w-full min-h-[44px]" data-error={!!$errors.monthCount}>
 							<span>
 								{$form.monthCount
 									? `${$form.monthCount} month${Number($form.monthCount) > 1 ? 's' : ''}`
@@ -138,7 +138,7 @@
 						onValueChange={(v) => ($form.propertyId = v)}
 						value={$form.propertyId}
 					>
-						<SelectTrigger class="w-full" data-error={!!$errors.propertyId}>
+						<SelectTrigger class="w-full min-h-[44px]" data-error={!!$errors.propertyId}>
 							<span>
 								{$form.propertyId
 									? (properties.find((p: Property) => p.id.toString() === $form.propertyId)?.name ??
@@ -166,10 +166,11 @@
 						id="showInactiveLeases"
 						name="showInactiveLeases"
 						bind:checked={$form.showInactiveLeases}
+						class="h-5 w-5"
 					/>
 					<label
 						for="showInactiveLeases"
-						class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+						class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 py-2 cursor-pointer"
 					>
 						Include inactive leases
 					</label>
@@ -177,7 +178,7 @@
 			</div>
 
 			<div class="flex justify-end">
-				<Button type="submit">Apply Filters</Button>
+				<Button type="submit" class="min-h-[44px]">Apply Filters</Button>
 			</div>
 		</form>
 	</Card.Content>

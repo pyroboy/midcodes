@@ -13,6 +13,11 @@
 	} from '$lib/components/ui/tooltip';
 	import { getStatusClasses } from '$lib/utils/format';
 
+	// [P0-1] Humanize enum labels
+	function humanizeEnum(value: string): string {
+		return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bAnd\b/g, 'and');
+	}
+
 	// Props using Svelte 5 $props rune
 	let { budget, formatCurrency, onEdit, onDelete, onAddItem } = $props<{
 		budget: BudgetWithStats;
@@ -72,7 +77,7 @@
 			<div class="flex-1 flex items-center gap-2 min-w-0">
 				<h3 class="text-base font-semibold text-foreground truncate">{budget.project_name}</h3>
 				<Badge class={`${getStatusClasses(budget.status)} flex-shrink-0`}>
-					{budget.status}
+					{humanizeEnum(budget.status)}
 				</Badge>
 			</div>
 
@@ -84,7 +89,7 @@
 					</div>
 					<div class="flex items-center gap-1">
 						<Tag class="h-3 w-3" />
-						<span>{budget.project_category}</span>
+						<span>{humanizeEnum(budget.project_category)}</span>
 					</div>
 				</div>
 
@@ -96,7 +101,7 @@
 									onclick={onEdit}
 									variant="ghost"
 									size="icon"
-									class="h-9 w-9 sm:h-7 sm:w-7 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+									class="h-11 w-11 sm:h-7 sm:w-7 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
 								>
 									<Edit class="h-4 w-4 sm:h-3.5 sm:w-3.5" />
 								</Button>
@@ -112,7 +117,7 @@
 									onclick={onDelete}
 									variant="ghost"
 									size="icon"
-									class="h-9 w-9 sm:h-7 sm:w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+									class="h-11 w-11 sm:h-7 sm:w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50"
 								>
 									<Trash2 class="h-4 w-4 sm:h-3.5 sm:w-3.5" />
 								</Button>
@@ -136,20 +141,20 @@
 		<div class="grid grid-cols-3 gap-2 mb-3">
 			<div class="bg-muted/50 p-2 rounded-md border border-border">
 				<div class="text-xs text-muted-foreground mb-0.5">Planned</div>
-				<div class="text-sm font-bold text-foreground">
+				<div class="text-sm font-bold text-foreground tabular-nums">
 					{safeFormatCurrency(budget.planned_amount)}
 				</div>
 			</div>
 
 			<div class="bg-muted/50 p-2 rounded-md border border-border">
 				<div class="text-xs text-muted-foreground mb-0.5">Allocated</div>
-				<div class="text-sm font-medium">{safeFormatCurrency(budget.allocatedAmount)}</div>
+				<div class="text-sm font-medium tabular-nums">{safeFormatCurrency(budget.allocatedAmount)}</div>
 			</div>
 
 			<div class="bg-muted/50 p-2 rounded-md border border-border">
 				<div class="text-xs text-muted-foreground mb-0.5">Remaining</div>
 				<div
-					class="text-sm font-bold"
+					class="text-sm font-bold tabular-nums"
 					class:text-green-600={budget.remainingAmount >= 0}
 					class:text-red-600={budget.remainingAmount < 0}
 				>
@@ -178,7 +183,7 @@
 					onclick={onAddItem}
 					variant="outline"
 					size="sm"
-					class="h-8 sm:h-6 py-0 px-2 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+					class="min-h-[44px] sm:min-h-0 sm:h-6 py-0 px-2 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
 				>
 					<Plus class="h-3 w-3 mr-1" />
 					Add Item
@@ -202,19 +207,19 @@
 							<div class="flex items-center justify-between mb-1">
 								<span class="text-sm font-medium">{item.name || '—'}</span>
 								{#if item.type}
-									<span class="px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">{item.type}</span>
+									<span class="px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">{humanizeEnum(item.type)}</span>
 								{/if}
 							</div>
 							<div class="flex items-center justify-between text-xs text-muted-foreground">
-								<span>{safeFormatCurrency(cost)} × {quantity}</span>
-								<span class="font-medium text-foreground">{safeFormatCurrency(total)}</span>
+								<span class="tabular-nums">{safeFormatCurrency(cost)} × {quantity}</span>
+								<span class="font-medium text-foreground tabular-nums">{safeFormatCurrency(total)}</span>
 							</div>
 						</div>
 					{/each}
 					<!-- Summary -->
 					<div class="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-lg text-sm font-medium">
 						<span>Total Allocated</span>
-						<span>{safeFormatCurrency(budget.allocatedAmount || 0)}</span>
+						<span class="tabular-nums">{safeFormatCurrency(budget.allocatedAmount || 0)}</span>
 					</div>
 				</div>
 
@@ -264,17 +269,17 @@
 											<span
 												class="inline-block px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground"
 											>
-												{item.type}
+												{humanizeEnum(item.type)}
 											</span>
 										{:else}
 											<span class="text-muted-foreground">—</span>
 										{/if}
 									</td>
-									<td class="px-3 py-1.5 text-xs text-muted-foreground text-right"
+									<td class="px-3 py-1.5 text-xs text-muted-foreground text-right tabular-nums"
 										>{safeFormatCurrency(cost)}</td
 									>
-									<td class="px-3 py-1.5 text-xs text-muted-foreground text-right">{quantity || '—'}</td>
-									<td class="px-3 py-1.5 text-xs font-medium text-foreground text-right">
+									<td class="px-3 py-1.5 text-xs text-muted-foreground text-right tabular-nums">{quantity || '—'}</td>
+									<td class="px-3 py-1.5 text-xs font-medium text-foreground text-right tabular-nums">
 										{safeFormatCurrency(total)}
 									</td>
 								</tr>
@@ -284,7 +289,7 @@
 								<td colspan="4" class="px-3 py-1.5 text-xs text-foreground text-right"
 									>Total Allocated:</td
 								>
-								<td class="px-3 py-1.5 text-xs font-bold text-foreground text-right">
+								<td class="px-3 py-1.5 text-xs font-bold text-foreground text-right tabular-nums">
 									{safeFormatCurrency(budget.allocatedAmount || 0)}
 								</td>
 							</tr>
@@ -296,7 +301,7 @@
 	</CardContent>
 
 	<CardFooter
-		class="px-4 py-2 bg-muted/50 border-t text-xxs text-muted-foreground flex justify-between items-center"
+		class="px-4 py-2 bg-muted/50 border-t text-xs text-muted-foreground flex justify-between items-center"
 	>
 		<div class="flex gap-3">
 			<span class="flex items-center gap-1">

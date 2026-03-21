@@ -16,10 +16,10 @@
 		Card,
 		CardContent,
 		CardHeader,
-		CardTitle,
-		CardDescription
+		CardTitle
 	} from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
+	import { Input } from '$lib/components/ui/input';
 	import {
 		DollarSign,
 		CheckCircle,
@@ -29,24 +29,19 @@
 		Trash2,
 		RefreshCw,
 		Info,
-		CalendarRange
+		CalendarRange,
+		Loader2,
+		Search
 	} from 'lucide-svelte';
+	const ITEMS_PER_PAGE = 24;
 	import type { Budget, BudgetWithStats, BudgetItem } from './types';
 	import BudgetFormModal from './BudgetFormModal.svelte';
 	import BudgetItemFormModal from './BudgetItemFormModal.svelte';
-	import BudgetDistributionCard from './BudgetDistributionCard.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { cn } from '$lib/utils';
 	import { formatDate, formatCurrency, getStatusClasses } from '$lib/utils/format';
 	import BudgetProjectCard from './BudgetProjectCard.svelte';
-	import {
-		Tooltip,
-		TooltipContent,
-		TooltipProvider,
-		TooltipTrigger
-	} from '$lib/components/ui/tooltip';
-
-	import { ChartBar, PieChart, AlertTriangle } from 'lucide-svelte';
+	import { PieChart } from 'lucide-svelte';
 	// RxDB stores (singletons from collections.svelte.ts)
 	let properties = $derived(
 		[...propertiesStore.value]
@@ -61,8 +56,12 @@
 			const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
 			return bMs - aMs;
 		});
+		// [P1-8] Map for O(1) property lookup
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+
 		return sortedBudgets.map((budget: any) => {
-			const property = propertiesStore.value.find((p: any) => String(p.id) === String(budget.property_id));
+			const property = propMap.get(String(budget.property_id));
 
 			let budgetItems: any[];
 			try {
@@ -128,9 +127,41 @@
 
 	let isLoading = $derived(!budgetsStore.initialized);
 
+	// Search and pagination
+	let searchInput = $state('');
+	let searchQuery = $state('');
+	let searchTimer: ReturnType<typeof setTimeout>;
+	let currentPage = $state(1);
+
+	function handleSearchInput(e: Event) {
+		const val = (e.target as HTMLInputElement).value;
+		searchInput = val;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => { searchQuery = val; }, 300);
+	}
+
+	let filteredBudgets = $derived.by(() => {
+		if (!searchQuery.trim()) return budgets;
+		const q = searchQuery.trim().toLowerCase();
+		return budgets.filter((b: any) =>
+			b.project_name?.toLowerCase().includes(q) ||
+			b.property?.name?.toLowerCase().includes(q) ||
+			b.project_category?.toLowerCase().includes(q)
+		);
+	});
+
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredBudgets.length / ITEMS_PER_PAGE)));
+	let pagedBudgets = $derived(filteredBudgets.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE));
+
+	$effect(() => {
+		searchQuery;
+		currentPage = 1;
+	});
+
 	// State management for modals and UI
 	let savedFormData = $state<any>(null);
 	let submitSeq = 0;
+	let isSubmitting = $state(false);
 	let rollback: (() => Promise<void>) | null = null;
 	let showDeleteDialog = $state(false);
 	let budgetToDeleteId = $state<number | null>(null);
@@ -170,13 +201,11 @@
 		onUpdate: ({ form }) => {
 			},
 		onSubmit: async () => {
-			// Capture current form data before submission
 			submitSeq++;
 			savedFormData = { ...$form, _seq: submitSeq };
 			const isEdit = editingBudget;
-			// Close modal immediately for instant feel
+			isSubmitting = true;
 			showBudgetFormModal = false;
-			toast.info(isEdit ? 'Saving budget...' : 'Creating budget...');
 			// For updates: optimistic write to RxDB now (ID is already known)
 			if (isEdit && savedFormData?.id) {
 				rollback = await optimisticUpsertBudget({
@@ -197,6 +226,7 @@
 		},
 		onError: async ({ result }) => {
 			console.error('Form error', result.error);
+			isSubmitting = false;
 			toast.error('Error saving budget');
 			// Instant rollback, then confirm with resync
 			if (rollback) { await rollback(); rollback = null; }
@@ -209,15 +239,18 @@
 			if (result.type === 'success') {
 				const resultData = (result as any).data;
 				const isEdit = editingBudget;
+				isSubmitting = false;
 				selectedBudget = null;
 				editingBudget = false;
-				rollback = null; // Success — discard snapshot
-				toast.success(isEdit ? 'Budget updated' : 'Budget added');
-				// For creates: upsert with server-assigned data (real ID)
+				rollback = null;
+				const budgetLabel = savedFormData?.project_name || 'Budget';
+				const amt = formatCurrency(parseFloat(savedFormData?.planned_amount) || 0);
+				toast.success(isEdit ? `${budgetLabel} updated (${amt})` : `${budgetLabel} created (${amt})`);
 				if (resultData?.budget) {
 					await optimisticUpsertBudget(resultData.budget);
 				}
 			} else if (result.type === 'failure') {
+				isSubmitting = false;
 				if ((result.data as any)?.conflict) {
 					toast.error(CONFLICT_MESSAGE, { duration: 6000 });
 				} else {
@@ -254,9 +287,23 @@
 		showItemFormModal = true;
 	}
 
+	// Duplicate guard
+	let lastBudgetSubmitKey = '';
+	let lastBudgetSubmitTime = 0;
+
 	// Handle budget form submission
 	function handleBudgetSubmit(event: CustomEvent<Budget>) {
 		const budget = event.detail;
+
+		// Duplicate guard — block same name+amount within 2s
+		const submitKey = `${budget.project_name}|${budget.planned_amount}`;
+		const now = Date.now();
+		if (submitKey === lastBudgetSubmitKey && now - lastBudgetSubmitTime < 2000) {
+			toast.warning('Duplicate submission blocked');
+			return;
+		}
+		lastBudgetSubmitKey = submitKey;
+		lastBudgetSubmitTime = now;
 
 		// Ensure all budget items have string ids
 		const sanitizedBudgetItems = sanitizeBudgetItems(budget.budget_items || []);
@@ -352,6 +399,8 @@
 		const deleteFormData = new FormData();
 		deleteFormData.append('id', String(budgetId));
 
+		const budgetName = budgets.find((b: any) => b.id === budgetId)?.project_name ?? 'Budget';
+
 		await bufferedMutation({
 			label: `Delete Budget #${budgetId}`,
 			collection: 'budgets',
@@ -365,7 +414,7 @@
 				return response;
 			},
 			onSuccess: async () => {
-				toast.success('Budget deleted');
+				toast.success(`${budgetName} deleted`);
 			}
 		});
 	}
@@ -387,15 +436,32 @@
 			<p class="text-muted-foreground mt-1">Manage and track your property renovation budgets</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<Button onclick={refreshData} variant="outline" size="sm" class="flex items-center gap-1">
+			<Button onclick={refreshData} variant="outline" size="sm" class="flex items-center gap-1 min-h-[44px]">
 				<RefreshCw class="h-4 w-4" />
 				Refresh
 			</Button>
-			<Button onclick={handleAddBudget} variant="default" size="sm" class="flex items-center gap-1">
-				<Plus class="h-4 w-4" />
-				Add Project
+			<Button onclick={handleAddBudget} variant="default" size="sm" class="flex items-center gap-1 min-h-[44px]" disabled={isSubmitting}>
+				{#if isSubmitting}
+					<Loader2 class="h-4 w-4 animate-spin" />
+					Saving...
+				{:else}
+					<Plus class="h-4 w-4" />
+					Add Project
+				{/if}
 			</Button>
 		</div>
+	</div>
+
+	<!-- Search -->
+	<div class="relative max-w-md mb-6">
+		<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+		<Input
+			type="text"
+			placeholder="Search budgets..."
+			class="pl-9 min-h-[44px]"
+			value={searchInput}
+			oninput={handleSearchInput}
+		/>
 	</div>
 
 	<!-- Compact Statistics Summary -->
@@ -408,7 +474,7 @@
 				</div>
 				<div>
 					<div class="text-sm font-medium text-muted-foreground mb-0.5">Total Budget</div>
-					<div class="text-xl font-bold">{formatCurrency(statistics.totalPlannedBudget)}</div>
+					<div class="text-xl font-bold tabular-nums">{formatCurrency(statistics.totalPlannedBudget)}</div>
 				</div>
 			</div>
 
@@ -451,7 +517,7 @@
 						)}
 					/>
 
-					<div class="flex justify-between items-center text-xs">
+					<div class="flex justify-between items-center text-xs tabular-nums">
 						<span>{formatCurrency(statistics.totalAllocatedBudget)}</span>
 						<span
 							class={cn(
@@ -481,7 +547,7 @@
 						<span class="h-5 w-5 rounded-full bg-green-100 mr-1.5 flex items-center justify-center">
 							<CheckCircle class="h-3 w-3 text-green-600" />
 						</span>
-						<span class="text-sm font-semibold">{statistics.completedProjects}</span>
+						<span class="text-sm font-semibold tabular-nums">{statistics.completedProjects}</span>
 					</div>
 					<div class="flex items-center">
 						<span
@@ -489,7 +555,7 @@
 						>
 							<Clock class="h-3 w-3 text-yellow-600" />
 						</span>
-						<span class="text-sm font-semibold">{statistics.ongoingProjects}</span>
+						<span class="text-sm font-semibold tabular-nums">{statistics.ongoingProjects}</span>
 					</div>
 				</div>
 
@@ -552,9 +618,15 @@
 					</Button>
 				</div>
 			</div>
+		{:else if filteredBudgets.length === 0}
+			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
+				<Search class="h-12 w-12 mx-auto text-muted-foreground" />
+				<h3 class="mt-2 text-lg font-medium text-foreground">No matching budgets</h3>
+				<p class="mt-1 text-sm text-muted-foreground">Try adjusting your search terms.</p>
+			</div>
 		{:else}
 			<div class="grid grid-cols-1 gap-6">
-				{#each budgets as budget (budget.id)}
+				{#each pagedBudgets as budget (budget.id)}
 					<BudgetProjectCard
 						{budget}
 						{formatCurrency}
@@ -564,6 +636,19 @@
 					/>
 				{/each}
 			</div>
+
+			<!-- Pagination -->
+			{#if totalPages > 1}
+				<div class="flex items-center justify-between mt-6">
+					<span class="text-sm text-muted-foreground tabular-nums">
+						{filteredBudgets.length} budget{filteredBudgets.length !== 1 ? 's' : ''} · Page {currentPage} of {totalPages}
+					</span>
+					<div class="flex gap-2">
+						<Button variant="outline" size="sm" class="min-h-[44px]" disabled={currentPage <= 1} onclick={() => currentPage--}>Previous</Button>
+						<Button variant="outline" size="sm" class="min-h-[44px]" disabled={currentPage >= totalPages} onclick={() => currentPage++}>Next</Button>
+					</div>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>
@@ -600,7 +685,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; budgetToDeleteId = null; }}>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={confirmDeleteBudget}>Continue</AlertDialog.Action>
+			<AlertDialog.Action onclick={confirmDeleteBudget} class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

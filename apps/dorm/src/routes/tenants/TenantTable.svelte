@@ -114,12 +114,7 @@
 						<Badge class="{getStatusClasses(tenant.tenant_status)} text-xs px-1.5 py-0.5 sm:px-2 sm:py-1">
 							{@const StatusIcon = getStatusIcon(tenant.tenant_status)}<StatusIcon class="h-3.5 w-3.5 mr-1 inline" />
 							<span class="hidden sm:inline">{tenant.tenant_status}</span>
-							<span class="sm:hidden">
-								{tenant.tenant_status === 'ACTIVE' ? 'ACT' :
-								 tenant.tenant_status === 'INACTIVE' ? 'INA' :
-								 tenant.tenant_status === 'PENDING' ? 'PEN' :
-								 tenant.tenant_status === 'BLACKLISTED' ? 'BLK' : tenant.tenant_status}
-							</span>
+							<span class="sm:hidden sr-only">{tenant.tenant_status}</span>
 						</Badge>
 					</td>
 					<td class="p-2 sm:p-4">

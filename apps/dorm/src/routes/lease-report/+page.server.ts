@@ -131,8 +131,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	);
 
 	try {
-		const startTime = performance.now();
-
 		// Fetch all required data
 		const [floorsData, propertiesData, rentalUnitsData] = await Promise.all([
 			db.select().from(floors).where(eq(floors.status, 'ACTIVE')),
@@ -320,12 +318,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				reportData.floors.push(floorGroup);
 			}
 		}
-
-		const queryTime = performance.now() - startTime;
-		console.log('Data fetch completed:', {
-			floors: reportData.floors.length,
-			time: `${queryTime.toFixed(2)}ms`
-		});
 
 		return {
 			filterForm,

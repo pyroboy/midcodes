@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Loader2 } from 'lucide-svelte';
 
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import { Switch } from '$lib/components/ui/switch';
@@ -131,32 +132,18 @@
 	let readingsJson = $derived.by(() => {
 		const readingsToSubmit = meterReadings
 			.filter((r) => {
-				const hasReading =
-					r.currentReading !== null &&
+				return r.currentReading !== null &&
 					r.currentReading !== undefined &&
 					!isNaN(Number(r.currentReading));
-				console.log(`Meter ${r.meterId} (${r.meterName}):`, {
-					currentReading: r.currentReading,
-					hasReading,
-					type: typeof r.currentReading
-				});
-				return hasReading;
 			})
-			.map((r) => {
-				const readingData = {
-					meter_id: Number(r.meterId),
-					reading: Number(r.currentReading),
-					reading_date: readingDate,
-					backdating_enabled: allowBackdating
-				};
-				console.log(`Mapped reading for meter ${r.meterId}:`, readingData);
-				return readingData;
-			});
+			.map((r) => ({
+				meter_id: Number(r.meterId),
+				reading: Number(r.currentReading),
+				reading_date: readingDate,
+				backdating_enabled: allowBackdating
+			}));
 
-		const jsonString = JSON.stringify(readingsToSubmit);
-		console.log('Generated readings JSON:', jsonString);
-		console.log('Total readings to submit:', readingsToSubmit.length);
-		return jsonString;
+		return JSON.stringify(readingsToSubmit);
 	});
 
 	// Initialize superForm with comprehensive error handling
@@ -185,7 +172,6 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
         }
     },
     onResult: async ({ result }) => {
-        console.log('Form submission result:', result);
         isSubmitting = false;
         
         if (result.type === 'success') {
@@ -203,7 +189,6 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
         }
     },
     onError: ({ result }) => {
-        console.error('Form submission error:', result);
         const errorMessage =
             result.error?.message ||
             (typeof result.error === 'string' ? result.error : 'Failed to save readings');
@@ -467,10 +452,6 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 	async function handleSave() {
 		if (isSubmitting) return;
 
-		console.log('=== Starting form save ===');
-		console.log('Current meter readings:', meterReadings);
-		console.log('Reading date:', readingDate, 'Cost per unit:', costPerUnit, typeof costPerUnit);
-
 		const readingsToSubmit = meterReadings.filter(
 			(r) =>
 				r.currentReading !== null &&
@@ -498,11 +479,6 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 			return;
 		}
 
-		// Show warning but allow submission
-		if (dateCheck.warning) {
-			console.warn('Date validation warning:', dateCheck.warning);
-		}
-
 		if (!costPerUnit || isNaN(Number(costPerUnit)) || Number(costPerUnit) <= 0) {
 			toast.error('Valid cost per unit is required');
 			return;
@@ -511,14 +487,6 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 		isSubmitting = true;
 
 		try {
-			console.log('Submitting form with data:', {
-				readingsJson,
-				readingDate,
-				costPerUnit: Number(costPerUnit),
-				utilityType,
-				backdating_enabled: allowBackdating
-			});
-
 			// Update form data before submission
 			$form.readings_json = readingsJson;
 			$form.reading_date = readingDate;
@@ -573,7 +541,7 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 						{#if utilityType}
 							<Badge class="{getUtilityColorClass(utilityType)} text-lg">
 								<span class="mr-2 h-3 w-3 rounded-full {getUtilityBadgeColor(utilityType)}"></span>
-								{utilityType}
+								{utilityType.charAt(0) + utilityType.slice(1).toLowerCase()}
 							</Badge>
 						{/if}
 					</div>
@@ -648,6 +616,7 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 								type="number"
 								step="0.01"
 								min="0"
+								inputmode="decimal"
 								bind:value={costPerUnit}
 								placeholder="Enter cost per unit"
 								class="pl-7"
@@ -707,6 +676,7 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 													type="number"
 													step="0.01"
 													min="0"
+													inputmode="decimal"
 													placeholder="Enter reading"
 													oninput={(e) =>
 														handleReadingChange(
@@ -727,10 +697,10 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 												{/if}
 											</div>
 										</td>
-										<td class="px-4">
+										<td class="px-4 tabular-nums">
 											{reading.consumption !== null ? reading.consumption.toFixed(2) : '-'}
 										</td>
-										<td class="px-4">
+										<td class="px-4 tabular-nums">
 											{reading.cost !== null ? formatCurrency(reading.cost) : '-'}
 										</td>
 									</tr>
@@ -747,19 +717,7 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 				<input type="hidden" name="type" value={utilityType} />
 				<input type="hidden" name="backdating_enabled" value={allowBackdating} />
 
-				<!-- Debug info in development -->
-				{#if typeof window !== 'undefined' && window.location.hostname === 'localhost'}
-					<div class="mt-2 p-2 bg-gray-50 border rounded text-xs text-gray-600">
-						<strong>Debug Info:</strong><br />
-						Readings JSON: {readingsJson?.substring(0, 100)}...<br />
-						Reading Date: {readingDate}<br />
-						Rate At Reading: {costPerUnit} (type: {typeof costPerUnit})<br />
-						Utility Type: {utilityType}<br />
-						Backdating Enabled: {allowBackdating}<br />
-		
-					</div>
-				{/if}
-			</form>
+				</form>
 
 			<!-- Display validation errors -->
 			{#if $errors.readings_json}
@@ -778,10 +736,11 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 				</div>
 			{/if}
 
-			<Dialog.Footer class="mt-4">
-				<Button variant="outline" onclick={close} class="mr-2">Cancel</Button>
+			<Dialog.Footer class="mt-4 sticky bottom-0 bg-background pt-4 pb-2">
+				<Button variant="outline" class="min-h-[44px]" onclick={close}>Cancel</Button>
 				<Button
 					type="button"
+					class="min-h-[44px]"
 					onclick={handleSave}
 					disabled={meterReadings.filter((r) => r.currentReading !== null).length === 0 ||
 						isSubmitting ||
@@ -789,7 +748,7 @@ const { form, errors, enhance, submitting, message } = superForm((() => formData
 						!dateValidation.isValid}
 				>
 					{#if isSubmitting || $submitting}
-						<span class="mr-2">⏳</span>
+						<Loader2 class="w-4 h-4 mr-2 animate-spin" />
 						Saving...
 					{:else}
 						Save Readings

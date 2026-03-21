@@ -67,6 +67,20 @@
 	let isSubmitting = $state(false);
 	let mobileBillingsExpanded = $state(true);
 	let mobileAllocationExpanded = $state(false);
+	let amountTouched = $state(false);
+	let editingPaidByDate = $state(false);
+	let editingAmount = $state(false);
+	let showSuccessAnimation = $state(false);
+	let scrollContainerRef = $state<HTMLDivElement | null>(null);
+	// P2-3: Collapsed billing type summary (e.g., "Rent + Utility")
+	let selectedBillingTypeSummary = $derived.by(() => {
+		if (selectedBillings.size === 0) return '';
+		const types = (lease.billings || [])
+			.filter((b: Billing) => selectedBillings.has(b.id) && b.status !== 'PAID')
+			.map((b: Billing) => billingTypeLabels[b.type] || b.type);
+		const unique = [...new Set(types)];
+		return unique.join(' + ');
+	});
 
 	// P0-NEW-1: Pre-select all unpaid billings when modal opens
 	$effect(() => {
@@ -86,6 +100,10 @@
 				if (saved && paymentTypes.some((t) => t.value === saved)) {
 					selectedPaymentType = saved as PaymentMethod['value'];
 				}
+				// P1-2: Auto-focus Submit — setTimeout(150) fires after dialog focus trap settles
+				setTimeout(() => {
+					document.querySelector<HTMLButtonElement>('[data-payment-submit]')?.focus();
+				}, 150);
 			});
 		}
 	});
@@ -287,7 +305,10 @@
 					await onDataChange();
 				}
 
-				// Close modal first so toast isn't obscured
+				// Feature 3: Success micro-animation before close
+				showSuccessAnimation = true;
+				await new Promise((r) => setTimeout(r, 900));
+				showSuccessAnimation = false;
 				onOpenChange(false);
 
 				// #1: Rich success toast with undo hint
@@ -430,6 +451,14 @@
 		'OVERDUE-PARTIAL': 'bg-orange-200 text-orange-900 border-orange-500'
 	};
 
+	// Feature 2: Dismiss keyboard on scroll (mobile)
+	function handleScrollDismiss() {
+		const active = document.activeElement;
+		if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+			(active as HTMLElement).blur();
+		}
+	}
+
 	function getDisplayStatus(billing: Billing): string {
 		if (billing.balance <= 0) {
 			return 'PAID';
@@ -455,6 +484,17 @@
 
 <Dialog.Root open={isOpen} {onOpenChange}>
 	<Dialog.Content class="sm:max-w-[900px] max-h-[90dvh] flex flex-col overflow-hidden p-0">
+		<!-- Feature 3: Success micro-animation overlay -->
+		{#if showSuccessAnimation}
+			<div class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 animate-in fade-in duration-200">
+				<svg class="w-16 h-16 text-green-500" viewBox="0 0 52 52" fill="none">
+					<circle class="stroke-green-500/20" cx="26" cy="26" r="24" stroke-width="3" />
+					<circle class="stroke-green-500 success-circle" cx="26" cy="26" r="24" stroke-width="3" stroke-linecap="round" />
+					<path class="stroke-green-500 success-check" d="M14 27l8 8 16-16" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+				</svg>
+				<p class="text-sm font-medium text-green-700 mt-3">Payment Recorded</p>
+			</div>
+		{/if}
 		<Dialog.Header class="px-4 pt-3 pb-1.5 sm:px-5 sm:pt-4 flex-shrink-0 border-b">
 			<Dialog.Title class="text-base">Make Payment</Dialog.Title>
 			<Dialog.Description class="text-xs">
@@ -463,7 +503,8 @@
 		</Dialog.Header>
 
 		<form onsubmit={handleSubmit} class="flex flex-col flex-1 min-h-0">
-			<div class="flex-1 overflow-y-auto px-4 sm:px-5 py-3">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="flex-1 overflow-y-auto px-4 sm:px-5 py-3" bind:this={scrollContainerRef} onscroll={handleScrollDismiss}>
 				<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)] gap-3 lg:gap-4">
 
 				<!-- Column 1: Billings -->
@@ -478,6 +519,9 @@
 							Billings
 							{#if selectedBillings.size > 0}
 								<span class="text-primary font-medium lg:hidden">({selectedBillings.size})</span>
+								{#if !mobileBillingsExpanded && selectedBillingTypeSummary}
+									<span class="text-[10px] text-muted-foreground font-normal lg:hidden truncate max-w-[160px]">— {selectedBillingTypeSummary}</span>
+								{/if}
 							{/if}
 						</button>
 						{#if sortedBillings.filter((b: Billing) => b.status !== 'PAID').length > 1}
@@ -495,7 +539,7 @@
 									resetInvalidPaymentType();
 								}}
 							>
-								{selectedBillings.size === sortedBillings.filter((b: Billing) => b.status !== 'PAID').length ? 'None' : 'All'}
+								{selectedBillings.size === sortedBillings.filter((b: Billing) => b.status !== 'PAID').length ? 'Clear' : 'All'}
 							</button>
 						{/if}
 					</div>
@@ -578,7 +622,7 @@
 							{#each availablePaymentTypes as type}
 								<button
 									type="button"
-									class="px-2 py-1.5 text-xs rounded border transition-colors text-center leading-tight {selectedPaymentType === type.value
+									class="px-2 py-2 text-xs rounded border transition-colors text-center leading-tight {selectedPaymentType === type.value
 										? 'bg-primary text-primary-foreground border-primary'
 										: 'bg-background border-input hover:bg-muted'}"
 									onclick={() => { selectedPaymentType = type.value; }}
@@ -609,74 +653,138 @@
 						</div>
 					{/if}
 
-					<!-- Row: Paid By + Date -->
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-						<div>
-							<Label for="paid-by" class="text-xs">Paid By</Label>
-							{#if lease.lease_tenants && lease.lease_tenants.length > 1}
-								<div class="flex flex-wrap gap-0.5 mb-1">
-									{#each lease.lease_tenants as lt}
-										{@const name = lt.tenant?.name || ''}
-										<button
-											type="button"
-											class="text-[10px] px-1.5 py-0.5 rounded border transition-colors {paidBy === name ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-input hover:bg-muted'}"
-											onclick={() => { paidBy = name; }}
-										>{name || '?'}</button>
-									{/each}
+					<!-- Row: Paid By + Date — collapsed read-only on mobile when pre-filled, always editable on desktop -->
+					{#if !editingPaidByDate && paidBy && paidAt}
+						<!-- Mobile: read-only summary -->
+						<div class="lg:hidden flex items-center justify-between py-1.5 px-2.5 bg-muted/50 rounded text-xs">
+							<span class="truncate"><span class="text-muted-foreground">By</span> {paidBy} <span class="text-muted-foreground">on</span> {new Date(paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+							<button type="button" class="text-primary hover:underline flex-shrink-0 ml-2" onclick={() => { editingPaidByDate = true; }}>Edit</button>
+						</div>
+						<!-- Desktop: always show inputs -->
+						<div class="hidden lg:grid grid-cols-2 gap-2">
+							<div>
+								<Label for="paid-by" class="text-xs">Paid By</Label>
+								{#if lease.lease_tenants && lease.lease_tenants.length > 1}
+									<div class="flex flex-wrap gap-0.5 mb-1">
+										{#each lease.lease_tenants as lt}
+											{@const name = lt.tenant?.name || ''}
+											<button
+												type="button"
+												class="text-[10px] px-1.5 py-0.5 rounded border transition-colors {paidBy === name ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-input hover:bg-muted'}"
+												onclick={() => { paidBy = name; }}
+											>{name || '?'}</button>
+										{/each}
+									</div>
+								{/if}
+								<Input id="paid-by" bind:value={paidBy} placeholder="Payer name" class="h-8 text-sm" />
+							</div>
+							<div>
+								<DatePicker
+									bind:value={paidAt}
+									label="Date"
+									placeholder="Payment date"
+									required={true}
+									id="paid-at"
+									name="paid-at"
+								/>
+							</div>
+						</div>
+					{:else}
+						<!-- Expanded: full inputs (both viewports) -->
+						<div class="grid grid-cols-2 gap-2">
+							<div>
+								<Label for="paid-by" class="text-xs">Paid By</Label>
+								{#if lease.lease_tenants && lease.lease_tenants.length > 1}
+									<div class="flex flex-wrap gap-0.5 mb-1">
+										{#each lease.lease_tenants as lt}
+											{@const name = lt.tenant?.name || ''}
+											<button
+												type="button"
+												class="text-[10px] px-1.5 py-0.5 rounded border transition-colors {paidBy === name ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-input hover:bg-muted'}"
+												onclick={() => { paidBy = name; }}
+											>{name || '?'}</button>
+										{/each}
+									</div>
+								{/if}
+								<Input id="paid-by" bind:value={paidBy} placeholder="Payer name" class="h-8 text-sm" />
+							</div>
+							<div>
+								<DatePicker
+									bind:value={paidAt}
+									label="Date"
+									placeholder="Payment date"
+									required={true}
+									id="paid-at"
+									name="paid-at"
+								/>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Amount + Reference -->
+					{#if !editingAmount && paymentAmount > 0 && paymentAmount === selectedAmount}
+						<!-- Read-only amount (mobile) — tap Edit to change -->
+						<div class="lg:hidden flex items-center justify-between py-1.5 px-2.5 bg-muted/50 rounded text-xs">
+							<span><span class="text-muted-foreground">Amount</span> <span class="font-semibold tabular-nums text-sm">{formatCurrency(paymentAmount)}</span></span>
+							<button type="button" class="text-primary hover:underline flex-shrink-0 ml-2" onclick={() => { editingAmount = true; }}>Edit</button>
+						</div>
+						<!-- Desktop: always show input -->
+						<div class="hidden lg:grid {selectedPaymentType !== 'CASH' ? 'grid-cols-2' : 'grid-cols-1'} gap-2">
+							<div>
+								<Label for="amount" class="text-xs">Amount</Label>
+								<div class="flex items-center gap-1">
+									<Input id="amount" type="number" inputmode="decimal" bind:value={paymentAmount} min="0.01" step="0.01" class="h-8 text-sm tabular-nums" onblur={() => { amountTouched = true; }} />
+								</div>
+							</div>
+							{#if selectedPaymentType !== 'CASH'}
+								<div>
+									<Label for="reference" class="text-xs">Reference #</Label>
+									<Input id="reference" bind:value={referenceNumber} placeholder="Transaction ID" class="h-8 text-sm" />
 								</div>
 							{/if}
-							<Input id="paid-by" bind:value={paidBy} placeholder="Payer name" class="h-8 text-sm" />
 						</div>
-						<div>
-							<DatePicker
-								bind:value={paidAt}
-								label="Date"
-								placeholder="Payment date"
-								required={true}
-								id="paid-at"
-								name="paid-at"
-							/>
-						</div>
-					</div>
-
-					<!-- Row: Amount + Reference -->
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-						<div>
-							<Label for="amount" class="text-xs">Amount</Label>
-							<div class="flex items-center gap-1">
-								<Input
-									id="amount"
-									type="number"
-									bind:value={paymentAmount}
-									min="0.01"
-									step="0.01"
-									class="h-8 text-sm tabular-nums"
-								/>
-								{#if selectedAmount > 0 && paymentAmount !== selectedAmount}
-									<Button type="button" variant="outline" size="sm" onclick={setExactAmount} title="Reset to {formatCurrency(selectedAmount)}" class="h-8 px-2 text-[10px] flex-shrink-0">
-										Reset
-									</Button>
+					{:else}
+						<!-- Editable amount (both viewports, or when amount differs from selected) -->
+						<div class="grid {selectedPaymentType !== 'CASH' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} gap-2">
+							<div>
+								<Label for="amount" class="text-xs">Amount</Label>
+								<div class="flex items-center gap-1">
+									<Input
+										id="amount"
+										type="number"
+										inputmode="decimal"
+										bind:value={paymentAmount}
+										min="0.01"
+										step="0.01"
+										class="h-8 text-sm tabular-nums {amountTouched && (!paymentAmount || paymentAmount <= 0) ? 'border-red-400 focus-visible:ring-red-400' : ''}"
+										onblur={() => { amountTouched = true; }}
+									/>
+									{#if selectedAmount > 0 && paymentAmount !== selectedAmount}
+										<Button type="button" variant="outline" size="sm" onclick={setExactAmount} title="Reset to {formatCurrency(selectedAmount)}" class="h-8 px-2 text-[10px] flex-shrink-0">
+											Reset
+										</Button>
+									{/if}
+								</div>
+								{#if amountTouched && (!paymentAmount || paymentAmount <= 0)}
+									<p class="text-[10px] text-red-500 mt-0.5">Amount must be greater than zero</p>
+								{:else if amountTouched && selectedPaymentType === 'SECURITY_DEPOSIT' && paymentAmount > availableSecurityDeposit}
+									<p class="text-[10px] text-red-500 mt-0.5">Exceeds available deposit ({formatCurrency(availableSecurityDeposit)})</p>
+								{:else if paymentAmount > 0 && selectedAmount > 0 && paymentAmount !== selectedAmount}
+									<p class="text-[10px] text-muted-foreground mt-0.5">
+										{paymentAmount < selectedAmount
+											? `Partial — ${formatCurrency(selectedAmount - paymentAmount)} remaining`
+											: `${formatCurrency(paymentAmount - selectedAmount)} change`}
+									</p>
 								{/if}
 							</div>
-							{#if paymentAmount > 0 && selectedAmount > 0 && paymentAmount !== selectedAmount}
-								<p class="text-[10px] text-muted-foreground mt-0.5">
-									{paymentAmount < selectedAmount
-										? `Partial — ${formatCurrency(selectedAmount - paymentAmount)} remaining`
-										: `${formatCurrency(paymentAmount - selectedAmount)} change`}
-								</p>
+							{#if selectedPaymentType !== 'CASH'}
+								<div>
+									<Label for="reference" class="text-xs">Reference #</Label>
+									<Input id="reference" bind:value={referenceNumber} placeholder="Transaction ID" class="h-8 text-sm" />
+								</div>
 							{/if}
 						</div>
-						<div>
-							<Label for="reference" class="text-xs">Reference #</Label>
-							<Input
-								id="reference"
-								bind:value={referenceNumber}
-								placeholder={selectedPaymentType === 'CASH' ? 'N/A' : 'Transaction ID'}
-								disabled={selectedPaymentType === 'CASH'}
-								class="h-8 text-sm"
-							/>
-						</div>
-					</div>
+					{/if}
 				</div>
 
 				<!-- Column 3: Summary (desktop only) -->
@@ -739,7 +847,7 @@
 						{:else if selectedPaymentType === 'SECURITY_DEPOSIT' && paymentAmount > availableSecurityDeposit}Amount exceeds available security deposit{/if}
 					</p>
 				{:else}<div></div>{/if}
-				<Button type="submit" disabled={!canSubmit} class="h-8 px-4 text-sm">
+				<Button type="submit" disabled={!canSubmit} class="h-8 px-4 text-sm" data-payment-submit>
 					{#if isSubmitting}
 						<svg class="animate-spin -ml-1 mr-1.5 h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
 						Submitting...
@@ -795,3 +903,23 @@
 		</form>
 	</Dialog.Content>
 </Dialog.Root>
+
+<style>
+	/* Success checkmark animation */
+	.success-circle {
+		stroke-dasharray: 151;
+		stroke-dashoffset: 151;
+		animation: circle-draw 0.4s ease-out 0.1s forwards;
+	}
+	.success-check {
+		stroke-dasharray: 40;
+		stroke-dashoffset: 40;
+		animation: check-draw 0.3s ease-out 0.4s forwards;
+	}
+	@keyframes circle-draw {
+		to { stroke-dashoffset: 0; }
+	}
+	@keyframes check-draw {
+		to { stroke-dashoffset: 0; }
+	}
+</style>

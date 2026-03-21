@@ -20,7 +20,6 @@ export const actions: Actions = {
 		const form = await superValidate(rawFormData, zod(expenseSchema));
 
 		if (!form.valid) {
-			console.error('Form validation error:', form.errors);
 			return fail(400, { form });
 		}
 
@@ -62,13 +61,7 @@ export const actions: Actions = {
 					})
 					.returning();
 
-				console.log('Creating expense with data:', {
-					inputData: expenseData,
-					dbData: result,
-					type: expenseData.type
-				});
-
-				return { form, success: true, operation: 'create', expense: result?.[0] };
+					return { form, success: true, operation: 'create', expense: result?.[0] };
 			}
 		} catch (err) {
 			console.error('Error in upsert operation:', err);
@@ -86,21 +79,15 @@ export const actions: Actions = {
 			const formData = await request.formData();
 			const id = formData.get('id');
 
-			console.log('Received delete request with ID:', id);
-
 			if (!id) {
-				console.error('Error: Expense ID is required but was not provided');
 				return fail(400, { message: 'Expense ID is required' });
 			}
 
-			console.log('Attempting to delete expense with ID:', id);
 			const result = await db
 				.update(expenses)
 				.set({ deletedAt: new Date(), updatedAt: new Date() })
 				.where(eq(expenses.id, Number(id)))
 				.returning();
-
-			console.log('Delete result:', { data: result });
 
 			return { success: true };
 		} catch (err) {

@@ -30,6 +30,16 @@
 		search: ''
 	});
 
+	// Debounced search (300ms)
+	let debouncedSearch = $state('');
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		const term = filters.search;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => { debouncedSearch = term; }, 300);
+		return () => clearTimeout(searchTimer);
+	});
+
 	// Smart period default: use latest period with data
 	let periodInitialized = false;
 	$effect(() => {
@@ -172,9 +182,9 @@
 		return props.readings.filter((r: Reading) => {
 			const matchesPeriod = !filters.period || r.period === filters.period;
 			const matchesSearch =
-				!filters.search ||
-				r.meters?.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-				r.meters?.type.toLowerCase().includes(filters.search.toLowerCase());
+				!debouncedSearch ||
+				r.meters?.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+				r.meters?.type.toLowerCase().includes(debouncedSearch.toLowerCase());
 			return matchesPeriod && matchesSearch;
 		});
 	});
@@ -472,7 +482,7 @@
 						</div>
 						<div>
 							<span class="text-muted-foreground">Cost</span>
-							<p class="font-medium">{formatCurrency(reading.cost)}</p>
+							<p class="font-medium tabular-nums">{formatCurrency(reading.cost)}</p>
 						</div>
 					</div>
 
@@ -485,7 +495,7 @@
 								<span class="text-xs text-green-600">✓ Billed</span>
 							{/if}
 						</div>
-						<Button variant="ghost" size="sm" onclick={(e) => handleShareClick(e as MouseEvent, reading)}>Bill</Button>
+						<Button variant="ghost" size="sm" class="min-h-[44px]" onclick={(e) => handleShareClick(e as MouseEvent, reading)}>Bill</Button>
 					</div>
 				</div>
 			{/each}
@@ -498,7 +508,6 @@
 				<Table.Row>
 					<!-- Removed top header checkbox as requested -->
 					<Table.Head>Meter</Table.Head>
-					<Table.Head>Type</Table.Head>
 					<Table.Head>Last Billed</Table.Head>
 					<Table.Head>Previous</Table.Head>
 					<Table.Head>Current</Table.Head>
@@ -535,9 +544,6 @@
 									</span>
 								{/if}
 							</div>
-						</Table.Cell>
-						<Table.Cell>
-							{reading.meters?.type ? formatEnumLabel(reading.meters.type) : '-'}
 						</Table.Cell>
 						<Table.Cell>
 							{#if props.meterLastBilledDates && props.meterLastBilledDates[String(reading.meter_id)]}
@@ -592,8 +598,8 @@
 								</span>
 							{/if}
 						</Table.Cell>
-						<Table.Cell>{formatCurrency(reading.rate_at_reading)}</Table.Cell>
-						<Table.Cell class="font-medium">{formatCurrency(reading.cost)}</Table.Cell>
+						<Table.Cell class="tabular-nums">{formatCurrency(reading.rate_at_reading)}</Table.Cell>
+						<Table.Cell class="font-medium tabular-nums">{formatCurrency(reading.cost)}</Table.Cell>
 						<Table.Cell>
 							<Button
 								variant="ghost"

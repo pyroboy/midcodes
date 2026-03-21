@@ -14,7 +14,11 @@
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from './formSchema';
-	import { Pencil, Trash2, Users, Tag, List, Plus, Search, Home, Building2, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import { Pencil, Trash2, Users, List, Plus, Search, Home, Building2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-svelte';
+	import { browser } from '$app/environment';
+
+	const LS_TYPE_KEY = 'dorm:rental-unit:lastType';
+	const LS_STATUS_KEY = 'dorm:rental-unit:lastStatus';
 	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import {
@@ -32,28 +36,36 @@
 	let savedFormData: any = null;
 	let savedEditMode = false;
 	let submitSeq = 0;
+	let isSubmitting = $state(false);
 	let rollback: (() => Promise<void>) | null = null;
 
-	// Enrich rental units with property and floor relationships
-	let rentalUnits = $derived(rentalUnitsStore.value.map((unit: any) => {
-		const property = propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id));
-		const floor = floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id));
-		return {
-			...unit,
-			id: Number(unit.id),
-			property_id: Number(unit.property_id),
-			floor_id: Number(unit.floor_id),
-			base_rate: unit.base_rate,
-			amenities: Array.isArray(unit.amenities) ? unit.amenities : [],
-			property: property ? { id: Number(property.id), name: property.name } : null,
-			floor: floor ? {
-				id: Number(floor.id),
-				property_id: floor.property_id,
-				floor_number: floor.floor_number,
-				wing: floor.wing
-			} : null
-		};
-	}));
+	// [P2-15] Enrich rental units with Map lookups for O(1) joins
+	let rentalUnits = $derived.by(() => {
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+		const floorMap = new Map<string, any>();
+		for (const f of floorsStore.value) floorMap.set(String(f.id), f);
+
+		return rentalUnitsStore.value.map((unit: any) => {
+			const property = propMap.get(String(unit.property_id));
+			const floor = floorMap.get(String(unit.floor_id));
+			return {
+				...unit,
+				id: Number(unit.id),
+				property_id: Number(unit.property_id),
+				floor_id: Number(unit.floor_id),
+				base_rate: unit.base_rate,
+				amenities: Array.isArray(unit.amenities) ? unit.amenities : [],
+				property: property ? { id: Number(property.id), name: property.name } : null,
+				floor: floor ? {
+					id: Number(floor.id),
+					property_id: floor.property_id,
+					floor_number: floor.floor_number,
+					wing: floor.wing
+				} : null
+			};
+		});
+	});
 
 	let properties = $derived(
 		[...propertiesStore.value]
@@ -71,7 +83,15 @@
 	let isLoading = $derived(!rentalUnitsStore.initialized);
 
 	// UI States
+	let searchInput = $state('');
 	let searchQuery = $state('');
+	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+	// [P3-16] 300ms debounce on search
+	$effect(() => {
+		if (searchTimeout) clearTimeout(searchTimeout);
+		const val = searchInput;
+		searchTimeout = setTimeout(() => { searchQuery = val; }, 300);
+	});
 	let showModal = $state(false);
 	let editMode = $state(false);
 
@@ -177,10 +197,14 @@
 
 	let hasActiveFilters = $derived(filterFloor !== '' || filterType !== '' || filterStatus !== '');
 
+	// Badge suppression: hide status badge when all filtered units share the same status
+	let allSameStatus = $derived(filteredRentalUnits.length > 0 && filteredRentalUnits.every((u: any) => u.rental_unit_status === filteredRentalUnits[0].rental_unit_status));
+
 	function clearFilters() {
 		filterFloor = '';
 		filterType = '';
 		filterStatus = '';
+		searchInput = '';
 		searchQuery = '';
 	}
 
@@ -197,16 +221,16 @@
 	} = superForm(defaults(zod(rental_unitSchema)), {
 		id: 'rental-unit-form',
 		validators: zodClient(rental_unitSchema),
-		validationMethod: 'oninput',
+		validationMethod: 'onsubmit',
 		dataType: 'json',
 		resetForm: true,
 		onSubmit: async ({ formData: fd }) => {
 			submitSeq++;
 			savedFormData = { ...$formData, _seq: submitSeq };
 			savedEditMode = editMode;
+			isSubmitting = true;
 			// Close modal immediately for snappy UX
 			showModal = false;
-			toast.info(editMode ? 'Saving unit...' : 'Creating unit...');
 			// For updates with a known ID, run the optimistic write right away
 			if (editMode && savedFormData?.id) {
 				rollback = await optimisticUpsertRentalUnit({
@@ -224,8 +248,8 @@
 			}
 		},
 		onError: async ({ result }) => {
+			isSubmitting = false;
 			toast.error('Error saving rental unit');
-			// Instant rollback, then confirm with resync
 			if (rollback) { await rollback(); rollback = null; }
 			resyncCollection('rental_units').catch((err) =>
 				console.warn('[RentalUnit] Resync after error:', err)
@@ -236,6 +260,7 @@
 			if (!savedFormData || savedFormData._seq !== submitSeq) return;
 
 			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				isSubmitting = false;
 				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
 				if (rollback) { await rollback(); rollback = null; }
 				resyncCollection('rental_units').catch(() => {});
@@ -246,7 +271,8 @@
 			if (result.type === 'success') {
 				const serverData = (result as any).data?.form?.data;
 				const fd = serverData ?? savedFormData;
-				rollback = null; // Success — discard snapshot
+				isSubmitting = false;
+				rollback = null;
 				// For creates, apply optimistic upsert with server-assigned ID
 				if (!savedEditMode && fd?.id) {
 					await optimisticUpsertRentalUnit({
@@ -264,11 +290,16 @@
 				} else if (!savedEditMode) {
 					bgResync('rental_units');
 				}
-				toast.success(savedEditMode ? 'Rental unit updated' : 'Rental unit created');
+				// Save preferences to localStorage
+				if (browser && fd?.type) localStorage.setItem(LS_TYPE_KEY, fd.type);
+				if (browser && fd?.rental_unit_status) localStorage.setItem(LS_STATUS_KEY, fd.rental_unit_status);
+
+				const unitLabel = fd?.name ? `${fd.name} (#${fd.number})` : 'Rental unit';
+				toast.success(savedEditMode ? `${unitLabel} updated` : `${unitLabel} created`);
 				savedFormData = null;
 			} else if (result.type === 'failure' || result.type === 'error') {
+				isSubmitting = false;
 				toast.error('Failed to save rental unit');
-				// Instant rollback, then confirm with resync
 				if (rollback) { await rollback(); rollback = null; }
 				resyncCollection('rental_units').catch((err) =>
 					console.warn('[RentalUnit] Resync after failure:', err)
@@ -352,7 +383,7 @@
 				return result;
 			},
 			onSuccess: async () => {
-				toast.success('Rental unit deleted');
+				toast.success(`${rentalUnit.name} (#${rentalUnit.number}) deleted`);
 			}
 		});
 	}
@@ -409,7 +440,7 @@
 					{#if isLoading}
 						Manage rooms, beds, and occupancy
 					{:else if selectedProperty}
-						{unitCount} unit{unitCount !== 1 ? 's' : ''} · {vacantCount} vacant
+						<span class="tabular-nums">{unitCount}</span> unit{unitCount !== 1 ? 's' : ''} · <span class="tabular-nums">{vacantCount}</span> vacant
 					{:else}
 						Select a property to view units
 					{/if}
@@ -417,9 +448,14 @@
 			</div>
 		</div>
 
-		<Button onclick={handleAddClick} class="shadow-sm">
-			<Plus class="w-4 h-4 mr-2" />
-			Add Unit
+		<Button onclick={handleAddClick} class="shadow-sm min-h-[44px]" disabled={isSubmitting}>
+			{#if isSubmitting}
+				<Loader2 class="w-4 h-4 mr-2 animate-spin" />
+				Saving...
+			{:else}
+				<Plus class="w-4 h-4 mr-2" />
+				Add Unit
+			{/if}
 		</Button>
 	</div>
 
@@ -431,16 +467,16 @@
 					<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
 					<Input
 						placeholder="Search units by name or number..."
-						class="pl-9 bg-white"
-						bind:value={searchQuery}
+						class="pl-9 bg-white min-h-[44px]"
+						bind:value={searchInput}
 					/>
 				</div>
 
-				<!-- Filter dropdowns [06] -->
+				<!-- [P2-13] Filter dropdowns with responsive widths -->
 				<div class="flex flex-wrap gap-2">
 					{#if availableFloors.length > 0}
 						<Select type="single" bind:value={filterFloor}>
-							<SelectTrigger class="w-[140px]">
+							<SelectTrigger class="w-full sm:w-[140px] min-h-[44px]">
 								{filterFloor ? `Floor ${filterFloor}` : 'All Floors'}
 							</SelectTrigger>
 							<SelectContent>
@@ -454,7 +490,7 @@
 
 					{#if availableTypes.length > 0}
 						<Select type="single" bind:value={filterType}>
-							<SelectTrigger class="w-[160px]">
+							<SelectTrigger class="w-full sm:w-[160px] min-h-[44px]">
 								{filterType ? formatType(filterType) : 'All Types'}
 							</SelectTrigger>
 							<SelectContent>
@@ -467,7 +503,7 @@
 					{/if}
 
 					<Select type="single" bind:value={filterStatus}>
-						<SelectTrigger class="w-[150px]">
+						<SelectTrigger class="w-full sm:w-[150px] min-h-[44px]">
 							{filterStatus ? formatStatus(filterStatus) : 'All Statuses'}
 						</SelectTrigger>
 						<SelectContent>
@@ -479,7 +515,7 @@
 					</Select>
 
 					{#if hasActiveFilters}
-						<Button variant="ghost" size="sm" onclick={clearFilters} class="text-muted-foreground">
+						<Button variant="ghost" size="sm" onclick={clearFilters} class="text-muted-foreground min-h-[44px]">
 							Clear filters
 						</Button>
 					{/if}
@@ -552,14 +588,16 @@
 											<span>{formatType(unit.type)}</span>
 										</div>
 										<div class="flex items-center gap-2 mt-2">
-											<Badge
-												variant={getStatusVariant(unit.rental_unit_status)}
-												class="shadow-none {getStatusClass(unit.rental_unit_status)}"
-											>
-												{formatStatus(unit.rental_unit_status)}
-											</Badge>
+											{#if !allSameStatus}
+												<Badge
+													variant={getStatusVariant(unit.rental_unit_status)}
+													class="shadow-none {getStatusClass(unit.rental_unit_status)}"
+												>
+													{formatStatus(unit.rental_unit_status)}
+												</Badge>
+											{/if}
 											<span class="text-sm font-medium text-gray-700">
-												{formatCurrency(Number(unit.base_rate))}/mo
+												<span class="tabular-nums">{formatCurrency(Number(unit.base_rate))}</span>/mo
 											</span>
 										</div>
 									</div>
@@ -597,7 +635,7 @@
 
 					<!-- Desktop Units List [01] - hidden on mobile -->
 					<div class="hidden lg:block">
-						<Accordion.Root type="single" class="divide-y divide-gray-100">
+						<Accordion.Root type="multiple" class="divide-y divide-gray-100">
 							{#each paginatedUnits as unit (unit.id)}
 								<Accordion.Item value={unit.id.toString()} class="border-b-0 group">
 									<div class="flex items-center w-full hover:bg-gray-50/50 transition-colors">
@@ -619,17 +657,21 @@
 														{formatType(unit.type)}
 													</span>
 												</div>
-												<!-- [07] Base rate column -->
-												<div class="text-left text-gray-700 font-medium">
+												<!-- [07] Base rate column [P1-7] tabular-nums -->
+												<div class="text-left text-gray-700 font-medium tabular-nums">
 													{formatCurrency(Number(unit.base_rate))}
 												</div>
 												<div class="text-left">
-													<Badge
-														variant={getStatusVariant(unit.rental_unit_status)}
-														class="shadow-none {getStatusClass(unit.rental_unit_status)}"
-													>
-														{formatStatus(unit.rental_unit_status)}
-													</Badge>
+													{#if !allSameStatus}
+														<Badge
+															variant={getStatusVariant(unit.rental_unit_status)}
+															class="shadow-none {getStatusClass(unit.rental_unit_status)}"
+														>
+															{formatStatus(unit.rental_unit_status)}
+														</Badge>
+													{:else}
+														<span class="text-sm text-muted-foreground">{formatStatus(unit.rental_unit_status)}</span>
+													{/if}
 												</div>
 											</div>
 										</Accordion.Trigger>
@@ -665,8 +707,9 @@
 
 									<Accordion.Content>
 										<div class="px-6 pb-6 pt-2 bg-gray-50/30">
-											<div
-												class="bg-white border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-3 gap-6 shadow-sm"
+											<!-- [P1-8] Removed redundant Base Rate — already in list column -->
+										<div
+												class="bg-white border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-6 shadow-sm"
 											>
 												<div class="flex items-start gap-3">
 													<div class="p-2 bg-blue-50 rounded-md text-blue-600">
@@ -675,18 +718,6 @@
 													<div>
 														<p class="text-sm font-medium text-gray-900">Capacity</p>
 														<p class="text-sm text-muted-foreground">{unit.capacity} people</p>
-													</div>
-												</div>
-
-												<div class="flex items-start gap-3">
-													<div class="p-2 bg-green-50 rounded-md text-green-600">
-														<Tag class="h-4 w-4" />
-													</div>
-													<div>
-														<p class="text-sm font-medium text-gray-900">Base Rate</p>
-														<p class="text-sm text-muted-foreground">
-															{formatCurrency(Number(unit.base_rate))} / month
-														</p>
 													</div>
 												</div>
 
@@ -722,7 +753,7 @@
 					<!-- Pagination Controls [11] -->
 					{#if totalPages > 1}
 						<div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-							<p class="text-sm text-muted-foreground">
+							<p class="text-sm text-muted-foreground tabular-nums">
 								Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRentalUnits.length)} of {filteredRentalUnits.length}
 							</p>
 							<div class="flex items-center gap-2">
@@ -731,6 +762,7 @@
 									size="sm"
 									disabled={currentPage <= 1}
 									onclick={() => currentPage--}
+									class="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9"
 								>
 									<ChevronLeft class="w-4 h-4" />
 								</Button>
@@ -740,7 +772,7 @@
 											variant={currentPage === i + 1 ? 'default' : 'outline'}
 											size="sm"
 											onclick={() => currentPage = i + 1}
-											class="w-9"
+											class="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9"
 										>
 											{i + 1}
 										</Button>
@@ -755,6 +787,7 @@
 									size="sm"
 									disabled={currentPage >= totalPages}
 									onclick={() => currentPage++}
+									class="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9"
 								>
 									<ChevronRight class="w-4 h-4" />
 								</Button>
@@ -801,7 +834,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; rentalUnitToDelete = null; }}>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={confirmDeleteRentalUnit}>Continue</AlertDialog.Action>
+			<AlertDialog.Action onclick={confirmDeleteRentalUnit} class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

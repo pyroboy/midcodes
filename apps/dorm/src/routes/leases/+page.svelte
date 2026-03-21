@@ -241,13 +241,26 @@
 		if (next.has(id)) {
 			next.delete(id);
 		} else {
-			if (next.size >= 10) {
-				toast.error('Maximum 10 leases per batch');
+			if (next.size >= 50) {
+				toast.error('Maximum 50 leases per batch');
 				return;
 			}
 			next.add(id);
 		}
 		selectedLeaseIds = next;
+	}
+
+	// P0-1: Select all visible (filtered) leases with unpaid billings
+	function handleSelectAllVisible() {
+		const unpaidLeases = filteredLeases.filter((l: any) =>
+			l.billings?.some((b: any) => b.status !== 'PAID')
+		);
+		if (selectedLeaseIds.size === unpaidLeases.length) {
+			// Deselect all
+			selectedLeaseIds = new Set();
+		} else {
+			selectedLeaseIds = new Set(unpaidLeases.slice(0, 50).map((l: any) => l.id));
+		}
 	}
 
 	// Single-pass: enrich with status + compute summary metrics together
@@ -322,6 +335,9 @@
 	});
 
 	// #7: Batch derived (must be after filteredLeases)
+	let selectableCount = $derived(
+		filteredLeases.filter((l: any) => l.billings?.some((b: any) => b.status !== 'PAID')).length
+	);
 	let batchLeases = $derived(
 		filteredLeases.filter((l: any) => selectedLeaseIds.has(l.id))
 	);
@@ -593,6 +609,26 @@
 
 	<!-- Main Content Area -->
 	<div class="max-w-7xl mx-auto  sm:px-2  ">
+		<!-- Batch mode hint banner + Select All -->
+		{#if batchMode}
+			<div class="mx-3 sm:mx-0 mb-3 p-2.5 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center justify-between gap-2">
+				<div class="flex items-center gap-2">
+					<CreditCard class="w-4 h-4 flex-shrink-0" />
+					{#if selectedLeaseIds.size === 0}
+						<span>Tap leases to select, or use Select All.</span>
+					{:else}
+						<span><strong>{selectedLeaseIds.size}</strong> of {selectableCount} selected</span>
+					{/if}
+				</div>
+				<button
+					type="button"
+					class="text-xs font-medium text-green-700 hover:text-green-900 hover:underline flex-shrink-0"
+					onclick={handleSelectAllVisible}
+				>
+					{selectedLeaseIds.size === selectableCount ? 'Deselect All' : `Select All (${selectableCount})`}
+				</button>
+			</div>
+		{/if}
 		<!-- Active Filter Display -->
 		{#if activeFilter !== 'all'}
 			<div class="mb-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60">
@@ -627,7 +663,7 @@
 		{/if}
 
 		<!-- Lease List Section -->
-		<div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm">
+		<div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm {batchMode && selectedLeaseIds.size > 0 ? 'pb-20' : ''}">
 			{#if isLoading}
 				<!-- Skeleton Loading State -->
 				<div class="p-6">

@@ -1,8 +1,9 @@
 import type { PageServerLoad, Actions } from './$types';
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { floorLayoutItems } from '$lib/server/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
@@ -30,11 +31,17 @@ export const actions: Actions = {
 		const gridH = parseInt(data.get('grid_h') as string, 10);
 		const label = (data.get('label') as string) || null;
 		const color = (data.get('color') as string) || null;
+		const lockTs = extractLockTimestamp(data);
 
 		if (id) {
-			const [updated] = await db
-				.update(floorLayoutItems)
-				.set({
+			const result = await optimisticLockUpdate(
+				db,
+				floorLayoutItems,
+				floorLayoutItems.id,
+				id,
+				floorLayoutItems.updatedAt,
+				lockTs,
+				{
 					floorId,
 					rentalUnitId,
 					itemType: itemType as any,
@@ -45,10 +52,10 @@ export const actions: Actions = {
 					label,
 					color,
 					updatedAt: new Date()
-				})
-				.where(and(eq(floorLayoutItems.id, id), isNull(floorLayoutItems.deletedAt)))
-				.returning();
-			return { item: updated };
+				}
+			);
+			if (result.conflict) return fail(409, { conflict: true, message: result.message });
+			return { item: result.rows[0] };
 		} else {
 			const [inserted] = await db
 				.insert(floorLayoutItems)

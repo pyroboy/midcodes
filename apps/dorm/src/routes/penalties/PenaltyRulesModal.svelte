@@ -72,7 +72,9 @@
 						id="grace-period"
 						type="number"
 						min="0"
-						class="w-20"
+						inputmode="numeric"
+						autofocus
+						class="w-20 min-h-[44px]"
 						bind:value={gracePeriodDays}
 					/>
 					<span class="text-sm text-gray-500">days after due date</span>
@@ -88,7 +90,7 @@
 						onValueChange={handlePenaltyTypeChange}
 						items={penaltyTypeOptions}
 					>
-						<Select.Trigger>
+						<Select.Trigger class="min-h-[44px]">
 							{#snippet children()}
 								{penaltyType === 'percentage' ? 'Percentage of Amount' : 'Fixed Amount'}
 							{/snippet}
@@ -119,7 +121,8 @@
 							type="number"
 							min="0"
 							max="100"
-							class="w-20"
+							inputmode="decimal"
+							class="w-20 min-h-[44px]"
 							bind:value={penaltyPercentage}
 						/>
 						<span class="text-sm text-gray-500">% of the original amount</span>
@@ -133,7 +136,8 @@
 							id="penalty-fixed"
 							type="number"
 							min="0"
-							class="w-32"
+							inputmode="decimal"
+							class="w-32 min-h-[44px]"
 							bind:value={penaltyFixedAmount}
 						/>
 						<span class="text-sm text-gray-500">PHP</span>
@@ -148,7 +152,8 @@
 						id="apply-after-days"
 						type="number"
 						min="0"
-						class="w-20"
+						inputmode="numeric"
+						class="w-20 min-h-[44px]"
 						bind:value={applyPenaltyAfterDays}
 					/>
 					<span class="text-sm text-gray-500">days past due date</span>
@@ -156,9 +161,9 @@
 			</div>
 		</div>
 
-		<DialogFooter>
-			<Button variant="outline" onclick={() => onOpenChange(false)}>Cancel</Button>
-			<Button onclick={saveRules}>Save Rules</Button>
+		<DialogFooter class="sticky bottom-0 bg-background pt-4 pb-2">
+			<Button variant="outline" class="min-h-[44px]" onclick={() => onOpenChange(false)}>Cancel</Button>
+			<Button class="min-h-[44px]" onclick={saveRules}>Save Rules</Button>
 		</DialogFooter>
 	</DialogContent>
 </Dialog>

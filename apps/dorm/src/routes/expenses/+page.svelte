@@ -20,25 +20,32 @@
 	import { formatDate, formatCurrency, humanizeExpenseType } from '$lib/utils/format';
 	import { DollarSign, Briefcase, Wrench, Plus } from 'lucide-svelte';
 
-	// Client-side join: enrich expenses with property name (sorted by updated_at desc)
-	let expenses = $derived(
-		[...expensesStore.value]
+	// Duplicate guard — prevent double submit within 2s
+	let lastSubmitKey = $state('');
+	let lastSubmitTime = $state(0);
+
+	// [P1-6] Client-side join with Map lookup for O(1) property resolution
+	let expenses = $derived.by(() => {
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+
+		return [...expensesStore.value]
 			.sort((a: any, b: any) => {
 				const aMs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
 				const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
 				return bMs - aMs;
 			})
 			.map((e: any) => {
-			const property = propertiesStore.value.find((p: any) => String(p.id) === String(e.property_id));
-			return {
-				...e,
-				id: Number(e.id),
-				property_id: e.property_id ? Number(e.property_id) : null,
-				property: property ? { id: Number(property.id), name: property.name } : null,
-				expense_date: e.expense_date ? formatDate(e.expense_date) : null
-			};
-		})
-	);
+				const property = propMap.get(String(e.property_id));
+				return {
+					...e,
+					id: Number(e.id),
+					property_id: e.property_id ? Number(e.property_id) : null,
+					property: property ? { id: Number(property.id), name: property.name } : null,
+					expense_date: e.expense_date ? formatDate(e.expense_date) : null
+				};
+			});
+	});
 
 	let properties = $derived(propertiesStore.value.map((p: any) => ({ id: Number(p.id), name: p.name })));
 	let isLoading = $derived(!expensesStore.initialized);
@@ -71,8 +78,20 @@
 
 	const { form, errors, enhance, constraints, submitting, reset } = superForm(defaults(zod(expenseSchema)), {
 		validators: zodClient(expenseSchema),
+		validationMethod: 'onsubmit',
 		resetForm: true,
-		onSubmit: async () => {
+		onSubmit: async ({ cancel }) => {
+			// Duplicate guard — block same description+amount within 2s
+			const submitKey = `${$form.description}|${$form.amount}|${$form.type}`;
+			const now = Date.now();
+			if (submitKey === lastSubmitKey && now - lastSubmitTime < 2000) {
+				toast.warning('Duplicate submission blocked');
+				cancel();
+				return;
+			}
+			lastSubmitKey = submitKey;
+			lastSubmitTime = now;
+
 			submitSeq++;
 			savedFormData = { ...$form, _seq: submitSeq };
 			const isEdit = !!(selectedExpense);
@@ -105,7 +124,9 @@
 				const resultData = (result as any).data;
 				const isEdit = !!(savedFormData?.id);
 				rollback = null;
-				toast.success(isEdit ? 'Expense updated' : 'Expense added');
+				const amt = formatCurrency(parseFloat(savedFormData.amount) || 0);
+				const typeName = humanizeExpenseType(savedFormData.type);
+				toast.success(isEdit ? `Expense updated: ${amt} ${typeName}` : `Expense added: ${amt} ${typeName}`);
 
 				if (resultData?.expense) {
 					const exp = resultData.expense;
@@ -235,7 +256,7 @@
 				</div>
 				<div>
 					<p class="text-sm text-muted-foreground">Total Expenses</p>
-					<p class="text-lg font-bold">{formatCurrency(stats.totalAmount)}</p>
+					<p class="text-lg font-bold tabular-nums">{formatCurrency(stats.totalAmount)}</p>
 				</div>
 			</Card.Content>
 		</Card.Root>
@@ -246,7 +267,7 @@
 				</div>
 				<div>
 					<p class="text-sm text-muted-foreground">Capital</p>
-					<p class="text-lg font-bold">{formatCurrency(stats.capitalAmount)}</p>
+					<p class="text-lg font-bold tabular-nums">{formatCurrency(stats.capitalAmount)}</p>
 					<p class="text-xs text-muted-foreground">{stats.capitalCount} expense{stats.capitalCount !== 1 ? 's' : ''}</p>
 				</div>
 			</Card.Content>
@@ -258,24 +279,12 @@
 				</div>
 				<div>
 					<p class="text-sm text-muted-foreground">Operational</p>
-					<p class="text-lg font-bold">{formatCurrency(stats.operationalAmount)}</p>
+					<p class="text-lg font-bold tabular-nums">{formatCurrency(stats.operationalAmount)}</p>
 					<p class="text-xs text-muted-foreground">{stats.operationalCount} expense{stats.operationalCount !== 1 ? 's' : ''}</p>
 				</div>
 			</Card.Content>
 		</Card.Root>
 	</div>
-
-	<!-- Hidden form for superForm submission -->
-	<form id="expense-form" method="POST" action="?/upsert" use:enhance>
-		<input type="hidden" name="id" value={$form.id} />
-		<input type="hidden" name="_updated_at" value={editUpdatedAt ?? ''} />
-		<input type="hidden" name="property_id" value={$form.property_id} />
-		<input type="hidden" name="amount" value={$form.amount} />
-		<input type="hidden" name="description" value={$form.description} />
-		<input type="hidden" name="type" value={$form.type} />
-		<input type="hidden" name="expense_status" value={$form.expense_status} />
-		<input type="hidden" name="expense_date" value={$form.expense_date} />
-	</form>
 
 	{#if isLoading}
 		<div class="space-y-2">
@@ -326,7 +335,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; expenseToDeleteId = null; }}>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={confirmDeleteExpense}>Continue</AlertDialog.Action>
+			<AlertDialog.Action onclick={confirmDeleteExpense} class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

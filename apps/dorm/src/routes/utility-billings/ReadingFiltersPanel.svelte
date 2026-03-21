@@ -51,7 +51,7 @@
 			</div>
 			<div class="flex items-center gap-2 w-full sm:w-auto">
 				<Button
-					class="flex items-center gap-2 flex-1 sm:flex-initial"
+					class="flex items-center gap-2 flex-1 sm:flex-initial min-h-[44px]"
 					size="sm"
 					disabled={!selectedProperty || !filters.type}
 					onclick={() => addReadings()}
@@ -64,7 +64,7 @@
 						Add Meter Readings
 					{/if}
 				</Button>
-				<Button variant="ghost" onclick={resetFilters}>Reset</Button>
+				<Button variant="ghost" class="min-h-[44px]" onclick={resetFilters}>Reset</Button>
 			</div>
 		</div>
 	</Card.Header>

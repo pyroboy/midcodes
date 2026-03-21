@@ -7,6 +7,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Select from '$lib/components/ui/select';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Loader2 } from 'lucide-svelte';
 	import {
 		utilityTypeEnum,
 		meterStatusEnum,
@@ -14,6 +15,9 @@
 		meterFormSchema
 	} from './formSchema';
 	import { formatEnumLabel } from '$lib/utils/format';
+
+	// Collapsible notes toggle
+	let showNotes = $state(false);
 
 	interface Property {
 		id: number;
@@ -80,6 +84,11 @@
 
 	// State for delete confirmation
 	let showDeleteConfirm = $state(false);
+
+	// Auto-show notes if meter already has notes content
+	$effect(() => {
+		if (data.meter?.notes) showNotes = true;
+	});
 
 	// Using $derived instead of $effect + $state
 	let filteredProperties = $derived((data.properties || []).filter((p) => p.status === 'ACTIVE'));
@@ -205,6 +214,7 @@
 		<Input
 			type="number"
 			id="initial_reading"
+			inputmode="decimal"
 			bind:value={$form.initial_reading}
 			step="0.01"
 			min="0"
@@ -338,19 +348,33 @@
 		</div>
 	</div>
 
-	<div>
-		<Label for="notes" class="text-sm font-medium">Notes</Label>
-		<Textarea id="notes" bind:value={$form.notes} rows={3} />
-		{#if $errors.notes}<span class="text-xs text-red-500">{$errors.notes}</span>{/if}
-	</div>
+	<!-- Collapsible Notes -->
+	{#if showNotes}
+		<div>
+			<Label for="notes" class="text-sm font-medium">Notes</Label>
+			<Textarea id="notes" bind:value={$form.notes} rows={3} />
+			{#if $errors.notes}<span class="text-xs text-red-500">{$errors.notes}</span>{/if}
+		</div>
+	{:else}
+		<Button
+			type="button"
+			variant="ghost"
+			size="sm"
+			class="text-muted-foreground"
+			onclick={() => { showNotes = true; }}
+		>
+			+ Add notes
+		</Button>
+	{/if}
 
-	<!-- [Fix 07] Use shadcn Button components consistently -->
-	<div class="flex justify-between items-center pt-3">
+	<!-- Sticky footer on mobile + submit spinner -->
+	<div class="flex justify-between items-center pt-3 sticky bottom-0 bg-background pb-1 sm:static sm:pb-0 border-t sm:border-0">
 		{#if editMode}
 			<Button
 				type="button"
 				variant="destructive"
 				size="sm"
+				class="min-h-[44px] sm:min-h-0"
 				onclick={() => { showDeleteConfirm = true; }}
 			>
 				Delete
@@ -364,6 +388,7 @@
 				type="button"
 				variant="outline"
 				size="sm"
+				class="min-h-[44px] sm:min-h-0"
 				onclick={handleCancel}
 			>
 				Cancel
@@ -371,9 +396,15 @@
 			<Button
 				type="submit"
 				size="sm"
+				class="min-h-[44px] sm:min-h-0"
 				disabled={$submitting}
 			>
-				{editMode ? 'Update' : 'Create'} Meter
+				{#if $submitting}
+					<Loader2 class="w-4 h-4 mr-2 animate-spin" />
+					Saving...
+				{:else}
+					{editMode ? 'Update' : 'Create'} Meter
+				{/if}
 			</Button>
 		</div>
 	</div>

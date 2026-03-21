@@ -5,7 +5,7 @@
 	import { zod } from 'sveltekit-superforms/adapters';
 	import { Button } from '$lib/components/ui/button';
 	import * as Alert from '$lib/components/ui/alert';
-	import { Check, RefreshCw, Download, BarChart } from 'lucide-svelte';
+	import { Check, RefreshCw, Download, BarChart, Loader2 } from 'lucide-svelte';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -75,6 +75,14 @@
 			.sort((a: any, b: any) => a.name.localeCompare(b.name))
 			.map((p: any) => ({ id: Number(p.id), name: p.name }));
 
+		// Map lookups for O(1) joins
+		const unitMap = new Map<string, any>();
+		for (const u of rentalUnitsStore.value) unitMap.set(String(u.id), u);
+		const tenantMap = new Map<string, any>();
+		for (const t of tenantsStore.value) tenantMap.set(String(t.id), t);
+		const meterMap = new Map<string, any>();
+		for (const m of metersStore.value) meterMap.set(String(m.id), m);
+
 		const metersData = metersStore.value.map((m: any) => ({
 			id: Number(m.id),
 			name: m.name,
@@ -82,7 +90,7 @@
 			propertyId: m.property_id ? Number(m.property_id) : null,
 			initialReading: m.initial_reading,
 			rental_unit: m.rental_unit_id ? (() => {
-				const unit = rentalUnitsStore.value.find((u: any) => String(u.id) === String(m.rental_unit_id));
+				const unit = unitMap.get(String(m.rental_unit_id));
 				return unit ? { id: Number(unit.id), name: unit.name, number: unit.number } : null;
 			})() : null
 		}));
@@ -124,10 +132,10 @@
 
 		// Leases with rental unit and tenant info
 		const leasesData = leasesStore.value.map((l: any) => {
-			const unit = rentalUnitsStore.value.find((u: any) => String(u.id) === String(l.rental_unit_id));
+			const unit = unitMap.get(String(l.rental_unit_id));
 			const ltDocs = leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(l.id));
 			const lease_tenants_list = ltDocs.map((lt: any) => {
-				const tenant = tenantsStore.value.find((t: any) => String(t.id) === String(lt.tenant_id));
+				const tenant = tenantMap.get(String(lt.tenant_id));
 				return tenant ? {
 					tenants: { id: Number(tenant.id), full_name: tenant.name, tenant_status: tenant.tenant_status }
 				} : null;
@@ -147,7 +155,7 @@
 
 		// All readings with meter info (for pending review)
 		const allReadingsData = readingsStore.value.map((r: any) => {
-			const meter = metersStore.value.find((m: any) => String(m.id) === String(r.meter_id));
+			const meter = meterMap.get(String(r.meter_id));
 			return {
 				id: Number(r.id),
 				meter_id: Number(r.meter_id),
@@ -172,6 +180,17 @@
 			if (result.type === 'success') {
 				modals.reading = false; // Close modal on success
 				showSuccessMessage = true;
+				// Save preferences to localStorage
+				try {
+					if (filters.type) localStorage.setItem(LS_LAST_UTILITY_TYPE, filters.type);
+					if (readingEntry.costPerUnit) localStorage.setItem(LS_LAST_COST_PER_UNIT, String(readingEntry.costPerUnit));
+				} catch {}
+				// Rich success toast
+				const readingCount = readingEntry.meterReadings.filter(r => r.currentReading !== null).length;
+				const typeLabel = readingEntry.utilityType ? readingEntry.utilityType.charAt(0) + readingEntry.utilityType.slice(1).toLowerCase() : 'Utility';
+				toast.success(`${readingCount} ${typeLabel} reading${readingCount !== 1 ? 's' : ''} saved`, {
+					description: `Date: ${readingEntry.readingDate} — Rate: ${readingEntry.costPerUnit}/unit`
+				});
 				// Resync readings and meters after successful batch add
 				resyncUtilityData();
 				setTimeout(() => {
@@ -187,6 +206,17 @@
 	// UI state
 	let showSuccessMessage = $state(false);
 
+	// localStorage preference keys
+	const LS_LAST_UTILITY_TYPE = 'dorm:utility-billings:lastType';
+	const LS_LAST_COST_PER_UNIT = 'dorm:utility-billings:lastCostPerUnit';
+
+	function getLastType(): string {
+		try { return localStorage.getItem(LS_LAST_UTILITY_TYPE) ?? ''; } catch { return ''; }
+	}
+	function getLastCost(): number {
+		try { return Number(localStorage.getItem(LS_LAST_COST_PER_UNIT)) || 0; } catch { return 0; }
+	}
+
 	// Grouped state for reading entry modal
 	let readingEntry = $state({
 		utilityType: '',
@@ -195,11 +225,11 @@
 		costPerUnit: 0
 	});
 
-	// Grouped state for filters
+	// Grouped state for filters (pre-fill type from localStorage)
 	let filters = $state({
 		searchQuery: '',
 		date: '',
-		type: null as string | null
+		type: getLastType() || null as string | null
 	});
 
 	// Grouped state for modal visibility
@@ -287,7 +317,9 @@
 				const data = await res.json().catch(() => ({}));
 				throw new Error(data?.error || 'Failed to approve readings');
 			}
-			toast.success('Readings approved');
+			toast.success(`${readingIds.length} reading${readingIds.length !== 1 ? 's' : ''} approved`, {
+				description: 'Readings are now confirmed and billable'
+			});
 			resyncUtilityData();
 		} catch (e: any) {
 			toast.error(e?.message || 'Failed to approve readings');
@@ -303,7 +335,9 @@
 				const data = await res.json().catch(() => ({}));
 				throw new Error(data?.error || 'Failed to reject readings');
 			}
-			toast.success('Readings rejected');
+			toast.success(`${readingIds.length} reading${readingIds.length !== 1 ? 's' : ''} rejected`, {
+				description: 'Rejected readings will not be billed'
+			});
 			resyncUtilityData();
 		} catch (e: any) {
 			toast.error(e?.message || 'Failed to reject readings');
@@ -349,7 +383,7 @@
 			};
 		});
 		readingEntry.readingDate = new Date().toISOString().split('T')[0];
-		readingEntry.costPerUnit = 0;
+		readingEntry.costPerUnit = getLastCost();
 
 		modals.reading = true;
 	}
@@ -454,8 +488,8 @@
 								<p class="font-medium">{new Date(group.date).toLocaleDateString()}</p>
 							</div>
 							<div class="flex items-center gap-2">
-								<Button variant="outline" onclick={() => rejectGroup(group.readings.map((r) => r.id))}>Reject</Button>
-								<Button onclick={() => approveGroup(group.readings.map((r) => r.id))}>Approve</Button>
+								<Button variant="outline" class="min-h-[44px]" onclick={() => rejectGroup(group.readings.map((r) => r.id))}>Reject</Button>
+								<Button class="min-h-[44px]" onclick={() => approveGroup(group.readings.map((r) => r.id))}>Approve</Button>
 							</div>
 						</div>
 						<div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -545,7 +579,7 @@
 					<Button
 						variant="outline"
 						onclick={() => (modals.billingGraph = true)}
-						class="flex items-center gap-2"
+						class="flex items-center gap-2 min-h-[44px]"
 						disabled={displayReadings.length === 0}
 					>
 						<BarChart class="h-4 w-4 mr-1" />
@@ -556,7 +590,7 @@
 					<Button
 						variant="outline"
 						onclick={() => (modals.export = true)}
-						class="flex items-center gap-2"
+						class="flex items-center gap-2 min-h-[44px]"
 						disabled={displayReadings.length === 0}
 					>
 						<Download class="h-4 w-4 mr-1" />

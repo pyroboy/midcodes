@@ -24,8 +24,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Property will be handled by global state, but still accept URL override for deep linking
 	const propertyIdOverride = url.searchParams.get('propertyId') || null;
 
-	console.log('URL Parameters:', { year, month, propertyIdOverride });
-
 	try {
 		// Return basic data - property selection will be handled by global state
 		return {

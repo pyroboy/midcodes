@@ -9,7 +9,6 @@ import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimist
 
 export const actions = {
 	create: async ({ request, locals }) => {
-		console.log('Starting create action');
 
 		try {
 			const { user } = locals;
@@ -152,7 +151,6 @@ export const actions = {
 	},
 
 	update: async ({ request, locals }) => {
-		console.log('Starting update action');
 
 		try {
 			const { user } = locals;

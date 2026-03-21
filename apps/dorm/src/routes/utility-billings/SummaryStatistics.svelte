@@ -20,13 +20,17 @@
 
 	// Helper functions to calculate stats
 	function getUniquePropertyCount(): number {
+		// Map lookup for O(1) access
+		const meterMap = new Map<string, Meter>();
+		for (const m of meters) meterMap.set(String(m.id), m);
+
 		return new Set(
 			readings
 				.map((r: Reading) => {
 					// Try direct property from joined meter data first
 					if ((r as any).meters?.property_id) return (r as any).meters.property_id;
-					// Fallback to meters prop lookup with string coercion (RxDB IDs are strings)
-					const meter = meters.find((m: Meter) => String(m.id) === String(r.meter_id));
+					// Fallback to meters prop lookup with Map
+					const meter = meterMap.get(String(r.meter_id));
 					return meter?.property_id;
 				})
 				.filter(Boolean)
@@ -53,17 +57,17 @@
 			{#if readings.length > 0}
 				<div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
 					<p class="text-sm text-blue-500 font-medium">Total Readings</p>
-					<p class="text-2xl font-bold">{readings.length}</p>
+					<p class="text-2xl font-bold tabular-nums">{readings.length}</p>
 				</div>
 
 				<div class="bg-green-50 rounded-lg p-4 border border-green-100">
 					<p class="text-sm text-green-500 font-medium">Properties</p>
-					<p class="text-2xl font-bold">{getUniquePropertyCount()}</p>
+					<p class="text-2xl font-bold tabular-nums">{getUniquePropertyCount()}</p>
 				</div>
 
 				<div class="bg-amber-50 rounded-lg p-4 border border-amber-100">
 					<p class="text-sm text-amber-500 font-medium">Meters</p>
-					<p class="text-2xl font-bold">{getUniqueMeterCount()}</p>
+					<p class="text-2xl font-bold tabular-nums">{getUniqueMeterCount()}</p>
 				</div>
 
 				<div class="bg-purple-50 rounded-lg p-4 border border-purple-100">

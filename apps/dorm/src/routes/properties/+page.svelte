@@ -26,6 +26,7 @@
 	import { bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
 	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
+	import { humanizeType, formatEnumLabel, getStatusClasses } from '$lib/utils/format';
 
 	// ─── RxDB reactive store ───────────────────────────────────────────
 	// propertiesStore singleton is sorted by name asc in collections.svelte.ts
@@ -36,18 +37,27 @@
 	);
 	let isLoading = $derived(!propertiesStore.initialized);
 
-	// ─── Search ────────────────────────────────────────────────────────
+	// ─── Search (300ms debounce) ──────────────────────────────────────
 	let searchQuery = $state('');
+	let debouncedSearch = $state('');
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		const term = searchQuery;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => { debouncedSearch = term; }, 300);
+		return () => clearTimeout(searchTimer);
+	});
 	let filteredProperties = $derived(
-		searchQuery === ''
+		debouncedSearch === ''
 			? properties
 			: properties.filter((p: Property) =>
-					p.name.toLowerCase().includes(searchQuery.toLowerCase())
+					p.name.toLowerCase().includes(debouncedSearch.toLowerCase())
 				)
 	);
 
 	let editMode = $state(false);
 	let showModal = $state(false);
+	let isSubmitting = $state(false);
 
 	// Delete confirmation dialog state
 	let showDeleteDialog = $state(false);
@@ -67,7 +77,7 @@
 	} = superForm(defaults(zod(propertySchema)), {
 		id: 'property-form',
 		validators: zodClient(propertySchema),
-		validationMethod: 'oninput',
+		validationMethod: 'onsubmit',
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
@@ -75,9 +85,7 @@
 			submitSeq++;
 			savedFormData = { ...$formData, _seq: submitSeq };
 			const isEdit = editMode;
-			// Close modal immediately for instant feel
-			showModal = false;
-			toast.info(isEdit ? 'Saving property...' : 'Creating property...');
+			isSubmitting = true;
 			// For updates: optimistic write to RxDB now
 			if (isEdit && savedFormData.id) {
 				rollback = await optimisticUpsertProperty({
@@ -90,12 +98,16 @@
 			}
 		},
 		onError: async ({ result }) => {
+			isSubmitting = false;
+			showModal = false;
 			toast.error('Error saving property');
 			// Instant rollback, then confirm with resync
 			if (rollback) { await rollback(); rollback = null; }
 			import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('properties'));
 		},
 		onResult: async ({ result }) => {
+			isSubmitting = false;
+			showModal = false;
 			// Ignore if a newer submission has already overwritten
 			if (!savedFormData || savedFormData._seq !== submitSeq) return;
 
@@ -110,8 +122,11 @@
 				const serverForm = (result as any).data?.form?.data;
 				const fd = serverForm ?? savedFormData;
 				const action = savedFormData && editMode ? 'updated' : 'created';
-				toast.success(editMode ? 'Property updated' : 'Property created');
-				syncStatus.addLog(`Server: property "${fd.name}" ${action} on Neon ✓`, 'success');
+				const typeName = formatEnumLabel(fd.type ?? 'DORMITORY');
+				toast.success(`${fd.name} ${action}`, {
+					description: `${typeName} — ${formatEnumLabel(fd.status ?? 'ACTIVE')}`
+				});
+				syncStatus.addLog(`Server: property "${fd.name}" ${action} on Neon`, 'success');
 				editMode = false;
 				rollback = null; // Success — discard snapshot
 				// For creates: optimistic upsert with server-assigned ID
@@ -157,19 +172,6 @@
 		showModal = true;
 	}
 
-	function getStatusClasses(status: string): string {
-		switch (status) {
-			case 'ACTIVE':
-				return 'bg-green-100 text-green-800 border-green-200';
-			case 'INACTIVE':
-				return 'bg-red-100 text-red-800 border-red-200';
-			case 'MAINTENANCE':
-				return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-			default:
-				return '';
-		}
-	}
-
 	function handleDeleteProperty(property: Property) {
 		propertyToDelete = property;
 		showDeleteDialog = true;
@@ -200,7 +202,9 @@
 				return response;
 			},
 			onSuccess: async () => {
-				toast.success('Property deleted');
+				toast.success(`${deletingName} deleted`, {
+					description: 'Property has been archived'
+				});
 			}
 		});
 	}
@@ -221,11 +225,16 @@
 				<Building2 class="w-6 h-6 text-orange-600" />
 			</div>
 			<div>
-				<h1 class="text-2xl font-bold tracking-tight">Properties</h1>
+				<div class="flex items-center gap-2">
+					<h1 class="text-2xl font-bold tracking-tight">Properties</h1>
+					{#if !isLoading && properties.length > 0}
+						<Badge variant="secondary" class="text-xs tabular-nums">{properties.length}</Badge>
+					{/if}
+				</div>
 				<p class="text-sm text-muted-foreground">Manage your properties here.</p>
 			</div>
 		</div>
-		<Button onclick={handleAddProperty} class="shadow-sm">
+		<Button onclick={handleAddProperty} class="shadow-sm min-h-[44px] sm:min-h-0">
 			<Plus class="w-4 h-4 mr-2" />
 			Add Property
 		</Button>
@@ -269,14 +278,15 @@
 							<div class="flex-1 min-w-0">
 								<p class="font-medium truncate">{property.name}</p>
 								<p class="text-sm text-muted-foreground truncate">{property.address}</p>
+								<p class="text-xs text-muted-foreground mt-0.5">{humanizeType(property.type)}</p>
 							</div>
 							<div class="flex items-center gap-2 shrink-0">
 								<Badge class={getStatusClasses(property.status)}>
-									{property.status}
+									{formatEnumLabel(property.status)}
 								</Badge>
 								<DropdownMenu.Root>
 									<DropdownMenu.Trigger
-										class="inline-flex items-center justify-center rounded-md h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors"
+										class="inline-flex items-center justify-center rounded-md h-11 w-11 hover:bg-accent hover:text-accent-foreground transition-colors"
 										onclick={(e: MouseEvent) => e.stopPropagation()}
 									>
 										<Ellipsis class="w-4 h-4" />
@@ -318,7 +328,7 @@
 							: 'Get started by adding your first property.'}
 					</p>
 					{#if !searchQuery}
-						<Button variant="outline" class="mt-4" onclick={handleAddProperty}>Add Property</Button>
+						<Button variant="outline" class="mt-4 min-h-[44px] sm:min-h-0" onclick={handleAddProperty}>Add Property</Button>
 					{/if}
 				</div>
 			</div>
@@ -359,10 +369,10 @@
 							<tr class="border-b hover:bg-muted/50 transition-colors cursor-pointer" onclick={() => handlePropertyClick(property)}>
 								<td class="px-6 py-4 font-medium">{property.name}</td>
 								<td class="px-6 py-4">{property.address}</td>
-								<td class="px-6 py-4">{property.type}</td>
+								<td class="px-6 py-4">{humanizeType(property.type)}</td>
 								<td class="px-6 py-4">
 									<Badge class={getStatusClasses(property.status)}>
-										{property.status}
+										{formatEnumLabel(property.status)}
 									</Badge>
 								</td>
 								<td class="px-6 py-4">
@@ -408,7 +418,7 @@
 											: 'Get started by adding your first property.'}
 									</p>
 									{#if !searchQuery}
-										<Button variant="outline" class="mt-4" onclick={handleAddProperty}>Add Property</Button>
+										<Button variant="outline" class="mt-4 min-h-[44px] sm:min-h-0" onclick={handleAddProperty}>Add Property</Button>
 									{/if}
 								</div>
 							</td>
@@ -432,6 +442,7 @@
 		<PropertyForm
 			{editMode}
 			updatedAt={editUpdatedAt}
+			submitting={isSubmitting}
 			form={formData}
 			{errors}
 			{enhance}
@@ -456,7 +467,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; propertyToDelete = null; }}>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={confirmDeleteProperty}>Continue</AlertDialog.Action>
+			<AlertDialog.Action class="bg-destructive text-destructive-foreground hover:bg-destructive/90" onclick={confirmDeleteProperty}>Delete</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

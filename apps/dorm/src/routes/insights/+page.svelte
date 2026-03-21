@@ -869,6 +869,106 @@
 		if (days >= 8) return 'text-orange-600 bg-orange-50 border-orange-200';
 		return 'text-yellow-600 bg-yellow-50 border-yellow-200';
 	}
+
+	function humanizeBillingType(type: string): string {
+		const map: Record<string, string> = {
+			RENT: 'Rent',
+			UTILITY: 'Utility',
+			SECURITY_DEPOSIT: 'Security Deposit',
+			ADVANCE_RENT: 'Advance Rent',
+			MISCELLANEOUS: 'Miscellaneous',
+			PENALTY: 'Penalty'
+		};
+		return map[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function humanizeStatus(status: string): string {
+		const map: Record<string, string> = {
+			PENDING: 'Pending',
+			PARTIAL: 'Partial',
+			PAID: 'Paid',
+			OVERDUE: 'Overdue',
+			PENALIZED: 'Penalized',
+			ACTIVE: 'Active',
+			INACTIVE: 'Inactive',
+			EXPIRED: 'Expired',
+			TERMINATED: 'Terminated',
+			BLACKLISTED: 'Blacklisted',
+			APPROVED: 'Approved',
+			REJECTED: 'Rejected',
+			IN_PROGRESS: 'In Progress',
+			COMPLETED: 'Completed',
+			SUCCESS: 'Success',
+			FAILED: 'Failed'
+		};
+		return map[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function formatDate(dateStr: string): string {
+		try {
+			const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+			return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+		} catch {
+			return dateStr;
+		}
+	}
+
+	function humanizeUtilityType(type: string | null): string {
+		if (!type) return 'Other';
+		const map: Record<string, string> = {
+			ELECTRICITY: 'Electricity',
+			WATER: 'Water',
+			OTHER: 'Other'
+		};
+		return map[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function humanizePaymentMethod(method: string): string {
+		const map: Record<string, string> = {
+			CASH: 'Cash',
+			GCASH: 'GCash',
+			BANK_TRANSFER: 'Bank Transfer',
+			CHECK: 'Check',
+			CREDIT_CARD: 'Credit Card',
+			DEBIT_CARD: 'Debit Card',
+			OTHER: 'Other'
+		};
+		return map[method] ?? method.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function humanizeExpenseType(type: string): string {
+		const map: Record<string, string> = {
+			MAINTENANCE: 'Maintenance',
+			SUPPLIES: 'Supplies',
+			UTILITIES: 'Utilities',
+			SALARY: 'Salary',
+			INSURANCE: 'Insurance',
+			TAX: 'Tax',
+			OTHER: 'Other'
+		};
+		return map[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function humanizeMeterType(type: string): string {
+		const map: Record<string, string> = {
+			ELECTRICITY: 'Electricity',
+			WATER: 'Water',
+			GAS: 'Gas',
+			OTHER: 'Other'
+		};
+		return map[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function humanizeUnitType(type: string): string {
+		const map: Record<string, string> = {
+			ROOM: 'Room',
+			BED: 'Bed',
+			STUDIO: 'Studio',
+			APARTMENT: 'Apartment',
+			DORMITORY: 'Dormitory'
+		};
+		return map[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+	}
 </script>
 
 <svelte:head>
@@ -897,7 +997,7 @@
 			<a
 				href="/insights"
 				data-sveltekit-reload
-				class="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted transition-colors"
+				class="inline-flex items-center gap-2 rounded-md border px-3 py-2 min-h-[44px] text-sm hover:bg-muted transition-colors"
 			>
 				<RefreshCw class="h-4 w-4" />
 				Refresh
@@ -905,7 +1005,7 @@
 			<button
 				onclick={copySummary}
 				disabled={!summary}
-				class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 transition-colors"
+				class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 min-h-[44px] text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 transition-colors"
 			>
 				{#if copied}
 					<Check class="h-4 w-4" />
@@ -952,7 +1052,7 @@
 					<TrendingDown class="h-4 w-4 text-red-500" />
 					Total Overdue
 				</div>
-				<p class="text-2xl font-bold text-red-600">
+				<p class="text-2xl font-bold text-red-600 tabular-nums">
 					{formatCurrency(insights.overdue.totalOverdueBalance)}
 				</p>
 				<p class="text-xs text-muted-foreground">
@@ -966,10 +1066,10 @@
 					<Activity class="h-4 w-4 text-green-500" />
 					Collection Rate
 				</div>
-				<p class="text-2xl font-bold text-green-600">
+				<p class="text-2xl font-bold text-green-600 tabular-nums">
 					{insights.financial.collectionRate.toFixed(1)}%
 				</p>
-				<p class="text-xs text-muted-foreground">
+				<p class="text-xs text-muted-foreground tabular-nums">
 					{formatCurrency(insights.financial.totalCollected)} of {formatCurrency(insights.financial.totalBilled)}
 				</p>
 			</div>
@@ -980,7 +1080,7 @@
 					<Home class="h-4 w-4 text-blue-500" />
 					Occupancy
 				</div>
-				<p class="text-2xl font-bold">
+				<p class="text-2xl font-bold tabular-nums">
 					{insights.occupancy.occupancyRate.toFixed(1)}%
 				</p>
 				<p class="text-xs text-muted-foreground">
@@ -994,7 +1094,7 @@
 					<CreditCard class="h-4 w-4 text-emerald-500" />
 					This Month
 				</div>
-				<p class="text-2xl font-bold text-emerald-600">
+				<p class="text-2xl font-bold text-emerald-600 tabular-nums">
 					{formatCurrency(insights.paymentActivity.amountCollectedThisMonth)}
 				</p>
 				<p class="text-xs text-muted-foreground">
@@ -1008,7 +1108,7 @@
 					<ShieldAlert class="h-4 w-4 text-orange-500" />
 					Penalties Eligible
 				</div>
-				<p class="text-2xl font-bold text-orange-600">
+				<p class="text-2xl font-bold text-orange-600 tabular-nums">
 					{insights.penalties.eligible.length}
 				</p>
 				<p class="text-xs text-muted-foreground">
@@ -1022,7 +1122,7 @@
 					<DollarSign class="h-4 w-4 text-violet-500" />
 					Security Deposits
 				</div>
-				<p class="text-2xl font-bold text-violet-600">
+				<p class="text-2xl font-bold text-violet-600 tabular-nums">
 					{formatCurrency(insights.financial.securityDeposits.totalPaid)}
 				</p>
 				<p class="text-xs text-muted-foreground">
@@ -1036,7 +1136,7 @@
 					<Users class="h-4 w-4 text-cyan-500" />
 					Tenants
 				</div>
-				<p class="text-2xl font-bold">
+				<p class="text-2xl font-bold tabular-nums">
 					{insights.tenantOverview.active}
 				</p>
 				<p class="text-xs text-muted-foreground">
@@ -1051,7 +1151,7 @@
 						<Wrench class="h-4 w-4 text-amber-500" />
 						Maintenance
 					</div>
-					<p class="text-2xl font-bold text-amber-600">
+					<p class="text-2xl font-bold text-amber-600 tabular-nums">
 						{insights.maintenanceSummary.pending}
 					</p>
 					<p class="text-xs text-muted-foreground">
@@ -1066,7 +1166,7 @@
 					<FileWarning class="h-4 w-4 text-yellow-500" />
 					Data Issues
 				</div>
-				<p class="text-2xl font-bold text-yellow-600">
+				<p class="text-2xl font-bold text-yellow-600 tabular-nums">
 					{insights.missingData.reduce((s: number, c: any) => s + c.items.length, 0)}
 				</p>
 				<p class="text-xs text-muted-foreground">
@@ -1123,10 +1223,10 @@
 													<span class="font-medium">{billing.tenantName}</span>
 													<span class="text-xs opacity-75 ml-2">{billing.unitName}</span>
 													<div class="text-xs opacity-75 mt-0.5">
-														{billing.type} — Due: {billing.dueDate} ({billing.daysOverdue}d overdue)
+														{humanizeBillingType(billing.type)} — Due: {formatDate(billing.dueDate)} ({billing.daysOverdue}d overdue)
 													</div>
 												</div>
-												<div class="text-right shrink-0 ml-4">
+												<div class="text-right shrink-0 ml-4 tabular-nums">
 													<div class="font-semibold">{formatCurrency(Number(billing.balance))}</div>
 													{#if Number(billing.penaltyAmount) > 0}
 														<div class="text-xs">+{formatCurrency(Number(billing.penaltyAmount))} penalty</div>
@@ -1229,10 +1329,10 @@
 											<div class="flex-1 min-w-0">
 												<span class="font-medium text-orange-800">{p.tenantName}</span>
 												<div class="text-xs text-orange-600 mt-0.5">
-													{p.type} — {p.daysOverdue}d overdue (grace: {p.gracePeriod}d, rate: {p.configPercentage}%)
+													{humanizeBillingType(p.type)} — {p.daysOverdue}d overdue (grace: {p.gracePeriod}d, rate: {p.configPercentage}%)
 												</div>
 											</div>
-											<div class="text-right shrink-0 ml-4">
+											<div class="text-right shrink-0 ml-4 tabular-nums">
 												<div class="font-semibold text-orange-800">{formatCurrency(Number(p.balance))}</div>
 												<div class="text-xs text-orange-600">of {formatCurrency(Number(p.amount))}</div>
 											</div>
@@ -1245,7 +1345,7 @@
 						{#if insights.penalties.applied.length > 0}
 							<div>
 								<h3 class="text-sm font-medium mb-2 text-red-700">Penalties Applied</h3>
-								<p class="text-xs text-muted-foreground mb-2">
+								<p class="text-xs text-muted-foreground mb-2 tabular-nums">
 									Total: {formatCurrency(insights.penalties.totalPenaltyApplied)}
 								</p>
 								<div class="space-y-2">
@@ -1253,9 +1353,9 @@
 										<div class="flex items-center justify-between rounded-md border border-red-200 bg-red-50 p-3 text-sm">
 											<div class="flex-1 min-w-0">
 												<span class="font-medium text-red-800">{p.tenantName}</span>
-												<div class="text-xs text-red-600 mt-0.5">{p.type} — Due: {p.dueDate}</div>
+												<div class="text-xs text-red-600 mt-0.5">{humanizeBillingType(p.type)} — Due: {formatDate(p.dueDate)}</div>
 											</div>
-											<div class="text-right shrink-0 ml-4">
+											<div class="text-right shrink-0 ml-4 tabular-nums">
 												<div class="font-semibold text-red-800">+{formatCurrency(Number(p.penaltyAmount))}</div>
 												<div class="text-xs text-red-600">on {formatCurrency(Number(p.originalAmount))}</div>
 											</div>
@@ -1318,7 +1418,7 @@
 
 					<div class="text-sm">
 						<span class="text-muted-foreground">Est. monthly revenue: </span>
-						<span class="font-medium">{formatCurrency(insights.occupancy.totalMonthlyRevenue)}</span>
+						<span class="font-medium tabular-nums">{formatCurrency(insights.occupancy.totalMonthlyRevenue)}</span>
 					</div>
 
 					{#if insights.occupancy.expiredWithTenant.length > 0}
@@ -1335,7 +1435,7 @@
 											<span class="text-xs text-red-600 ml-2">{u.propertyName}, Floor {u.floorNumber}</span>
 										</div>
 										<div class="text-xs text-red-600">
-											{u.tenantName} — ended {u.leaseEnd}
+											{u.tenantName} — ended {formatDate(u.leaseEnd ?? '')}
 										</div>
 									</div>
 								{/each}
@@ -1355,7 +1455,7 @@
 									{#each group.items as u}
 										<div class="flex items-center justify-between rounded-md border {group.borderColor} {group.bgColor} p-2 text-sm">
 											<span class="font-medium {group.textColor}">{u.unitName}</span>
-											<span class="text-xs {group.subColor}">{u.tenantName} — ends {u.leaseEnd}</span>
+											<span class="text-xs {group.subColor}">{u.tenantName} — ends {formatDate(u.leaseEnd ?? '')}</span>
 										</div>
 									{/each}
 								</div>
@@ -1373,7 +1473,7 @@
 											<span class="font-medium">{u.unitName}</span>
 											<span class="text-xs text-muted-foreground ml-2">{u.propertyName}, Floor {u.floorNumber}</span>
 										</div>
-										<span class="text-sm font-medium">{formatCurrency(Number(u.baseRate))}/mo</span>
+										<span class="text-sm font-medium tabular-nums">{formatCurrency(Number(u.baseRate))}/mo</span>
 									</div>
 								{/each}
 							</div>
@@ -1414,7 +1514,7 @@
 							<button
 								onclick={handleRunClick}
 								disabled={runningJobs}
-								class="inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+								class="inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 min-h-[44px] text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
 							>
 								{#if runningJobs}
 									<Loader2 class="h-4 w-4 animate-spin" />
@@ -1502,7 +1602,7 @@
 													log.status === 'PARTIAL' && "bg-yellow-100 text-yellow-700",
 													log.status === 'FAILED' && "bg-red-100 text-red-700"
 												)}>
-													{log.status}
+													{humanizeStatus(log.status)}
 												</span>
 											</div>
 										</div>

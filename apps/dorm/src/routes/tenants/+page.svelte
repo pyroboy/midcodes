@@ -261,6 +261,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Tenants{!isLoading ? ` (${stats.total})` : ''} | Dorm</title>
+</svelte:head>
+
 <div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
 	<div class="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
 		<SyncErrorBanner collections={['tenants', 'leases', 'lease_tenants']} />
@@ -285,7 +289,7 @@
 					<button
 						onclick={() => handleFilterClick('active')}
 						aria-pressed={activeFilter === 'active'}
-						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter ===
 						'active'
 							? 'bg-green-100 ring-2 ring-green-500'
 							: 'bg-green-50 hover:bg-green-100'} {stats.active === 0 && activeFilter !== 'active' ? 'opacity-50' : ''}"
@@ -301,7 +305,7 @@
 					<button
 						onclick={() => handleFilterClick('all')}
 						aria-pressed={activeFilter === 'all'}
-						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
 						'all'
 							? 'bg-blue-100 ring-2 ring-blue-500'
 							: 'bg-blue-50 hover:bg-blue-100'} {stats.total === 0 && activeFilter !== 'all' ? 'opacity-50' : ''}"
@@ -317,7 +321,7 @@
 					<button
 						onclick={() => handleFilterClick('inactive')}
 						aria-pressed={activeFilter === 'inactive'}
-						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 {activeFilter ===
 						'inactive'
 							? 'bg-gray-100 ring-2 ring-gray-500'
 							: 'bg-gray-50 hover:bg-gray-100'} {stats.inactive === 0 && activeFilter !== 'inactive' ? 'opacity-50' : ''}"
@@ -333,7 +337,7 @@
 					<button
 						onclick={() => handleFilterClick('pending')}
 						aria-pressed={activeFilter === 'pending'}
-						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 {activeFilter ===
 						'pending'
 							? 'bg-yellow-100 ring-2 ring-yellow-500'
 							: 'bg-yellow-50 hover:bg-yellow-100'} {stats.pending === 0 && activeFilter !== 'pending' ? 'opacity-50' : ''}"
@@ -349,7 +353,7 @@
 					<button
 						onclick={() => handleFilterClick('blacklisted')}
 						aria-pressed={activeFilter === 'blacklisted'}
-						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter ===
 						'blacklisted'
 							? 'bg-red-100 ring-2 ring-red-500'
 							: 'bg-red-50 hover:bg-red-100'} {stats.blacklisted === 0 && activeFilter !== 'blacklisted' ? 'opacity-50' : ''}"
@@ -359,7 +363,7 @@
 						{:else}
 							<span class="text-red-600 font-medium">{stats.blacklisted}</span>
 						{/if}
-						<span class="text-slate-600">Blacklisted</span>
+						<span class="text-slate-600"><span class="hidden sm:inline">Blacklisted</span><span class="sm:hidden">Blocked</span></span>
 					</button>
 				</div>
 
@@ -408,7 +412,7 @@
 					</Select>
 
 					<!-- View Toggle Buttons -->
-					<div class="flex border border-slate-200 rounded-md bg-white">
+					<div class="flex flex-shrink-0 border border-slate-200 rounded-md bg-white">
 						<Button
 							variant={viewMode === 'card' ? 'default' : 'ghost'}
 							size="sm"
@@ -434,7 +438,7 @@
 		<div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm">
 			<div class="p-6">
 				<h2 class="text-lg font-semibold text-slate-800 mb-4">
-					Tenant List {isLoading ? '' : `(${filteredTenants.length})`}
+					Tenants
 				</h2>
 
 				{#if isLoading}

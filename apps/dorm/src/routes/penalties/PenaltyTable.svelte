@@ -118,8 +118,8 @@
 						</TableCell>
 						<TableCell>{formatDate(penalty.billing_date)}</TableCell>
 						<TableCell>{formatDate(penalty.due_date)}</TableCell>
-						<TableCell>{formatCurrency(penalty.amount)}</TableCell>
-						<TableCell>
+						<TableCell class="tabular-nums">{formatCurrency(penalty.amount)}</TableCell>
+						<TableCell class="tabular-nums">
 							{#if penalty.penalty_amount > 0}
 								<span class="font-medium text-red-600"
 									>{formatCurrency(penalty.penalty_amount)}</span

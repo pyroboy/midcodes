@@ -24,6 +24,13 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	if (!propertySlug) errorDetails.push('Property slug is required');
 	if (!date) errorDetails.push('Date parameter is required');
 
+	// Validate date format before any new Date() calls (EC-P0-1)
+	if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+		errorDetails.push('Invalid date format. Expected YYYY-MM-DD.');
+	} else if (date && isNaN(new Date(date + 'T00:00:00Z').getTime())) {
+		errorDetails.push('Invalid date. The date does not exist.');
+	}
+
 	// Since Drizzle doesn't have RLS, we query directly (no service role needed)
 
 	// Fetch property details by slug
@@ -77,7 +84,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		}
 
 		if (futureDates.length > 0) {
-			return `\n\n** Tomorrow's input:**\n${futureDates.join('')}`;
+			return `\n\nTomorrow's input:\n${futureDates.join('')}`;
 		}
 		return '';
 	}
@@ -122,7 +129,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 					day: 'numeric'
 				});
 
-				const successMessage = `Information:\n Existing Data Found\n\n**${displayDate}** already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nYou can view or update the existing readings below.${futureDateLinks}`;
+				const successMessage = `Information:\n Existing Data Found\n\n${displayDate} already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nTo enter new readings, navigate to a date without existing data.${futureDateLinks}`;
 
 				return {
 					meters: [],

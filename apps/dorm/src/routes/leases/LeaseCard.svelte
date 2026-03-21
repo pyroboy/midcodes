@@ -34,7 +34,7 @@
 	import { getSecurityDepositStatus } from '$lib/utils/lease';
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { getUtilityDisplayStatus } from '$lib/utils/lease-status';
-	import { justPaidMap } from './just-paid.svelte';
+	import { getJustPaidMap } from './just-paid.svelte';
 
 	interface Props {
 		lease: Lease & { balanceStatus?: any };
@@ -203,7 +203,7 @@
 	});
 
 	// #5: "Just paid" transient badge
-	let justPaid = $derived(justPaidMap.get(String(lease.id)));
+	let justPaid = $derived(getJustPaidMap().get(String(lease.id)));
 
 	// [04] + [10]: Unified payment status color for left border and status dot
 	// P2-5: Severity gradient — more tiers so "wall of red" differentiates urgency
@@ -280,7 +280,7 @@
 	}
 </script>
 <Card.Root
-	class="group hover:shadow-lg transition-all duration-300 w-full border-0 bg-white/70 backdrop-blur-sm hover:bg-white/90 rounded-xl overflow-hidden cursor-pointer border-l-4 {paymentStatusColor.border} {batchMode && isSelected ? 'ring-2 ring-primary' : ''}"
+	class="group hover:shadow-lg transition-all duration-300 w-full border-0 backdrop-blur-sm rounded-xl overflow-hidden cursor-pointer border-l-4 {paymentStatusColor.border} {batchMode && isSelected ? 'ring-2 ring-primary bg-primary/5' : batchMode ? 'bg-white/50 hover:bg-white/70' : 'bg-white/70 hover:bg-white/90'}"
 	onclick={() => {
 		if (batchMode && onBatchToggle) {
 			onBatchToggle();
@@ -300,7 +300,7 @@
 				<div class="flex-1 min-w-0">
 					<div class="flex items-center gap-1.5">
 						{#if batchMode}
-							<input type="checkbox" checked={isSelected} class="h-4 w-4 flex-shrink-0" tabindex="-1" onclick={(e) => e.stopPropagation()} />
+							<input type="checkbox" checked={isSelected} class="h-5 w-5 flex-shrink-0 accent-primary" tabindex="-1" onclick={(e) => { e.stopPropagation(); onBatchToggle?.(); }} />
 						{:else}
 							<!-- [10] Status dot reflecting payment status -->
 							<span class="w-2 h-2 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
@@ -441,7 +441,7 @@
 			<div class="flex-shrink-0 min-w-0 w-56">
 				<div class="flex items-center gap-1.5">
 					{#if batchMode}
-						<input type="checkbox" checked={isSelected} class="h-4 w-4 flex-shrink-0" tabindex="-1" onclick={(e) => e.stopPropagation()} />
+						<input type="checkbox" checked={isSelected} class="h-5 w-5 flex-shrink-0 accent-primary" tabindex="-1" onclick={(e) => { e.stopPropagation(); onBatchToggle?.(); }} />
 					{:else}
 						<!-- [10] Status dot reflecting payment status -->
 						<span class="w-2.5 h-2.5 rounded-full flex-shrink-0 {paymentStatusColor.dot}" title={paymentStatusColor.label}></span>
@@ -562,7 +562,8 @@
 				{/if}
 			</div>
 
-			<!-- Status Dropdown -->
+			<!-- Status Dropdown — hidden in batch mode -->
+			{#if !batchMode}
 			<div class="flex-shrink-0">
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
@@ -691,9 +692,11 @@
 					{totalDue > 0 ? `Pay ${formatCurrency(totalDue)}` : 'Make Payment'}
 				</Button>
 			</div>
+			{/if}
 		</div>
 
-		<!-- Mobile: Row 3 Status and Actions -->
+		<!-- Mobile: Row 3 Status and Actions — hidden in batch mode -->
+		{#if !batchMode}
 		<div class="lg:hidden flex items-center justify-between gap-2 flex-wrap w-full mt-1">
 				<!-- Status Dropdown -->
 				<DropdownMenu.Root>
@@ -823,6 +826,7 @@
 					</Button>
 				</div>
 		</div>
+		{/if}
 	</Card.Content>
 </Card.Root>
 
