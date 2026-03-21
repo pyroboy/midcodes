@@ -14,19 +14,31 @@
 		leasesStore,
 		rentalUnitsStore,
 		floorsStore,
-		propertiesStore
+		propertiesStore,
+		paymentAllocationsStore,
+		leaseTenantsStore,
+		tenantsStore
 	} from '$lib/stores/collections.svelte';
 	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { formatCurrency, formatDate, getStatusClasses } from '$lib/utils/format';
 	import { Input } from '$lib/components/ui/input';
 	import * as Select from '$lib/components/ui/select';
+	import { toast } from 'svelte-sonner';
+	import { Label } from '$lib/components/ui/label';
+	import { resyncCollection } from '$lib/db/replication';
 	import {
 		ChevronLeft,
 		ChevronRight,
+		ChevronDown,
+		ChevronUp,
 		CreditCard,
+		Clock,
 		DollarSign,
+		Download,
+		Filter,
 		Hash,
+		Receipt,
 		Search,
 		Wallet,
 		Plus,
@@ -44,6 +56,7 @@
 			type: string;
 			utility_type?: string;
 			status?: string;
+			due_date?: string;
 			lease?: {
 				id: number;
 				name: string;
@@ -67,6 +80,33 @@
 	}
 
 	let { data }: Props = $props();
+
+	// ─── Helper: format billing period ──────────────────────────
+	function formatBillingPeriod(dateStr: string | null | undefined): string {
+		if (!dateStr) return '';
+		try {
+			const d = new Date(dateStr);
+			if (isNaN(d.getTime())) return '';
+			return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+		} catch {
+			return '';
+		}
+	}
+
+	// ─── Helper: display paid_by (treats "Unknown" as falsy) ──────────
+	function getDisplayPaidBy(payment: Payment): string | null {
+		const paidBy = payment.paid_by && payment.paid_by !== 'Unknown' ? payment.paid_by : null;
+		return paidBy || payment.billing?.lease?.name || null;
+	}
+
+	// ─── Helper: humanize method enums ──────────────────────────
+	const METHOD_LABELS: Record<string, string> = {
+		CASH: 'Cash',
+		BANK: 'Bank',
+		GCASH: 'GCash',
+		OTHER: 'Other',
+		SECURITY_DEPOSIT: 'Security Deposit'
+	};
 
 	// ─── Helper: humanize billing type enums ──────────────────────────
 	function humanizeBillingType(type: string | undefined | null): string {
@@ -136,6 +176,7 @@
 					type: primaryBilling.type,
 					utility_type: primaryBilling.utility_type,
 					status: primaryBilling.status,
+					due_date: primaryBilling.due_date,
 					lease: lease ? {
 						id: Number(lease.id),
 						name: lease.name,
@@ -218,17 +259,27 @@
 	let detailPayment: Payment | null = $state(null);
 
 	let searchQuery = $state('');
+	let debouncedSearch = $state('');
 	let methodFilter = $state('');
+	let statusFilter = $state('');
 	// [03] Date range filter state
 	let dateFrom = $state('');
 	let dateTo = $state('');
 	// [11] Sort controls
 	let sortBy = $state('date_newest');
+	let showDateFilter = $state(false);
+
+	// 300ms search debounce to avoid filtering on every keystroke
+	$effect(() => {
+		const q = searchQuery;
+		const timer = setTimeout(() => { debouncedSearch = q; }, 300);
+		return () => clearTimeout(timer);
+	});
 
 	let filteredPayments = $derived.by(() => {
 		let result = payments;
-		if (searchQuery) {
-			const q = searchQuery.toLowerCase();
+		if (debouncedSearch) {
+			const q = debouncedSearch.toLowerCase();
 			result = result.filter((p: any) =>
 				(p.billing?.lease?.name ?? '').toLowerCase().includes(q) ||
 				(p.billing?.lease?.rental_unit?.rental_unit_number ?? '').toLowerCase().includes(q) ||
@@ -239,6 +290,9 @@
 		}
 		if (methodFilter) {
 			result = result.filter((p: any) => p.method === methodFilter);
+		}
+		if (statusFilter) {
+			result = result.filter((p: any) => p.billing?.status === statusFilter);
 		}
 		// [03] Date range filter
 		if (dateFrom) {
@@ -292,8 +346,23 @@
 	);
 
 	$effect(() => {
-		searchQuery; methodFilter; dateFrom; dateTo; sortBy;
+		searchQuery; methodFilter; statusFilter; dateFrom; dateTo; sortBy;
 		currentPage = 1;
+	});
+
+	// Suppress status badges when all visible payments have the same status
+	let allSameStatus = $derived.by(() => {
+		const statuses = new Set(paginatedPayments.map((p: Payment) => p.billing?.status).filter(Boolean));
+		return statuses.size <= 1;
+	});
+
+	// Auto-focus amount field when form dialog opens
+	$effect(() => {
+		if (formDialogOpen) {
+			setTimeout(() => {
+				document.querySelector<HTMLInputElement>('[data-payment-amount]')?.focus();
+			}, 150);
+		}
 	});
 
 	function handlePaymentAdded() {
@@ -333,6 +402,107 @@
 		return { totalAmount, count, byMethod, outstandingAmount, outstandingCount };
 	});
 
+	// ─── Revert with reason state ──────────────────────────────
+	let showRevertDialog = $state(false);
+	let revertPaymentId = $state<number | null>(null);
+	let revertReason = $state('');
+
+	async function confirmRevert() {
+		if (revertPaymentId === null) return;
+		const id = revertPaymentId;
+		const reason = revertReason;
+		// Capture payment details for rich toast before clearing state
+		const revertedPayment = payments.find((p) => p.id === id);
+		showRevertDialog = false;
+		revertPaymentId = null;
+		revertReason = '';
+
+		const formData = new FormData();
+		formData.append('payment_id', String(id));
+		if (reason) formData.append('reason', reason);
+
+		try {
+			const response = await fetch('?/revert', { method: 'POST', body: formData });
+			if (response.ok) {
+				const desc = revertedPayment
+					? `${formatCurrency(revertedPayment.amount)} ${METHOD_LABELS[revertedPayment.method] ?? revertedPayment.method}${reason ? ` — Reason: ${reason}` : ''}`
+					: undefined;
+				toast.success('Payment reverted', { description: desc });
+				resyncCollection('payments');
+				resyncCollection('billings');
+				resyncCollection('payment_allocations');
+			} else {
+				toast.error('Failed to revert payment');
+			}
+		} catch {
+			toast.error('Error reverting payment');
+		}
+	}
+
+	// ─── CSV Export ──────────────────────────────────────────────
+	function handleExportCSV() {
+		const data = filteredPayments;
+		if (!data.length) {
+			toast.error('No payments to export');
+			return;
+		}
+		const headers = ['ID', 'Amount', 'Method', 'Paid By', 'Paid At', 'Reference', 'Notes', 'Receipt URL', 'Lease'];
+		const rows = [
+			headers.join(','),
+			...data.map((p) => [
+				p.id,
+				p.amount,
+				p.method,
+				(p.paid_by ?? '').replace(/,/g, ' '),
+				p.paid_at ?? '',
+				p.reference_number ?? '',
+				(p.notes ?? '').replace(/,/g, ' '),
+				p.receipt_url ?? '',
+				p.billing?.lease?.name ?? ''
+			].join(','))
+		];
+		const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+		const link = document.createElement('a');
+		link.href = URL.createObjectURL(blob);
+		link.download = `payments_export_${new Date().toISOString().split('T')[0]}.csv`;
+		link.style.visibility = 'hidden';
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		toast.success(`${data.length} payment${data.length === 1 ? '' : 's'} exported`);
+	}
+
+	// ─── Allocation detail toggle in detail modal ──────────────
+	let showAllocationDetail = $state(false);
+	let showAuditInfo = $state(false);
+
+	// Build rich allocation data for the detail modal
+	function getDetailAllocations(payment: Payment) {
+		const allocations = paymentAllocationsStore.value.filter(
+			(a: any) => String(a.payment_id) === String(payment.id)
+		);
+		if (!allocations.length) return [];
+
+		const billingMap = new Map<string, any>();
+		for (const b of billingsStore.value) billingMap.set(String(b.id), b);
+		const leaseMap = new Map<string, any>();
+		for (const l of leasesStore.value) leaseMap.set(String(l.id), l);
+
+		return allocations.map((a: any) => {
+			const billing = billingMap.get(String(a.billing_id));
+			const lease = billing ? leaseMap.get(String(billing.lease_id)) : null;
+			return {
+				billing_id: Number(a.billing_id),
+				allocated_amount: parseFloat(a.amount) || 0,
+				billing_type: billing?.type ?? 'Unknown',
+				utility_type: billing?.utility_type ?? null,
+				billing_amount: billing ? (parseFloat(billing.amount) || 0) : 0,
+				due_date: billing?.due_date ?? null,
+				lease_name: lease?.name ?? null
+			};
+		});
+	}
+
 	// [02] SP-02 helper: check if payment is orphaned (no billing)
 	function isOrphaned(payment: Payment): boolean {
 		return !payment.billing;
@@ -347,22 +517,30 @@
 </script>
 
 <div class="space-y-4">
-	<SyncErrorBanner collections={['payments', 'billings', 'leases', 'rental_units', 'floors', 'properties']} />
+	<SyncErrorBanner collections={['payments', 'billings', 'leases', 'rental_units', 'floors', 'properties', 'payment_allocations']} />
 
 	<div class="flex justify-between items-center">
 		<h1 class="text-2xl font-bold">Payments</h1>
-		{#if isAdminLevel || isAccountant || isFrontdesk || isResident}
-			<Button
-				class="hidden sm:inline-flex"
-				onclick={() => {
-					selectedPayment = undefined;
-					formDialogOpen = true;
-				}}
-			>
-				<Plus class="w-4 h-4 mr-2" />
-				Create Payment
-			</Button>
-		{/if}
+		<div class="flex gap-2">
+			{#if !isLoading && payments.length > 0}
+				<Button variant="outline" class="hidden sm:inline-flex" onclick={handleExportCSV}>
+					<Download class="w-4 h-4 mr-2" />
+					Export
+				</Button>
+			{/if}
+			{#if isAdminLevel || isAccountant || isFrontdesk || isResident}
+				<Button
+					class="hidden sm:inline-flex"
+					onclick={() => {
+						selectedPayment = undefined;
+						formDialogOpen = true;
+					}}
+				>
+					<Plus class="w-4 h-4 mr-2" />
+					Create Payment
+				</Button>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Summary Stats -->
@@ -379,7 +557,7 @@
 							<span class="sm:hidden">Collected</span>
 							<span class="hidden sm:inline">Total Collected</span>
 						</p>
-						<p class="text-xl font-bold">{formatCurrency(stats.totalAmount)}</p>
+						<p class="text-xl font-bold tabular-nums">{formatCurrency(stats.totalAmount)}</p>
 					</div>
 				</Card.Content>
 			</Card.Root>
@@ -407,12 +585,13 @@
 							<span class="sm:hidden">Unpaid</span>
 							<span class="hidden sm:inline">Outstanding</span>
 						</p>
-						<p class="text-xl font-bold">{formatCurrency(stats.outstandingAmount)}</p>
+						<p class="text-xl font-bold tabular-nums">{formatCurrency(stats.outstandingAmount)}</p>
 						<p class="text-xs text-muted-foreground">{stats.outstandingCount} billing{stats.outstandingCount !== 1 ? 's' : ''}</p>
 					</div>
 				</Card.Content>
 			</Card.Root>
-			{#each Object.entries(stats.byMethod).slice(0, 1) as [method, methodData]}
+			{#if Object.keys(stats.byMethod).length > 0}
+				{@const sortedMethods = Object.entries(stats.byMethod).sort((a, b) => b[1].total - a[1].total)}
 				<Card.Root class="flex-shrink-0 min-w-[140px] sm:min-w-0">
 					<Card.Content class="flex items-center gap-3 p-4">
 						<div class="rounded-full bg-purple-100 p-2 flex-shrink-0">
@@ -420,15 +599,19 @@
 						</div>
 						<div class="min-w-0">
 							<p class="text-sm font-medium text-muted-foreground truncate">
-								<span class="sm:hidden">{method.slice(0, 4)}</span>
-								<span class="hidden sm:inline">{method}</span>
+								<span class="sm:hidden">Methods</span>
+								<span class="hidden sm:inline">By Method</span>
 							</p>
-							<p class="text-xl font-bold">{formatCurrency(methodData.total)}</p>
-							<p class="text-xs text-muted-foreground">{methodData.count} payment{methodData.count !== 1 ? 's' : ''}</p>
+							<p class="text-xl font-bold tabular-nums">{formatCurrency(sortedMethods[0][1].total)}</p>
+							<div class="text-xs text-muted-foreground">
+								{#each sortedMethods as [m, d]}
+									<span class="mr-2">{METHOD_LABELS[m] ?? m}: {d.count}</span>
+								{/each}
+							</div>
 						</div>
 					</Card.Content>
 				</Card.Root>
-			{/each}
+			{/if}
 		</div>
 	{/if}
 
@@ -448,7 +631,7 @@
 				</div>
 				<Select.Root type="single" bind:value={methodFilter}>
 					<Select.Trigger class="w-full sm:w-40">
-						{methodFilter || 'All Methods'}
+						{methodFilter ? METHOD_LABELS[methodFilter] ?? methodFilter : 'All Methods'}
 					</Select.Trigger>
 					<Select.Content>
 						<Select.Item value="">All Methods</Select.Item>
@@ -456,6 +639,18 @@
 						<Select.Item value="BANK">Bank</Select.Item>
 						<Select.Item value="GCASH">GCash</Select.Item>
 						<Select.Item value="OTHER">Other</Select.Item>
+					</Select.Content>
+				</Select.Root>
+				<Select.Root type="single" bind:value={statusFilter}>
+					<Select.Trigger class="w-full sm:w-40">
+						{statusFilter || 'All Statuses'}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="">All Statuses</Select.Item>
+						<Select.Item value="PAID">Paid</Select.Item>
+						<Select.Item value="PARTIAL">Partial</Select.Item>
+						<Select.Item value="PENDING">Pending</Select.Item>
+						<Select.Item value="OVERDUE">Overdue</Select.Item>
 					</Select.Content>
 				</Select.Root>
 				<!-- [11] Sort dropdown -->
@@ -475,34 +670,44 @@
 					</Select.Content>
 				</Select.Root>
 			</div>
-			<!-- [03] Row 2: Date range filter -->
+			<!-- [03] Row 2: Date range filter (toggle) -->
 			<div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-				<div class="flex items-center gap-2 flex-1">
-					<CalendarDays class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-					<Input
-						type="date"
-						placeholder="From date"
-						bind:value={dateFrom}
-						class="flex-1"
-					/>
-					<span class="text-muted-foreground text-sm">to</span>
-					<Input
-						type="date"
-						placeholder="To date"
-						bind:value={dateTo}
-						class="flex-1"
-					/>
-					{#if dateFrom || dateTo}
-						<Button
-							variant="ghost"
-							size="sm"
-							onclick={() => { dateFrom = ''; dateTo = ''; }}
-							class="flex-shrink-0"
-						>
-							<X class="w-4 h-4" />
-						</Button>
-					{/if}
-				</div>
+				<Button
+					variant="ghost"
+					size="sm"
+					onclick={() => { showDateFilter = !showDateFilter; }}
+					class="self-start"
+				>
+					<CalendarDays class="w-4 h-4 mr-1" />
+					{showDateFilter ? 'Hide dates' : 'Filter by date'}
+				</Button>
+				{#if showDateFilter}
+					<div class="flex items-center gap-2 flex-1">
+						<Input
+							type="date"
+							placeholder="From date"
+							bind:value={dateFrom}
+							class="flex-1"
+						/>
+						<span class="text-muted-foreground text-sm">to</span>
+						<Input
+							type="date"
+							placeholder="To date"
+							bind:value={dateTo}
+							class="flex-1"
+						/>
+						{#if dateFrom || dateTo}
+							<Button
+								variant="ghost"
+								size="sm"
+								onclick={() => { dateFrom = ''; dateTo = ''; }}
+								class="flex-shrink-0"
+							>
+								<X class="w-4 h-4" />
+							</Button>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -553,7 +758,7 @@
 										<AlertTriangle class="w-3 h-3 mr-1" />
 										Unlinked
 									</Badge>
-								{:else}
+								{:else if !allSameStatus}
 									<Badge class={getStatusClasses(payment.billing?.status ?? '')}>
 										{payment.billing?.status}
 									</Badge>
@@ -561,14 +766,11 @@
 							</div>
 						</Card.Title>
 						<Card.Description>
-							<!-- [05] Humanized billing type labels -->
+							<!-- [05] Humanized billing type labels with period -->
 							{#if isOrphaned(payment)}
 								<span class="text-amber-700">Unlinked Payment</span>
 							{:else}
-								{humanizeBillingType(payment.billing?.type)}
-								{#if payment.billing?.utility_type}
-									- {humanizeUtilityType(payment.billing.utility_type)}
-								{/if}
+								{humanizeBillingType(payment.billing?.type)}{#if payment.billing?.utility_type}{' '}- {humanizeUtilityType(payment.billing.utility_type)}{/if}{#if formatBillingPeriod(payment.billing?.due_date)}{' '}({formatBillingPeriod(payment.billing?.due_date)}){/if}
 							{/if}
 						</Card.Description>
 					</Card.Header>
@@ -576,11 +778,11 @@
 						<div class="space-y-2">
 							<div class="flex justify-between items-baseline gap-2">
 								<span class="text-muted-foreground flex-shrink-0">Amount:</span>
-								<span class="font-medium text-right">{formatCurrency(payment.amount)}</span>
+								<span class="font-medium text-right tabular-nums">{formatCurrency(payment.amount)}</span>
 							</div>
 							<div class="flex justify-between items-baseline gap-2">
 								<span class="text-muted-foreground flex-shrink-0">Method:</span>
-								<span class="font-medium text-right">{payment.method}</span>
+								<span class="font-medium text-right">{METHOD_LABELS[payment.method] ?? payment.method}</span>
 							</div>
 							<div class="flex justify-between items-baseline gap-2">
 								<span class="text-muted-foreground flex-shrink-0">Date:</span>
@@ -588,24 +790,18 @@
 									{formatDate(payment.paid_at)}
 								</span>
 							</div>
-							<!-- [07] Paid By: fallback to lease tenant, hide if truly unknown -->
-							{#if payment.paid_by || payment.billing?.lease?.name}
+							<!-- [07] Paid By: treat "Unknown" as falsy, fallback to lease tenant -->
+							{#if getDisplayPaidBy(payment)}
 								<div class="flex justify-between items-baseline gap-2">
 									<span class="text-muted-foreground flex-shrink-0">Paid By:</span>
-									<span class="font-medium text-right truncate">{payment.paid_by || payment.billing?.lease?.name}</span>
+									<span class="font-medium text-right truncate">{getDisplayPaidBy(payment)}</span>
 								</div>
 							{/if}
 							{#if payment.billing?.lease?.rental_unit}
 								<div class="flex justify-between items-baseline gap-2">
 									<span class="text-muted-foreground flex-shrink-0">Unit:</span>
 									<span class="font-medium text-right break-words">
-										{payment.billing.lease.rental_unit.rental_unit_number}
-										{#if payment.billing.lease.rental_unit.floor}
-											- Floor {payment.billing.lease.rental_unit.floor.floor_number}
-											{#if payment.billing.lease.rental_unit.floor.wing}
-												Wing {payment.billing.lease.rental_unit.floor.wing}
-											{/if}
-										{/if}
+										{#if payment.billing.lease.rental_unit.floor}{payment.billing.lease.rental_unit.floor.floor_number}F - {/if}Room {payment.billing.lease.rental_unit.rental_unit_number}{#if payment.billing.lease.rental_unit.floor?.wing}{' '}({payment.billing.lease.rental_unit.floor.wing}){/if}
 									</span>
 								</div>
 							{/if}
@@ -740,20 +936,20 @@
 					</div>
 					<div class="flex justify-between py-2 border-b">
 						<span class="text-muted-foreground">Amount</span>
-						<span class="font-semibold text-base">{formatCurrency(detailPayment.amount)}</span>
+						<span class="font-semibold text-base tabular-nums">{formatCurrency(detailPayment.amount)}</span>
 					</div>
 					<div class="flex justify-between py-2 border-b">
 						<span class="text-muted-foreground">Method</span>
-						<Badge variant="outline">{detailPayment.method}</Badge>
+						<Badge variant="outline">{METHOD_LABELS[detailPayment.method] ?? detailPayment.method}</Badge>
 					</div>
 					<div class="flex justify-between py-2 border-b">
 						<span class="text-muted-foreground">Date Paid</span>
 						<span>{formatDate(detailPayment.paid_at)}</span>
 					</div>
-					{#if detailPayment.paid_by || detailPayment.billing?.lease?.name}
+					{#if getDisplayPaidBy(detailPayment)}
 						<div class="flex justify-between py-2 border-b">
 							<span class="text-muted-foreground">Paid By</span>
-							<span class="font-medium">{detailPayment.paid_by || detailPayment.billing?.lease?.name}</span>
+							<span class="font-medium">{getDisplayPaidBy(detailPayment)}</span>
 						</div>
 					{/if}
 					{#if detailPayment.billing?.status}
@@ -768,13 +964,7 @@
 						<div class="flex justify-between py-2 border-b">
 							<span class="text-muted-foreground">Unit</span>
 							<span>
-								{detailPayment.billing.lease.rental_unit.rental_unit_number}
-								{#if detailPayment.billing.lease.rental_unit.floor}
-									- Floor {detailPayment.billing.lease.rental_unit.floor.floor_number}
-									{#if detailPayment.billing.lease.rental_unit.floor.wing}
-										Wing {detailPayment.billing.lease.rental_unit.floor.wing}
-									{/if}
-								{/if}
+								{#if detailPayment.billing.lease.rental_unit.floor}{detailPayment.billing.lease.rental_unit.floor.floor_number}F - {/if}Room {detailPayment.billing.lease.rental_unit.rental_unit_number}{#if detailPayment.billing.lease.rental_unit.floor?.wing}{' '}({detailPayment.billing.lease.rental_unit.floor.wing}){/if}
 							</span>
 						</div>
 					{/if}
@@ -804,12 +994,110 @@
 							<span class="text-sm">{detailPayment.notes}</span>
 						</div>
 					{/if}
+					<!-- Collapsible Allocation Breakdown -->
+					{#if detailPayment && getDetailAllocations(detailPayment).length > 0}
+					{@const detailAllocations = getDetailAllocations(detailPayment)}
+						<div class="py-2 border-b">
+							<button
+								class="flex items-center justify-between w-full text-left hover:bg-muted/50 p-2 min-h-[44px] rounded-md transition-colors"
+								onclick={() => showAllocationDetail = !showAllocationDetail}
+							>
+								<span class="text-sm font-medium text-muted-foreground flex items-center gap-2">
+									<Receipt class="h-4 w-4" />
+									Payment Allocation Details ({detailAllocations.length})
+								</span>
+								{#if showAllocationDetail}
+									<ChevronUp class="h-4 w-4 text-muted-foreground" />
+								{:else}
+									<ChevronDown class="h-4 w-4 text-muted-foreground" />
+								{/if}
+							</button>
+							{#if showAllocationDetail}
+								<div class="space-y-2 mt-2 pl-2">
+									{#each detailAllocations as alloc}
+										<div class="flex items-center justify-between py-2 px-3 bg-muted/30 rounded text-sm">
+											<div>
+												<span class="font-medium">
+													{alloc.billing_type}
+													{#if alloc.utility_type}({alloc.utility_type}){/if}
+												</span>
+												{#if alloc.lease_name}
+													<div class="text-xs text-muted-foreground">{alloc.lease_name}</div>
+												{/if}
+												{#if alloc.due_date}
+													<div class="text-xs text-muted-foreground">Due: {formatDate(alloc.due_date)}</div>
+												{/if}
+											</div>
+											<div class="text-right">
+												<div class="font-semibold text-emerald-600 tabular-nums">
+													{formatCurrency(alloc.allocated_amount)}
+												</div>
+												<div class="text-xs text-muted-foreground tabular-nums">
+													of {formatCurrency(alloc.billing_amount)}
+												</div>
+											</div>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/if}
+
+					<!-- Collapsible Audit Information -->
+					{#if detailPayment?.created_at || detailPayment?.updated_at}
+						<div class="py-2 border-b">
+							<button
+								class="flex items-center justify-between w-full text-left hover:bg-muted/50 p-2 min-h-[44px] rounded-md transition-colors"
+								onclick={() => showAuditInfo = !showAuditInfo}
+							>
+								<span class="text-sm font-medium text-muted-foreground flex items-center gap-2">
+									<Clock class="h-4 w-4" />
+									Audit Information
+								</span>
+								{#if showAuditInfo}
+									<ChevronUp class="h-4 w-4 text-muted-foreground" />
+								{:else}
+									<ChevronDown class="h-4 w-4 text-muted-foreground" />
+								{/if}
+							</button>
+							{#if showAuditInfo}
+								<div class="pl-6 space-y-2 text-sm mt-2">
+									{#if detailPayment.created_at}
+										<div class="flex justify-between">
+											<span class="text-muted-foreground">Created:</span>
+											<span>{formatDate(detailPayment.created_at)}</span>
+										</div>
+									{/if}
+									{#if detailPayment.updated_at}
+										<div class="flex justify-between">
+											<span class="text-muted-foreground">Updated:</span>
+											<span>{formatDate(detailPayment.updated_at)}</span>
+										</div>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					{/if}
 				</div>
-				<!-- Edit button for admin/accountant roles -->
+				<!-- Action buttons for admin/accountant roles -->
 				{#if isAdminLevel || isAccountant}
-					<div class="flex justify-end pt-4 border-t mt-4">
+					<div class="flex justify-between pt-4 border-t mt-4">
+						<Button
+							variant="destructive"
+							size="sm"
+							class="min-h-[44px] sm:min-h-0"
+							onclick={() => {
+								revertPaymentId = detailPayment?.id ?? null;
+								revertReason = '';
+								detailDialogOpen = false;
+								showRevertDialog = true;
+							}}
+						>
+							Revert
+						</Button>
 						<Button
 							variant="outline"
+							class="min-h-[44px] sm:min-h-0"
 							onclick={() => {
 								selectedPayment = detailPayment ? { ...detailPayment } as any : undefined;
 								detailDialogOpen = false;
@@ -822,6 +1110,28 @@
 				{/if}
 			</div>
 		{/if}
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Revert with Reason Dialog -->
+<Dialog.Root bind:open={showRevertDialog}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Revert Payment</Dialog.Title>
+			<Dialog.Description>
+				Are you sure you want to revert this payment? This will adjust related billings.
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="grid gap-4 py-4">
+			<div class="grid gap-2">
+				<Label for="revert-reason">Reason for reverting (optional)</Label>
+				<Input id="revert-reason" bind:value={revertReason} placeholder="Enter a reason..." />
+			</div>
+		</div>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => { showRevertDialog = false; revertPaymentId = null; revertReason = ''; }}>Cancel</Button>
+			<Button variant="destructive" onclick={confirmRevert}>Revert Payment</Button>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
 
