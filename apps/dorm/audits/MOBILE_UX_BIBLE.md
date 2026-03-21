@@ -273,13 +273,169 @@ Every old metric maps to exactly one UXI dimension:
 
 ---
 
+## 6. Rent Management Domain Patterns
+
+These patterns are specific to dormitory/property management apps. They override generic form UX advice when there's a domain-specific need.
+
+### 6.1 Lease List Scanning (The "Wall of Cards" Problem)
+
+| Principle | Detail |
+|-----------|--------|
+| **Problem** | A property with 40 leases creates a wall of visually similar cards. When 37/40 are overdue, every card screams urgent — urgency signal is lost. |
+| **Research** | NNGroup F-pattern eye-tracking: users scan top-left first, then sweep right, then down the left edge. Cards not on the left edge or top row get less attention. |
+| **Fix: Severity gradient** | Use 4-tier color severity on left border + status dot: amber (<30d) → red-400 (30-90d) → red-600 (90-180d) → red-800 pulsing (180d+). This creates visual differentiation even when all cards are "overdue." |
+| **Fix: Sort by urgency** | Sort by `daysOverdue` descending, not `updated_at`. Most critical leases appear first (F-pattern primacy). |
+| **Fix: Summary cards as filters** | Clickable stat cards (Total/Paid/Pending/Partial/Overdue) act as both at-a-glance KPIs and filter toggles. Reduces cognitive load from scanning 40 cards to scanning 5 numbers. |
+
+**Card vs. List on mobile** (NNGroup 2024):
+- Cards are **less scannable** than lists — "the positioning of individual elements is fixed in size and more predictable in a vertical list"
+- Cards take **more space** — "any given screen size can't show as many cards as a list view"
+- Cards are **poor for comparison** — users look "back and forth multiple times"
+- **Recommendation for lease lists**: Use compact card rows (not full cards) on mobile — one line per lease with status dot + name + balance. Expand on tap.
+
+### 6.2 Payment Recording (The Primary Workflow)
+
+| Principle | Detail |
+|-----------|--------|
+| **Context** | Recording a rent payment is the #1 task for property managers. It happens 40-100 times per month (once per lease). Speed and accuracy matter equally. |
+| **Optimal flow** | 2 clicks: "Pay ₱X" → "Submit". All fields pre-filled from context (billings, amount, payer, date, last method). |
+| **Pre-fill priority** | 1. Select all unpaid billings. 2. Auto-compute amount. 3. Pre-fill payer name from lease. 4. Default date to today. 5. Remember last payment method (localStorage). |
+| **Research** | Baymard: avg checkout has 23.48 form elements, but ideal is 12-14. Most sites can achieve 20-60% reduction. A +35.26% conversion uplift is possible from checkout redesign alone. |
+| **Duplicate guard** | Financial forms need extra safety — confirm if a similar amount was recorded for the same lease in the last 24h. |
+
+### 6.3 Status Indicator Hierarchy
+
+Status indicators are critical in rent management — a property manager glancing at a dashboard must instantly see which leases need attention.
+
+**Severity color scale** (based on Carbon Design System + Astro UX DS + RAG pattern research):
+
+| Level | Color | Border | Dot | When |
+|-------|-------|--------|-----|------|
+| Critical | `red-800` | `border-l-red-800` | `bg-red-700 animate-pulse` | 180+ days overdue |
+| High | `red-600` | `border-l-red-600` | `bg-red-600` | 90-180 days overdue |
+| Medium | `red-400` | `border-l-red-400` | `bg-red-400` | 30-90 days overdue |
+| Low | `amber-500` | `border-l-amber-500` | `bg-amber-500` | <30 days overdue |
+| Warning | `orange-400` | `border-l-orange-400` | `bg-orange-400` | Pending (not yet due) |
+| Partial | `amber-400` | `border-l-amber-400` | `bg-amber-400` | Partially paid |
+| Good | `green-500` | `border-l-green-500` | `bg-green-500` | Fully paid |
+
+**Key rule**: Color must never be the sole indicator (WCAG). Always pair with text ("170d overdue"), icon, or position. The pulsing animation on 180d+ adds a non-color signal.
+
+### 6.4 Cross-Screen Workflow Patterns
+
+Property managers start on desktop (office) and check on mobile (walking the building or off-site). The app must support **sequential cross-device usage**.
+
+| Pattern | Desktop Behavior | Mobile Behavior | Research |
+|---------|-----------------|-----------------|----------|
+| **Lease overview** | Full table with all columns, filters, bulk actions | Compact cards with status dot + name + balance, expandable detail | NNGroup: "lock headers, allow column subset" for mobile tables |
+| **Payment recording** | 3-column modal (billings / form / summary) | Single column with collapsible billings, sticky footer | NNGroup: hiding navigation "cuts discoverability in half" — don't hide the CTA |
+| **Billing review** | Side-by-side comparison, multi-select | Stacked cards, tap to expand | NNGroup: cards "poor for comparison" — offer sort/filter instead |
+| **Reports/insights** | Full dashboard with charts | KPI cards only, charts on demand | <40% info density = 63% faster pattern recognition |
+
+**Feature parity rule** (NNGroup): "Most companies have understood the need of delivering a decent mobile experience that is not reduced to 2-3 randomly picked pieces of content." All critical actions must be accessible on mobile — not just viewing.
+
+### 6.5 Dashboard Scanning Patterns
+
+**F-pattern** (NNGroup, 232 users, thousands of pages):
+- Users read horizontally across the top first
+- Then scan down the left side
+- Then read horizontally again lower
+- Total: 57% viewing time in first screenful
+
+**Applied to dorm dashboard**:
+- **Top row**: Summary stat cards (Total/Paid/Pending/Partial/Overdue) — catches the horizontal sweep
+- **Left edge**: Lease names + status dots — catches the vertical scan
+- **Right side**: Balance amounts — caught on the second horizontal sweep
+- **Below fold**: Secondary info (dates, penalties) — gets only 26% of viewing time
+
+### 6.6 Data Table → Card Conversion Rules
+
+When converting desktop tables to mobile, follow these evidence-based rules:
+
+| Rule | Detail | Source |
+|------|--------|--------|
+| **Prioritize columns** | Show only: status + name + primary amount on mobile. Hide: dates, notes, secondary amounts | NNGroup: "limit what's shown by default on small screens" |
+| **Expand on tap** | Tap card to reveal full details (dates, penalty breakdown, allocations) | Progressive disclosure: -18% abandonment (Baymard) |
+| **Lock identifiers** | Name + status always visible, even when scrolling horizontally | NNGroup: "leftmost column should be locked in place" |
+| **25 rows optimal** | Paginate at 24-25 items per page for performance and scanability | Industry consensus for data-dense tables |
+| **Cut-off hint** | Partially visible last card signals "scroll for more" | Gestalt closure principle |
+
+### 6.7 Utility Billing Workflow
+
+| Principle | Detail |
+|-----------|--------|
+| **Context** | Utility readings are entered in bulk (per meter, per floor). This is a data entry task, not a decision task. |
+| **Speed rule** | Tab between fields, auto-advance on entry, numpad keyboard (`inputmode="decimal"`) |
+| **Error prevention** | Flag readings that are lower than previous (meter rollback), highlight outliers (>2x previous) |
+| **Mobile consideration** | Readings are often entered while walking the building with phone in hand — inputs must be large, keyboard must be numeric |
+
+---
+
+## 7. Cognitive Psychology Applied to Rent Management
+
+### 7.1 Hick's Law — Choice Reduction
+
+| Aspect | Dorm App Application |
+|--------|---------------------|
+| **Statement** | Decision time increases logarithmically with number of choices |
+| **Applied** | 40 lease cards = ~5.3 bits of choice entropy. Filter by status (5 categories) reduces to ~2.3 bits → 57% faster scanning |
+| **Check** | Count visible interactive elements per screen state. Flag >7 ungrouped choices at same hierarchy level |
+| **Fix** | Summary stat cards as filters, search debounce (300ms), sort options |
+
+### 7.2 Miller's Law — Chunking
+
+| Aspect | Dorm App Application |
+|--------|---------------------|
+| **Statement** | Working memory holds 7 ± 2 chunks |
+| **Applied** | Payment modal groups fields into 3 visual sections (Billings / Form / Summary). Lease cards chunk info into 3 rows (name+balance / tenants+status / actions) |
+| **Check** | Count unchunked items in any list, panel, or card. Flag >7 |
+| **Fix** | Section headers, visual separators, grouped stat cards |
+
+### 7.3 Fitts's Law — Target Reachability
+
+| Aspect | Dorm App Application |
+|--------|---------------------|
+| **Statement** | Time to reach target = f(distance / size). Bigger + closer = faster |
+| **Applied** | "Make Payment" button is the primary action — it must be the largest, most reachable button on each lease card. Desktop: right-aligned, h-9. Mobile: full-width-ish, min-h-[44px] |
+| **Check** | Measure touch targets (min 44px). Check distance between primary CTA and the data it acts on |
+| **MIT Touch Lab** | Average fingertip pad is 10-14mm wide (Dandekar, Raju & Srinivasan, 2003). Targets below 9.6mm (~36px) show significantly higher error rates |
+
+### 7.4 Jakob's Law — Conventions
+
+| Aspect | Dorm App Application |
+|--------|---------------------|
+| **Statement** | Users expect your app to work like other apps they use |
+| **Applied** | Property managers use Buildium, AppFolio, TenantCloud. Common patterns: left sidebar nav, status-colored cards, payment modals, summary dashboards. Follow these conventions. |
+| **Check** | Compare layout patterns to leading property management tools |
+
+### 7.5 Doherty Threshold — Responsiveness
+
+| Aspect | Dorm App Application |
+|--------|---------------------|
+| **Statement** | Productivity soars when response time < 400ms (Doherty & Thadhani, IBM, 1982) |
+| **Applied** | RxDB local-first reads are instant. Server writes use optimistic updates (appear instant, sync in background). Resync uses bgResync with 500ms debounce. |
+| **Check** | Time every interaction from tap to visual feedback. Flag >400ms without loading indicator |
+
+### 7.6 Serial Position Effect — Ordering
+
+| Aspect | Dorm App Application |
+|--------|---------------------|
+| **Statement** | People remember first and last items best (primacy + recency) |
+| **Applied** | Sort overdue leases first (most urgent = primacy). "Make Payment" button is last element in card row (recency). Sidebar nav: Dashboard first (most used), Settings last |
+
+---
+
 ## Sources
 
 | Source | Key Finding | Year |
 |--------|-------------|------|
-| NNGroup Eye-Tracking | 57% viewing time above fold, 74% in first 2 screenfuls | 2018 |
+| NNGroup Eye-Tracking | 57% viewing time above fold, 74% in first 2 screenfuls; F-pattern across 232 users | 2018 |
+| NNGroup Mobile Tables | Lock headers, allow column subset, hide less-critical columns on mobile | 2024 |
+| NNGroup Cards vs Lists | Cards less scannable than lists, take more space, poor for comparison | 2024 |
+| NNGroup Navigation Hiding | Hiding nav cuts discoverability "almost in half", increases task time | 2024 |
+| NNGroup Feature Parity | "Content must be prioritized over chrome on mobile" — don't strip critical features | 2024 |
 | HubSpot (n=40,000) | 4→3 fields = +50% conversion | 2019 |
-| Baymard Institute | Each field beyond 8: -3-7% mobile conversion; avg checkout 11.3 fields, 8 needed | 2024 |
+| Baymard Institute | Each field beyond 8: -3-7% mobile conversion; avg checkout 23.48 elements, ideal 12-14; +35.26% conversion from checkout redesign; 20-60% field reduction possible; 17% abandon due to difficult checkout | 2024 |
 | CHI Study | Grouped forms: 78% one-try success vs 42% ungrouped | 2020 |
 | Luke Wroblewski | Inline validation: +22% success, -42% time, +31% satisfaction | 2009 |
 | Google Chrome | Autofill: +25% completion, 30% faster | 2021 |
@@ -292,3 +448,11 @@ Every old metric maps to exactly one UXI dimension:
 | WCAG 2.2 | 24px AA, 44px AAA touch targets | 2023 |
 | Stripe | Mobile cart abandonment ≈79% vs desktop ≈67% | 2025 |
 | Formstack | ≤4 fields: +160% conversion; social autofill: +189% | 2020 |
+| MIT Touch Lab | Average fingertip 10-14mm; <9.6mm = significantly higher error rates | 2003 |
+| Parhi, Karlson & Bederson | Targets below 9.2mm: significantly higher thumb error rates (MobileHCI '06) | 2006 |
+| Doherty & Thadhani | <400ms response time → disproportionate productivity increase (IBM Systems Journal) | 1982 |
+| Carbon Design System | Status color palette: severity scale from grey (off) to red (alert) | 2024 |
+| Astro UX DS | Status system: severity levels with shape + color + text redundancy | 2024 |
+| ScienceDirect | Dashboard info load: cognitive style affects hazard recognition speed vs accuracy | 2023 |
+| UX Magazine | Dashboard <40% info density correlates with faster pattern recognition | 2024 |
+| Buildium/AppFolio | Leading property management UX: centralized dashboards, mobile-first rent collection, tenant profiles | 2025 |
