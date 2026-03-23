@@ -1,0 +1,379 @@
+- generic [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e95]:
+    - generic [ref=e99]:
+      - generic [ref=e101]:
+        - img [ref=e103]
+        - generic [ref=e104]:
+          - generic [ref=e105]: Dorm
+          - generic [ref=e106]: Management
+      - generic [ref=e107]:
+        - list [ref=e108]:
+          - link "Dashboard" [ref=e109] [cursor=pointer]:
+            - /url: /
+            - listitem [ref=e110]:
+              - button "Dashboard" [ref=e111]:
+                - img [ref=e112]
+                - generic [ref=e113]: Dashboard
+        - list [ref=e114]:
+          - link "Locations" [ref=e115] [cursor=pointer]:
+            - /url: /locations
+            - listitem [ref=e116]:
+              - button "Locations" [ref=e117]:
+                - img [ref=e118]
+                - generic [ref=e119]: Locations
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - heading "Rent Management" [level=3] [ref=e124]:
+              - button "Rent Management" [expanded] [ref=e125] [cursor=pointer]:
+                - generic [ref=e126]:
+                  - img [ref=e127]
+                  - text: Rent Management
+                - img [ref=e128]
+            - list [ref=e131]:
+              - link "Tenants" [ref=e132] [cursor=pointer]:
+                - /url: /tenants
+                - listitem [ref=e133]:
+                  - button "Tenants" [ref=e134]:
+                    - img [ref=e135]
+                    - generic [ref=e136]: Tenants
+              - link "Leases" [ref=e137] [cursor=pointer]:
+                - /url: /leases
+                - listitem [ref=e138]:
+                  - button "Leases" [ref=e139]:
+                    - img [ref=e140]
+                    - generic [ref=e141]: Leases
+              - link "Utilities" [ref=e142] [cursor=pointer]:
+                - /url: /utility-billings
+                - listitem [ref=e143]:
+                  - button "Utilities" [ref=e144]:
+                    - img [ref=e145]
+                    - generic [ref=e146]: Utilities
+              - link "Penalties" [ref=e147] [cursor=pointer]:
+                - /url: /penalties
+                - listitem [ref=e148]:
+                  - button "Penalties" [ref=e149]:
+                    - img [ref=e150]
+                    - generic [ref=e151]: Penalties
+          - generic [ref=e152]:
+            - heading "Finance" [level=3] [ref=e153]:
+              - button "Finance" [expanded] [ref=e154] [cursor=pointer]:
+                - generic [ref=e155]:
+                  - img [ref=e156]
+                  - text: Finance
+                - img [ref=e157]
+            - list [ref=e160]:
+              - link "Payments" [ref=e161] [cursor=pointer]:
+                - /url: /payments
+                - listitem [ref=e162]:
+                  - button "Payments" [ref=e163]:
+                    - img [ref=e164]
+                    - generic [ref=e165]: Payments
+              - link "Expenses" [ref=e166] [cursor=pointer]:
+                - /url: /expenses
+                - listitem [ref=e167]:
+                  - button "Expenses" [ref=e168]:
+                    - img [ref=e169]
+                    - generic [ref=e170]: Expenses
+              - link "Budgets" [ref=e171] [cursor=pointer]:
+                - /url: /budgets
+                - listitem [ref=e172]:
+                  - button "Budgets" [ref=e173]:
+                    - img [ref=e174]
+                    - generic [ref=e175]: Budgets
+          - generic [ref=e176]:
+            - heading "Reports" [level=3] [ref=e177]:
+              - button "Reports" [expanded] [ref=e178] [cursor=pointer]:
+                - generic [ref=e179]:
+                  - img [ref=e180]
+                  - text: Reports
+                - img [ref=e181]
+            - list [ref=e184]:
+              - link "Insights" [ref=e185] [cursor=pointer]:
+                - /url: /insights
+                - listitem [ref=e186]:
+                  - button "Insights" [ref=e187]:
+                    - img [ref=e188]
+                    - generic [ref=e189]: Insights
+              - link "Monthly Reports" [ref=e190] [cursor=pointer]:
+                - /url: /reports
+                - listitem [ref=e191]:
+                  - button "Monthly Reports" [ref=e192]:
+                    - img [ref=e193]
+                    - generic [ref=e194]: Monthly Reports
+              - link "Lease Reports" [ref=e195] [cursor=pointer]:
+                - /url: /lease-report
+                - listitem [ref=e196]:
+                  - button "Lease Reports" [ref=e197]:
+                    - img [ref=e198]
+                    - generic [ref=e199]: Lease Reports
+      - generic [ref=e201]:
+        - generic [ref=e202]:
+          - img [ref=e204]
+          - generic [ref=e206]: admin@dev.local
+        - link "Sign out" [ref=e207] [cursor=pointer]:
+          - /url: /auth/signout
+          - img [ref=e208]
+          - generic [ref=e209]: Sign out
+      - button "Toggle Sidebar" [ref=e210]
+    - generic [ref=e211]:
+      - generic [ref=e213]:
+        - button "Toggle Sidebar" [ref=e214] [cursor=pointer]:
+          - img
+          - generic [ref=e215]: Toggle Sidebar
+        - generic [ref=e216]:
+          - generic [ref=e217]:
+            - img [ref=e218]
+            - button "DA Tirol Dormitory" [ref=e219] [cursor=pointer]:
+              - generic [ref=e220]: DA Tirol Dormitory
+              - img [ref=e221]
+          - button "Notifications" [ref=e223] [cursor=pointer]:
+            - img [ref=e224]
+          - button "Open sync status details" [ref=e225] [cursor=pointer]:
+            - img [ref=e226]
+            - generic [ref=e227]: In sync
+            - img [ref=e228]
+          - link "3D View" [ref=e229] [cursor=pointer]:
+            - /url: /property/5/floorplan
+            - img [ref=e230]
+            - text: 3D View
+      - main [ref=e232]:
+        - generic [ref=e234]:
+          - generic [ref=e235]:
+            - generic [ref=e236]:
+              - img [ref=e238]
+              - generic [ref=e239]:
+                - heading "Rental Units" [level=1] [ref=e240]
+                - paragraph [ref=e241]: 12 units · 1 vacant
+            - button "Add Unit" [active] [ref=e242] [cursor=pointer]:
+              - img
+              - text: Add Unit
+          - generic [ref=e243]:
+            - generic [ref=e245]:
+              - generic [ref=e246]:
+                - img [ref=e247]
+                - textbox "Search units by name or number..." [ref=e248]
+              - generic [ref=e249]:
+                - button "All Floors" [ref=e250] [cursor=pointer]:
+                  - text: All Floors
+                  - img [ref=e251]
+                - button "All Types" [ref=e252] [cursor=pointer]:
+                  - text: All Types
+                  - img [ref=e253]
+                - button "All Statuses" [ref=e254] [cursor=pointer]:
+                  - text: All Statuses
+                  - img [ref=e255]
+            - generic [ref=e257]:
+              - generic [ref=e258]:
+                - generic [ref=e259]: Unit Details
+                - generic [ref=e260]: Floor
+                - generic [ref=e261]: Type
+                - generic [ref=e262]: Rate
+                - generic [ref=e263]: Status
+                - generic [ref=e264]: Actions
+              - generic [ref=e266]:
+                - generic [ref=e268]:
+                  - 'heading "3F-Room 6 Unit #12 Floor 3 Private Room ₱5,000.00 Occupied" [level=3] [ref=e269]':
+                    - 'button "3F-Room 6 Unit #12 Floor 3 Private Room ₱5,000.00 Occupied" [ref=e270] [cursor=pointer]':
+                      - generic [ref=e271]:
+                        - generic [ref=e272]:
+                          - generic [ref=e273]: 3F-Room 6
+                          - generic [ref=e274]: "Unit #12"
+                        - generic [ref=e275]: Floor 3
+                        - generic [ref=e277]: Private Room
+                        - generic [ref=e278]: ₱5,000.00
+                        - generic [ref=e280]: Occupied
+                      - img [ref=e281]
+                  - generic [ref=e282]:
+                    - button "Edit 3F-Room 6" [ref=e283] [cursor=pointer]:
+                      - img
+                    - button "Delete 3F-Room 6" [ref=e284] [cursor=pointer]:
+                      - img
+                - generic [ref=e286]:
+                  - 'heading "3F-Room 1 Unit #1 Floor 3 Dormitory ₱2,000.00 Occupied" [level=3] [ref=e287]':
+                    - 'button "3F-Room 1 Unit #1 Floor 3 Dormitory ₱2,000.00 Occupied" [ref=e288] [cursor=pointer]':
+                      - generic [ref=e289]:
+                        - generic [ref=e290]:
+                          - generic [ref=e291]: 3F-Room 1
+                          - generic [ref=e292]: "Unit #1"
+                        - generic [ref=e293]: Floor 3
+                        - generic [ref=e295]: Dormitory
+                        - generic [ref=e296]: ₱2,000.00
+                        - generic [ref=e298]: Occupied
+                      - img [ref=e299]
+                  - generic [ref=e300]:
+                    - button "Edit 3F-Room 1" [ref=e301] [cursor=pointer]:
+                      - img
+                    - button "Delete 3F-Room 1" [ref=e302] [cursor=pointer]:
+                      - img
+                - generic [ref=e304]:
+                  - 'heading "3F-Room 2 Unit #2 Floor 3 Dormitory ₱2,000.00 Occupied" [level=3] [ref=e305]':
+                    - 'button "3F-Room 2 Unit #2 Floor 3 Dormitory ₱2,000.00 Occupied" [ref=e306] [cursor=pointer]':
+                      - generic [ref=e307]:
+                        - generic [ref=e308]:
+                          - generic [ref=e309]: 3F-Room 2
+                          - generic [ref=e310]: "Unit #2"
+                        - generic [ref=e311]: Floor 3
+                        - generic [ref=e313]: Dormitory
+                        - generic [ref=e314]: ₱2,000.00
+                        - generic [ref=e316]: Occupied
+                      - img [ref=e317]
+                  - generic [ref=e318]:
+                    - button "Edit 3F-Room 2" [ref=e319] [cursor=pointer]:
+                      - img
+                    - button "Delete 3F-Room 2" [ref=e320] [cursor=pointer]:
+                      - img
+                - generic [ref=e322]:
+                  - 'heading "3F-Room 3 Unit #3 Floor 3 Dormitory ₱2,000.00 Occupied" [level=3] [ref=e323]':
+                    - 'button "3F-Room 3 Unit #3 Floor 3 Dormitory ₱2,000.00 Occupied" [ref=e324] [cursor=pointer]':
+                      - generic [ref=e325]:
+                        - generic [ref=e326]:
+                          - generic [ref=e327]: 3F-Room 3
+                          - generic [ref=e328]: "Unit #3"
+                        - generic [ref=e329]: Floor 3
+                        - generic [ref=e331]: Dormitory
+                        - generic [ref=e332]: ₱2,000.00
+                        - generic [ref=e334]: Occupied
+                      - img [ref=e335]
+                  - generic [ref=e336]:
+                    - button "Edit 3F-Room 3" [ref=e337] [cursor=pointer]:
+                      - img
+                    - button "Delete 3F-Room 3" [ref=e338] [cursor=pointer]:
+                      - img
+                - generic [ref=e340]:
+                  - 'heading "3F-Room 4 Unit #4 Floor 3 Dormitory ₱1,500.00 Occupied" [level=3] [ref=e341]':
+                    - 'button "3F-Room 4 Unit #4 Floor 3 Dormitory ₱1,500.00 Occupied" [ref=e342] [cursor=pointer]':
+                      - generic [ref=e343]:
+                        - generic [ref=e344]:
+                          - generic [ref=e345]: 3F-Room 4
+                          - generic [ref=e346]: "Unit #4"
+                        - generic [ref=e347]: Floor 3
+                        - generic [ref=e349]: Dormitory
+                        - generic [ref=e350]: ₱1,500.00
+                        - generic [ref=e352]: Occupied
+                      - img [ref=e353]
+                  - generic [ref=e354]:
+                    - button "Edit 3F-Room 4" [ref=e355] [cursor=pointer]:
+                      - img
+                    - button "Delete 3F-Room 4" [ref=e356] [cursor=pointer]:
+                      - img
+                - generic [ref=e358]:
+                  - 'heading "3F-Room 5 Unit #5 Floor 3 Dormitory ₱2,500.00 Occupied" [level=3] [ref=e359]':
+                    - 'button "3F-Room 5 Unit #5 Floor 3 Dormitory ₱2,500.00 Occupied" [ref=e360] [cursor=pointer]':
+                      - generic [ref=e361]:
+                        - generic [ref=e362]:
+                          - generic [ref=e363]: 3F-Room 5
+                          - generic [ref=e364]: "Unit #5"
+                        - generic [ref=e365]: Floor 3
+                        - generic [ref=e367]: Dormitory
+                        - generic [ref=e368]: ₱2,500.00
+                        - generic [ref=e370]: Occupied
+                      - img [ref=e371]
+                  - generic [ref=e372]:
+                    - button "Edit 3F-Room 5" [ref=e373] [cursor=pointer]:
+                      - img
+                    - button "Delete 3F-Room 5" [ref=e374] [cursor=pointer]:
+                      - img
+                - generic [ref=e376]:
+                  - 'heading "3F -Room 7 Unit #412412 Floor 3 1232 ₱5,000.00 Occupied" [level=3] [ref=e377]':
+                    - 'button "3F -Room 7 Unit #412412 Floor 3 1232 ₱5,000.00 Occupied" [ref=e378] [cursor=pointer]':
+                      - generic [ref=e379]:
+                        - generic [ref=e380]:
+                          - generic [ref=e381]: 3F -Room 7
+                          - generic [ref=e382]: "Unit #412412"
+                        - generic [ref=e383]: Floor 3
+                        - generic [ref=e385]: "1232"
+                        - generic [ref=e386]: ₱5,000.00
+                        - generic [ref=e388]: Occupied
+                      - img [ref=e389]
+                  - generic [ref=e390]:
+                    - button "Edit 3F -Room 7" [ref=e391] [cursor=pointer]:
+                      - img
+                    - button "Delete 3F -Room 7" [ref=e392] [cursor=pointer]:
+                      - img
+                - generic [ref=e394]:
+                  - 'heading "2F-Room 1 Unit #1 Floor 2 Dormitory ₱1,250.00 Occupied" [level=3] [ref=e395]':
+                    - 'button "2F-Room 1 Unit #1 Floor 2 Dormitory ₱1,250.00 Occupied" [ref=e396] [cursor=pointer]':
+                      - generic [ref=e397]:
+                        - generic [ref=e398]:
+                          - generic [ref=e399]: 2F-Room 1
+                          - generic [ref=e400]: "Unit #1"
+                        - generic [ref=e401]: Floor 2
+                        - generic [ref=e403]: Dormitory
+                        - generic [ref=e404]: ₱1,250.00
+                        - generic [ref=e406]: Occupied
+                      - img [ref=e407]
+                  - generic [ref=e408]:
+                    - button "Edit 2F-Room 1" [ref=e409] [cursor=pointer]:
+                      - img
+                    - button "Delete 2F-Room 1" [ref=e410] [cursor=pointer]:
+                      - img
+                - generic [ref=e412]:
+                  - 'heading "2F-Room 2 Unit #2 Floor 2 Dormitory ₱2,000.00 Occupied" [level=3] [ref=e413]':
+                    - 'button "2F-Room 2 Unit #2 Floor 2 Dormitory ₱2,000.00 Occupied" [ref=e414] [cursor=pointer]':
+                      - generic [ref=e415]:
+                        - generic [ref=e416]:
+                          - generic [ref=e417]: 2F-Room 2
+                          - generic [ref=e418]: "Unit #2"
+                        - generic [ref=e419]: Floor 2
+                        - generic [ref=e421]: Dormitory
+                        - generic [ref=e422]: ₱2,000.00
+                        - generic [ref=e424]: Occupied
+                      - img [ref=e425]
+                  - generic [ref=e426]:
+                    - button "Edit 2F-Room 2" [ref=e427] [cursor=pointer]:
+                      - img
+                    - button "Delete 2F-Room 2" [ref=e428] [cursor=pointer]:
+                      - img
+                - generic [ref=e430]:
+                  - 'heading "2F-Room 3 Unit #3 Floor 2 Dormitory ₱1,700.00 Occupied" [level=3] [ref=e431]':
+                    - 'button "2F-Room 3 Unit #3 Floor 2 Dormitory ₱1,700.00 Occupied" [ref=e432] [cursor=pointer]':
+                      - generic [ref=e433]:
+                        - generic [ref=e434]:
+                          - generic [ref=e435]: 2F-Room 3
+                          - generic [ref=e436]: "Unit #3"
+                        - generic [ref=e437]: Floor 2
+                        - generic [ref=e439]: Dormitory
+                        - generic [ref=e440]: ₱1,700.00
+                        - generic [ref=e442]: Occupied
+                      - img [ref=e443]
+                  - generic [ref=e444]:
+                    - button "Edit 2F-Room 3" [ref=e445] [cursor=pointer]:
+                      - img
+                    - button "Delete 2F-Room 3" [ref=e446] [cursor=pointer]:
+                      - img
+                - generic [ref=e448]:
+                  - 'heading "2F-Room 5 Unit #112 Floor 2 Private ₱0.00 Occupied" [level=3] [ref=e449]':
+                    - 'button "2F-Room 5 Unit #112 Floor 2 Private ₱0.00 Occupied" [ref=e450] [cursor=pointer]':
+                      - generic [ref=e451]:
+                        - generic [ref=e452]:
+                          - generic [ref=e453]: 2F-Room 5
+                          - generic [ref=e454]: "Unit #112"
+                        - generic [ref=e455]: Floor 2
+                        - generic [ref=e457]: Private
+                        - generic [ref=e458]: ₱0.00
+                        - generic [ref=e460]: Occupied
+                      - img [ref=e461]
+                  - generic [ref=e462]:
+                    - button "Edit 2F-Room 5" [ref=e463] [cursor=pointer]:
+                      - img
+                    - button "Delete 2F-Room 5" [ref=e464] [cursor=pointer]:
+                      - img
+                - generic [ref=e466]:
+                  - 'heading "2F-Room 4 Unit #22 Floor 2 Private ₱0.00 Vacant" [level=3] [ref=e467]':
+                    - 'button "2F-Room 4 Unit #22 Floor 2 Private ₱0.00 Vacant" [ref=e468] [cursor=pointer]':
+                      - generic [ref=e469]:
+                        - generic [ref=e470]:
+                          - generic [ref=e471]: 2F-Room 4
+                          - generic [ref=e472]: "Unit #22"
+                        - generic [ref=e473]: Floor 2
+                        - generic [ref=e475]: Private
+                        - generic [ref=e476]: ₱0.00
+                        - generic [ref=e478]: Vacant
+                      - img [ref=e479]
+                  - generic [ref=e480]:
+                    - button "Edit 2F-Room 4" [ref=e481] [cursor=pointer]:
+                      - img
+                    - button "Delete 2F-Room 4" [ref=e482] [cursor=pointer]:
+                      - img

@@ -238,8 +238,13 @@ const timingHandle: Handle = async ({ event, resolve }) => {
 	const method = event.request.method;
 	const path = event.url.pathname;
 
-	// Skip noisy requests (HMR, static assets, internal, rxdb replication)
-	if (path.startsWith('/__') || path.startsWith('/node_modules') || path.startsWith('/@') || path.startsWith('/api/rxdb/')) {
+	// Skip noisy requests (HMR, static assets, internal, rxdb replication, non-dorm routes from stale WTFPOS tabs)
+	if (
+		path.startsWith('/__') || path.startsWith('/node_modules') || path.startsWith('/@') ||
+		path.startsWith('/api/rxdb/') ||
+		path.startsWith('/api/replication/') || path.startsWith('/api/device/') ||
+		path === '/pos' || path.startsWith('/pos/') || path.startsWith('/kitchen')
+	) {
 		return resolve(event);
 	}
 

@@ -15,7 +15,7 @@ export default defineConfig({
   },
 	server: {
 		host: true, // Allow LAN access (mobile dev via 192.168.x.x)
-		port: 5173
+		port: 5174
 	},
 	optimizeDeps: {
 		exclude: [
