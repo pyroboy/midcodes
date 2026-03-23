@@ -16,13 +16,15 @@ export async function optimisticUpsertBudget(data: {
 	end_date?: string | null;
 	property_id: number;
 	created_by?: string | null;
-}) {
+}): Promise<(() => Promise<void>) | null> {
 	console.log(`[Optimistic] budget #${data.id} → writing to RxDB...`);
 	syncStatus.addLog(`Optimistic: budget #${data.id} → writing to RxDB...`, 'info');
+	let snapshot: Record<string, any> | null = null;
 	try {
 		const db = await getDb();
 		const sid = String(data.id);
 		const existing = await db.budgets.findOne(sid).exec();
+		snapshot = existing ? existing.toJSON(true) : null;
 		await db.budgets.upsert({
 			id: sid,
 			project_name: data.project_name,
@@ -46,27 +48,51 @@ export async function optimisticUpsertBudget(data: {
 	} catch (err) {
 		console.warn('[Optimistic] Budget upsert failed, falling back to resync:', err);
 		syncStatus.addLog(`Optimistic: budget #${data.id} upsert failed — ${(err as Error)?.message || err}`, 'error');
+		bgResync('budgets');
+		return null;
 	}
 	bgResync('budgets');
+	const capturedSnapshot = snapshot;
+	const sid = String(data.id);
+	return async () => {
+		try {
+			const db = await getDb();
+			if (capturedSnapshot) {
+				await db.budgets.upsert(capturedSnapshot);
+			} else {
+				const doc = await db.budgets.findOne(sid).exec();
+				if (doc) await doc.incrementalPatch({ deleted_at: new Date().toISOString() });
+			}
+			syncStatus.addLog(`Optimistic: budget #${data.id} rolled back`, 'warn');
+		} catch (err) {
+			console.warn('[Optimistic] Budget rollback failed:', err);
+		}
+	};
 }
 
-export async function optimisticDeleteBudget(budgetId: number) {
-	console.log(`[Optimistic] budget #${budgetId} → soft-deleting in RxDB...`);
-	syncStatus.addLog(`Optimistic: budget #${budgetId} → soft-deleting in RxDB...`, 'info');
+export async function optimisticDeleteBudget(budgetId: number | string) {
+	const sid = String(budgetId);
+	if (!sid || sid === 'undefined' || sid === 'null' || sid === 'NaN') {
+		console.warn(`[Optimistic] Budget delete skipped — invalid id: ${budgetId}`);
+		syncStatus.addLog(`Optimistic: budget delete skipped — invalid id: ${budgetId}`, 'warn');
+		return;
+	}
+	console.log(`[Optimistic] budget #${sid} → soft-deleting in RxDB...`);
+	syncStatus.addLog(`Optimistic: budget #${sid} → soft-deleting in RxDB...`, 'info');
 	try {
 		const db = await getDb();
-		const doc = await db.budgets.findOne(String(budgetId)).exec();
+		const doc = await db.budgets.findOne(sid).exec();
 		if (doc) {
 			await doc.incrementalPatch({
 				deleted_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
 			});
 		}
-		console.log(`[Optimistic] budget #${budgetId} soft-deleted ✓`);
-		syncStatus.addLog(`Optimistic: budget #${budgetId} soft-deleted ✓`, 'success');
+		console.log(`[Optimistic] budget #${sid} soft-deleted ✓`);
+		syncStatus.addLog(`Optimistic: budget #${sid} soft-deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Budget delete failed, falling back to resync:', err);
-		syncStatus.addLog(`Optimistic: budget #${budgetId} delete failed — ${(err as Error)?.message || err}`, 'error');
+		syncStatus.addLog(`Optimistic: budget #${sid} delete failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	bgResync('budgets');
 }

@@ -6,6 +6,7 @@ import type { Actions } from './$types';
 import { db } from '$lib/server/db';
 import { expenses } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 export const actions: Actions = {
 	upsert: async ({ request, locals }) => {
@@ -14,10 +15,11 @@ export const actions: Actions = {
 			throw error(401, 'Unauthorized');
 		}
 
-		const form = await superValidate(request, zod(expenseSchema));
+		const rawFormData = await request.formData();
+		const lockTs = extractLockTimestamp(rawFormData);
+		const form = await superValidate(rawFormData, zod(expenseSchema));
 
 		if (!form.valid) {
-			console.error('Form validation error:', form.errors);
 			return fail(400, { form });
 		}
 
@@ -25,22 +27,24 @@ export const actions: Actions = {
 			const { id, ...expenseData } = form.data;
 
 			if (id) {
-				// Update
-				const result = await db
-					.update(expenses)
-					.set({
+				// Update with optimistic lock
+				const lockResult = await optimisticLockUpdate(
+					db, expenses, expenses.id, id, expenses.updatedAt, lockTs,
+					{
 						propertyId: expenseData.property_id,
 						amount: String(expenseData.amount),
 						description: expenseData.description,
 						type: expenseData.type as 'OPERATIONAL' | 'CAPITAL',
 						status: expenseData.expense_status,
 						expenseDate: expenseData.expense_date ? new Date(expenseData.expense_date) : null,
-					updatedAt: new Date()
-					})
-					.where(eq(expenses.id, id))
-					.returning();
+						updatedAt: new Date()
+					}
+				);
+				if (lockResult.conflict) {
+					return fail(409, { form, conflict: true, message: lockResult.message });
+				}
 
-				return { form, success: true, operation: 'update', expense: result?.[0] };
+				return { form, success: true, operation: 'update', expense: lockResult.rows?.[0] };
 			} else {
 				// Create
 				const result = await db
@@ -57,13 +61,7 @@ export const actions: Actions = {
 					})
 					.returning();
 
-				console.log('Creating expense with data:', {
-					inputData: expenseData,
-					dbData: result,
-					type: expenseData.type
-				});
-
-				return { form, success: true, operation: 'create', expense: result?.[0] };
+					return { form, success: true, operation: 'create', expense: result?.[0] };
 			}
 		} catch (err) {
 			console.error('Error in upsert operation:', err);
@@ -81,21 +79,15 @@ export const actions: Actions = {
 			const formData = await request.formData();
 			const id = formData.get('id');
 
-			console.log('Received delete request with ID:', id);
-
 			if (!id) {
-				console.error('Error: Expense ID is required but was not provided');
 				return fail(400, { message: 'Expense ID is required' });
 			}
 
-			console.log('Attempting to delete expense with ID:', id);
 			const result = await db
 				.update(expenses)
 				.set({ deletedAt: new Date(), updatedAt: new Date() })
 				.where(eq(expenses.id, Number(id)))
 				.returning();
-
-			console.log('Delete result:', { data: result });
 
 			return { success: true };
 		} catch (err) {

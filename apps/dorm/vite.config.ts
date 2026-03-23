@@ -1,19 +1,21 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	test: {
+		include: ['src/**/*.test.ts'],
+		environment: 'node',
+		testTimeout: 15_000,
+		hookTimeout: 10_000
+	},
   ssr: {
     external: ['style-to-object', 'runed'],
     noExternal: []
   },
 	server: {
-		host: '127.0.0.1',
-		port: 5173,
-		hmr: {
-			port: 5173,
-			host: '127.0.0.1'
-		}
+		host: true, // Allow LAN access (mobile dev via 192.168.x.x)
+		port: 5174
 	},
 	optimizeDeps: {
 		exclude: [

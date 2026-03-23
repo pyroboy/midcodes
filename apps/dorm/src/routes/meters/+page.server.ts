@@ -4,11 +4,11 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { meterSchema } from './formSchema';
 import { db } from '$lib/server/db';
 import { meters, floors, rentalUnit, readings, profiles } from '$lib/server/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, isNull } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 export const actions = {
 	create: async ({ request, locals }) => {
-		console.log('Starting create action');
 
 		try {
 			const { user } = locals;
@@ -114,10 +114,11 @@ export const actions = {
 				return fail(400, { form, message: 'Property ID is required' });
 			}
 
-			// Check for duplicate meter names
+			// Check for duplicate meter names (excluding soft-deleted)
 			const duplicateConditions = [
 				eq(meters.name, form.data.name),
-				eq(meters.propertyId, insertData.propertyId)
+				eq(meters.propertyId, insertData.propertyId),
+				isNull(meters.deletedAt)
 			];
 			if (location_type === 'FLOOR' && insertData.floorId) {
 				duplicateConditions.push(eq(meters.floorId, insertData.floorId));
@@ -139,7 +140,8 @@ export const actions = {
 				});
 			}
 
-			await db.insert(meters).values(insertData);
+			const [inserted] = await db.insert(meters).values(insertData).returning({ id: meters.id });
+			form.data.id = inserted.id;
 
 			return { form, success: true };
 		} catch (err) {
@@ -149,7 +151,6 @@ export const actions = {
 	},
 
 	update: async ({ request, locals }) => {
-		console.log('Starting update action');
 
 		try {
 			const { user } = locals;
@@ -157,7 +158,9 @@ export const actions = {
 				return fail(401, { message: 'Unauthorized' });
 			}
 
-			const form = await superValidate(request, zod(meterSchema));
+			const rawFormData = await request.formData();
+			const lockTs = extractLockTimestamp(rawFormData);
+			const form = await superValidate(rawFormData, zod(meterSchema));
 
 			if (!form.valid) {
 				return fail(400, { form });
@@ -270,11 +273,12 @@ export const actions = {
 				return fail(400, { form, message: 'Property ID is required' });
 			}
 
-			// Check for duplicate meter names (excluding current)
+			// Check for duplicate meter names (excluding current and soft-deleted)
 			const duplicateConditions = [
 				eq(meters.name, form.data.name),
 				eq(meters.propertyId, cleanUpdateData.propertyId),
-				ne(meters.id, id)
+				ne(meters.id, id),
+				isNull(meters.deletedAt)
 			];
 			if (location_type === 'FLOOR' && cleanUpdateData.floorId) {
 				duplicateConditions.push(eq(meters.floorId, cleanUpdateData.floorId));
@@ -296,7 +300,12 @@ export const actions = {
 				});
 			}
 
-			await db.update(meters).set(cleanUpdateData).where(eq(meters.id, id));
+			const lockResult = await optimisticLockUpdate(
+				db, meters, meters.id, id, meters.updatedAt, lockTs, cleanUpdateData
+			);
+			if (lockResult.conflict) {
+				return fail(409, { form, conflict: true, message: lockResult.message });
+			}
 
 			return { form, success: true };
 		} catch (err) {

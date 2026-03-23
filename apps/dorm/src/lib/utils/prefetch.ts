@@ -60,7 +60,7 @@ export function prefetchWhenVisible(node: HTMLAnchorElement) {
 export const preloadRelatedPages = {
 	async finances(): Promise<void> {
 		await Promise.all([
-			safePreloadData('/transactions'),
+			safePreloadData('/payments'),
 			safePreloadData('/expenses'),
 			safePreloadData('/budgets')
 		]);
@@ -97,7 +97,7 @@ export async function contextualPreload(
 	userRoles: string[] = []
 ): Promise<void> {
 	// Preload related pages based on current location
-	if (currentPath.startsWith('/expenses') || currentPath.startsWith('/transactions')) {
+	if (currentPath.startsWith('/expenses') || currentPath.startsWith('/payments')) {
 		await preloadRelatedPages.finances();
 	} else if (currentPath.startsWith('/properties') || currentPath.startsWith('/rental-unit')) {
 		await preloadRelatedPages.locations();
@@ -155,7 +155,6 @@ export const smartPreload = {
 	 */
 	onBillingContext() {
 		safePreloadData('/payments');
-		safePreloadData('/transactions');
 		safePreloadData('/penalties');
 	}
 };

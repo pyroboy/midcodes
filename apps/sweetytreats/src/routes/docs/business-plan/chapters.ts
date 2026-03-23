@@ -12,5 +12,7 @@ export const chapters = [
     { slug: '11-growth-roadmap', title: '11 Growth Roadmap' },
     { slug: '12-legal-compliance', title: '12 Legal & Compliance' },
     { slug: '13-risk-management', title: '13 Risk Management' },
-    { slug: '14-appendices', title: '14 Appendices' }
+    { slug: '14-appendices', title: '14 Appendices' },
+    { slug: '15-delivery-platforms', title: '15 Delivery Platforms & Integration' },
+    { slug: '16-content-calendar', title: '16 Social Media Content Calendar' }
 ];

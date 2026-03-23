@@ -5,19 +5,21 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		budgetsStore,
 		propertiesStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertBudget, optimisticDeleteBudget } from '$lib/db/optimistic-budgets';
+	import { bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import {
 		Card,
 		CardContent,
 		CardHeader,
-		CardTitle,
-		CardDescription
+		CardTitle
 	} from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
+	import { Input } from '$lib/components/ui/input';
 	import {
 		DollarSign,
 		CheckCircle,
@@ -27,23 +29,19 @@
 		Trash2,
 		RefreshCw,
 		Info,
-		CalendarRange
+		CalendarRange,
+		Loader2,
+		Search
 	} from 'lucide-svelte';
+	const ITEMS_PER_PAGE = 24;
 	import type { Budget, BudgetWithStats, BudgetItem } from './types';
 	import BudgetFormModal from './BudgetFormModal.svelte';
 	import BudgetItemFormModal from './BudgetItemFormModal.svelte';
-	import BudgetDistributionCard from './BudgetDistributionCard.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { cn } from '$lib/utils';
+	import { formatDate, formatCurrency, getStatusClasses } from '$lib/utils/format';
 	import BudgetProjectCard from './BudgetProjectCard.svelte';
-	import {
-		Tooltip,
-		TooltipContent,
-		TooltipProvider,
-		TooltipTrigger
-	} from '$lib/components/ui/tooltip';
-
-	import { ChartBar, PieChart, AlertTriangle } from 'lucide-svelte';
+	import { PieChart } from 'lucide-svelte';
 	// RxDB stores (singletons from collections.svelte.ts)
 	let properties = $derived(
 		[...propertiesStore.value]
@@ -58,8 +56,12 @@
 			const bMs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
 			return bMs - aMs;
 		});
+		// [P1-8] Map for O(1) property lookup
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+
 		return sortedBudgets.map((budget: any) => {
-			const property = propertiesStore.value.find((p: any) => String(p.id) === String(budget.property_id));
+			const property = propMap.get(String(budget.property_id));
 
 			let budgetItems: any[];
 			try {
@@ -98,12 +100,8 @@
 					cost: typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0,
 					quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
 				})),
-				start_date: budget.start_date ? new Date(budget.start_date).toLocaleDateString('en-US', {
-					year: 'numeric', month: '2-digit', day: '2-digit'
-				}) : null,
-				end_date: budget.end_date ? new Date(budget.end_date).toLocaleDateString('en-US', {
-					year: 'numeric', month: '2-digit', day: '2-digit'
-				}) : null
+				start_date: budget.start_date ? formatDate(budget.start_date) : null,
+				end_date: budget.end_date ? formatDate(budget.end_date) : null
 			};
 		});
 	});
@@ -129,7 +127,42 @@
 
 	let isLoading = $derived(!budgetsStore.initialized);
 
+	// Search and pagination
+	let searchInput = $state('');
+	let searchQuery = $state('');
+	let searchTimer: ReturnType<typeof setTimeout>;
+	let currentPage = $state(1);
+
+	function handleSearchInput(e: Event) {
+		const val = (e.target as HTMLInputElement).value;
+		searchInput = val;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => { searchQuery = val; }, 300);
+	}
+
+	let filteredBudgets = $derived.by(() => {
+		if (!searchQuery.trim()) return budgets;
+		const q = searchQuery.trim().toLowerCase();
+		return budgets.filter((b: any) =>
+			b.project_name?.toLowerCase().includes(q) ||
+			b.property?.name?.toLowerCase().includes(q) ||
+			b.project_category?.toLowerCase().includes(q)
+		);
+	});
+
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredBudgets.length / ITEMS_PER_PAGE)));
+	let pagedBudgets = $derived(filteredBudgets.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE));
+
+	$effect(() => {
+		searchQuery;
+		currentPage = 1;
+	});
+
 	// State management for modals and UI
+	let savedFormData = $state<any>(null);
+	let submitSeq = 0;
+	let isSubmitting = $state(false);
+	let rollback: (() => Promise<void>) | null = null;
 	let showDeleteDialog = $state(false);
 	let budgetToDeleteId = $state<number | null>(null);
 	let showBudgetFormModal = $state(false);
@@ -166,47 +199,69 @@
 		resetForm: true,
 		dataType: 'json',
 		onUpdate: ({ form }) => {
-			console.log('Form updated', form);
+			},
+		onSubmit: async () => {
+			submitSeq++;
+			savedFormData = { ...$form, _seq: submitSeq };
+			const isEdit = editingBudget;
+			isSubmitting = true;
+			showBudgetFormModal = false;
+			// For updates: optimistic write to RxDB now (ID is already known)
+			if (isEdit && savedFormData?.id) {
+				rollback = await optimisticUpsertBudget({
+					id: savedFormData.id,
+					project_name: savedFormData.project_name,
+					project_description: savedFormData.project_description,
+					project_category: savedFormData.project_category,
+					planned_amount: String(savedFormData.planned_amount),
+					pending_amount: savedFormData.pending_amount != null ? String(savedFormData.pending_amount) : null,
+					actual_amount: savedFormData.actual_amount != null ? String(savedFormData.actual_amount) : null,
+					budget_items: savedFormData.budget_items,
+					status: savedFormData.status,
+					start_date: savedFormData.start_date,
+					end_date: savedFormData.end_date,
+					property_id: savedFormData.property_id
+				});
+			}
 		},
-		onError: ({ result }) => {
+		onError: async ({ result }) => {
 			console.error('Form error', result.error);
+			isSubmitting = false;
 			toast.error('Error saving budget');
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('budgets'));
 		},
-		onResult: ({ result }) => {
+		onResult: async ({ result }) => {
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
 			if (result.type === 'success') {
-				toast.success(selectedBudget ? 'Budget updated' : 'Budget added');
-				selectedBudget = null;
-				// Optimistic upsert after server confirms
 				const resultData = (result as any).data;
+				const isEdit = editingBudget;
+				isSubmitting = false;
+				selectedBudget = null;
+				editingBudget = false;
+				rollback = null;
+				const budgetLabel = savedFormData?.project_name || 'Budget';
+				const amt = formatCurrency(parseFloat(savedFormData?.planned_amount) || 0);
+				toast.success(isEdit ? `${budgetLabel} updated (${amt})` : `${budgetLabel} created (${amt})`);
 				if (resultData?.budget) {
-					optimisticUpsertBudget(resultData.budget);
+					await optimisticUpsertBudget(resultData.budget);
 				}
+			} else if (result.type === 'failure') {
+				isSubmitting = false;
+				if ((result.data as any)?.conflict) {
+					toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				} else {
+					toast.error('Failed to save budget');
+				}
+				// Instant rollback, then confirm with resync
+				if (rollback) { await rollback(); rollback = null; }
+				import('$lib/db/replication').then(({ resyncCollection }) => resyncCollection('budgets'));
 			}
 		}
 	});
-
-	// Format currency with Peso sign
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP',
-			minimumFractionDigits: 2
-		}).format(amount);
-	}
-
-	// Get status badge color
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'PLANNED':
-				return 'bg-blue-100 text-blue-800';
-			case 'ONGOING':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'COMPLETED':
-				return 'bg-green-100 text-green-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
 
 	// Handle add budget
 	function handleAddBudget() {
@@ -215,10 +270,13 @@
 		showBudgetFormModal = true;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	// Handle edit budget
 	function handleEditBudget(budget: BudgetWithStats) {
 		selectedBudget = budget;
 		editingBudget = true;
+		editUpdatedAt = (budget as any).updated_at ?? null;
 		showBudgetFormModal = true;
 	}
 
@@ -229,9 +287,23 @@
 		showItemFormModal = true;
 	}
 
+	// Duplicate guard
+	let lastBudgetSubmitKey = '';
+	let lastBudgetSubmitTime = 0;
+
 	// Handle budget form submission
 	function handleBudgetSubmit(event: CustomEvent<Budget>) {
 		const budget = event.detail;
+
+		// Duplicate guard — block same name+amount within 2s
+		const submitKey = `${budget.project_name}|${budget.planned_amount}`;
+		const now = Date.now();
+		if (submitKey === lastBudgetSubmitKey && now - lastBudgetSubmitTime < 2000) {
+			toast.warning('Duplicate submission blocked');
+			return;
+		}
+		lastBudgetSubmitKey = submitKey;
+		lastBudgetSubmitTime = now;
 
 		// Ensure all budget items have string ids
 		const sanitizedBudgetItems = sanitizeBudgetItems(budget.budget_items || []);
@@ -324,25 +396,27 @@
 		showDeleteDialog = false;
 		budgetToDeleteId = null;
 
-		try {
-			const formData = new FormData();
-			formData.append('id', budgetId.toString());
+		const deleteFormData = new FormData();
+		deleteFormData.append('id', String(budgetId));
 
-			const response = await fetch(`?/delete`, {
-				method: 'POST',
-				body: formData
-			});
+		const budgetName = budgets.find((b: any) => b.id === budgetId)?.project_name ?? 'Budget';
 
-			if (response.ok) {
-				toast.success('Budget deleted');
-				optimisticDeleteBudget(budgetId);
-			} else {
-				toast.error('Error deleting budget');
+		await bufferedMutation({
+			label: `Delete Budget #${budgetId}`,
+			collection: 'budgets',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteBudget(budgetId);
+			},
+			serverAction: async () => {
+				const response = await fetch('?/delete', { method: 'POST', body: deleteFormData });
+				if (!response.ok) throw new Error('Server rejected delete');
+				return response;
+			},
+			onSuccess: async () => {
+				toast.success(`${budgetName} deleted`);
 			}
-		} catch (error) {
-			console.error('Error deleting budget', error);
-			toast.error('Error deleting budget');
-		}
+		});
 	}
 
 	// Refresh data
@@ -354,35 +428,53 @@
 </script>
 
 <div class="container mx-auto py-8 px-4">
+	<SyncErrorBanner collections={['budgets', 'properties']} />
 	<!-- Page Header -->
-	<div class="flex justify-between items-center mb-8 border-b pb-4">
+	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 border-b pb-4 gap-3">
 		<div>
-			<h1 class="text-3xl font-bold text-gray-800">Budget Planner</h1>
-			<p class="text-gray-600 mt-1">Manage and track your property renovation budgets</p>
+			<h1 class="text-2xl sm:text-3xl font-bold text-foreground">Budget Planner</h1>
+			<p class="text-muted-foreground mt-1">Manage and track your property renovation budgets</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<Button onclick={refreshData} variant="outline" size="sm" class="flex items-center gap-1">
+			<Button onclick={refreshData} variant="outline" size="sm" class="flex items-center gap-1 min-h-[44px]">
 				<RefreshCw class="h-4 w-4" />
 				Refresh
 			</Button>
-			<Button onclick={handleAddBudget} variant="default" size="sm" class="flex items-center gap-1">
-				<Plus class="h-4 w-4" />
-				Add Project
+			<Button onclick={handleAddBudget} variant="default" size="sm" class="flex items-center gap-1 min-h-[44px]" disabled={isSubmitting}>
+				{#if isSubmitting}
+					<Loader2 class="h-4 w-4 animate-spin" />
+					Saving...
+				{:else}
+					<Plus class="h-4 w-4" />
+					Add Project
+				{/if}
 			</Button>
 		</div>
 	</div>
 
+	<!-- Search -->
+	<div class="relative max-w-md mb-6">
+		<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+		<Input
+			type="text"
+			placeholder="Search budgets..."
+			class="pl-9 min-h-[44px]"
+			value={searchInput}
+			oninput={handleSearchInput}
+		/>
+	</div>
+
 	<!-- Compact Statistics Summary -->
-	<Card class="bg-white shadow-md border border-gray-200 rounded-lg overflow-hidden mb-8">
-		<div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200">
+	<Card class="bg-white shadow-md border border-border rounded-lg overflow-hidden mb-8">
+		<div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
 			<!-- Total Budget Column -->
 			<div class="p-4 flex items-center flex-1">
 				<div class="rounded-full bg-emerald-100 p-2 mr-3 flex-shrink-0">
 					<DollarSign class="h-5 w-5 text-emerald-600" />
 				</div>
 				<div>
-					<div class="text-sm font-medium text-gray-500 mb-0.5">Total Budget</div>
-					<div class="text-xl font-bold">{formatCurrency(statistics.totalPlannedBudget)}</div>
+					<div class="text-sm font-medium text-muted-foreground mb-0.5">Total Budget</div>
+					<div class="text-xl font-bold tabular-nums">{formatCurrency(statistics.totalPlannedBudget)}</div>
 				</div>
 			</div>
 
@@ -391,7 +483,7 @@
 				<div class="flex justify-between items-center mb-1">
 					<div class="flex items-center">
 						<PieChart class="h-4 w-4 text-blue-600 mr-1.5" />
-						<span class="text-sm font-medium text-gray-500">Distribution</span>
+						<span class="text-sm font-medium text-muted-foreground">Distribution</span>
 					</div>
 					{#if statistics.totalPlannedBudget > 0}
 						{@const allocatedPercentage = Math.min(
@@ -425,7 +517,7 @@
 						)}
 					/>
 
-					<div class="flex justify-between items-center text-xs">
+					<div class="flex justify-between items-center text-xs tabular-nums">
 						<span>{formatCurrency(statistics.totalAllocatedBudget)}</span>
 						<span
 							class={cn(
@@ -439,7 +531,7 @@
 						</span>
 					</div>
 				{:else}
-					<div class="text-xs text-gray-500">No planned budget</div>
+					<div class="text-xs text-muted-foreground">No planned budget</div>
 				{/if}
 			</div>
 
@@ -447,7 +539,7 @@
 			<div class="p-4 flex-1">
 				<div class="flex items-center mb-1.5">
 					<CalendarRange class="h-4 w-4 text-purple-600 mr-1.5" />
-					<span class="text-sm font-medium text-gray-500">Project Status</span>
+					<span class="text-sm font-medium text-muted-foreground">Project Status</span>
 				</div>
 
 				<div class="flex gap-3 mb-1.5">
@@ -455,7 +547,7 @@
 						<span class="h-5 w-5 rounded-full bg-green-100 mr-1.5 flex items-center justify-center">
 							<CheckCircle class="h-3 w-3 text-green-600" />
 						</span>
-						<span class="text-sm font-semibold">{statistics.completedProjects}</span>
+						<span class="text-sm font-semibold tabular-nums">{statistics.completedProjects}</span>
 					</div>
 					<div class="flex items-center">
 						<span
@@ -463,7 +555,7 @@
 						>
 							<Clock class="h-3 w-3 text-yellow-600" />
 						</span>
-						<span class="text-sm font-semibold">{statistics.ongoingProjects}</span>
+						<span class="text-sm font-semibold tabular-nums">{statistics.ongoingProjects}</span>
 					</div>
 				</div>
 
@@ -475,10 +567,10 @@
 					)}
 					<div class="flex items-center gap-2">
 						<Progress value={completionPercentage} class="h-1.5 flex-1" />
-						<span class="text-xs text-gray-500">{completionPercentage}%</span>
+						<span class="text-xs text-muted-foreground">{completionPercentage}%</span>
 					</div>
 				{:else}
-					<div class="text-xs text-gray-500">No active projects</div>
+					<div class="text-xs text-muted-foreground">No active projects</div>
 				{/if}
 			</div>
 		</div>
@@ -487,6 +579,7 @@
 	<!-- Hidden form for submitting budget data -->
 	<form id="budget-form" method="POST" action="?/upsert" use:enhance>
 		<input type="hidden" name="id" value={$form.id} />
+		<input type="hidden" name="_updated_at" value={editUpdatedAt ?? ''} />
 		<input type="hidden" name="property_id" value={$form.property_id} />
 		<input type="hidden" name="project_name" value={$form.project_name} />
 		<input type="hidden" name="project_description" value={$form.project_description} />
@@ -510,14 +603,14 @@
 	<div class="mb-6">
 		{#if isLoading}
 			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
-				<RefreshCw class="h-12 w-12 mx-auto text-gray-400 animate-spin" />
-				<h3 class="mt-2 text-lg font-medium text-gray-900">Loading budgets...</h3>
+				<RefreshCw class="h-12 w-12 mx-auto text-muted-foreground animate-spin" />
+				<h3 class="mt-2 text-lg font-medium text-foreground">Loading budgets...</h3>
 			</div>
 		{:else if budgets.length === 0}
 			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
-				<DollarSign class="h-12 w-12 mx-auto text-gray-400" />
-				<h3 class="mt-2 text-lg font-medium text-gray-900">No budget projects</h3>
-				<p class="mt-1 text-sm text-gray-500">Get started by creating your first budget project.</p>
+				<DollarSign class="h-12 w-12 mx-auto text-muted-foreground" />
+				<h3 class="mt-2 text-lg font-medium text-foreground">No budget projects</h3>
+				<p class="mt-1 text-sm text-muted-foreground">Get started by creating your first budget project.</p>
 				<div class="mt-6">
 					<Button onclick={handleAddBudget} class="flex items-center gap-1 mx-auto">
 						<Plus class="h-4 w-4" />
@@ -525,19 +618,37 @@
 					</Button>
 				</div>
 			</div>
+		{:else if filteredBudgets.length === 0}
+			<div class="bg-white rounded-lg shadow-sm p-8 text-center border">
+				<Search class="h-12 w-12 mx-auto text-muted-foreground" />
+				<h3 class="mt-2 text-lg font-medium text-foreground">No matching budgets</h3>
+				<p class="mt-1 text-sm text-muted-foreground">Try adjusting your search terms.</p>
+			</div>
 		{:else}
 			<div class="grid grid-cols-1 gap-6">
-				{#each budgets as budget (budget.id)}
+				{#each pagedBudgets as budget (budget.id)}
 					<BudgetProjectCard
 						{budget}
 						{formatCurrency}
-						{getStatusColor}
 						onEdit={() => handleEditBudget(budget)}
 						onDelete={() => handleDeleteBudget(budget.id)}
 						onAddItem={() => handleAddItem(budget.id)}
 					/>
 				{/each}
 			</div>
+
+			<!-- Pagination -->
+			{#if totalPages > 1}
+				<div class="flex items-center justify-between mt-6">
+					<span class="text-sm text-muted-foreground tabular-nums">
+						{filteredBudgets.length} budget{filteredBudgets.length !== 1 ? 's' : ''} · Page {currentPage} of {totalPages}
+					</span>
+					<div class="flex gap-2">
+						<Button variant="outline" size="sm" class="min-h-[44px]" disabled={currentPage <= 1} onclick={() => currentPage--}>Previous</Button>
+						<Button variant="outline" size="sm" class="min-h-[44px]" disabled={currentPage >= totalPages} onclick={() => currentPage++}>Next</Button>
+					</div>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>
@@ -569,12 +680,12 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>Delete Budget</AlertDialog.Title>
 			<AlertDialog.Description>
-				Are you sure you want to delete this budget? This action cannot be undone.
+				Are you sure you want to delete this budget? It will be archived and removed from your active list.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; budgetToDeleteId = null; }}>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={confirmDeleteBudget}>Continue</AlertDialog.Action>
+			<AlertDialog.Action onclick={confirmDeleteBudget} class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

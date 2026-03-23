@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
@@ -45,14 +44,14 @@
 
 <Card.Root class="mb-6">
 	<Card.Header class="pb-2">
-		<div class="flex items-center justify-between">
+		<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
 			<div>
 				<Card.Title class="text-lg">Filter Readings</Card.Title>
 				<Card.Description>Select criteria to filter the readings table</Card.Description>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2 w-full sm:w-auto">
 				<Button
-					class="flex items-center gap-2"
+					class="flex items-center gap-2 flex-1 sm:flex-initial min-h-[44px]"
 					size="sm"
 					disabled={!selectedProperty || !filters.type}
 					onclick={() => addReadings()}
@@ -65,7 +64,7 @@
 						Add Meter Readings
 					{/if}
 				</Button>
-				<Button variant="ghost" onclick={resetFilters}>Reset</Button>
+				<Button variant="ghost" class="min-h-[44px]" onclick={resetFilters}>Reset</Button>
 			</div>
 		</div>
 	</Card.Header>
@@ -79,7 +78,7 @@
 					type="text"
 					readonly
 					value={selectedProperty ? selectedProperty.name : 'No property selected'}
-					class="w-full bg-gray-100 cursor-not-allowed"
+					class="w-full bg-muted cursor-not-allowed"
 				/>
 			</div>
 

@@ -39,7 +39,8 @@ const ALL_SOFT_DELETE_COLLECTIONS = [
 	'payment_allocations',
 	'expenses',
 	'budgets',
-	'penalty_configs'
+	'penalty_configs',
+	'floor_layout_items'
 ];
 
 /**
@@ -74,7 +75,7 @@ export async function pruneOldRecords(): Promise<{ collection: string; pruned: n
 			if (oldDocs.length > 0) {
 				await collection.bulkRemove(oldDocs.map((d: any) => d.id));
 				// D5: flush RxDB internal tombstones immediately after removal
-				await collection.cleanup(0);
+				await collection.cleanup(0).catch(() => {/* storage may be closed during HMR */});
 				results.push({ collection: name, pruned: oldDocs.length });
 			}
 		} catch (err) {
@@ -100,7 +101,7 @@ export async function pruneOldRecords(): Promise<{ collection: string; pruned: n
 			if (softDeleted.length > 0) {
 				await collection.bulkRemove(softDeleted.map((d: any) => d.id));
 				// D5: flush RxDB internal tombstones immediately after removal
-				await collection.cleanup(0);
+				await collection.cleanup(0).catch(() => {/* storage may be closed during HMR */});
 				results.push({ collection: `${name}:soft_deleted`, pruned: softDeleted.length });
 			}
 		} catch (err) {

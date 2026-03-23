@@ -22,6 +22,7 @@
 	import { z } from 'zod/v3';
 	import type { SuperForm } from 'sveltekit-superforms';
 	import { securityDepositSchema } from './securityDepositSchema';
+	import { getStatusClasses } from '$lib/utils/format';
 
 	type SecurityDepositForm = z.infer<typeof securityDepositSchema>;
 
@@ -189,20 +190,6 @@
 		});
 	};
 
-	const getStatusBadgeClass = (status: string) => {
-		switch (status) {
-			case 'PAID':
-				return 'bg-green-100 text-green-800';
-			case 'PENDING':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'OVERDUE':
-				return 'bg-red-100 text-red-800';
-			case 'PARTIAL':
-				return 'bg-blue-100 text-blue-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	};
 
 	// Calculate security deposit usage (when security deposit money is used for other billings)
 	let securityDepositUsage = $derived(() => {
@@ -363,7 +350,7 @@
 									<div class="flex items-center gap-2 mb-1">
 										<span class="font-medium">{formatCurrency(deposit.amount)}</span>
 										<span
-											class={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(deposit.status)}`}
+											class={`px-2 py-1 rounded-full text-xs font-medium ${getStatusClasses(deposit.status)}`}
 										>
 											{deposit.status}
 										</span>

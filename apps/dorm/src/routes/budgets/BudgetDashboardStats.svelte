@@ -49,7 +49,7 @@
 					<DollarSign class="h-6 w-6 text-green-600" />
 				</div>
 				<div>
-					<p class="text-sm font-medium text-gray-500">Total Budget</p>
+					<p class="text-sm font-medium text-muted-foreground">Total Budget</p>
 					<p class="text-2xl font-bold mt-1">{formatCurrency(statistics.totalPlannedBudget)}</p>
 				</div>
 			</div>
@@ -59,7 +59,7 @@
 				<div class="flex justify-between items-center mb-2">
 					<div class="flex items-center">
 						<BarChart3 class="h-5 w-5 text-blue-600 mr-2" />
-						<span class="text-sm font-medium text-gray-500">Budget Distribution</span>
+						<span class="text-sm font-medium text-muted-foreground">Budget Distribution</span>
 					</div>
 					<span class="text-xs font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-700">
 						{allocatedPercentage}% Allocated
@@ -70,11 +70,11 @@
 
 				<div class="grid grid-cols-2 gap-2 mt-3">
 					<div>
-						<p class="text-xs text-gray-500">Allocated</p>
+						<p class="text-xs text-muted-foreground">Allocated</p>
 						<p class="text-sm font-semibold">{formatCurrency(statistics.totalAllocatedBudget)}</p>
 					</div>
 					<div class="text-right">
-						<p class="text-xs text-gray-500">Remaining</p>
+						<p class="text-xs text-muted-foreground">Remaining</p>
 						<p
 							class={cn('text-sm font-semibold', isOverBudget ? 'text-red-600' : 'text-green-600')}
 						>
@@ -95,7 +95,7 @@
 				<div class="flex justify-between items-center mb-3">
 					<div class="flex items-center">
 						<TrendingUp class="h-5 w-5 text-purple-600 mr-2" />
-						<span class="text-sm font-medium text-gray-500">Project Status</span>
+						<span class="text-sm font-medium text-muted-foreground">Project Status</span>
 					</div>
 					{#if totalProjects > 0}
 						<span class="text-xs font-medium px-2 py-1 rounded-full bg-purple-100 text-purple-700">
@@ -110,7 +110,7 @@
 							<CheckCircle class="h-4 w-4 text-green-600" />
 						</div>
 						<div>
-							<p class="text-xs text-gray-500">Completed</p>
+							<p class="text-xs text-muted-foreground">Completed</p>
 							<p class="text-lg font-bold">{statistics.completedProjects}</p>
 						</div>
 					</div>
@@ -119,14 +119,14 @@
 							<Clock class="h-4 w-4 text-yellow-600" />
 						</div>
 						<div>
-							<p class="text-xs text-gray-500">Ongoing</p>
+							<p class="text-xs text-muted-foreground">Ongoing</p>
 							<p class="text-lg font-bold">{statistics.ongoingProjects}</p>
 						</div>
 					</div>
 				</div>
 
 				{#if totalProjects === 0}
-					<div class="text-xs text-gray-500 mt-1">No active projects</div>
+					<div class="text-xs text-muted-foreground mt-1">No active projects</div>
 				{/if}
 			</div>
 		</div>

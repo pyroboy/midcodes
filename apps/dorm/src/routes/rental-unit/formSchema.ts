@@ -83,7 +83,8 @@ const baseRental_UnitSchema = z.object({
 			required_error: 'Capacity is required',
 			invalid_type_error: 'Capacity must be a valid number'
 		})
-		.min(1, 'Capacity must be at least 1'),
+		.min(1, 'Capacity must be at least 1')
+		.default(1),
 	base_rate: z.coerce
 		.number({
 			required_error: 'Base rate is required',

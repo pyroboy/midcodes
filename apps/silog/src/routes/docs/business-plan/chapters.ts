@@ -14,6 +14,11 @@ export const chapters = [
     { slug: '14-printable-logs', title: '14 Ops Logs' },
     { slug: '16-daily-checklists', title: '16 Daily Checklists' },
     { slug: '17-contingency', title: '17 Contingency Plan' },
-    { slug: '18-complaint-handling', title: '18 Complaint Handling' }
+    { slug: '18-complaint-handling', title: '18 Complaint Handling' },
+    { slug: '19-social-media', title: '19 Social Media Strategy' },
+    { slug: '20-delivery-economics', title: '20 Delivery Platform Economics' },
+    { slug: '21-seasonal-plan', title: '21 Seasonal Revenue Plan' },
+    { slug: '22-growth-roadmap', title: '22 Growth Roadmap' },
+    { slug: '23-legal-compliance', title: '23 Legal & Compliance' }
 ];
 

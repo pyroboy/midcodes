@@ -1,0 +1,326 @@
+- generic:
+  - generic:
+    - link "Skip to content":
+      - /url: "#main-content"
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - button "Toggle Sidebar":
+                - img
+                - generic: Toggle Sidebar
+              - generic:
+                - generic:
+                  - img
+                  - button "DA Tirol Dormitory":
+                    - generic: DA Tirol Dormitory
+                    - img
+                - generic:
+                  - button "Notifications":
+                    - img
+                - button "Open sync status details":
+                  - img
+                  - img
+                - link "3D View":
+                  - /url: /property/5/floorplan
+                  - img
+                  - text: 3D View
+          - generic:
+            - main:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                      - generic:
+                        - heading "Rental Units" [level=1]
+                        - paragraph: 12 units · 1 vacant
+                    - button "Add Unit":
+                      - img
+                      - text: Add Unit
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - img
+                          - textbox "Search units by name or number..."
+                        - generic:
+                          - button "All Floors":
+                            - text: All Floors
+                            - img
+                          - button "All Types":
+                            - text: All Types
+                            - img
+                          - button "All Statuses":
+                            - text: All Statuses
+                            - img
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "3F-Room 6" [level=3]
+                                  - generic: "#12"
+                                - generic:
+                                  - generic: Floor 3
+                                  - generic: "|"
+                                  - generic: Private Room
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱5,000.00/mo
+                              - generic:
+                                - button "Edit 3F-Room 6":
+                                  - img
+                                - button "Delete 3F-Room 6":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "3F-Room 1" [level=3]
+                                  - generic: "#1"
+                                - generic:
+                                  - generic: Floor 3
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱2,000.00/mo
+                              - generic:
+                                - button "Edit 3F-Room 1":
+                                  - img
+                                - button "Delete 3F-Room 1":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "3F-Room 2" [level=3]
+                                  - generic: "#2"
+                                - generic:
+                                  - generic: Floor 3
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱2,000.00/mo
+                              - generic:
+                                - button "Edit 3F-Room 2":
+                                  - img
+                                - button "Delete 3F-Room 2":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "3F-Room 3" [level=3]
+                                  - generic: "#3"
+                                - generic:
+                                  - generic: Floor 3
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱2,000.00/mo
+                              - generic:
+                                - button "Edit 3F-Room 3":
+                                  - img
+                                - button "Delete 3F-Room 3":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "3F-Room 4" [level=3]
+                                  - generic: "#4"
+                                - generic:
+                                  - generic: Floor 3
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱1,500.00/mo
+                              - generic:
+                                - button "Edit 3F-Room 4":
+                                  - img
+                                - button "Delete 3F-Room 4":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "3F-Room 5" [level=3]
+                                  - generic: "#5"
+                                - generic:
+                                  - generic: Floor 3
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱2,500.00/mo
+                              - generic:
+                                - button "Edit 3F-Room 5":
+                                  - img
+                                - button "Delete 3F-Room 5":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "3F -Room 7" [level=3]
+                                  - generic: "#412412"
+                                - generic:
+                                  - generic: Floor 3
+                                  - generic: "|"
+                                  - generic: "1232"
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱5,000.00/mo
+                              - generic:
+                                - button "Edit 3F -Room 7":
+                                  - img
+                                - button "Delete 3F -Room 7":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "2F-Room 1" [level=3]
+                                  - generic: "#1"
+                                - generic:
+                                  - generic: Floor 2
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱1,250.00/mo
+                              - generic:
+                                - button "Edit 2F-Room 1":
+                                  - img
+                                - button "Delete 2F-Room 1":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "2F-Room 2" [level=3]
+                                  - generic: "#2"
+                                - generic:
+                                  - generic: Floor 2
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱2,000.00/mo
+                              - generic:
+                                - button "Edit 2F-Room 2":
+                                  - img
+                                - button "Delete 2F-Room 2":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "2F-Room 3" [level=3]
+                                  - generic: "#3"
+                                - generic:
+                                  - generic: Floor 2
+                                  - generic: "|"
+                                  - generic: Dormitory
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱1,700.00/mo
+                              - generic:
+                                - button "Edit 2F-Room 3":
+                                  - img
+                                - button "Delete 2F-Room 3":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "2F-Room 5" [level=3]
+                                  - generic: "#112"
+                                - generic:
+                                  - generic: Floor 2
+                                  - generic: "|"
+                                  - generic: Private
+                                - generic:
+                                  - generic: Occupied
+                                  - generic: ₱0.00/mo
+                              - generic:
+                                - button "Edit 2F-Room 5":
+                                  - img
+                                - button "Delete 2F-Room 5":
+                                  - img
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - heading "2F-Room 4" [level=3]
+                                  - generic: "#22"
+                                - generic:
+                                  - generic: Floor 2
+                                  - generic: "|"
+                                  - generic: Private
+                                - generic:
+                                  - generic: Vacant
+                                  - generic: ₱0.00/mo
+                              - generic:
+                                - button "Edit 2F-Room 4":
+                                  - img
+                                - button "Delete 2F-Room 4":
+                                  - img
+  - dialog "Create Rental Unit" [ref=e588]:
+    - generic [ref=e589]:
+      - heading "Create Rental Unit" [level=2] [ref=e590]
+      - generic [ref=e591]: Fill in the details below to add a new rental unit.
+    - generic [ref=e592]:
+      - generic [ref=e593]:
+        - generic [ref=e594]:
+          - generic [ref=e595]: Floor *
+          - button "Select a floor" [active] [ref=e596] [cursor=pointer]:
+            - text: Select a floor
+            - img [ref=e597]
+        - generic [ref=e598]:
+          - generic [ref=e599]: Unit Name *
+          - textbox "Unit Name *" [ref=e600]:
+            - /placeholder: e.g. Room 101
+      - generic [ref=e601]:
+        - generic [ref=e602]:
+          - generic [ref=e603]: Unit Number *
+          - spinbutton "Unit Number *" [ref=e604]
+        - generic [ref=e605]:
+          - generic [ref=e606]: Type *
+          - button "Select type" [ref=e607] [cursor=pointer]:
+            - text: Select type
+            - img [ref=e608]
+      - generic [ref=e609]:
+        - generic [ref=e610]:
+          - generic [ref=e611]: Capacity *
+          - spinbutton "Capacity *" [ref=e612]: "1"
+        - generic [ref=e613]:
+          - generic [ref=e614]: Base Rate (₱) *
+          - spinbutton "Base Rate (₱) *" [ref=e615]
+      - generic [ref=e616]:
+        - generic [ref=e617]: Occupancy Status
+        - button "VACANT" [ref=e618] [cursor=pointer]:
+          - text: VACANT
+          - img [ref=e619]
+      - generic [ref=e620]:
+        - generic [ref=e621]: Amenities
+        - generic [ref=e622]:
+          - textbox "e.g. Aircon, Heater, Cabinet" [ref=e623]
+          - button [ref=e624] [cursor=pointer]:
+            - img
+        - paragraph [ref=e625]: No amenities added yet.
+      - generic [ref=e626]:
+        - button "Cancel" [ref=e627] [cursor=pointer]
+        - button "Create Unit" [ref=e628] [cursor=pointer]
+    - button "Close" [ref=e629] [cursor=pointer]:
+      - img [ref=e630]
+      - generic [ref=e631]: Close

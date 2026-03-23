@@ -13,14 +13,19 @@
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from '../rental-unit/formSchema';
 	import { Pencil, Trash2, Users, Tag, List, Search, Home, Building2 } from 'lucide-svelte';
+	import { getStatusClasses, formatCurrency, humanizeType } from '$lib/utils/format';
 	import {
 		rentalUnitsStore,
 		propertiesStore,
 		floorsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
-	import { resyncCollection } from '$lib/db/replication';
+	import { bgResync, bufferedMutation } from '$lib/db/optimistic-utils';
 	import { toast } from 'svelte-sonner';
+
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let savedEditMode = false;
 
 	interface Props {
 		rentalUnitForm: any;
@@ -102,32 +107,36 @@
 		validationMethod: 'oninput',
 		dataType: 'json',
 		resetForm: true,
+		onSubmit: () => {
+			savedFormData = { ...$formData };
+			savedEditMode = editMode;
+		},
 		onError: ({ result }) => {
 			toast.error('Error saving rental unit');
 		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
-				toast.success(editMode ? 'Rental unit updated' : 'Rental unit created');
+				const serverData = (result as any).data?.form?.data;
+				const fd = serverData ?? savedFormData;
+				toast.success(savedEditMode ? 'Rental unit updated' : 'Rental unit created');
 				showModal = false;
-				const d = $formData;
-				if (d.id) {
+				if (fd?.id) {
 					await optimisticUpsertRentalUnit({
-						id: d.id,
-						name: d.name,
-						number: d.number,
-						capacity: d.capacity,
-						rental_unit_status: d.rental_unit_status,
-						base_rate: String(d.base_rate),
-						property_id: d.property_id,
-						floor_id: d.floor_id,
-						type: d.type,
-						amenities: d.amenities
+						id: fd.id,
+						name: fd.name,
+						number: fd.number,
+						capacity: fd.capacity,
+						rental_unit_status: fd.rental_unit_status,
+						base_rate: String(fd.base_rate),
+						property_id: fd.property_id,
+						floor_id: fd.floor_id,
+						type: fd.type,
+						amenities: fd.amenities
 					});
 				} else {
-					resyncCollection('rental_units').catch((err) =>
-						console.warn('[RentalUnit] Background resync failed:', err)
-					);
+					bgResync('rental_units');
 				}
+				savedFormData = null;
 			}
 		}
 	});
@@ -190,46 +199,31 @@
 		showDeleteDialog = false;
 		rentalUnitToDelete = null;
 
-		await optimisticDeleteRentalUnit(unit.id);
-
 		const deleteData = new FormData();
 		deleteData.append('id', String(unit.id));
 
-		try {
-			const result = await fetch('?/unitDelete', {
-				method: 'POST',
-				body: deleteData
-			});
-
-			if (!result.ok) {
-				const resp = await result.json();
-				toast.error(resp.message || 'Failed to delete rental unit');
-				resyncCollection('rental_units').catch((err) =>
-					console.warn('[RentalUnit] Resync after failed delete:', err)
-				);
-			} else {
+		await bufferedMutation({
+			label: `Delete Unit #${unit.id}`,
+			collection: 'rental_units',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteRentalUnit(unit.id);
+			},
+			serverAction: async () => {
+				const response = await fetch('?/unitDelete', {
+					method: 'POST',
+					body: deleteData
+				});
+				if (!response.ok) throw new Error('Server rejected delete');
+				return response;
+			},
+			onSuccess: async () => {
 				toast.success('Rental unit deleted');
+			},
+			onFailure: async () => {
+				toast.error('Failed to delete rental unit');
 			}
-		} catch (error) {
-			console.error(error);
-			toast.error('An unexpected error occurred');
-			resyncCollection('rental_units').catch((err) =>
-				console.warn('[RentalUnit] Resync after error:', err)
-			);
-		}
-	}
-
-	function getStatusVariant(status: string) {
-		switch (status) {
-			case 'VACANT':
-				return 'secondary';
-			case 'OCCUPIED':
-				return 'default';
-			case 'RESERVED':
-				return 'outline';
-			default:
-				return 'default';
-		}
+		});
 	}
 
 	function handleModalChange(open: boolean) {
@@ -247,7 +241,7 @@
 		<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
 		<Input
 			placeholder="Search units by name or number..."
-			class="pl-9 bg-white"
+			class="pl-9"
 			bind:value={searchQuery}
 		/>
 	</div>
@@ -295,7 +289,7 @@
 			{:else}
 				<!-- List Header -->
 				<div
-					class="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-gray-50/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider"
+					class="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider"
 				>
 					<div>Unit Details</div>
 					<div>Floor</div>
@@ -308,38 +302,33 @@
 				<Accordion.Root type="single" class="divide-y divide-gray-100">
 					{#each filteredRentalUnits as unit (unit.id)}
 						<Accordion.Item value={unit.id.toString()} class="border-b-0 group">
-							<div class="flex items-center w-full hover:bg-gray-50/50 transition-colors">
-								<Accordion.Trigger class="flex-grow px-6 py-4 hover:no-underline">
-									<div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr] gap-4 items-center w-full text-sm">
-										<div class="text-left">
-											<div class="font-semibold text-gray-900">{unit.name}</div>
-											<div class="text-xs text-muted-foreground mt-0.5">
-												Unit #{unit.number}
-											</div>
-										</div>
-										<div class="text-left text-gray-600 hidden sm:block">
-											Floor {unit.floor?.floor_number}
-										</div>
-										<div class="text-left hidden sm:block">
-											<span
-												class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-700"
-											>
-												{unit.type}
-											</span>
-										</div>
-										<div class="text-left hidden sm:block">
-											<Badge
-												variant={getStatusVariant(unit.rental_unit_status)}
-												class="shadow-none"
-											>
-												{unit.rental_unit_status}
-											</Badge>
-										</div>
+							<div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-6 py-4 hover:bg-muted/50 transition-colors text-sm">
+								<Accordion.Trigger class="text-left hover:no-underline p-0">
+									<div class="font-semibold text-gray-900">{unit.name}</div>
+									<div class="text-xs text-muted-foreground mt-0.5">
+										Unit #{unit.number}
 									</div>
 								</Accordion.Trigger>
+								<div class="text-left text-gray-600 hidden sm:block">
+									Floor {unit.floor?.floor_number}
+								</div>
+								<div class="text-left hidden sm:block">
+									<span
+										class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-700"
+									>
+										{humanizeType(unit.type)}
+									</span>
+								</div>
+								<div class="text-left hidden sm:block">
+									<Badge
+										class="{getStatusClasses(unit.rental_unit_status)} shadow-none"
+									>
+										{unit.rental_unit_status}
+									</Badge>
+								</div>
 
 								<!-- Actions -->
-								<div class="flex items-center gap-1 px-6">
+								<div class="flex items-center justify-end gap-1">
 									<Button
 										variant="ghost"
 										size="icon"
@@ -364,7 +353,6 @@
 									</Button>
 								</div>
 							</div>
-
 							<Accordion.Content>
 								<div class="px-6 pb-6 pt-2 bg-gray-50/30">
 									<div
@@ -387,7 +375,7 @@
 											<div>
 												<p class="text-sm font-medium text-gray-900">Base Rate</p>
 												<p class="text-sm text-muted-foreground">
-													₱{unit.base_rate.toLocaleString()} / month
+													{formatCurrency(Number(unit.base_rate))} / month
 												</p>
 											</div>
 										</div>

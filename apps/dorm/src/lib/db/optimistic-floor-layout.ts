@@ -1,6 +1,41 @@
 import { getDb } from '$lib/db';
 import { syncStatus } from '$lib/stores/sync-status.svelte';
 
+// ─── Validation Constants ────────────────────────────────────────────────────
+
+const VALID_ITEM_TYPES = new Set([
+	'RENTAL_UNIT', 'CORRIDOR', 'BATHROOM', 'KITCHEN', 'COMMON_ROOM',
+	'STAIRWELL', 'ELEVATOR', 'STORAGE', 'OFFICE', 'CUSTOM',
+	'WALL', 'DOOR', 'WINDOW'
+]);
+
+const GRID_MIN = -9999;
+const GRID_MAX = 9999;
+const SIZE_MAX = 999;
+
+/**
+ * Validate floor layout item data before writing to RxDB.
+ * Returns an error message if invalid, null if valid.
+ */
+export function validateFloorLayoutItem(data: {
+	id: number;
+	floor_id: number;
+	item_type: string;
+	grid_x: number;
+	grid_y: number;
+	grid_w: number;
+	grid_h: number;
+}): string | null {
+	if (!Number.isFinite(data.id) || data.id === 0) return `Invalid id: ${data.id}`;
+	if (!Number.isFinite(data.floor_id) || data.floor_id <= 0) return `Invalid floor_id: ${data.floor_id}`;
+	if (!VALID_ITEM_TYPES.has(data.item_type)) return `Invalid item_type: ${data.item_type}`;
+	if (!Number.isInteger(data.grid_x) || data.grid_x < GRID_MIN || data.grid_x > GRID_MAX) return `grid_x out of bounds: ${data.grid_x}`;
+	if (!Number.isInteger(data.grid_y) || data.grid_y < GRID_MIN || data.grid_y > GRID_MAX) return `grid_y out of bounds: ${data.grid_y}`;
+	if (!Number.isInteger(data.grid_w) || data.grid_w < 0 || data.grid_w > SIZE_MAX) return `grid_w out of bounds: ${data.grid_w}`;
+	if (!Number.isInteger(data.grid_h) || data.grid_h < 0 || data.grid_h > SIZE_MAX) return `grid_h out of bounds: ${data.grid_h}`;
+	return null;
+}
+
 export async function optimisticUpsertFloorLayoutItem(data: {
 	id: number;
 	floor_id: number;
@@ -13,6 +48,14 @@ export async function optimisticUpsertFloorLayoutItem(data: {
 	label?: string | null;
 	color?: string | null;
 }): Promise<(() => Promise<void>) | null> {
+	// Validate before writing
+	const validationError = validateFloorLayoutItem(data);
+	if (validationError) {
+		console.warn(`[Optimistic] Floor layout item validation failed: ${validationError}`);
+		syncStatus.addLog(`Optimistic: floor_layout_item #${data.id} rejected — ${validationError}`, 'warn');
+		return null;
+	}
+
 	console.log(`[Optimistic] floor_layout_item #${data.id} → writing to RxDB...`);
 	syncStatus.addLog(`Optimistic: floor_layout_item #${data.id} → writing to RxDB...`, 'info');
 	let snapshot: Record<string, any> | null = null;
@@ -63,23 +106,29 @@ export async function optimisticUpsertFloorLayoutItem(data: {
 	};
 }
 
-export async function optimisticDeleteFloorLayoutItem(itemId: number) {
-	console.log(`[Optimistic] floor_layout_item #${itemId} → soft-deleting in RxDB...`);
-	syncStatus.addLog(`Optimistic: floor_layout_item #${itemId} → soft-deleting in RxDB...`, 'info');
+export async function optimisticDeleteFloorLayoutItem(itemId: number | string) {
+	const sid = String(itemId);
+	if (!sid || sid === 'undefined' || sid === 'null' || sid === 'NaN') {
+		console.warn(`[Optimistic] FloorLayoutItem delete skipped — invalid id: ${itemId}`);
+		syncStatus.addLog(`Optimistic: floor_layout_item delete skipped — invalid id: ${itemId}`, 'warn');
+		return;
+	}
+	console.log(`[Optimistic] floor_layout_item #${sid} → soft-deleting in RxDB...`);
+	syncStatus.addLog(`Optimistic: floor_layout_item #${sid} → soft-deleting in RxDB...`, 'info');
 	try {
 		const db = await getDb();
-		const doc = await db.floor_layout_items.findOne(String(itemId)).exec();
+		const doc = await db.floor_layout_items.findOne(sid).exec();
 		if (doc) {
 			await doc.incrementalPatch({
 				deleted_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
 			});
 		}
-		console.log(`[Optimistic] floor_layout_item #${itemId} soft-deleted ✓`);
-		syncStatus.addLog(`Optimistic: floor_layout_item #${itemId} soft-deleted ✓`, 'success');
+		console.log(`[Optimistic] floor_layout_item #${sid} soft-deleted ✓`);
+		syncStatus.addLog(`Optimistic: floor_layout_item #${sid} soft-deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Floor layout item delete failed:', err);
-		syncStatus.addLog(`Optimistic: floor_layout_item #${itemId} delete failed — ${(err as Error)?.message || err}`, 'error');
+		syncStatus.addLog(`Optimistic: floor_layout_item #${sid} delete failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	// Note: bgResync is NOT called here — bufferedMutation handles resync on server confirm/fail
 }

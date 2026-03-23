@@ -1,7 +1,18 @@
 import { replicateRxCollection, type RxReplicationState } from 'rxdb/plugins/replication';
 import type { RxDatabase } from 'rxdb';
-import { syncStatus } from '$lib/stores/sync-status.svelte';
+// firstValueFrom/filter/skip removed — replaced by awaitInSync() which handles the race correctly
+import { syncStatus, isFresh } from '$lib/stores/sync-status.svelte';
 import { mutationQueue } from '$lib/stores/mutation-queue.svelte';
+
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** Result of a resync operation — callers can inspect to show appropriate UI feedback. */
+export type ResyncResult = {
+	status: 'ok' | 'skipped' | 'partial';
+	reason?: 'neon_down' | 'not_started';
+	synced: number;
+	skipped: number;
+};
 
 /** W7: Eager collections — synced on startup */
 const EAGER_COLLECTIONS = [
@@ -57,6 +68,16 @@ const LAST_SYNC_TIME_KEY = '__dorm_last_sync_time';
 
 /** Holds the maxUpdatedAt from the current sync's health check, persisted when all collections complete. */
 let pendingServerTs: string | null = null;
+
+/**
+ * Count active (non-deleted) docs for a collection.
+ * All synced collections have `deleted_at` — filter to match what the UI shows
+ * and what the server count/integrity endpoints return.
+ */
+async function countActiveDocs(collection: any): Promise<number> {
+	const docs = await collection.find({ selector: { deleted_at: { $eq: null } } }).exec();
+	return docs.length;
+}
 
 /** W7: Reference to the database for lazy collection sync */
 let syncDb: RxDatabase | null = null;
@@ -142,18 +163,21 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 		: null;
 	if (lastSyncTime && lastKnownTs) {
 		const ageMs = Date.now() - Number(lastSyncTime);
-		if (ageMs < 5 * 60 * 1000) {
+		if (isFresh(ageMs, 5 * 60 * 1000)) {
 			console.log(`[RxSync] Cache < ${Math.round(ageMs / 1000)}s old — serving from cache`);
 			syncStatus.addLog('Serving from cache (< 5 min old)', 'success');
 			syncStatus.setNeonHealthDirect('ok');
+			// Use updateCollection (not markSynced) to avoid premature allDone trigger.
+			// markSynced's auto-detection fires on the first collection because idle=done.
+			const now = new Date().toISOString();
 			for (const name of COLLECTIONS_TO_SYNC) {
 				const collection = (db as any)[name];
 				if (!collection) continue;
 				try {
-					const count = await collection.count().exec();
-					syncStatus.markSynced(name, count);
+					const count = await countActiveDocs(collection);
+					syncStatus.updateCollection(name, { status: 'synced', docCount: count, lastSyncedAt: now, error: null, parsedError: null });
 				} catch {
-					syncStatus.markSynced(name, 0);
+					syncStatus.updateCollection(name, { status: 'synced', docCount: 0, lastSyncedAt: now, error: null, parsedError: null });
 				}
 			}
 			syncStatus.setPhase('complete');
@@ -180,15 +204,16 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 	if (maxUpdatedAt && cachedServerTs && maxUpdatedAt === cachedServerTs) {
 		console.log('[RxSync] Server unchanged — skipping all pulls');
 		syncStatus.addLog('Server unchanged — using cached data', 'success');
-		// Mark all collections as synced with their current IndexedDB counts
+		// Use updateCollection (not markSynced) to set counts without premature allDone trigger
+		const now = new Date().toISOString();
 		for (const name of COLLECTIONS_TO_SYNC) {
 			const collection = (db as any)[name];
 			if (!collection) continue;
 			try {
-				const count = await collection.count().exec();
-				syncStatus.markSynced(name, count);
+				const count = await countActiveDocs(collection);
+				syncStatus.updateCollection(name, { status: 'synced', docCount: count, lastSyncedAt: now, error: null, parsedError: null });
 			} catch {
-				syncStatus.markSynced(name, 0);
+				syncStatus.updateCollection(name, { status: 'synced', docCount: 0, lastSyncedAt: now, error: null, parsedError: null });
 			}
 		}
 		// W10: Persist sync time
@@ -321,7 +346,7 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 			if (active) {
 				lastError = false;
 			} else if (!lastError) {
-				collection.count().exec().then((count: number) => {
+				countActiveDocs(collection).then((count: number) => {
 					syncStatus.markSynced(name, count);
 					// W2: Persist maxUpdatedAt once all collections are synced
 					if (pendingServerTs && syncStatus.phase === 'complete') {
@@ -336,6 +361,17 @@ export async function startSync(db: RxDatabase): Promise<Map<string, RxReplicati
 		});
 
 		replications.set(name, repl);
+	}
+
+	// Re-sync previously-started lazy collections when server data has changed.
+	// Without this, lazy collections only pull once (on first page access) and
+	// never refresh on startup — new server records are invisible until reconcile.
+	for (const name of LAZY_COLLECTIONS) {
+		const repl = replications.get(name);
+		if (!repl) continue; // not started yet — will sync on first page access
+		syncStatus.markSyncing(name);
+		repl.reSync();
+		// No await needed — existing active$/error$ subscribers handle completion
 	}
 
 	return replications;
@@ -356,10 +392,10 @@ function cancelAllReplications() {
  *
  * W8: Automatically resyncs stale dependencies first (recursive, deduped).
  */
-export async function resyncCollection(name: string): Promise<void> {
-	if (neonDown) return;
+export async function resyncCollection(name: string): Promise<ResyncResult> {
+	if (neonDown) return { status: 'skipped', reason: 'neon_down', synced: 0, skipped: 1 };
 	const repl = replications.get(name);
-	if (!repl) return;
+	if (!repl) return { status: 'skipped', reason: 'not_started', synced: 0, skipped: 1 };
 
 	// W2: Invalidate cached server timestamp — next startup must re-check
 	if (typeof localStorage !== 'undefined') {
@@ -380,18 +416,32 @@ export async function resyncCollection(name: string): Promise<void> {
 
 	// Deduplicate: return existing in-flight promise if one exists
 	const existing = inFlightResyncs.get(name);
-	if (existing) return existing;
+	if (existing) {
+		await existing;
+		return { status: 'ok', synced: 1, skipped: 0 };
+	}
 
 	const promise = (async () => {
 		syncStatus.markSyncing(name);
-		await repl.reSync();
-		await repl.awaitInSync();
+		// reSync() is synchronous — it just flags the internal state machine.
+		// We need to wait for the pull cycle to complete (active$ goes false).
+		//
+		// Previous approach used skip(1) + filter(true) + filter(false) which
+		// raced: if the pull completed before skip(1) subscribed, firstValueFrom
+		// threw "no elements in sequence". Instead, use awaitInSync() which
+		// internally waits for the correct state, wrapped in a safety timeout.
+		repl.reSync();
+		await Promise.race([
+			repl.awaitInSync(),
+			delay(30_000) // safety: don't hang forever if pull never activates
+		]);
 	})().finally(() => {
 		inFlightResyncs.delete(name);
 	});
 
 	inFlightResyncs.set(name, promise);
-	return promise;
+	await promise;
+	return { status: 'ok', synced: 1, skipped: 0 };
 }
 
 /**
@@ -450,23 +500,252 @@ export async function ensureCollectionSynced(name: string): Promise<void> {
 	repl.active$.subscribe((active) => {
 		if (active) { lastError = false; }
 		else if (!lastError) {
-			collection.count().exec()
+			countActiveDocs(collection)
 				.then((count: number) => syncStatus.markSynced(name, count))
 				.catch(() => syncStatus.markSynced(name, 0));
 		}
 	});
 
 	replications.set(name, repl);
+
+	// Wait for the initial pull to complete before returning.
+	// Without this, callers get an empty collection because the pull
+	// hasn't finished yet (lazy collections are accessed on first page visit).
+	try {
+		await Promise.race([
+			repl.awaitInSync(),
+			delay(30_000)
+		]);
+	} catch {
+		// Don't throw — the collection is registered and will eventually sync
+		syncStatus.addLog(`Lazy sync for ${name} timed out — will retry`, 'warn');
+	}
 }
 
 /**
  * Force all collections to re-pull (manual refresh only).
  */
-export async function resyncAll(): Promise<void> {
-	if (neonDown) return;
-	await Promise.all(
+export async function resyncAll(): Promise<ResyncResult> {
+	if (neonDown) return { status: 'skipped', reason: 'neon_down', synced: 0, skipped: replications.size };
+	const results = await Promise.all(
 		Array.from(replications.keys()).map((name) => resyncCollection(name))
 	);
+	const synced = results.filter((r) => r.status === 'ok').length;
+	const skipped = results.filter((r) => r.status === 'skipped').length;
+	if (results.length > 0 && skipped === results.length) return { status: 'skipped', reason: results[0]?.reason, synced: 0, skipped };
+	if (skipped > 0) return { status: 'partial', synced, skipped };
+	return { status: 'ok', synced, skipped: 0 };
+}
+
+/**
+ * Refresh local RxDB active doc counts and update the sync status store.
+ * Counts only non-deleted records (deleted_at IS NULL) to match what the UI shows.
+ */
+export async function refreshLocalCounts(): Promise<Record<string, number>> {
+	if (!syncDb) return {};
+	const counts: Record<string, number> = {};
+	const ALL_COLLECTIONS = [
+		'properties', 'floors', 'rental_units',
+		'tenants', 'leases', 'lease_tenants', 'meters',
+		'readings', 'billings', 'payments', 'payment_allocations',
+		'expenses', 'budgets', 'penalty_configs', 'floor_layout_items'
+	];
+	for (const name of ALL_COLLECTIONS) {
+		const collection = (syncDb as any)[name];
+		if (!collection) continue;
+		try {
+			const count = await countActiveDocs(collection);
+			counts[name] = count;
+			syncStatus.updateCollection(name, { docCount: count });
+		} catch {
+			counts[name] = 0;
+		}
+	}
+	return counts;
+}
+
+/** Result of a reconciliation — per-collection breakdown of what was fixed. */
+export type ReconcileResult = {
+	status: 'ok' | 'skipped' | 'error';
+	reason?: string;
+	collections: {
+		name: string;
+		serverCount: number;
+		localCount: number;
+		orphansRemoved: number;
+		missingFetched: number;
+		inSync: boolean;
+		/** Post-fix verification: did re-count confirm match? */
+		verified: boolean;
+		verifiedLocalCount?: number;
+		verifiedServerCount?: number;
+	}[];
+	totalOrphansRemoved: number;
+	totalMissingFetched: number;
+	/** True only if post-fix verification confirmed all collections match */
+	verified: boolean;
+};
+
+/**
+ * Targeted reconciliation: compares active (non-deleted) local RxDB IDs against active server IDs.
+ * Both sides filter deleted_at IS NULL — only active records are compared.
+ * Fixes: removes orphans (local-only), fetches missing (server-only) by exact ID.
+ * After fixing, runs a verification pass to confirm local is a true mirror of server.
+ */
+export async function reconcile(): Promise<ReconcileResult> {
+	const empty: ReconcileResult = { status: 'skipped', collections: [], totalOrphansRemoved: 0, totalMissingFetched: 0, verified: false };
+	if (neonDown) return { ...empty, reason: 'Server is unreachable' };
+	if (!syncDb) return { ...empty, reason: 'Database not initialized' };
+
+	syncStatus.addLog('Reconciliation started — comparing ALL local vs server IDs', 'info');
+
+	try {
+		// ── Phase 1: Fetch server-side integrity data (ALL rows, no deleted_at filter) ──
+		const res = await fetch('/api/rxdb/integrity');
+		if (!res.ok) {
+			const msg = `Integrity endpoint failed: ${res.status}`;
+			syncStatus.addLog(msg, 'error');
+			return { ...empty, status: 'error', reason: msg };
+		}
+		const data = await res.json();
+		const serverCollections: Record<string, { count: number; ids: number[] }> = data.collections;
+
+		let totalOrphansRemoved = 0;
+		let totalMissingFetched = 0;
+		const results: ReconcileResult['collections'] = [];
+
+		// ── Phase 2: Diff and fix each collection ──
+		for (const [name, serverData] of Object.entries(serverCollections)) {
+			const collection = (syncDb as any)[name];
+			if (!collection) {
+				results.push({ name, serverCount: serverData.count, localCount: 0, orphansRemoved: 0, missingFetched: 0, inSync: false, verified: false });
+				continue;
+			}
+
+			// Get active local IDs (deleted_at IS NULL) — matches integrity endpoint filter
+			const localDocs = await collection.find({ selector: { deleted_at: { $eq: null } } }).exec();
+			const localIds = new Set<number>(localDocs.map((d: any) => Number(d.id)));
+			const serverIds = new Set<number>(serverData.ids);
+
+			// Compute diff
+			const orphanIds: number[] = [];
+			for (const id of localIds) {
+				if (!serverIds.has(id)) orphanIds.push(id);
+			}
+			const missingIds: number[] = [];
+			for (const id of serverIds) {
+				if (!localIds.has(id)) missingIds.push(id);
+			}
+
+			const inSync = orphanIds.length === 0 && missingIds.length === 0;
+
+			if (inSync) {
+				syncStatus.addLog(`${name}: ${localIds.size}/${serverData.count} — in sync`, 'success');
+				results.push({ name, serverCount: serverData.count, localCount: localIds.size, orphansRemoved: 0, missingFetched: 0, inSync: true, verified: true, verifiedLocalCount: localIds.size, verifiedServerCount: serverData.count });
+				continue;
+			}
+
+			syncStatus.addLog(`${name}: local ${localIds.size} vs server ${serverData.count} — ${orphanIds.length} orphan(s), ${missingIds.length} missing`, 'warn');
+
+			// 2a. Remove orphans from RxDB (IDs that exist locally but not on server)
+			if (orphanIds.length > 0) {
+				let removed = 0;
+				for (const id of orphanIds) {
+					try {
+						const doc = await collection.findOne(String(id)).exec();
+						if (doc) { await doc.remove(); removed++; }
+					} catch { /* already gone */ }
+				}
+				totalOrphansRemoved += removed;
+				syncStatus.addLog(`${name}: removed ${removed}/${orphanIds.length} orphan(s)`, removed === orphanIds.length ? 'success' : 'warn');
+			}
+
+			// 2b. Fetch missing rows from server by ID (IDs on server but not local)
+			if (missingIds.length > 0) {
+				let fetched = 0;
+				try {
+					// Batch in chunks of 100 to avoid URL length limits
+					for (let i = 0; i < missingIds.length; i += 100) {
+						const chunk = missingIds.slice(i, i + 100);
+						const pullRes = await fetch(`/api/rxdb/pull/${name}?ids=${chunk.join(',')}`);
+						if (pullRes.ok) {
+							const pullData = await pullRes.json();
+							for (const doc of pullData.documents || []) {
+								await collection.upsert(doc);
+								fetched++;
+							}
+						}
+					}
+					totalMissingFetched += fetched;
+					syncStatus.addLog(`${name}: fetched ${fetched}/${missingIds.length} missing row(s)`, fetched === missingIds.length ? 'success' : 'warn');
+				} catch {
+					syncStatus.addLog(`${name}: failed to fetch missing rows`, 'error');
+				}
+			}
+
+			results.push({
+				name,
+				serverCount: serverData.count,
+				localCount: localIds.size,
+				orphansRemoved: orphanIds.length,
+				missingFetched: missingIds.length,
+				inSync: false,
+				verified: false // set in verification pass
+			});
+		}
+
+		// ── Phase 3: Verification pass ──
+		// Re-count ALL local docs and compare to server total to confirm fixes worked.
+		syncStatus.addLog('Verification — re-counting ALL local docs vs server...', 'info');
+
+		let allVerified = true;
+		for (const r of results) {
+			if (r.verified) continue; // already verified (was in sync from phase 2)
+			const collection = (syncDb as any)[r.name];
+			if (!collection) { allVerified = false; continue; }
+
+			// Re-count active local docs (matching count endpoint filter)
+			const postFixCount = await countActiveDocs(collection);
+			const serverCount = serverCollections[r.name]?.count ?? 0;
+
+			r.verifiedLocalCount = postFixCount;
+			r.verifiedServerCount = serverCount;
+			r.verified = postFixCount === serverCount;
+
+			if (r.verified) {
+				syncStatus.addLog(`✓ ${r.name}: verified ${postFixCount}/${serverCount} — true mirror`, 'success');
+			} else {
+				allVerified = false;
+				syncStatus.addLog(`✗ ${r.name}: post-fix ${postFixCount} local vs ${serverCount} server — STILL MISMATCHED`, 'error');
+			}
+		}
+
+		// ── Phase 4: Refresh store doc counts so UI collection table is current ──
+		await refreshLocalCounts();
+
+		// ── Phase 5: Summary ──
+		const fixedCount = results.filter((r) => !r.inSync).length;
+		if (fixedCount === 0) {
+			syncStatus.addLog(`Reconciliation complete — all ${results.length} collections are true mirrors of server ✓`, 'success');
+		} else if (allVerified) {
+			syncStatus.addLog(
+				`Reconciliation complete — fixed ${fixedCount} collection(s): ${totalOrphansRemoved} orphan(s) removed, ${totalMissingFetched} missing fetched. All verified ✓`,
+				'success'
+			);
+		} else {
+			const unverified = results.filter((r) => !r.verified);
+			syncStatus.addLog(
+				`Reconciliation done but ${unverified.length} collection(s) still mismatched: ${unverified.map((u) => u.name).join(', ')}`,
+				'error'
+			);
+		}
+
+		return { status: 'ok', collections: results, totalOrphansRemoved, totalMissingFetched, verified: allVerified };
+	} catch (err: any) {
+		const msg = err?.message || 'Reconciliation failed';
+		syncStatus.addLog(msg, 'error');
+		return { ...empty, status: 'error', reason: msg };
+	}
 }
 
 /**

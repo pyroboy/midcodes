@@ -11,6 +11,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { Loader2 } from 'lucide-svelte';
 	import { formatCurrency } from '$lib/utils/format';
 	import type { PenaltyBilling } from './types';
 
@@ -69,7 +70,7 @@
 				<div class="grid grid-cols-4 items-center gap-4">
 					<Label for="original-amount" class="text-right">Original Amount</Label>
 					<div id="original-amount" class="col-span-3">
-						<p class="font-medium">{formatCurrency(penalty.amount)}</p>
+						<p class="font-medium tabular-nums">{formatCurrency(penalty.amount)}</p>
 					</div>
 				</div>
 
@@ -82,8 +83,10 @@
 							type="number"
 							step="0.01"
 							min="0"
+							inputmode="decimal"
+							autofocus
 							bind:value={form.penalty_amount}
-							class={errors?.penalty_amount ? 'border-red-500' : ''}
+							class="min-h-[44px] {errors?.penalty_amount ? 'border-red-500' : ''}"
 						/>
 						{#if errors?.penalty_amount}
 							<p class="text-xs text-red-500 mt-1">{errors.penalty_amount[0]}</p>
@@ -94,11 +97,11 @@
 				<div class="grid grid-cols-4 items-center gap-4">
 					<Label for="new-total" class="text-right">New Total</Label>
 					<div id="new-total" class="col-span-3">
-						<p class="font-medium">{formatCurrency(newTotal)}</p>
+						<p class="font-medium tabular-nums">{formatCurrency(newTotal)}</p>
 						{#if difference > 0}
-							<p class="text-xs text-green-600">+{formatCurrency(difference)}</p>
+							<p class="text-xs text-green-600 tabular-nums">+{formatCurrency(difference)}</p>
 						{:else if difference < 0}
-							<p class="text-xs text-red-600">{formatCurrency(difference)}</p>
+							<p class="text-xs text-red-600 tabular-nums">{formatCurrency(difference)}</p>
 						{/if}
 					</div>
 				</div>
@@ -120,10 +123,15 @@
 				</div>
 			</div>
 
-			<DialogFooter>
-				<Button type="button" variant="outline" onclick={() => onOpenChange(false)}>Cancel</Button>
-				<Button type="submit" disabled={submitting}>
-					{submitting ? 'Saving...' : 'Save Changes'}
+			<DialogFooter class="sticky bottom-0 bg-background pt-4 pb-2">
+				<Button type="button" variant="outline" class="min-h-[44px]" onclick={() => onOpenChange(false)}>Cancel</Button>
+				<Button type="submit" class="min-h-[44px]" disabled={submitting}>
+					{#if submitting}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+						Saving...
+					{:else}
+						Save Changes
+					{/if}
 				</Button>
 			</DialogFooter>
 		</form>

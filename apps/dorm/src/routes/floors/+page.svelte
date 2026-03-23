@@ -12,6 +12,7 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import type { FloorWithProperty } from './formSchema';
 	import { propertyStore } from '$lib/stores/property';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		floorsStore,
 		propertiesStore,
@@ -20,19 +21,50 @@
 		leaseTenantsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertFloor, optimisticDeleteFloor } from '$lib/db/optimistic-floors';
-	import { Layers, Plus, Search, Pencil, Trash2 } from 'lucide-svelte';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
+	import { Layers, Plus, Search, Pencil, Trash2, Building2, Loader2 } from 'lucide-svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { toast } from 'svelte-sonner';
+
+	const ITEMS_PER_PAGE = 24;
+
+	/** Humanize raw enum labels: "ACTIVE" → "Active", "IN_PROGRESS" → "In Progress" */
+	function humanize(s: string): string {
+		return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase());
+	}
+
+	// Capture form data before superForm resets it (resetForm: true clears $formData before onResult)
+	let savedFormData: { id?: number; property_id: number; floor_number: number; wing?: string | null; status: string; _seq?: number } | null = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
 
 	let editMode = $state(false);
 	let showModal = $state(false);
+	let isSubmitting = $state(false);
 	let isDeleteDialogOpen = $state(false);
 	let floorToDelete = $state<FloorWithProperty | null>(null);
+	let searchInput = $state('');
 	let searchQuery = $state('');
+	let currentPage = $state(1);
+	let debounceTimer: ReturnType<typeof setTimeout>;
+
+	function handleSearchInput(e: Event) {
+		const val = (e.target as HTMLInputElement).value;
+		searchInput = val;
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => { searchQuery = val; }, 300);
+	}
 
 	// Build nested floor → units → leases structure (replaces server-side join)
 	let allFloors = $derived.by(() => {
+		// Map lookups for O(1) joins
+		const propertyMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propertyMap.set(String(p.id), p);
+
 		return [...floorsStore.value].sort((a: any, b: any) => a.floor_number - b.floor_number).map((floor: any) => {
-			const property = propertiesStore.value.find((p: any) => String(p.id) === String(floor.property_id));
+			const property = propertyMap.get(String(floor.property_id));
 			const floorUnits = rentalUnitsStore.value
 				.filter((u: any) => String(u.floor_id) === String(floor.id))
 				.map((unit: any) => {
@@ -74,37 +106,93 @@
 	} = superForm(defaults(zod(floorSchema)), {
 		id: 'floor-form',
 		validators: zodClient(floorSchema),
-		validationMethod: 'oninput',
+		validationMethod: 'onsubmit',
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
-		onError: ({ result }) => {
+		onSubmit: async () => {
+			// Capture form data BEFORE superForm resets it — resetForm: true
+			// clears $formData before onResult runs, making $formData.id always undefined
+			submitSeq++;
+			savedFormData = { ...$formData, _seq: submitSeq };
+			savedEditMode = editMode;
+			isSubmitting = true;
+
+			// Close modal immediately for snappy UX
+			showModal = false;
+
+			// For updates where ID is known, write to RxDB immediately
+			if (savedEditMode && savedFormData.id) {
+				rollback = await optimisticUpsertFloor({
+					id: savedFormData.id,
+					property_id: savedFormData.property_id,
+					floor_number: savedFormData.floor_number,
+					wing: savedFormData.wing,
+					status: savedFormData.status || 'ACTIVE'
+				});
+			}
+		},
+		onError: async ({ result }) => {
 			console.error('Form submission error:', {
 				error: result.error,
 				status: result.status
 			});
+			isSubmitting = false;
 			toast.error('Error saving floor');
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			bgResync('floors');
 		},
 		onResult: async ({ result }) => {
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				isSubmitting = false;
+				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('floors');
+				savedFormData = null;
+				return;
+			}
+
 			if (result.type === 'success') {
-				toast.success(editMode ? 'Floor updated' : 'Floor created');
-				showModal = false;
+				// Server response has the form data WITH the new ID (for creates)
+				// This is reliable — not affected by resetForm: true
+				const serverData = (result as any).data?.form?.data;
+				const fd = serverData ?? savedFormData;
+
 				editMode = false;
-				// Optimistic upsert into RxDB instead of invalidateAll
-				const d = $formData;
-				if (d.id) {
-					await optimisticUpsertFloor({
-						id: d.id,
-						property_id: d.property_id,
-						floor_number: d.floor_number,
-						wing: d.wing,
-						status: d.status || 'ACTIVE'
-					});
+				isSubmitting = false;
+				rollback = null; // Success — discard snapshot
+				const floorLabel = `Floor ${fd?.floor_number ?? ''}${fd?.wing ? ` (${fd.wing})` : ''}`;
+				toast.success(savedEditMode ? `${floorLabel} updated` : `${floorLabel} created`);
+
+				if (fd?.id) {
+					// For creates: apply optimistic write with the real server ID
+					if (!savedEditMode) {
+						await optimisticUpsertFloor({
+							id: fd.id,
+							property_id: fd.property_id,
+							floor_number: fd.floor_number,
+							wing: fd.wing,
+							status: fd.status || 'ACTIVE'
+						});
+					}
+					// Confirm in background either way
+					bgResync('floors');
 				} else {
-					// For creates, resync to pick up the server-assigned id
-					const { resyncCollection } = await import('$lib/db/replication');
-					resyncCollection('floors');
+					// Fallback: no ID available — pull from server
+					bgResync('floors');
 				}
+				savedFormData = null;
+			} else {
+				// Non-success result (validation error, etc.) — instant rollback
+				isSubmitting = false;
+				toast.error('Failed to save floor');
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('floors');
+				savedFormData = null;
 			}
 		}
 	});
@@ -127,6 +215,19 @@
 		return floors;
 	});
 
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredFloors.length / ITEMS_PER_PAGE)));
+	let pagedFloors = $derived(filteredFloors.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE));
+
+	// Badge suppression: hide status badge when all floors share the same status
+	let allSameStatus = $derived(filteredFloors.length > 0 && filteredFloors.every((f) => f.status === filteredFloors[0].status));
+
+	// Reset page on search change
+	$effect(() => {
+		searchQuery;
+		currentPage = 1;
+	});
+
+	let isLoading = $derived(!floorsStore.initialized);
 	let selectedFloor = $state<FloorWithProperty | null>(null);
 
 	function openAddModal() {
@@ -135,9 +236,12 @@
 		showModal = true;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	function handleFloorClick(floor: FloorWithProperty) {
 		editMode = true;
 		selectedFloor = floor;
+		editUpdatedAt = floor.updated_at ?? null;
 		reset({
 			data: {
 				id: floor.id,
@@ -164,32 +268,33 @@
 	async function proceedWithDelete() {
 		if (!floorToDelete) return;
 
-		// Optimistic: remove from RxDB immediately
-		await optimisticDeleteFloor(floorToDelete.id);
-
-		const formData = new FormData();
-		formData.append('id', floorToDelete.id.toString());
-		const response = await fetch('?/delete', {
-			method: 'POST',
-			body: formData
-		});
-
-		if (!response.ok) {
-			console.error('Failed to delete floor.', response);
-			toast.error('Failed to delete floor');
-			// Resync to restore the original state on error
-			const { resyncCollection } = await import('$lib/db/replication');
-			resyncCollection('floors');
-		} else {
-			toast.success('Floor deleted');
-		}
-
+		const targetFloor = floorToDelete;
 		isDeleteDialogOpen = false;
 		floorToDelete = null;
+
+		await bufferedMutation({
+			label: 'Delete floor',
+			collection: 'floors',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteFloor(targetFloor.id);
+			},
+			serverAction: async () => {
+				const body = new FormData();
+				body.append('id', targetFloor.id.toString());
+				const response = await fetch('?/delete', { method: 'POST', body });
+				if (!response.ok) throw new Error(`Server returned ${response.status}`);
+				return response;
+			},
+			onSuccess: async () => {
+				toast.success(`Floor ${targetFloor.floor_number}${targetFloor.wing ? ` (${targetFloor.wing})` : ''} deleted`);
+			}
+		});
 	}
 </script>
 
 <div class="container mx-auto p-4 space-y-6">
+	<SyncErrorBanner collections={['floors', 'properties', 'rental_units', 'leases', 'lease_tenants']} />
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-3">
@@ -201,9 +306,14 @@
 				<p class="text-sm text-muted-foreground">Manage building floors and wings</p>
 			</div>
 		</div>
-		<Button onclick={openAddModal}>
-			<Plus class="mr-2 h-4 w-4" />
-			Add Floor
+		<Button class="min-h-[44px]" onclick={openAddModal} disabled={isSubmitting}>
+			{#if isSubmitting}
+				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+				Saving...
+			{:else}
+				<Plus class="mr-2 h-4 w-4" />
+				Add Floor
+			{/if}
 		</Button>
 	</div>
 
@@ -213,16 +323,31 @@
 		<Input
 			type="text"
 			placeholder="Search floors..."
-			class="pl-9"
-			bind:value={searchQuery}
+			class="pl-9 min-h-[44px]"
+			value={searchInput}
+			oninput={handleSearchInput}
 		/>
 	</div>
 
 	<!-- Content -->
-	{#if !selectedProperty}
-		<div class="text-center py-8">
-			<p class="text-gray-500">Please select a property to view floors.</p>
+	{#if isLoading}
+		<div class="space-y-2">
+			{#each Array(4) as _, i (i)}
+				<div class="border rounded-lg p-4">
+					<div class="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4">
+						<Skeleton class="h-5 w-20" />
+						<Skeleton class="h-5 w-12" />
+						<Skeleton class="h-6 w-16 rounded-full" />
+						<div class="flex gap-2">
+							<Skeleton class="h-8 w-8" />
+							<Skeleton class="h-8 w-8" />
+						</div>
+					</div>
+				</div>
+			{/each}
 		</div>
+	{:else if !selectedProperty}
+		<EmptyState icon={Building2} title="No Property Selected" description="Select a property from the dropdown in the header to view floors." />
 	{:else if !filteredFloors.length}
 		<div class="text-center py-8">
 			<p class="text-gray-500">No floors found for this property.</p>
@@ -238,17 +363,22 @@
 				<div class="text-right">Actions</div>
 			</div>
 			<div class="divide-y">
-				{#each filteredFloors as floor (floor.id)}
+				{#each pagedFloors as floor (floor.id)}
 					<Accordion.Root type="single" class="w-full">
 						<Accordion.Item value={floor.id.toString()} class="border-b-0">
-							<div class="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-4 px-4 py-2">
-								<div>{floor.floor_number}</div>
-								<div>{floor.rental_unit.length}</div>
-								<div><Badge>{floor.status}</Badge></div>
-								<div class="flex items-center justify-end gap-2">
+							<div class="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_1fr_1fr_auto] items-center gap-2 md:gap-4 px-4 py-2">
+								<div class="flex flex-col md:flex-row md:contents">
+									<span class="font-medium md:font-normal tabular-nums">Floor {floor.floor_number}{floor.wing ? ` · ${floor.wing}` : ''}</span>
+									<span class="text-xs text-muted-foreground md:text-sm md:text-foreground tabular-nums">{floor.rental_unit.length} unit{floor.rental_unit.length !== 1 ? 's' : ''}</span>
+									{#if !allSameStatus}
+										<div class="mt-1 md:mt-0"><Badge>{humanize(floor.status)}</Badge></div>
+									{/if}
+								</div>
+								<div class="flex items-center justify-end gap-1">
 									<Button
 										size="icon"
 										variant="ghost"
+										class="min-h-[44px] min-w-[44px]"
 										onclick={(e) => {
 											e.stopPropagation();
 											handleFloorClick(floor);
@@ -260,6 +390,7 @@
 									<Button
 										size="icon"
 										variant="ghost"
+										class="min-h-[44px] min-w-[44px]"
 										onclick={(e) => {
 											e.stopPropagation();
 											confirmDelete(floor);
@@ -268,12 +399,14 @@
 										<span class="sr-only">Delete</span>
 										<Trash2 class="h-4 w-4" />
 									</Button>
-									<Accordion.Trigger class="p-1 rounded-md hover:bg-muted" />
+									<Accordion.Trigger class="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-muted" />
 								</div>
 							</div>
 							<Accordion.Content>
 								<div class="p-4 bg-muted/50">
-									<div class="font-medium mb-2">Wing: {floor.wing || 'N/A'}</div>
+									{#if floor.wing}
+										<div class="font-medium mb-2">Wing: {floor.wing}</div>
+									{/if}
 									<h4 class="font-medium mb-2">Rental Units:</h4>
 									{#if floor.rental_unit.length > 0}
 										<ul class="list-disc pl-5 space-y-1">
@@ -298,6 +431,31 @@
 				{/each}
 			</div>
 		</div>
+
+		<!-- Pagination -->
+		{#if totalPages > 1}
+			<div class="flex items-center justify-between pt-4">
+				<span class="text-sm text-muted-foreground tabular-nums">
+					{filteredFloors.length} floor{filteredFloors.length !== 1 ? 's' : ''} · Page {currentPage} of {totalPages}
+				</span>
+				<div class="flex gap-2">
+					<Button
+						variant="outline"
+						size="sm"
+						class="min-h-[44px]"
+						disabled={currentPage <= 1}
+						onclick={() => currentPage--}
+					>Previous</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						class="min-h-[44px]"
+						disabled={currentPage >= totalPages}
+						onclick={() => currentPage++}
+					>Next</Button>
+				</div>
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -312,6 +470,8 @@
 		</Dialog.Header>
 		<FloorForm
 			{editMode}
+			{isSubmitting}
+			updatedAt={editUpdatedAt}
 			form={formData}
 			{errors}
 			{enhance}
@@ -333,7 +493,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={proceedWithDelete}>Continue</AlertDialog.Action>
+			<AlertDialog.Action class="bg-destructive text-destructive-foreground hover:bg-destructive/90" onclick={proceedWithDelete}>Delete</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

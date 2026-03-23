@@ -54,6 +54,13 @@ apps/*/*.png
 # Upload directories
 apps/*/static/uploads/
 
+# Temp files
+_tmp_*
+
+# Cloudflare
+.wrangler/
+apps/*/.wrangler/
+
 # Windows problematic files
 nul
 apps/nul

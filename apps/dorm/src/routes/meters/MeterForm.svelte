@@ -4,15 +4,20 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { Button } from '$lib/components/ui/button';
 	import * as Select from '$lib/components/ui/select';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Loader2 } from 'lucide-svelte';
 	import {
 		utilityTypeEnum,
 		meterStatusEnum,
 		type MeterFormData,
 		meterFormSchema
 	} from './formSchema';
-	import { createEventDispatcher } from 'svelte';
+	import { formatEnumLabel } from '$lib/utils/format';
+
+	// Collapsible notes toggle
+	let showNotes = $state(false);
 
 	interface Property {
 		id: number;
@@ -62,6 +67,7 @@
 		enhance: SuperForm<z.infer<typeof meterFormSchema>>['enhance'];
 		constraints: SuperForm<z.infer<typeof meterFormSchema>>['constraints'];
 		submitting: SuperForm<z.infer<typeof meterFormSchema>>['submitting'];
+		oncancel?: () => void;
 	}
 
 	interface ActionProps {
@@ -70,16 +76,19 @@
 		actionDelete?: string;
 	}
 
-	let { data, editMode = false, form, errors, enhance, constraints, submitting, actionCreate = '?/create', actionUpdate = '?/update', actionDelete = '?/delete' }: Props & ActionProps = $props();
+	interface ExtraProps {
+		updatedAt?: string | null;
+	}
 
-	const dispatch = createEventDispatcher<{
-		meterAdded: void;
-		meterUpdated: void;
-		cancel: void;
-	}>();
+	let { data, editMode = false, updatedAt = null, form, errors, enhance, constraints, submitting, oncancel, actionCreate = '?/create', actionUpdate = '?/update', actionDelete = '?/delete' }: Props & ActionProps & ExtraProps = $props();
 
 	// State for delete confirmation
 	let showDeleteConfirm = $state(false);
+
+	// Auto-show notes if meter already has notes content
+	$effect(() => {
+		if (data.meter?.notes) showNotes = true;
+	});
 
 	// Using $derived instead of $effect + $state
 	let filteredProperties = $derived((data.properties || []).filter((p) => p.status === 'ACTIVE'));
@@ -182,13 +191,16 @@
 	}
 
 	function handleCancel() {
-		dispatch('cancel');
+		oncancel?.();
 	}
 </script>
 
 <form method="POST" action={editMode ? actionUpdate : actionCreate} use:enhance class="space-y-3">
 	{#if $form.id}
 		<input type="hidden" name="id" value={$form.id} />
+		{#if editMode}
+			<input type="hidden" name="_updated_at" value={updatedAt ?? ''} />
+		{/if}
 	{/if}
 
 	<div>
@@ -202,6 +214,7 @@
 		<Input
 			type="number"
 			id="initial_reading"
+			inputmode="decimal"
 			bind:value={$form.initial_reading}
 			step="0.01"
 			min="0"
@@ -215,7 +228,7 @@
 		<Label for="location_type" class="text-sm font-medium">Location Type</Label>
 		<Select.Root type="single" value={$form.location_type} onValueChange={handleLocationTypeChange}>
 			<Select.Trigger class="w-full">
-				<span>{$form.location_type || 'Select location type'}</span>
+				<span>{$form.location_type ? formatEnumLabel($form.location_type) : 'Select location type'}</span>
 			</Select.Trigger>
 			<Select.Content>
 				<Select.Item value="PROPERTY">Property</Select.Item>
@@ -308,7 +321,7 @@
 			<Label for="type" class="text-sm font-medium">Utility Type</Label>
 			<Select.Root type="single" value={$form.type} onValueChange={handleUtilityTypeChange}>
 				<Select.Trigger class="w-full">
-					<span>{$form.type || 'Select utility type'}</span>
+					<span>{$form.type ? formatEnumLabel($form.type) : 'Select utility type'}</span>
 				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="ELECTRICITY">Electricity</Select.Item>
@@ -323,7 +336,7 @@
 			<Label for="status" class="text-sm font-medium">Status</Label>
 			<Select.Root type="single" value={$form.status} onValueChange={handleStatusChange}>
 				<Select.Trigger class="w-full">
-					<span>{$form.status || 'Select status'}</span>
+					<span>{$form.status ? formatEnumLabel($form.status) : 'Select status'}</span>
 				</Select.Trigger>
 				<Select.Content>
 					<Select.Item value="ACTIVE">Active</Select.Item>
@@ -335,46 +348,69 @@
 		</div>
 	</div>
 
-	<div>
-		<Label for="notes" class="text-sm font-medium">Notes</Label>
-		<Textarea id="notes" bind:value={$form.notes} rows={3} />
-		{#if $errors.notes}<span class="text-xs text-red-500">{$errors.notes}</span>{/if}
-	</div>
+	<!-- Collapsible Notes -->
+	{#if showNotes}
+		<div>
+			<Label for="notes" class="text-sm font-medium">Notes</Label>
+			<Textarea id="notes" bind:value={$form.notes} rows={3} />
+			{#if $errors.notes}<span class="text-xs text-red-500">{$errors.notes}</span>{/if}
+		</div>
+	{:else}
+		<Button
+			type="button"
+			variant="ghost"
+			size="sm"
+			class="text-muted-foreground"
+			onclick={() => { showNotes = true; }}
+		>
+			+ Add notes
+		</Button>
+	{/if}
 
-	<div class="flex justify-between items-center pt-3">
-		<!-- Delete button - visible in edit mode -->
+	<!-- Sticky footer on mobile + submit spinner -->
+	<div class="flex justify-between items-center pt-3 sticky bottom-0 bg-background pb-1 sm:static sm:pb-0 border-t sm:border-0">
 		{#if editMode}
-			<button
+			<Button
 				type="button"
-				class="px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+				variant="destructive"
+				size="sm"
+				class="min-h-[44px] sm:min-h-0"
 				onclick={() => { showDeleteConfirm = true; }}
 			>
 				Delete
-			</button>
+			</Button>
 		{:else}
 			<div></div>
 		{/if}
 
 		<div class="flex space-x-2">
-			<button
+			<Button
 				type="button"
-				class="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+				variant="outline"
+				size="sm"
+				class="min-h-[44px] sm:min-h-0"
 				onclick={handleCancel}
 			>
 				Cancel
-			</button>
-			<button
+			</Button>
+			<Button
 				type="submit"
-				class="px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+				size="sm"
+				class="min-h-[44px] sm:min-h-0"
 				disabled={$submitting}
 			>
-				{editMode ? 'Update' : 'Create'} Meter
-			</button>
+				{#if $submitting}
+					<Loader2 class="w-4 h-4 mr-2 animate-spin" />
+					Saving...
+				{:else}
+					{editMode ? 'Update' : 'Create'} Meter
+				{/if}
+			</Button>
 		</div>
 	</div>
 </form>
 
-<!-- Delete Confirmation Dialog -->
+<!-- Delete Confirmation Dialog — [Fix 05] uses enhance for SPA-style submission -->
 <AlertDialog.Root bind:open={showDeleteConfirm}>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
@@ -385,7 +421,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteConfirm = false; }}>Cancel</AlertDialog.Cancel>
-			<form method="POST" action={actionDelete} class="inline">
+			<form method="POST" action={actionDelete} use:enhance class="inline">
 				<input type="hidden" name="id" value={$form.id} />
 				<AlertDialog.Action type="submit">Delete Meter</AlertDialog.Action>
 			</form>

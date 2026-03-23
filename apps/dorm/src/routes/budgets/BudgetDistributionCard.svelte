@@ -28,10 +28,10 @@
 </script>
 
 <Card
-	class="bg-white shadow hover:shadow-md transition-shadow border border-gray-200 rounded-xl overflow-hidden h-full"
+	class="bg-white shadow hover:shadow-md transition-shadow border border-border rounded-xl overflow-hidden h-full"
 >
-	<CardHeader class="pb-2 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
-		<CardTitle class="text-sm font-medium text-gray-700 flex items-center gap-2">
+	<CardHeader class="pb-2 bg-gradient-to-r from-muted/50 to-muted border-b">
+		<CardTitle class="text-sm font-medium text-foreground flex items-center gap-2">
 			<PieChart class="h-4 w-4 text-purple-600" />
 			{title}
 		</CardTitle>
@@ -58,11 +58,11 @@
 			<!-- Allocated Progress Bar -->
 			<div class="space-y-2">
 				<div class="flex justify-between items-center text-xs font-medium">
-					<span class="text-gray-700">Allocated</span>
-					<span class="text-gray-700">{allocatedPercentage}%</span>
+					<span class="text-foreground">Allocated</span>
+					<span class="text-foreground">{allocatedPercentage}%</span>
 				</div>
 				<div class="relative pt-1">
-					<div class="overflow-hidden h-2.5 text-xs flex rounded-full bg-gray-200">
+					<div class="overflow-hidden h-2.5 text-xs flex rounded-full bg-muted">
 						<div
 							style="width: {allocatedPercentage}%"
 							class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500 rounded-full transition-all duration-500 ease-in-out"
@@ -75,11 +75,11 @@
 			{#if remainingAmount >= 0}
 				<div class="space-y-2">
 					<div class="flex justify-between items-center text-xs font-medium">
-						<span class="text-gray-700">Remaining</span>
-						<span class="text-gray-700">{remainingPercentage}%</span>
+						<span class="text-foreground">Remaining</span>
+						<span class="text-foreground">{remainingPercentage}%</span>
 					</div>
 					<div class="relative pt-1">
-						<div class="overflow-hidden h-2.5 text-xs flex rounded-full bg-gray-200">
+						<div class="overflow-hidden h-2.5 text-xs flex rounded-full bg-muted">
 							<div
 								style="width: {remainingPercentage}%"
 								class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 rounded-full transition-all duration-500 ease-in-out"
@@ -96,7 +96,7 @@
 			{/if}
 
 			<!-- Total Budget as Reference -->
-			<div class="pt-2 mt-2 border-t border-gray-200 text-xs text-gray-600">
+			<div class="pt-2 mt-2 border-t border-border text-xs text-muted-foreground">
 				<div>
 					Total Planned Budget: <span class="font-semibold">{formatCurrency(plannedAmount)}</span>
 				</div>

@@ -7,7 +7,8 @@ import { rental_unitSchema } from './formSchema';
 import { cache } from '$lib/services/cache';
 import { db } from '$lib/server/db';
 import { rentalUnit } from '$lib/server/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 export const actions: Actions = {
 	create: async ({ request }: RequestEvent) => {
@@ -18,7 +19,7 @@ export const actions: Actions = {
 			return fail(400, { form });
 		}
 
-		// Check for duplicate rental unit number
+		// Check for duplicate rental unit number (excluding soft-deleted)
 		const existingUnit = await db
 			.select({ id: rentalUnit.id })
 			.from(rentalUnit)
@@ -26,7 +27,8 @@ export const actions: Actions = {
 				and(
 					eq(rentalUnit.propertyId, form.data.property_id!),
 					eq(rentalUnit.floorId, form.data.floor_id!),
-					eq(rentalUnit.number, form.data.number)
+					eq(rentalUnit.number, form.data.number),
+					isNull(rentalUnit.deletedAt)
 				)
 			)
 			.limit(1);
@@ -37,7 +39,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db.insert(rentalUnit).values({
+			const [inserted] = await db.insert(rentalUnit).values({
 				name: form.data.name,
 				number: form.data.number,
 				type: form.data.type,
@@ -48,7 +50,8 @@ export const actions: Actions = {
 				floorId: form.data.floor_id || 0,
 				amenities: form.data.amenities || [],
 				updatedAt: new Date()
-			});
+			}).returning({ id: rentalUnit.id });
+			form.data.id = inserted.id;
 		} catch (err: any) {
 			console.error('Error creating rental unit:', err);
 			return fail(500, { form });
@@ -62,6 +65,7 @@ export const actions: Actions = {
 
 	update: async ({ request }: RequestEvent) => {
 		const formData = await request.formData();
+		const lockTs = extractLockTimestamp(formData);
 		const rawForm = await superValidate(formData, zod(rental_unitSchema));
 
 		// Remove embedded objects before validation
@@ -75,9 +79,9 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db
-				.update(rentalUnit)
-				.set({
+			const result = await optimisticLockUpdate(
+				db, rentalUnit, rentalUnit.id, form.data.id, rentalUnit.updatedAt, lockTs,
+				{
 					name: updateData.name,
 					number: updateData.number,
 					type: updateData.type,
@@ -88,8 +92,11 @@ export const actions: Actions = {
 					floorId: updateData.floor_id || 0,
 					amenities: updateData.amenities || [],
 					updatedAt: new Date()
-				})
-				.where(eq(rentalUnit.id, form.data.id));
+				}
+			);
+			if (result.conflict) {
+				return fail(409, { form, conflict: true, message: result.message });
+			}
 		} catch (err: any) {
 			console.error('Error updating rental unit:', err);
 			if (err.message?.includes('Policy check failed')) {

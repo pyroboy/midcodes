@@ -63,3 +63,18 @@ export type PaymentStatus = z.infer<typeof paymentStatusEnum>;
 export type BillingType = z.infer<typeof billingTypeEnum>;
 export type UtilityType = z.infer<typeof utilityTypeEnum>;
 export type UserRole = z.infer<typeof userRoleEnum>;
+
+// Transaction schema (merged from payment-history) — used by the upsert action for edit-mode
+export const transactionSchema = z.object({
+	id: z.number().optional(),
+	amount: z.number().positive('Amount must be positive'),
+	method: paymentMethodEnum,
+	reference_number: z.string().nullable().optional(),
+	paid_by: z.string().min(1, 'Paid by is required'),
+	paid_at: z.string().nullable().optional(),
+	notes: z.string().nullable().optional(),
+	receipt_url: z.string().url('Must be a valid URL').or(z.literal('')).nullable().optional(),
+	billing_ids: z.array(z.number()).default([])
+});
+
+export type TransactionSchema = z.infer<typeof transactionSchema>;

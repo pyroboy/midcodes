@@ -16,6 +16,9 @@
 		tenantsStore
 	} from '$lib/stores/collections.svelte';
 	import { resyncCollection } from '$lib/db/replication';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	// UI Components
 	import {
@@ -41,8 +44,14 @@
 		List,
 		Settings,
 		Filter,
-		RefreshCw
+		RefreshCw,
+		Loader2
 	} from 'lucide-svelte';
+	import { browser } from '$app/environment';
+
+	const ITEMS_PER_PAGE = 24;
+	const LS_VIEW_KEY = 'dorm:penalties:viewMode';
+	const LS_FILTER_KEY = 'dorm:penalties:activeFilter';
 
 	// Custom components
 	import PenaltyTable from './PenaltyTable.svelte';
@@ -54,6 +63,11 @@
 	// Utilities
 	import { formatCurrency } from '$lib/utils/format';
 
+	/** Humanize raw enum labels: "PENDING" → "Pending", "OVERDUE" → "Overdue" */
+	function humanize(s: string): string {
+		return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase());
+	}
+
 	// ─── RxDB reactive stores (singletons from collections.svelte.ts) ──
 
 	// ─── Derived penalty billings from RxDB ─────────────────────────────
@@ -62,6 +76,18 @@
 	let penaltyBillings = $derived.by(() => {
 		const now = new Date();
 		const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+		// Map lookups for O(1) joins
+		const leaseMap = new Map<string, any>();
+		for (const l of leasesStore.value) leaseMap.set(String(l.id), l);
+		const unitMap = new Map<string, any>();
+		for (const u of rentalUnitsStore.value) unitMap.set(String(u.id), u);
+		const floorMap = new Map<string, any>();
+		for (const f of floorsStore.value) floorMap.set(String(f.id), f);
+		const propertyMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propertyMap.set(String(p.id), p);
+		const tenantMap = new Map<string, any>();
+		for (const t of tenantsStore.value) tenantMap.set(String(t.id), t);
 
 		return billingsStore.value
 			.filter((b: any) => {
@@ -75,15 +101,15 @@
 				);
 			})
 			.map((billing: any) => {
-				const lease = leasesStore.value.find((l: any) => String(l.id) === String(billing.lease_id));
-				const unit = lease ? rentalUnitsStore.value.find((u: any) => String(u.id) === String(lease.rental_unit_id)) : null;
-				const floor = unit ? floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id)) : null;
-				const property = unit ? propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id)) : null;
+				const lease = leaseMap.get(String(billing.lease_id));
+				const unit = lease ? unitMap.get(String(lease.rental_unit_id)) : null;
+				const floor = unit ? floorMap.get(String(unit.floor_id)) : null;
+				const property = unit ? propertyMap.get(String(unit.property_id)) : null;
 
 				// Lease tenants
 				const ltDocs = lease ? leaseTenantsStore.value.filter((lt: any) => String(lt.lease_id) === String(lease.id)) : [];
 				const lease_tenants = ltDocs.map((lt: any) => {
-					const tenant = tenantsStore.value.find((t: any) => String(t.id) === String(lt.tenant_id));
+					const tenant = tenantMap.get(String(lt.tenant_id));
 					return tenant ? {
 						tenants: {
 							id: Number(tenant.id),
@@ -128,8 +154,14 @@
 	let showPenaltyModal = $state(false);
 	let isFilterOpen = $state(false);
 	let showRulesModal = $state(false);
-	let viewMode = $state<'card' | 'list'>('list');
-	let activeFilter = $state<'all' | 'pending' | 'overdue' | 'penalized'>('all');
+	let currentPage = $state(1);
+
+	// Restore preferences from localStorage
+	const initialPenaltyFilter = $page.url.searchParams.get('filter') as 'all' | 'pending' | 'overdue' | 'penalized' | null;
+	const savedView = browser ? localStorage.getItem(LS_VIEW_KEY) : null;
+	const savedFilter = browser ? localStorage.getItem(LS_FILTER_KEY) : null;
+	let viewMode = $state<'card' | 'list'>((savedView === 'card' || savedView === 'list') ? savedView : 'list');
+	let activeFilter = $state<'all' | 'pending' | 'overdue' | 'penalized'>(initialPenaltyFilter ?? (savedFilter === 'pending' || savedFilter === 'overdue' || savedFilter === 'penalized' ? savedFilter : 'all'));
 
 	// Filter state
 	let filter: PenaltyFilter = $state({
@@ -144,7 +176,16 @@
 	let fromDate = $state('');
 	let toDate = $state('');
 	let statusFilter = $state('');
+	let searchInput = $state('');
 	let searchTerm = $state('');
+	let searchDebounce: ReturnType<typeof setTimeout>;
+
+	function handleSearchInput(e: Event) {
+		const val = (e.target as HTMLInputElement).value;
+		searchInput = val;
+		clearTimeout(searchDebounce);
+		searchDebounce = setTimeout(() => { searchTerm = val; }, 300);
+	}
 
 	// Status options for the select
 	const statusOptions = [
@@ -202,10 +243,21 @@
 		});
 	});
 
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredBillings.length / ITEMS_PER_PAGE)));
+	let pagedBillings = $derived(filteredBillings.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE));
+
+	// Reset page on filter/search change
+	$effect(() => {
+		searchTerm;
+		activeFilter;
+		statusFilter;
+		currentPage = 1;
+	});
+
 	const { form, enhance, errors, constraints, submitting, reset } = superForm(defaults(zod(updatePenaltySchema)), {
 		id: 'penalty-form',
 		validators: zodClient(updatePenaltySchema as AnyZodObject),
-		validationMethod: 'oninput',
+		validationMethod: 'onsubmit',
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
@@ -216,8 +268,9 @@
 		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				const penaltyAmt = formatCurrency($form.penalty_amount || 0);
 				toast.success('Penalty Updated', {
-					description: `The penalty for ${selectedPenalty?.lease?.name} has been successfully updated.`
+					description: `${selectedPenalty?.lease?.name ?? 'Billing'} penalty set to ${penaltyAmt}`
 				});
 				await resyncCollection('billings');
 				reset();
@@ -284,6 +337,7 @@
 		fromDate = '';
 		toDate = '';
 		statusFilter = '';
+		searchInput = '';
 		searchTerm = '';
 		filter = {};
 
@@ -305,9 +359,18 @@
 
 	function handleFilterClick(filter: 'all' | 'pending' | 'overdue' | 'penalized') {
 		activeFilter = filter;
+		if (browser) localStorage.setItem(LS_FILTER_KEY, filter);
 		if (filter !== 'all') {
 			statusFilter = '';
 		}
+		// Persist filter to URL for back-button support
+		const url = new URL($page.url);
+		if (filter === 'all') {
+			url.searchParams.delete('filter');
+		} else {
+			url.searchParams.set('filter', filter);
+		}
+		goto(url.toString(), { replaceState: true, keepFocus: true });
 	}
 
 	async function handleRefresh() {
@@ -326,6 +389,9 @@
 
 <!-- Modern Penalties Page -->
 <div class="min-h-screen bg-gray-50/50">
+	<div class="max-w-7xl mx-auto px-4 pt-4">
+		<SyncErrorBanner collections={['billings', 'leases', 'rental_units', 'floors', 'properties', 'tenants']} />
+	</div>
 	<!-- Modern Header -->
 	<div class="bg-white border-b border-gray-200">
 		<div class="max-w-7xl mx-auto px-4 py-6">
@@ -351,19 +417,23 @@
 							Track and manage billing penalties across all properties
 						</p>
 					</div>
-					<div class="flex items-center gap-2">
-						<Button variant="outline" size="sm" onclick={handleRefresh} disabled={isLoading}>
+					<div class="flex items-center gap-2 flex-wrap">
+						<Button variant="outline" size="sm" class="min-h-[44px]" onclick={handleRefresh} disabled={isLoading}>
 							<RefreshCw class="w-4 h-4 mr-2 {isLoading ? 'animate-spin' : ''}" />
 							Refresh
 						</Button>
-						<Button variant="outline" size="sm" onclick={toggleFilter}>
+						<Button variant="outline" size="sm" class="min-h-[44px]" onclick={toggleFilter}>
 							<Filter class="w-4 h-4 mr-2" />
 							{isFilterOpen ? 'Hide Filters' : 'Filters'}
 						</Button>
 						<Button
 							variant="outline"
 							size="sm"
-							onclick={() => (viewMode = viewMode === 'list' ? 'card' : 'list')}
+							class="min-h-[44px]"
+							onclick={() => {
+								viewMode = viewMode === 'list' ? 'card' : 'list';
+								if (browser) localStorage.setItem(LS_VIEW_KEY, viewMode);
+							}}
 						>
 							{#if viewMode === 'list'}
 								<LayoutGrid class="w-4 h-4 mr-2" />
@@ -373,7 +443,7 @@
 								List View
 							{/if}
 						</Button>
-						<Button variant="outline" size="sm" onclick={() => (showRulesModal = true)}>
+						<Button variant="outline" size="sm" class="min-h-[44px]" onclick={() => (showRulesModal = true)}>
 							<Settings class="w-4 h-4 mr-2" />
 							Rules
 						</Button>
@@ -402,7 +472,7 @@
 							<DollarSign class="w-8 h-8 text-emerald-600" />
 							<div>
 								<p class="text-sm font-medium text-muted-foreground">Total Penalties</p>
-								<p class="text-2xl font-bold">{formatCurrency(totalPenaltyAmount)}</p>
+								<p class="text-2xl font-bold tabular-nums">{formatCurrency(totalPenaltyAmount)}</p>
 								<p class="text-xs text-muted-foreground">{penaltyBillings.length} billings</p>
 							</div>
 						</div>
@@ -421,7 +491,7 @@
 							<AlertTriangle class="w-8 h-8 text-red-600" />
 							<div>
 								<p class="text-sm font-medium text-muted-foreground">Overdue</p>
-								<p class="text-2xl font-bold text-red-600">{overdueCount}</p>
+								<p class="text-2xl font-bold text-red-600 tabular-nums">{overdueCount}</p>
 								<p class="text-xs text-muted-foreground">requiring attention</p>
 							</div>
 						</div>
@@ -440,7 +510,7 @@
 							<Clock class="w-8 h-8 text-orange-600" />
 							<div>
 								<p class="text-sm font-medium text-muted-foreground">Pending</p>
-								<p class="text-2xl font-bold text-orange-600">{pendingCount}</p>
+								<p class="text-2xl font-bold text-orange-600 tabular-nums">{pendingCount}</p>
 								<p class="text-xs text-muted-foreground">awaiting payment</p>
 							</div>
 						</div>
@@ -459,7 +529,7 @@
 							<DollarSign class="w-8 h-8 text-yellow-600" />
 							<div>
 								<p class="text-sm font-medium text-muted-foreground">With Penalties</p>
-								<p class="text-2xl font-bold text-yellow-600">{penalizedCount}</p>
+								<p class="text-2xl font-bold text-yellow-600 tabular-nums">{penalizedCount}</p>
 								<p class="text-xs text-muted-foreground">have penalties</p>
 							</div>
 						</div>
@@ -479,8 +549,9 @@
 								/>
 								<Input
 									placeholder="Search by lease name, tenant, or unit..."
-									class="pl-10"
-									bind:value={searchTerm}
+									class="pl-10 min-h-[44px]"
+									value={searchInput}
+									oninput={handleSearchInput}
 								/>
 							</div>
 
@@ -488,12 +559,12 @@
 							<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 								<div>
 									<Label for="date-from" class="text-sm font-medium">From Date</Label>
-									<Input id="date-from" type="date" bind:value={fromDate} />
+									<Input id="date-from" type="date" class="min-h-[44px]" bind:value={fromDate} />
 								</div>
 
 								<div>
 									<Label for="date-to" class="text-sm font-medium">To Date</Label>
-									<Input id="date-to" type="date" bind:value={toDate} />
+									<Input id="date-to" type="date" class="min-h-[44px]" bind:value={toDate} />
 								</div>
 
 								<div>
@@ -504,7 +575,7 @@
 										onValueChange={handleStatusChange}
 										items={statusOptions}
 									>
-										<Select.Trigger>
+										<Select.Trigger class="min-h-[44px]">
 											{#snippet children()}
 												{statusOptions.find((option) => option.value === statusFilter)?.label ||
 													'All Statuses'}
@@ -527,10 +598,10 @@
 								</div>
 
 								<div class="flex items-end gap-2">
-									<Button variant="default" onclick={applyFilter} class="flex-1">
+									<Button variant="default" class="flex-1 min-h-[44px]" onclick={applyFilter}>
 										Apply Filters
 									</Button>
-									<Button variant="outline" onclick={resetFilter}>Reset</Button>
+									<Button variant="outline" class="min-h-[44px]" onclick={resetFilter}>Reset</Button>
 								</div>
 							</div>
 						</div>
@@ -567,25 +638,22 @@
 													? 'Penalized Billings'
 													: 'Penalties'}
 								</CardTitle>
-								<CardDescription>
-									{filteredBillings.length} of {penaltyBillings.length} penalties shown
+								<CardDescription class="tabular-nums">
+									{filteredBillings.length} of {penaltyBillings.length} penalties
 								</CardDescription>
 							</div>
-							<Badge variant="secondary" class="px-3 py-1">
-								{filteredBillings.length} records
-							</Badge>
 						</div>
 					</CardHeader>
 					<CardContent class="p-0">
 						{#if viewMode === 'list'}
 							<!-- Table View -->
 							<div class="overflow-x-auto">
-								<PenaltyTable penalties={filteredBillings} onPenaltyClick={handlePenaltyClick} />
+								<PenaltyTable penalties={pagedBillings} onPenaltyClick={handlePenaltyClick} />
 							</div>
 						{:else}
 							<!-- Card Grid View -->
 							<div class="p-6">
-								{#if filteredBillings.length === 0}
+								{#if pagedBillings.length === 0}
 									<div class="text-center py-12">
 										<AlertTriangle class="w-12 h-12 mx-auto text-muted-foreground mb-4" />
 										<h3 class="text-lg font-semibold mb-2">No penalties found</h3>
@@ -597,7 +665,7 @@
 									</div>
 								{:else}
 									<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-										{#each filteredBillings as penalty (penalty.id)}
+										{#each pagedBillings as penalty (penalty.id)}
 											<Card
 												class="cursor-pointer hover:shadow-md transition-all"
 												onclick={() => handlePenaltyClick(penalty)}
@@ -623,18 +691,18 @@
 																			: 'outline'}
 																class="text-xs"
 															>
-																{penalty.status}
+																{humanize(penalty.status)}
 															</Badge>
 														</div>
 
 														<div class="space-y-1">
 															<div class="flex justify-between text-sm">
 																<span>Balance:</span>
-																<span class="font-medium">{formatCurrency(penalty.balance)}</span>
+																<span class="font-medium tabular-nums">{formatCurrency(penalty.balance)}</span>
 															</div>
 															<div class="flex justify-between text-sm">
 																<span>Penalty:</span>
-																<span class="font-medium text-red-600">
+																<span class="font-medium text-red-600 tabular-nums">
 																	{formatCurrency(penalty.penalty_amount)}
 																</span>
 															</div>
@@ -652,6 +720,18 @@
 							</div>
 						{/if}
 					</CardContent>
+					<!-- Pagination -->
+					{#if totalPages > 1}
+						<CardFooter class="flex items-center justify-between border-t px-6 py-4">
+							<span class="text-sm text-muted-foreground tabular-nums">
+								{filteredBillings.length} penalt{filteredBillings.length !== 1 ? 'ies' : 'y'} · Page {currentPage} of {totalPages}
+							</span>
+							<div class="flex gap-2">
+								<Button variant="outline" size="sm" class="min-h-[44px]" disabled={currentPage <= 1} onclick={() => currentPage--}>Previous</Button>
+								<Button variant="outline" size="sm" class="min-h-[44px]" disabled={currentPage >= totalPages} onclick={() => currentPage++}>Next</Button>
+							</div>
+						</CardFooter>
+					{/if}
 				</Card>
 			{/if}
 		{/if}

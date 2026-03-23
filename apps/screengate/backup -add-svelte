@@ -1,0 +1,139 @@
+<script>
+  import { setClient, mutate } from "svelte-apollo";
+  import { client } from "./_apollo";
+  import { gql } from "apollo-boost";
+  import { ADD_TEACHER } from "./_queries";
+  import { onMount } from "svelte";
+  import Nav from "../components/Nav.svelte";
+  import { get } from "svelte/store";
+  import Validator from "fastest-validator";
+  onMount(async () => {
+    setClient(client);
+  });
+
+  // svelte variables and validation must be the same
+
+  // svelte variables
+  let idn,
+    name,
+    position = "";
+  let error_messages;
+  // validation
+  let v = new Validator();
+  const schema = {
+    idn: { type: "string", min: 3, max: 255 },
+    name: { type: "string", min: 3, max: 255 },
+    position: { type: "string", min: 3, max: 255 }
+  };
+  var check = v.compile(schema);
+  let errors = [];
+
+  async function addTeacher(e) {
+    e.preventDefault();
+    let c = check({ idn, name, position });
+    if (c == true) {
+      // pass validation
+      errors = [];
+    } else {
+      errors = check({ idn, name, position });
+      console.log(c);
+
+      if (errors.some(e => e.field === 'idn')) {
+       console.log("rat");
+      }
+
+      for (var a of errors) {
+        // console.log(a.field);
+
+
+      }
+    }
+
+    // try {
+    //   //await mutate(client, {mutation: ADD_TEACHER,variables: { idn, position, name }});
+    //   //alert("Added successfully");
+    //   idn = "";
+    //   name = "";
+    //   position = "";
+    // } catch (error) {
+    //   alert("Bugo");
+    //   console.log(error);
+    // }
+  }
+</script>
+
+<style>
+  main {
+    background-color: rgb(233, 233, 233);
+  }
+  h1 {
+    @apply bg-black text-white;
+  }
+</style>
+
+<main>
+  <nav class="navbar" role="navigation" aria-label="main navigation">
+    <div class="navbar-brand">
+      <div class="navbar-item">
+        <img
+          src="https://bulma.io/images/bulma-logo.png"
+          alt="Bulma: Free, open source, and modern CSS framework based on
+          Flexbox"
+          width="112"
+          height="28" />
+      </div>
+
+    </div>
+  </nav>
+  <section class="hero is-fullheight">
+
+    <div class="columns">
+
+      <Nav />
+
+      <div class="column is-5" style="padding: 3rem 1.5rem;">
+        <div class="card" style="padding: 1rem 1.5rem;">
+
+          <h1 style="font-size: 3rem;">Add Teacher</h1>
+          <form on:submit={addTeacher}>
+            <div class="field">
+              <label class="label">ID Number</label>
+              <div class="control">
+                <input
+                  class="input {errors.includes('message') ? 'is-danger' : ''}"
+                  placeholder="ID number"
+                  bind:value={idn} />
+              </div>
+            </div>
+            <div class="field">
+              <div class="control">
+                <input
+                  class="input"
+                  placeholder="Full name"
+                  bind:value={name} />
+              </div>
+            </div>
+            <div class="field">
+              <div class="control">
+                <input
+                  class="input"
+                  placeholder="Position"
+                  bind:value={position} />
+              </div>
+            </div>
+            <button class="button is-primary" type="submit">Add Bio</button>
+          </form>
+        </div>
+      </div>
+      <div class="column is-5" style="padding: 3rem 1.5rem;">
+        <div class="card" style="padding: 1rem 1.5rem;">
+          {#each errors as { message }}
+            <li>{message}</li>
+          {/each}
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>

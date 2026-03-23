@@ -244,7 +244,7 @@
 					<label for="year" class="block text-sm font-medium text-gray-700 mb-1">Year</label>
 					<select
 						id="year"
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+						class="w-full min-h-[44px] border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
 						value={year}
 						onchange={(e: Event) => {
 							const select = e.target as HTMLSelectElement;
@@ -262,7 +262,7 @@
 					<label for="month" class="block text-sm font-medium text-gray-700 mb-1">Month</label>
 					<select
 						id="month"
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+						class="w-full min-h-[44px] border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
 						value={month}
 						onchange={(e: Event) => {
 							const select = e.target as HTMLSelectElement;
@@ -317,7 +317,7 @@
 									<Building2 class="h-5 w-5 text-green-600 mr-2" />
 									<h3 class="text-sm font-medium text-green-700">Gross Income</h3>
 								</div>
-								<p class="text-2xl font-bold text-green-800">
+								<p class="text-2xl font-bold text-green-800 tabular-nums">
 									{formatCurrency(reportData.totals.grossIncome)}
 								</p>
 							</div>
@@ -327,7 +327,7 @@
 									<Receipt class="h-5 w-5 text-red-600 mr-2" />
 									<h3 class="text-sm font-medium text-red-700">Total Expenses</h3>
 								</div>
-								<p class="text-2xl font-bold text-red-800">
+								<p class="text-2xl font-bold text-red-800 tabular-nums">
 									{formatCurrency(
 										calculateOperationalExpenses(reportData.expenses) +
 											calculateCapitalExpenses(reportData.expenses)
@@ -340,7 +340,7 @@
 									<Wallet class="h-5 w-5 text-indigo-600 mr-2" />
 									<h3 class="text-sm font-medium text-indigo-700">Net Income</h3>
 								</div>
-								<p class="text-2xl font-bold text-indigo-800">
+								<p class="text-2xl font-bold text-indigo-800 tabular-nums">
 									{formatCurrency(
 										reportData.totals.grossIncome -
 											(calculateOperationalExpenses(reportData.expenses) +
@@ -369,7 +369,7 @@
 									<h3 class="text-sm font-medium text-amber-700">Total Collectibles</h3>
 								</div>
 								<div>
-									<p class="text-2xl font-bold text-amber-800">
+									<p class="text-2xl font-bold text-amber-800 tabular-nums">
 										{formatCurrency(reportData.totals.collectibles)}
 									</p>
 									{#if reportData.totals.lastCollectionDate}
@@ -408,7 +408,7 @@
 												{#if floor.tenantCount !== undefined}
 													<div class="flex items-center text-sm text-gray-500 ml-2">
 														<Users class="h-4 w-4 mr-1" />
-														<span>{floor.tenantCount} tenants</span>
+														<span class="tabular-nums">{floor.tenantCount} tenants</span>
 													</div>
 												{/if}
 											</div>
@@ -417,7 +417,7 @@
 									<div class="p-4 flex items-center">
 										<!-- Left side: Total Billable -->
 										<div class="flex-1">
-											<div class="text-2xl font-bold text-gray-800">
+											<div class="text-2xl font-bold text-gray-800 tabular-nums">
 												{formatCurrency(floor.income)}
 											</div>
 										</div>
@@ -480,13 +480,13 @@
 												<div class="space-y-2">
 													<div class="flex justify-between items-center">
 														<span class="text-xs text-gray-600">Collected</span>
-														<span class="text-xs font-medium text-green-600"
+														<span class="text-xs font-medium text-green-600 tabular-nums"
 															>{formatCurrency(floor.collected)}</span
 														>
 													</div>
 													<div class="flex justify-between items-center">
 														<span class="text-xs text-gray-600">Collectible (Unpaid)</span>
-														<span class="text-xs font-medium text-amber-600"
+														<span class="text-xs font-medium text-amber-600 tabular-nums"
 															>{formatCurrency(floor.collectible)}</span
 														>
 													</div>
@@ -517,20 +517,20 @@
 								<div class="p-4">
 									<div class="flex items-center justify-between">
 										<div>
-											<div class="text-2xl font-bold text-gray-800">
+											<div class="text-2xl font-bold text-gray-800 tabular-nums">
 												{formatCurrency(reportData.totals.grossIncome)}
 											</div>
 										</div>
 										<div class="flex gap-6 text-sm">
 											<div>
 												<div class="text-gray-500 mb-1">Collected</div>
-												<div class="font-semibold text-green-600">
+												<div class="font-semibold text-green-600 tabular-nums">
 													{formatCurrency(reportData.totals.collected)}
 												</div>
 											</div>
 											<div>
 												<div class="text-gray-500 mb-1">Collectible</div>
-												<div class="font-semibold text-amber-600">
+												<div class="font-semibold text-amber-600 tabular-nums">
 													{formatCurrency(reportData.totals.collectibles)}
 												</div>
 											</div>
@@ -559,19 +559,19 @@
 							<div class="space-y-4">
 								<div class="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
 									<span class="font-medium text-gray-700">Gross Income</span>
-									<span class="font-semibold text-green-600"
+									<span class="font-semibold text-green-600 tabular-nums"
 										>{formatCurrency(reportData.totals.grossIncome)}</span
 									>
 								</div>
 								<div class="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
 									<span class="font-medium text-gray-700">Operational Expenses</span>
-									<span class="font-semibold text-red-600"
+									<span class="font-semibold text-red-600 tabular-nums"
 										>- {formatCurrency(calculateOperationalExpenses(reportData.expenses))}</span
 									>
 								</div>
 								<div class="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-lg">
 									<span class="font-medium text-gray-700">Capital Expenses (60% share only)</span>
-									<span class="font-semibold text-red-600"
+									<span class="font-semibold text-red-600 tabular-nums"
 										>- {formatCurrency(calculateCapitalExpenses(reportData.expenses))}</span
 									>
 								</div>
@@ -580,7 +580,7 @@
 										class="flex justify-between items-center py-3 px-4 bg-indigo-100 rounded-lg font-bold"
 									>
 										<span class="text-indigo-800">40% Share</span>
-										<span class="text-indigo-800">
+										<span class="text-indigo-800 tabular-nums">
 											{formatCurrency(profitSharing.fortyShare)}
 										</span>
 									</div>
@@ -588,7 +588,7 @@
 										class="flex justify-between items-center py-3 px-4 bg-blue-100 rounded-lg font-bold"
 									>
 										<span class="text-blue-800">60% Share</span>
-										<span class="text-blue-800">
+										<span class="text-blue-800 tabular-nums">
 											{formatCurrency(profitSharing.sixtyShare)}
 										</span>
 									</div>
@@ -653,7 +653,7 @@
 															>{formatDate(expense.created_at)}</td
 														>
 														<td class="px-4 py-2 text-sm text-gray-900">{expense.description}</td>
-														<td class="px-4 py-2 text-sm font-medium"
+														<td class="px-4 py-2 text-sm font-medium tabular-nums"
 															>{formatCurrency(expense.amount)}</td
 														>
 													</tr>
@@ -665,7 +665,7 @@
 												<td colspan="2" class="px-4 py-3 text-right font-bold text-gray-800"
 													>Total</td
 												>
-												<td class="px-4 py-3 font-bold"
+												<td class="px-4 py-3 font-bold tabular-nums"
 													>{formatCurrency(
 														calculateTotalByType(reportData.expenses, 'OPERATIONAL')
 													)}</td
@@ -711,7 +711,7 @@
 															>{formatDate(expense.created_at)}</td
 														>
 														<td class="px-4 py-2 text-sm text-gray-900">{expense.description}</td>
-														<td class="px-4 py-2 text-sm font-medium"
+														<td class="px-4 py-2 text-sm font-medium tabular-nums"
 															>{formatCurrency(expense.amount)}</td
 														>
 													</tr>
@@ -723,7 +723,7 @@
 												<td colspan="2" class="px-4 py-3 text-right font-bold text-gray-800"
 													>Total</td
 												>
-												<td class="px-4 py-3 font-bold"
+												<td class="px-4 py-3 font-bold tabular-nums"
 													>{formatCurrency(
 														calculateTotalByType(reportData.expenses, 'CAPITAL')
 													)}</td

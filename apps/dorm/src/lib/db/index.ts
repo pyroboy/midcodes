@@ -1,9 +1,8 @@
-import { createRxDatabase, addRxPlugin, type RxDatabase } from 'rxdb';
+import { createRxDatabase, removeRxDatabase, addRxPlugin, type RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
 import { RxDBCleanupPlugin } from 'rxdb/plugins/cleanup';
-import { RxDBLeaderElectionPlugin } from 'rxdb/plugins/leader-election';
 import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema';
 import {
 	tenantSchema,
@@ -34,7 +33,6 @@ if (!pluginsRegistered) {
 	addRxPlugin(RxDBUpdatePlugin);
 	addRxPlugin(RxDBQueryBuilderPlugin);
 	addRxPlugin(RxDBCleanupPlugin);
-	addRxPlugin(RxDBLeaderElectionPlugin);
 	addRxPlugin(RxDBMigrationSchemaPlugin);
 	pluginsRegistered = true;
 }
@@ -57,13 +55,6 @@ const col = (schema: any) => ({
 	cleanup: { minimumDeletedTime: Infinity, autoStart: false }
 });
 
-// New collections starting at version 0 — no migration strategy needed
-const col0 = (schema: any) => ({
-	schema,
-	migrationStrategies: {},
-	cleanup: { minimumDeletedTime: Infinity, autoStart: false }
-});
-
 const COLLECTIONS = {
 	tenants: col(tenantSchema),
 	leases: col(leaseSchema),
@@ -79,7 +70,7 @@ const COLLECTIONS = {
 	expenses: col(expenseSchema),
 	budgets: col(budgetSchema),
 	penalty_configs: col(penaltyConfigSchema),
-	floor_layout_items: col0(floorLayoutItemSchema)
+	floor_layout_items: col(floorLayoutItemSchema)
 };
 
 // Store the singleton on globalThis to survive Vite's production code-splitting
@@ -113,32 +104,58 @@ export async function getDb(): Promise<RxDatabase> {
 			storage = wrappedValidateAjvStorage({ storage });
 		}
 
-		let db: RxDatabase;
-		try {
-			db = await createRxDatabase({
-				name: 'dorm_db',
+		const DB_NAME = 'dorm_db';
+
+		// UT8: crypto.subtle is unavailable in insecure contexts (HTTP on mobile).
+		// Provide a JS-only fallback hash so RxDB works over LAN/HTTP dev servers.
+		const hasSubtle = typeof globalThis.crypto?.subtle?.digest === 'function';
+		const hashFunction = hasSubtle
+			? undefined // use RxDB default (crypto.subtle)
+			: async (input: string) => {
+					// Simple djb2-based hash — not cryptographic, but RxDB only needs
+					// consistent hashing for internal change detection, not security.
+					let h = 5381;
+					for (let i = 0; i < input.length; i++) {
+						h = ((h << 5) + h + input.charCodeAt(i)) >>> 0;
+					}
+					return String(h.toString(16).padStart(8, '0'));
+				};
+
+		const createDb = async () => {
+			const db = await createRxDatabase({
+				name: DB_NAME,
 				storage,
 				eventReduce: true,
-				// ignoreDuplicate only works with dev-mode plugin loaded.
-				// In production, we rely on the globalThis promise cache to prevent duplicates.
-				ignoreDuplicate: dev
+				multiInstance: false,
+				ignoreDuplicate: dev,
+				...(hashFunction ? { hashFunction } : {})
 			});
+
+			// Only add collections if not already present
+			if (Object.keys(db.collections).length === 0) {
+				await db.addCollections(COLLECTIONS);
+			}
+			return db;
+		};
+
+		let db: RxDatabase;
+		try {
+			db = await createDb();
 		} catch (err: any) {
-			// DB9: database already exists — reuse it
-			if (err?.code === 'DB9' || err?.message?.includes('already exists')) {
+			if (err?.code === 'COL23') {
+				// COL23: stale IndexedDB has ghost collections pushing total over
+				// the open-source 16-collection limit. Wipe and recreate fresh.
+				console.warn('[RxDB] COL23 — removing stale database and recreating');
+				await removeRxDatabase(DB_NAME, storage);
+				db = await createDb();
+			} else if (err?.code === 'DB9' || err?.message?.includes('already exists')) {
 				console.warn('[RxDB] Database already exists, attempting reuse');
-				// Try creating with ignoreDuplicate in dev, or just re-throw in prod
-				// The globalThis cache should prevent this, but as a safety net:
 				const existingCached = getCachedDb();
 				if (existingCached) return existingCached;
 				throw err;
+			} else {
+				throw err;
 			}
-			throw err;
-		}
-
-		// Only add collections if not already present
-		if (Object.keys(db.collections).length === 0) {
-			await db.addCollections(COLLECTIONS);
 		}
 
 		// Cache the resolved instance

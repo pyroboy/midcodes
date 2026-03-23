@@ -9,7 +9,7 @@
 	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { formatCurrency } from '$lib/utils/format';
+	import { formatCurrency, formatDate, getStatusClasses } from '$lib/utils/format';
 	import type { PenaltyBilling } from './types';
 
 	let { penalty, onClose, onUpdate } = $props<{
@@ -18,34 +18,16 @@
 		onUpdate: (penalty: PenaltyBilling) => void;
 	}>();
 
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'PAID':
-				return 'bg-green-100 text-green-800';
-			case 'PARTIAL':
-				return 'bg-blue-100 text-blue-800';
-			case 'PENDING':
-				return 'bg-yellow-100 text-yellow-800';
-			case 'OVERDUE':
-				return 'bg-red-100 text-red-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
+	/** Humanize raw enum labels */
+	function humanize(s: string): string {
+		return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w+/g, (w) => w.toLowerCase());
 	}
 
 	function getFormattedType(type: string, utilityType: string | null): string {
 		if (type === 'UTILITY' && utilityType) {
-			return `${type} (${utilityType})`;
+			return `${humanize(type)} (${humanize(utilityType)})`;
 		}
-		return type;
-	}
-
-	function formatDate(dateStr: string) {
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
+		return humanize(type);
 	}
 </script>
 
@@ -57,7 +39,7 @@
 				Billing ID: {penalty.id}
 			</CardDescription>
 		</div>
-		<Button variant="outline" onclick={onClose}>Back to List</Button>
+		<Button variant="outline" class="min-h-[44px]" onclick={onClose}>Back to List</Button>
 	</CardHeader>
 	<CardContent>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -72,8 +54,8 @@
 					</div>
 					<div>
 						<p class="text-sm text-gray-500">Status</p>
-						<Badge variant="outline" class={getStatusColor(penalty.status)}>
-							{penalty.status}
+						<Badge variant="outline" class={getStatusClasses(penalty.status)}>
+							{humanize(penalty.status)}
 						</Badge>
 					</div>
 					<div>
@@ -86,19 +68,19 @@
 					</div>
 					<div>
 						<p class="text-sm text-gray-500">Original Amount</p>
-						<p>{formatCurrency(penalty.amount)}</p>
+						<p class="tabular-nums">{formatCurrency(penalty.amount)}</p>
 					</div>
 					<div>
 						<p class="text-sm text-gray-500">Penalty Amount</p>
-						<p class="font-semibold text-red-600">{formatCurrency(penalty.penalty_amount)}</p>
+						<p class="font-semibold text-red-600 tabular-nums">{formatCurrency(penalty.penalty_amount)}</p>
 					</div>
 					<div>
 						<p class="text-sm text-gray-500">Paid Amount</p>
-						<p>{formatCurrency(penalty.paid_amount)}</p>
+						<p class="tabular-nums">{formatCurrency(penalty.paid_amount)}</p>
 					</div>
 					<div>
 						<p class="text-sm text-gray-500">Remaining Balance</p>
-						<p class="font-semibold">{formatCurrency(penalty.balance)}</p>
+						<p class="font-semibold tabular-nums">{formatCurrency(penalty.balance)}</p>
 					</div>
 				</div>
 
@@ -194,6 +176,6 @@
 		</div>
 	</CardContent>
 	<CardFooter>
-		<Button onclick={() => onUpdate(penalty)} class="w-full">Update Penalty Amount</Button>
+		<Button onclick={() => onUpdate(penalty)} class="w-full min-h-[44px]">Update Penalty Amount</Button>
 	</CardFooter>
 </Card>

@@ -13,11 +13,12 @@
 	import SyncIndicator from '$lib/components/sync/SyncIndicator.svelte';
 	import { browser } from '$app/environment';
 	import { propertiesStore } from '$lib/stores/collections.svelte';
-	import GlobalPropertyViewer from '$lib/components/3d/GlobalPropertyViewer.svelte';
+	// GlobalPropertyViewer removed — 3D View button now links to /property/[id]/floorplan
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 	import * as Accordion from '$lib/components/ui/accordion';
+	import { onlineStatus } from '$lib/utils/offline.svelte';
 
 	// Import Lucide icons
 	import {
@@ -40,10 +41,10 @@
 		LogOut,
 		User,
 		Box,
-		X,
 		ChevronRight,
 		Lightbulb,
-		MapPin
+		MapPin,
+		WifiOff
 	} from 'lucide-svelte';
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 
@@ -51,8 +52,9 @@
 
 	let ready = $state(false);
 	let isAuthRoute = $state(false);
-	let show3DModel = $state(false);
-	let rxdbInitialized = false;
+	// show3DModel removed — 3D View now links directly to floorplan page
+	// Persist across HMR — plain `let` resets on hot reload, causing duplicate sync cycles
+	let rxdbInitialized = (globalThis as any).__dorm_rxdb_initialized ?? false;
 
 	onMount(() => {
 		ready = true;
@@ -96,6 +98,7 @@
 	$effect(() => {
 		if (!data.user || rxdbInitialized) return;
 		rxdbInitialized = true;
+		(globalThis as any).__dorm_rxdb_initialized = true;
 
 		// Persist IndexedDB storage to prevent browser eviction
 		navigator.storage?.persist?.().then((granted) => {
@@ -106,13 +109,13 @@
 		// syncStatus.setNeonHealthDirect() after its own preflight fetch, avoiding a duplicate round-trip.
 		import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
 			syncStatus.setPhase('initializing');
-			syncStatus.addLog('Network: ' + (navigator.onLine ? 'online' : 'offline'), navigator.onLine ? 'info' : 'warn');
+			// Session separator with route for context
+			const route = $page.url.pathname.split('/').filter(Boolean).slice(0, 2).join('/') || 'home';
+			syncStatus.addLog(`─── Page load (${route}) ───`, 'info');
 		});
 		import('$lib/db').then(({ getDb }) => {
 			import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-				syncStatus.setRxdbHealth('checking', 'Opening RxDB (IndexedDB/Dexie)...');
-				syncStatus.addLog('Storage: IndexedDB via Dexie adapter', 'info');
-				syncStatus.addLog('Schemas: v1 (14 collections, indexed)', 'info');
+				syncStatus.setRxdbHealth('checking');
 			});
 			const t0 = Date.now();
 			// F4: Wrap getDb() with a 30-second timeout
@@ -124,21 +127,62 @@
 			]).then((db) => {
 				const initMs = Date.now() - t0;
 				import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-					syncStatus.setRxdbHealth('ok', 'RxDB ready (IndexedDB)');
-					syncStatus.addLog(`RxDB opened in ${initMs}ms — ${Object.keys(db.collections).length} collections`, 'success');
+					syncStatus.setRxdbHealth('ok');
+					syncStatus.addLog(`RxDB ready (${initMs}ms, ${Object.keys(db.collections).length} collections)`, 'success');
+					// A2: Capture RxDB version
+					import('rxdb').then(({ RXDB_VERSION }) => syncStatus.setVersionInfo(RXDB_VERSION)).catch(() => {});
 					// F6: Clear reload-loop counter on successful init
 					sessionStorage.removeItem('__dorm_db_reset_v2');
 
-					// Log storage persistence status
+					// Log storage persistence only if NOT granted (warn-worthy)
 					navigator.storage?.persisted?.().then((persisted) => {
-						syncStatus.addLog(`Storage persistence: ${persisted ? 'granted' : 'not granted (data may be evicted)'}`, persisted ? 'info' : 'warn');
+						if (!persisted) syncStatus.addLog('Storage persistence not granted — data may be evicted', 'warn');
 					});
 				});
 				const t1 = Date.now();
 				return import('$lib/db/replication').then(({ startSync }) => startSync(db)).then(() => {
 					const syncMs = Date.now() - t1;
 					import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
-						syncStatus.addLog(`Initial sync completed in ${syncMs}ms`, 'success');
+						syncStatus.addLog(`Sync completed in ${syncMs}ms`, 'success');
+
+						// B2: Stale checkpoint auto-resync — check every 10 min
+						// Guard against HMR creating duplicate intervals
+						const STALE_CHECK_MS = 10 * 60 * 1000;
+						if ((globalThis as any).__dorm_stale_interval) clearInterval((globalThis as any).__dorm_stale_interval);
+						(globalThis as any).__dorm_stale_interval = setInterval(async () => {
+							if (!navigator.onLine || document.visibilityState !== 'visible') return;
+							const stale = syncStatus.getStaleCollections(STALE_CHECK_MS);
+							if (stale.length === 0) return;
+							syncStatus.addLog(`Auto-resyncing ${stale.length} stale collection(s)`, 'info');
+							const { resyncCollection } = await import('$lib/db/replication');
+							for (const name of stale) {
+								resyncCollection(name).catch(() => {});
+							}
+						}, STALE_CHECK_MS);
+					});
+					// Post-sync: run client-side automation (overdue, penalties, reminders)
+					import('$lib/db/client-automation').then(({ runClientAutomation }) => {
+						runClientAutomation().then((auto) => {
+							import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+								const parts: string[] = [];
+								if (auto.overdue.applied > 0) parts.push(`${auto.overdue.applied} overdue`);
+								if (auto.penalties.applied > 0) parts.push(`${auto.penalties.applied} penalties`);
+								if (auto.reminders.sent > 0) parts.push(`${auto.reminders.sent} reminders`);
+								if (parts.length > 0) {
+									syncStatus.addLog(`Automation: ${parts.join(', ')}`, 'success');
+								} else if (auto.overdue.detected > 0 || auto.penalties.detected > 0 || auto.reminders.detected > 0) {
+									syncStatus.addLog('Automation: all items already processed', 'info');
+								}
+								for (const err of auto.errors) {
+									syncStatus.addLog(`Automation error: ${err}`, 'warn');
+								}
+							});
+						}).catch((err) => {
+							console.warn('[Automation] Failed:', err);
+							import('$lib/stores/sync-status.svelte').then(({ syncStatus }) => {
+								syncStatus.addLog(`Automation failed: ${err?.message || err}`, 'warn');
+							});
+						});
 					});
 					// Post-sync: prune old records and check storage usage
 					import('$lib/db/pruning').then(({ pruneOldRecords }) => {
@@ -277,7 +321,7 @@
 		{
 			category: 'Finance',
 			links: [
-				{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+				{ href: '/payments', label: 'Payments', icon: CreditCard },
 				{ href: '/expenses', label: 'Expenses', icon: Receipt },
 				{ href: '/budgets', label: 'Budgets', icon: PiggyBank }
 			]
@@ -293,13 +337,17 @@
 	];
 
 	// Auto-expand the category containing the current page
-	let activeCategory = $derived.by(() => {
+	// Returns an array for type="multiple" accordion — always includes active category
+	let activeCategories = $derived.by(() => {
 		const pathname = $page.url.pathname;
-		if (pathname === '/') return ''; // Dashboard — don't expand any category
+		const allCategories = navigationLinks.map((g) => g.category);
+		// On dashboard, expand all so mobile users see everything
+		if (pathname === '/') return allCategories;
 		const match = navigationLinks.find((group) =>
 			group.links.some((link) => pathname.startsWith(link.href))
 		);
-		return match?.category ?? '';
+		// Always expand all categories so mobile drawer isn't mostly empty
+		return allCategories;
 	});
 </script>
 
@@ -357,6 +405,7 @@
 									href="/"
 									class="block no-underline"
 									data-sveltekit-preload-data="hover"
+									aria-label="Dashboard"
 								>
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
@@ -364,6 +413,9 @@
 												$page.url.pathname === '/' && "bg-accent text-accent-foreground"
 											)}
 										>
+											{#snippet tooltipContent()}
+												Dashboard
+											{/snippet}
 											<LayoutDashboard class="h-5 w-5" />
 											<span>Dashboard</span>
 										</Sidebar.MenuButton>
@@ -377,6 +429,7 @@
 									href="/locations"
 									class="block no-underline"
 									data-sveltekit-preload-data="hover"
+									aria-label="Locations"
 								>
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
@@ -387,6 +440,9 @@
 													: "hover:bg-muted"
 											)}
 										>
+											{#snippet tooltipContent()}
+												Locations
+											{/snippet}
 											<MapPin class={cn(
 												"h-5 w-5",
 												$page.url.pathname.startsWith('/locations')
@@ -403,6 +459,7 @@
 											href={link.href}
 											class="block no-underline"
 											data-sveltekit-preload-data="hover"
+											aria-label={link.label}
 										>
 											<Sidebar.MenuItem>
 												<Sidebar.MenuButton
@@ -413,6 +470,9 @@
 															: "hover:bg-muted"
 													)}
 												>
+													{#snippet tooltipContent()}
+														{link.label}
+													{/snippet}
 													<link.icon class={cn(
 														"h-4 w-4",
 														$page.url.pathname.startsWith(link.href)
@@ -431,14 +491,17 @@
 								<div class="border-t"></div>
 							</div>
 
-							<Accordion.Root type="single" value={activeCategory} class="w-full">
+							<Accordion.Root type="multiple" value={activeCategories} class="w-full">
 								{#each navigationLinks as group (group.category)}
 									<Accordion.Item value={group.category} class="border-b-0">
 										<Accordion.Trigger
-											class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:no-underline hover:text-foreground transition-colors"
+											class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:no-underline hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-90"
 											onmouseover={() => onSectionHover(group.links)}
 										>
-											{group.category}
+											<span class="flex items-center gap-1.5">
+												<ChevronRight class="h-3 w-3 shrink-0 transition-transform duration-200" />
+												{group.category}
+											</span>
 										</Accordion.Trigger>
 										<Accordion.Content class="pb-2 pt-0">
 											<Sidebar.Menu class="px-2">
@@ -448,6 +511,7 @@
 														class="block no-underline"
 														data-sveltekit-preload-data="hover"
 														data-sveltekit-preload-code="hover"
+														aria-label={link.label}
 													>
 														<Sidebar.MenuItem>
 															<Sidebar.MenuButton
@@ -458,6 +522,9 @@
 																		: "hover:bg-muted"
 																)}
 															>
+																{#snippet tooltipContent()}
+																	{link.label}
+																{/snippet}
 																<link.icon class={cn(
 																	"h-4 w-4",
 																	$page.url.pathname.startsWith(link.href)
@@ -485,9 +552,6 @@
 										</div>
 										<div class="flex flex-col min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
 											<span class="text-sm font-medium truncate">{data.user?.email || 'Logged in'}</span>
-											<div class="flex items-center gap-2">
-												<SyncIndicator />
-											</div>
 										</div>
 									</div>
 									<a
@@ -495,6 +559,7 @@
 										class="flex items-center gap-2 rounded-lg px-2 py-2 mt-1 text-sm text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors group-data-[collapsible=icon]:justify-center"
 										data-sveltekit-preload-data="off"
 										data-sveltekit-reload
+									aria-label="Sign out"
 									>
 										<LogOut class="h-4 w-4" />
 										<span class="group-data-[collapsible=icon]:hidden">Sign out</span>
@@ -504,6 +569,7 @@
 										href="/auth"
 										class="flex items-center gap-2 rounded-lg p-2 text-sm text-primary hover:bg-primary/10 transition-colors"
 										data-sveltekit-preload-data="off"
+									aria-label="Sign in"
 									>
 										<User class="h-4 w-4" />
 										<span class="group-data-[collapsible=icon]:hidden">Sign in</span>
@@ -515,35 +581,41 @@
 					</Sidebar.Root>
 
 					<!-- Flex container for Main Content + 3D Panel -->
-					<div class="flex flex-1 min-w-0 flex-col h-screen">
+					<div class="flex flex-1 min-w-0 flex-col h-dvh">
 						<!-- Header -->
 						<div
-							class="flex items-center justify-between p-4 md:p-6 border-b bg-background/95 backdrop-blur shrink-0"
+							class="flex items-center justify-between px-3 py-2 md:px-6 md:py-4 border-b bg-background/95 backdrop-blur shrink-0 min-h-[48px]"
 						>
-							<div class="flex items-center gap-4">
+							<div class="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
 								<Sidebar.Trigger />
 
 								{#if data.user}
-									<div class="flex items-center gap-2">
-										<PropertySelector />
-										<NotificationBell />
+									<div class="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
+										<!-- W11: Offline indicator -->
+										{#if !onlineStatus.value}
+											<div class="flex items-center gap-1 px-1.5 py-0.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md flex-shrink-0">
+												<WifiOff class="w-3 h-3 text-red-500" />
+												<span class="text-xs font-medium text-red-600 dark:text-red-400 hidden sm:inline">Offline</span>
+											</div>
+										{/if}
+										<div class="min-w-0 flex-shrink">
+											<PropertySelector />
+										</div>
+										<div class="flex items-center gap-1 flex-shrink-0">
+											<NotificationBell />
+											<SyncIndicator />
+										</div>
 
-										<!-- 3D Toggle Button moved here -->
-										{#if $featureFlags.enable3DView}
-											<Button
-												variant={show3DModel ? "secondary" : "outline"}
-												size="sm"
-												class="flex items-center gap-2 ml-2 border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
-												onclick={() => (show3DModel = !show3DModel)}
+										<!-- 3D View quick access — icon on mobile, full button on desktop -->
+										{#if $featureFlags.enable3DView && $propertyStore.selectedPropertyId}
+											<a
+												href="/property/{$propertyStore.selectedPropertyId}/floorplan?view=3d"
+												class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 sm:gap-2 sm:ml-1 sm:px-3 sm:py-1.5 text-sm font-medium rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors flex-shrink-0"
+												aria-label="3D View"
 											>
-												{#if show3DModel}
-													<X class="w-4 h-4" />
-													Close 3D
-												{:else}
-													<Box class="w-4 h-4" />
-													3D View
-												{/if}
-											</Button>
+												<Box class="w-4 h-4" />
+												<span class="hidden sm:inline">3D View</span>
+											</a>
 										{/if}
 									</div>
 								{/if}
@@ -585,19 +657,7 @@
 								</div>
 							</main>
 
-							<!-- 3D Panel (Slides in from Right) -->
-							{#if data.user && $featureFlags.enable3DView}
-								<div 
-									class={cn(
-										"border-l bg-background transition-all duration-300 ease-in-out overflow-hidden flex flex-col",
-										show3DModel ? "w-[450px] opacity-100" : "w-0 opacity-0"
-									)}
-								>
-									{#if show3DModel}
-										<GlobalPropertyViewer />
-									{/if}
-								</div>
-							{/if}
+							<!-- 3D Panel removed — now links to /property/[id]/floorplan -->
 						</div>
 					</div>
 				</div>

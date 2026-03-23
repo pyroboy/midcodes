@@ -164,7 +164,7 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 
 const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 	const connectSrc = dev
-		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* ws://localhost:* ws://127.0.0.1:*"
+		? "connect-src 'self' blob: https://*.neon.tech http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*"
 		: "connect-src 'self' https://*.neon.tech";
 
 	const cspDirectives = [
@@ -174,6 +174,7 @@ const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 		"img-src 'self' data: blob: https://*.neon.tech https://images.unsplash.com https://res.cloudinary.com",
 		connectSrc,
 		"worker-src 'self' blob:",
+		"frame-src 'self' https://rxdb.info",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
 		"form-action 'self'"
@@ -199,8 +200,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const path = event.url.pathname;
 	const isUserLoggedIn = !!event.locals.user;
 
-	// 1. Handle API routes (except auth API and cron)
-	if (path.startsWith('/api') && !path.startsWith('/api/auth') && !path.startsWith('/api/cron')) {
+	// 1. Handle API routes (except auth API)
+	if (path.startsWith('/api') && !path.startsWith('/api/auth')) {
 		if (!isUserLoggedIn) {
 			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
 				status: 401,
@@ -237,8 +238,13 @@ const timingHandle: Handle = async ({ event, resolve }) => {
 	const method = event.request.method;
 	const path = event.url.pathname;
 
-	// Skip noisy requests (HMR, static assets, internal, rxdb replication)
-	if (path.startsWith('/__') || path.startsWith('/node_modules') || path.startsWith('/@') || path.startsWith('/api/rxdb/')) {
+	// Skip noisy requests (HMR, static assets, internal, rxdb replication, non-dorm routes from stale WTFPOS tabs)
+	if (
+		path.startsWith('/__') || path.startsWith('/node_modules') || path.startsWith('/@') ||
+		path.startsWith('/api/rxdb/') ||
+		path.startsWith('/api/replication/') || path.startsWith('/api/device/') ||
+		path === '/pos' || path.startsWith('/pos/') || path.startsWith('/kitchen')
+	) {
 		return resolve(event);
 	}
 

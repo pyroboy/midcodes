@@ -2,9 +2,12 @@
 	import * as Card from '$lib/components/ui/card';
 	import type { Reading, Meter } from './types';
 
-	export let readings: Reading[] = [];
-	export let meters: Meter[] = [];
-	export let readingDates: string[] = [];
+	interface Props {
+		readings?: Reading[];
+		meters?: Meter[];
+		readingDates?: string[];
+	}
+	let { readings = [], meters = [], readingDates = [] }: Props = $props();
 
 	// Format date for display
 	function formatDate(dateString: string): string {
@@ -17,10 +20,17 @@
 
 	// Helper functions to calculate stats
 	function getUniquePropertyCount(): number {
+		// Map lookup for O(1) access
+		const meterMap = new Map<string, Meter>();
+		for (const m of meters) meterMap.set(String(m.id), m);
+
 		return new Set(
 			readings
 				.map((r: Reading) => {
-					const meter = meters.find((m: Meter) => m.id === r.meter_id);
+					// Try direct property from joined meter data first
+					if ((r as any).meters?.property_id) return (r as any).meters.property_id;
+					// Fallback to meters prop lookup with Map
+					const meter = meterMap.get(String(r.meter_id));
 					return meter?.property_id;
 				})
 				.filter(Boolean)
@@ -47,17 +57,17 @@
 			{#if readings.length > 0}
 				<div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
 					<p class="text-sm text-blue-500 font-medium">Total Readings</p>
-					<p class="text-2xl font-bold">{readings.length}</p>
+					<p class="text-2xl font-bold tabular-nums">{readings.length}</p>
 				</div>
 
 				<div class="bg-green-50 rounded-lg p-4 border border-green-100">
 					<p class="text-sm text-green-500 font-medium">Properties</p>
-					<p class="text-2xl font-bold">{getUniquePropertyCount()}</p>
+					<p class="text-2xl font-bold tabular-nums">{getUniquePropertyCount()}</p>
 				</div>
 
 				<div class="bg-amber-50 rounded-lg p-4 border border-amber-100">
 					<p class="text-sm text-amber-500 font-medium">Meters</p>
-					<p class="text-2xl font-bold">{getUniqueMeterCount()}</p>
+					<p class="text-2xl font-bold tabular-nums">{getUniqueMeterCount()}</p>
 				</div>
 
 				<div class="bg-purple-50 rounded-lg p-4 border border-purple-100">
@@ -67,8 +77,8 @@
 					</p>
 				</div>
 			{:else}
-				<div class="col-span-4 text-center p-4 bg-gray-50 rounded-lg">
-					<p class="text-gray-500">No data available for the selected filters</p>
+				<div class="col-span-4 text-center p-4 bg-muted rounded-lg">
+					<p class="text-muted-foreground">No data available for the selected filters</p>
 				</div>
 			{/if}
 		</div>

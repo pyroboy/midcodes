@@ -47,27 +47,43 @@
 		</h2>
 
 		{#if lease.lease_tenants?.length}
-			<div class="space-y-3">
-				{#each lease.lease_tenants.filter((lt) => lt.name) as leaseTenant, index}
+			<div class="space-y-4">
+				{#each lease.lease_tenants as leaseTenant}
 					{@const tenantData = (leaseTenant as any).tenant || leaseTenant}
-					{@const matchedTenant = tenants.find((t) => t.name === tenantData.name)}
-					{@const profileUrl = (tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
-					<div class="flex items-center gap-3">
-						{#if profileUrl}
-							<img
-								src={profileUrl}
-								alt="{tenantData.name}'s profile picture"
-								class="w-10 h-10 rounded-full object-cover"
-							/>
-						{:else}
-							<div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-								<span class="text-lg font-bold text-gray-700">
-									{tenantData.name?.charAt(0).toUpperCase()}
-								</span>
+					{@const tenantName = tenantData.name || (leaseTenant as any).name}
+					{@const matchedTenant = tenants.find((t: any) => t.name === tenantName)}
+					{@const profileUrl = tenantData.profile_picture_url || matchedTenant?.profile_picture_url}
+					{@const email = tenantData.email || matchedTenant?.email}
+					{@const phone = tenantData.contact_number || matchedTenant?.contact_number}
+					{#if tenantName}
+						<div class="flex items-start gap-3">
+							{#if profileUrl}
+								<img
+									src={profileUrl}
+									alt="{tenantName}'s profile picture"
+									class="w-12 h-12 rounded-full object-cover flex-shrink-0"
+								/>
+							{:else}
+								<div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+									<span class="text-lg font-bold text-gray-700">
+										{tenantName.charAt(0).toUpperCase()}
+									</span>
+								</div>
+							{/if}
+							<div class="min-w-0">
+								<div class="text-lg font-semibold text-gray-900">{tenantName}</div>
+								{#if phone}
+									<div class="text-sm text-gray-600">{phone}</div>
+								{/if}
+								{#if email}
+									<div class="text-sm text-gray-500">{email}</div>
+								{/if}
+								{#if !phone && !email}
+									<div class="text-sm text-gray-400 italic">No contact info</div>
+								{/if}
 							</div>
-						{/if}
-						<span class="text-xl font-semibold text-gray-900">{tenantData.name}</span>
-					</div>
+						</div>
+					{/if}
 				{/each}
 			</div>
 		{:else}

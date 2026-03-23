@@ -13,6 +13,7 @@
 	import {
 		formatCurrency,
 		formatDate,
+		formatBillingType,
 		getBillingStatusColor,
 		getDisplayStatus
 	} from '$lib/utils/format';
@@ -175,7 +176,7 @@
 						(selectedBillingType = type as 'RENT' | 'UTILITY' | 'PENALTY' | 'SECURITY_DEPOSIT')}
 				>
 					<div class="space-y-2">
-						<dt class="text-sm font-medium text-gray-500 uppercase tracking-wide">{type}</dt>
+						<dt class="text-sm font-medium text-gray-500 uppercase tracking-wide">{formatBillingType(type)}</dt>
 						<dd class="text-xl font-bold text-gray-900">
 							{formatCurrency(amounts.total)}
 						</dd>
@@ -198,7 +199,7 @@
 
 	<!-- Billing Details -->
 	<div class="space-y-4">
-		<h2 class="text-2xl font-bold text-gray-900 tracking-tight">{selectedBillingType} Details</h2>
+		<h2 class="text-2xl font-bold text-gray-900 tracking-tight">{formatBillingType(selectedBillingType)} Details</h2>
 
 		<div>
 			{#if lease.billings?.filter((b) => b.type === selectedBillingType).length}
@@ -308,7 +309,7 @@
 				<div class="text-center py-12 text-gray-500">
 					<FileText class="w-12 h-12 mx-auto mb-4 text-gray-300" />
 					<p class="text-lg font-semibold text-gray-600 mb-2">
-						No {selectedBillingType.toLowerCase()} billings
+						No {formatBillingType(selectedBillingType).toLowerCase()} billings
 					</p>
 					<p class="text-sm text-gray-500">No billing records found for this category</p>
 				</div>

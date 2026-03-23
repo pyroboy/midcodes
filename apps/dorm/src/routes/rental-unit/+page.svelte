@@ -9,40 +9,63 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Accordion from '$lib/components/ui/accordion';
 	import { Card, CardContent } from '$lib/components/ui/card';
+	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from './formSchema';
-	import { Pencil, Trash2, Users, Tag, List, Plus, Search, Home, Building2 } from 'lucide-svelte';
+	import { Pencil, Trash2, Users, List, Plus, Search, Home, Building2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-svelte';
+	import { browser } from '$app/environment';
+
+	const LS_TYPE_KEY = 'dorm:rental-unit:lastType';
+	const LS_STATUS_KEY = 'dorm:rental-unit:lastStatus';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import {
 		rentalUnitsStore,
 		propertiesStore,
 		floorsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertRentalUnit, optimisticDeleteRentalUnit } from '$lib/db/optimistic-rental-units';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import { resyncCollection } from '$lib/db/replication';
 	import { toast } from 'svelte-sonner';
+	import { formatCurrency } from '$lib/utils/format';
 
-	// Enrich rental units with property and floor relationships
-	let rentalUnits = $derived(rentalUnitsStore.value.map((unit: any) => {
-		const property = propertiesStore.value.find((p: any) => String(p.id) === String(unit.property_id));
-		const floor = floorsStore.value.find((f: any) => String(f.id) === String(unit.floor_id));
-		return {
-			...unit,
-			id: Number(unit.id),
-			property_id: Number(unit.property_id),
-			floor_id: Number(unit.floor_id),
-			base_rate: unit.base_rate,
-			amenities: Array.isArray(unit.amenities) ? unit.amenities : [],
-			property: property ? { id: Number(property.id), name: property.name } : null,
-			floor: floor ? {
-				id: Number(floor.id),
-				property_id: floor.property_id,
-				floor_number: floor.floor_number,
-				wing: floor.wing
-			} : null
-		};
-	}));
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let isSubmitting = $state(false);
+	let rollback: (() => Promise<void>) | null = null;
+
+	// [P2-15] Enrich rental units with Map lookups for O(1) joins
+	let rentalUnits = $derived.by(() => {
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+		const floorMap = new Map<string, any>();
+		for (const f of floorsStore.value) floorMap.set(String(f.id), f);
+
+		return rentalUnitsStore.value.map((unit: any) => {
+			const property = propMap.get(String(unit.property_id));
+			const floor = floorMap.get(String(unit.floor_id));
+			return {
+				...unit,
+				id: Number(unit.id),
+				property_id: Number(unit.property_id),
+				floor_id: Number(unit.floor_id),
+				base_rate: unit.base_rate,
+				amenities: Array.isArray(unit.amenities) ? unit.amenities : [],
+				property: property ? { id: Number(property.id), name: property.name } : null,
+				floor: floor ? {
+					id: Number(floor.id),
+					property_id: floor.property_id,
+					floor_number: floor.floor_number,
+					wing: floor.wing
+				} : null
+			};
+		});
+	});
 
 	let properties = $derived(
 		[...propertiesStore.value]
@@ -60,9 +83,26 @@
 	let isLoading = $derived(!rentalUnitsStore.initialized);
 
 	// UI States
+	let searchInput = $state('');
 	let searchQuery = $state('');
+	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+	// [P3-16] 300ms debounce on search
+	$effect(() => {
+		if (searchTimeout) clearTimeout(searchTimeout);
+		const val = searchInput;
+		searchTimeout = setTimeout(() => { searchQuery = val; }, 300);
+	});
 	let showModal = $state(false);
 	let editMode = $state(false);
+
+	// Filter states [06]
+	let filterFloor = $state('');
+	let filterType = $state('');
+	let filterStatus = $state('');
+
+	// Pagination [11]
+	let currentPage = $state(1);
+	const PAGE_SIZE = 24;
 
 	// Delete confirmation dialog state
 	let showDeleteDialog = $state(false);
@@ -71,17 +111,102 @@
 	// Derived states
 	let selectedProperty = $derived($propertyStore.selectedProperty);
 
-	let filteredRentalUnits = $derived(
-		selectedProperty && rentalUnits
-			? rentalUnits.filter(
-					(unit: any) =>
-						unit.property_id == selectedProperty!.id &&
-						(searchQuery === '' ||
-							unit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-							unit.number.toString().includes(searchQuery))
-				)
-			: []
+	// [04] Format type enum to human-readable label
+	function formatType(type: string): string {
+		const map: Record<string, string> = {
+			'PRIVATEROOM': 'Private Room',
+			'DORMITORY': 'Dormitory',
+			'STUDIO': 'Studio',
+			'SHARED': 'Shared',
+		};
+		return map[type] || type.charAt(0) + type.slice(1).toLowerCase();
+	}
+
+	// [04] Format status to title case
+	function formatStatus(status: string): string {
+		return status.charAt(0) + status.slice(1).toLowerCase();
+	}
+
+	// Get unique floor numbers for filter dropdown [06]
+	let availableFloors = $derived.by(() => {
+		if (!selectedProperty) return [];
+		const floorSet = new Set<number>();
+		for (const unit of rentalUnits) {
+			if (unit.property_id === selectedProperty.id && unit.floor?.floor_number != null) {
+				floorSet.add(unit.floor.floor_number);
+			}
+		}
+		return [...floorSet].sort((a, b) => a - b);
+	});
+
+	// Get unique types for filter dropdown [06]
+	let availableTypes = $derived.by(() => {
+		if (!selectedProperty) return [];
+		const typeSet = new Set<string>();
+		for (const unit of rentalUnits) {
+			if (unit.property_id === selectedProperty.id && unit.type) {
+				typeSet.add(unit.type);
+			}
+		}
+		return [...typeSet].sort();
+	});
+
+	// Single-pass: compute stats + filtered list [03][06]
+	let { unitCount, vacantCount, filteredRentalUnits } = $derived.by(() => {
+		if (!selectedProperty) return { unitCount: 0, vacantCount: 0, filteredRentalUnits: [] };
+
+		let total = 0;
+		let vacant = 0;
+		const searchLower = searchQuery.toLowerCase();
+		const filtered: any[] = [];
+
+		for (const unit of rentalUnits) {
+			if (unit.property_id !== selectedProperty.id) continue;
+			total++;
+			if (unit.rental_unit_status === 'VACANT') vacant++;
+
+			// Apply search filter
+			if (searchLower && !unit.name.toLowerCase().includes(searchLower) && !unit.number.toString().includes(searchQuery)) continue;
+			// Apply floor filter [06]
+			if (filterFloor && unit.floor?.floor_number !== Number(filterFloor)) continue;
+			// Apply type filter [06]
+			if (filterType && unit.type !== filterType) continue;
+			// Apply status filter [06]
+			if (filterStatus && unit.rental_unit_status !== filterStatus) continue;
+
+			filtered.push(unit);
+		}
+
+		return { unitCount: total, vacantCount: vacant, filteredRentalUnits: filtered };
+	});
+
+	// Reset page when filters change [11]
+	$effect(() => {
+		void searchQuery;
+		void filterFloor;
+		void filterType;
+		void filterStatus;
+		currentPage = 1;
+	});
+
+	// Pagination [11]
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredRentalUnits.length / PAGE_SIZE)));
+	let paginatedUnits = $derived(
+		filteredRentalUnits.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 	);
+
+	let hasActiveFilters = $derived(filterFloor !== '' || filterType !== '' || filterStatus !== '');
+
+	// Badge suppression: hide status badge when all filtered units share the same status
+	let allSameStatus = $derived(filteredRentalUnits.length > 0 && filteredRentalUnits.every((u: any) => u.rental_unit_status === filteredRentalUnits[0].rental_unit_status));
+
+	function clearFilters() {
+		filterFloor = '';
+		filterType = '';
+		filterStatus = '';
+		searchInput = '';
+		searchQuery = '';
+	}
 
 	// Build data object for the form component (it reads data.floors)
 	let formData_passthrough = $derived({ floors, properties });
@@ -96,37 +221,89 @@
 	} = superForm(defaults(zod(rental_unitSchema)), {
 		id: 'rental-unit-form',
 		validators: zodClient(rental_unitSchema),
-		validationMethod: 'oninput',
+		validationMethod: 'onsubmit',
 		dataType: 'json',
 		resetForm: true,
-		onError: ({ result }) => {
+		onSubmit: async ({ formData: fd }) => {
+			submitSeq++;
+			savedFormData = { ...$formData, _seq: submitSeq };
+			savedEditMode = editMode;
+			isSubmitting = true;
+			// Close modal immediately for snappy UX
+			showModal = false;
+			// For updates with a known ID, run the optimistic write right away
+			if (editMode && savedFormData?.id) {
+				rollback = await optimisticUpsertRentalUnit({
+					id: savedFormData.id,
+					name: savedFormData.name,
+					number: savedFormData.number,
+					capacity: savedFormData.capacity,
+					rental_unit_status: savedFormData.rental_unit_status,
+					base_rate: String(savedFormData.base_rate),
+					property_id: savedFormData.property_id ?? 0,
+					floor_id: savedFormData.floor_id ?? 0,
+					type: savedFormData.type,
+					amenities: savedFormData.amenities
+				});
+			}
+		},
+		onError: async ({ result }) => {
+			isSubmitting = false;
 			toast.error('Error saving rental unit');
+			if (rollback) { await rollback(); rollback = null; }
+			resyncCollection('rental_units').catch((err) =>
+				console.warn('[RentalUnit] Resync after error:', err)
+			);
 		},
 		onResult: async ({ result }) => {
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				isSubmitting = false;
+				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				if (rollback) { await rollback(); rollback = null; }
+				resyncCollection('rental_units').catch(() => {});
+				savedFormData = null;
+				return;
+			}
+
 			if (result.type === 'success') {
-				toast.success(editMode ? 'Rental unit updated' : 'Rental unit created');
-				showModal = false;
-				// Optimistic upsert — the server already persisted, push into RxDB
-				const d = $formData;
-				if (d.id) {
+				const serverData = (result as any).data?.form?.data;
+				const fd = serverData ?? savedFormData;
+				isSubmitting = false;
+				rollback = null;
+				// For creates, apply optimistic upsert with server-assigned ID
+				if (!savedEditMode && fd?.id) {
 					await optimisticUpsertRentalUnit({
-						id: d.id,
-						name: d.name,
-						number: d.number,
-						capacity: d.capacity,
-						rental_unit_status: d.rental_unit_status,
-						base_rate: String(d.base_rate),
-						property_id: d.property_id ?? 0,
-						floor_id: d.floor_id ?? 0,
-						type: d.type,
-						amenities: d.amenities
+						id: fd.id,
+						name: fd.name,
+						number: fd.number,
+						capacity: fd.capacity,
+						rental_unit_status: fd.rental_unit_status,
+						base_rate: String(fd.base_rate),
+						property_id: fd.property_id ?? 0,
+						floor_id: fd.floor_id ?? 0,
+						type: fd.type,
+						amenities: fd.amenities
 					});
-				} else {
-					// For create, we don't have the new ID — resync to pick it up
-					resyncCollection('rental_units').catch((err) =>
-						console.warn('[RentalUnit] Background resync failed:', err)
-					);
+				} else if (!savedEditMode) {
+					bgResync('rental_units');
 				}
+				// Save preferences to localStorage
+				if (browser && fd?.type) localStorage.setItem(LS_TYPE_KEY, fd.type);
+				if (browser && fd?.rental_unit_status) localStorage.setItem(LS_STATUS_KEY, fd.rental_unit_status);
+
+				const unitLabel = fd?.name ? `${fd.name} (#${fd.number})` : 'Rental unit';
+				toast.success(savedEditMode ? `${unitLabel} updated` : `${unitLabel} created`);
+				savedFormData = null;
+			} else if (result.type === 'failure' || result.type === 'error') {
+				isSubmitting = false;
+				toast.error('Failed to save rental unit');
+				if (rollback) { await rollback(); rollback = null; }
+				resyncCollection('rental_units').catch((err) =>
+					console.warn('[RentalUnit] Resync after failure:', err)
+				);
 			}
 		}
 	});
@@ -143,8 +320,11 @@
 		showModal = true;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	function handleEditClick(rentalUnit: any) {
 		editMode = true;
+		editUpdatedAt = rentalUnit.updated_at ?? null;
 		reset({
 			data: {
 				id: rentalUnit.id,
@@ -185,48 +365,54 @@
 		showDeleteDialog = false;
 		rentalUnitToDelete = null;
 
-		// Optimistic: remove from RxDB immediately
-		await optimisticDeleteRentalUnit(rentalUnit.id);
-
-		const deleteData = new FormData();
-		deleteData.append('id', String(rentalUnit.id));
-
-		try {
-			const result = await fetch('?/delete', {
-				method: 'POST',
-				body: deleteData
-			});
-
-			if (!result.ok) {
-				const resp = await result.json();
-				toast.error(resp.message || 'Failed to delete rental unit');
-				// Resync to restore the original state
-				resyncCollection('rental_units').catch((err) =>
-					console.warn('[RentalUnit] Resync after failed delete:', err)
-				);
-			} else {
-				toast.success('Rental unit deleted');
+		await bufferedMutation({
+			label: 'Delete rental unit',
+			collection: 'rental_units',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteRentalUnit(rentalUnit.id);
+			},
+			serverAction: async () => {
+				const deleteData = new FormData();
+				deleteData.append('id', String(rentalUnit.id));
+				const result = await fetch('?/delete', { method: 'POST', body: deleteData });
+				if (!result.ok) {
+					const resp = await result.json().catch(() => ({}));
+					throw new Error(resp.message || 'Failed to delete rental unit');
+				}
+				return result;
+			},
+			onSuccess: async () => {
+				toast.success(`${rentalUnit.name} (#${rentalUnit.number}) deleted`);
 			}
-		} catch (error) {
-			console.error(error);
-			toast.error('An unexpected error occurred');
-			// Resync to restore the original state on network error
-			resyncCollection('rental_units').catch((err) =>
-				console.warn('[RentalUnit] Resync after error:', err)
-			);
-		}
+		});
 	}
 
-	function getStatusVariant(status: string) {
+	// [08] Semantic status colors
+	function getStatusVariant(status: string): 'default' | 'secondary' | 'outline' | 'destructive' {
 		switch (status) {
 			case 'VACANT':
-				return 'secondary';
-			case 'OCCUPIED':
 				return 'default';
+			case 'OCCUPIED':
+				return 'secondary';
 			case 'RESERVED':
 				return 'outline';
 			default:
 				return 'default';
+		}
+	}
+
+	// [08] Custom classes for semantic colors
+	function getStatusClass(status: string): string {
+		switch (status) {
+			case 'VACANT':
+				return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100';
+			case 'OCCUPIED':
+				return 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100';
+			case 'RESERVED':
+				return 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100';
+			default:
+				return '';
 		}
 	}
 
@@ -240,6 +426,7 @@
 </script>
 
 <div class="space-y-6">
+	<SyncErrorBanner collections={['rental_units', 'properties', 'floors']} />
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 		<div class="flex items-center gap-3">
@@ -248,26 +435,91 @@
 			</div>
 			<div>
 				<h1 class="text-2xl font-bold tracking-tight">Rental Units</h1>
-				<p class="text-sm text-muted-foreground">Manage rooms, beds, and occupancy</p>
+				<!-- [03] Unit count display -->
+				<p class="text-sm text-muted-foreground">
+					{#if isLoading}
+						Manage rooms, beds, and occupancy
+					{:else if selectedProperty}
+						<span class="tabular-nums">{unitCount}</span> unit{unitCount !== 1 ? 's' : ''} · <span class="tabular-nums">{vacantCount}</span> vacant
+					{:else}
+						Select a property to view units
+					{/if}
+				</p>
 			</div>
 		</div>
 
-		<Button onclick={handleAddClick} class="shadow-sm">
-			<Plus class="w-4 h-4 mr-2" />
-			Add Unit
+		<Button onclick={handleAddClick} class="shadow-sm min-h-[44px]" disabled={isSubmitting}>
+			{#if isSubmitting}
+				<Loader2 class="w-4 h-4 mr-2 animate-spin" />
+				Saving...
+			{:else}
+				<Plus class="w-4 h-4 mr-2" />
+				Add Unit
+			{/if}
 		</Button>
 	</div>
 
 	<div>
-		<!-- Search & Filter Bar -->
-		<div class="mb-6">
-			<div class="relative max-w-md">
-				<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-				<Input
-					placeholder="Search units by name or number..."
-					class="pl-9 bg-white"
-					bind:value={searchQuery}
-				/>
+		<!-- Search & Filter Bar [06] -->
+		<div class="mb-6 space-y-3">
+			<div class="flex flex-col sm:flex-row gap-3">
+				<div class="relative flex-1 max-w-md">
+					<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+					<Input
+						placeholder="Search units by name or number..."
+						class="pl-9 bg-white min-h-[44px]"
+						bind:value={searchInput}
+					/>
+				</div>
+
+				<!-- [P2-13] Filter dropdowns with responsive widths -->
+				<div class="flex flex-wrap gap-2">
+					{#if availableFloors.length > 0}
+						<Select type="single" bind:value={filterFloor}>
+							<SelectTrigger class="w-full sm:w-[140px] min-h-[44px]">
+								{filterFloor ? `Floor ${filterFloor}` : 'All Floors'}
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="">All Floors</SelectItem>
+								{#each availableFloors as floorNum}
+									<SelectItem value={String(floorNum)}>Floor {floorNum}</SelectItem>
+								{/each}
+							</SelectContent>
+						</Select>
+					{/if}
+
+					{#if availableTypes.length > 0}
+						<Select type="single" bind:value={filterType}>
+							<SelectTrigger class="w-full sm:w-[160px] min-h-[44px]">
+								{filterType ? formatType(filterType) : 'All Types'}
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="">All Types</SelectItem>
+								{#each availableTypes as type}
+									<SelectItem value={type}>{formatType(type)}</SelectItem>
+								{/each}
+							</SelectContent>
+						</Select>
+					{/if}
+
+					<Select type="single" bind:value={filterStatus}>
+						<SelectTrigger class="w-full sm:w-[150px] min-h-[44px]">
+							{filterStatus ? formatStatus(filterStatus) : 'All Statuses'}
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="">All Statuses</SelectItem>
+							<SelectItem value="VACANT">Vacant</SelectItem>
+							<SelectItem value="OCCUPIED">Occupied</SelectItem>
+							<SelectItem value="RESERVED">Reserved</SelectItem>
+						</SelectContent>
+					</Select>
+
+					{#if hasActiveFilters}
+						<Button variant="ghost" size="sm" onclick={clearFilters} class="text-muted-foreground min-h-[44px]">
+							Clear filters
+						</Button>
+					{/if}
+				</div>
 			</div>
 		</div>
 
@@ -287,14 +539,8 @@
 						{/each}
 					</div>
 				{:else if !selectedProperty}
-					<div class="flex flex-col items-center justify-center py-16 text-center">
-						<div class="bg-gray-100 p-4 rounded-full mb-4">
-							<Building2 class="w-8 h-8 text-gray-400" />
-						</div>
-						<h3 class="text-lg font-semibold text-gray-900">No Property Selected</h3>
-						<p class="text-muted-foreground max-w-sm mt-2">
-							Please select a property from the top navigation to manage its rental units.
-						</p>
+					<div class="p-6">
+						<EmptyState icon={Building2} title="No Property Selected" description="Select a property from the dropdown in the header to view rental units." />
 					</div>
 				{:else if filteredRentalUnits.length === 0}
 					<div class="flex flex-col items-center justify-center py-16 text-center">
@@ -303,67 +549,66 @@
 						</div>
 						<h3 class="text-lg font-semibold text-gray-900">No Units Found</h3>
 						<p class="text-muted-foreground max-w-sm mt-2">
-							{searchQuery
-								? 'No rental units match your search criteria.'
+							{searchQuery || hasActiveFilters
+								? 'No rental units match your search or filter criteria.'
 								: 'Get started by adding the first rental unit to this property.'}
 						</p>
-						{#if !searchQuery}
+						{#if searchQuery || hasActiveFilters}
+							<Button variant="outline" class="mt-4" onclick={clearFilters}>Clear Filters</Button>
+						{:else}
 							<Button variant="outline" class="mt-4" onclick={handleAddClick}>Create Unit</Button>
 						{/if}
 					</div>
 				{:else}
-					<!-- List Header -->
+					<!-- Desktop List Header [01] - hidden on mobile -->
 					<div
-						class="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-gray-50/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider"
+						class="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-gray-50/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider"
 					>
 						<div>Unit Details</div>
 						<div>Floor</div>
 						<div>Type</div>
+						<div>Rate</div>
 						<div>Status</div>
 						<div class="text-right">Actions</div>
 					</div>
 
-					<!-- Units List -->
-					<Accordion.Root type="single" class="divide-y divide-gray-100">
-						{#each filteredRentalUnits as unit (unit.id)}
-							<Accordion.Item value={unit.id.toString()} class="border-b-0 group">
-								<div class="flex items-center w-full hover:bg-gray-50/50 transition-colors">
-									<Accordion.Trigger class="flex-grow px-6 py-4 hover:no-underline">
-										<div class="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 items-center w-full text-sm">
-											<div class="text-left">
-												<div class="font-semibold text-gray-900">{unit.name}</div>
-												<div class="text-xs text-muted-foreground mt-0.5">
-													Unit #{unit.number}
-												</div>
-											</div>
-											<div class="text-left text-gray-600">
-												Floor {unit.floor?.floor_number}
-											</div>
-											<div class="text-left">
-												<span
-													class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-700"
-												>
-													{unit.type}
-												</span>
-											</div>
-											<div class="text-left">
+					<!-- Mobile Card View [01] - visible only on mobile -->
+					<div class="lg:hidden divide-y divide-gray-100">
+						{#each paginatedUnits as unit (unit.id)}
+							<div class="p-4 hover:bg-gray-50/50 transition-colors">
+								<div class="flex items-start justify-between gap-3">
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2 flex-wrap">
+											<h3 class="font-semibold text-gray-900 truncate">{unit.name}</h3>
+											<span class="text-xs text-muted-foreground">#{unit.number}</span>
+										</div>
+										<div class="flex items-center gap-2 mt-1 text-sm text-gray-600">
+											<span>Floor {unit.floor?.floor_number ?? '—'}</span>
+											<span class="text-gray-300">|</span>
+											<span>{formatType(unit.type)}</span>
+										</div>
+										<div class="flex items-center gap-2 mt-2">
+											{#if !allSameStatus}
 												<Badge
 													variant={getStatusVariant(unit.rental_unit_status)}
-													class="shadow-none"
+													class="shadow-none {getStatusClass(unit.rental_unit_status)}"
 												>
-													{unit.rental_unit_status}
+													{formatStatus(unit.rental_unit_status)}
 												</Badge>
-											</div>
+											{/if}
+											<span class="text-sm font-medium text-gray-700">
+												<span class="tabular-nums">{formatCurrency(Number(unit.base_rate))}</span>/mo
+											</span>
 										</div>
-									</Accordion.Trigger>
-
-									<!-- Actions -->
-									<div class="flex items-center gap-1 px-6">
+									</div>
+									<!-- [02] Mobile action buttons with 44px touch targets -->
+									<div class="flex items-center gap-2">
 										<Button
 											variant="ghost"
 											size="icon"
-											class="h-8 w-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
-											onclick={(e) => {
+											class="h-11 w-11 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+											aria-label="Edit {unit.name}"
+											onclick={(e: MouseEvent) => {
 												e.stopPropagation();
 												handleEditClick(unit);
 											}}
@@ -373,8 +618,9 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="h-8 w-8 text-gray-500 hover:text-red-600 hover:bg-red-50"
-											onclick={(e) => {
+											class="h-11 w-11 text-gray-500 hover:text-red-600 hover:bg-red-50"
+											aria-label="Delete {unit.name}"
+											onclick={(e: MouseEvent) => {
 												e.stopPropagation();
 												handleDeleteClick(unit);
 											}}
@@ -383,61 +629,171 @@
 										</Button>
 									</div>
 								</div>
+							</div>
+						{/each}
+					</div>
 
-								<Accordion.Content>
-									<div class="px-6 pb-6 pt-2 bg-gray-50/30">
+					<!-- Desktop Units List [01] - hidden on mobile -->
+					<div class="hidden lg:block">
+						<Accordion.Root type="multiple" class="divide-y divide-gray-100">
+							{#each paginatedUnits as unit (unit.id)}
+								<Accordion.Item value={unit.id.toString()} class="border-b-0 group">
+									<div class="flex items-center w-full hover:bg-gray-50/50 transition-colors">
+										<Accordion.Trigger class="flex-grow px-6 py-4 hover:no-underline">
+											<div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 items-center w-full text-sm">
+												<div class="text-left">
+													<div class="font-semibold text-gray-900">{unit.name}</div>
+													<div class="text-xs text-muted-foreground mt-0.5">
+														Unit #{unit.number}
+													</div>
+												</div>
+												<div class="text-left text-gray-600">
+													Floor {unit.floor?.floor_number ?? '—'}
+												</div>
+												<div class="text-left">
+													<span
+														class="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-700"
+													>
+														{formatType(unit.type)}
+													</span>
+												</div>
+												<!-- [07] Base rate column [P1-7] tabular-nums -->
+												<div class="text-left text-gray-700 font-medium tabular-nums">
+													{formatCurrency(Number(unit.base_rate))}
+												</div>
+												<div class="text-left">
+													{#if !allSameStatus}
+														<Badge
+															variant={getStatusVariant(unit.rental_unit_status)}
+															class="shadow-none {getStatusClass(unit.rental_unit_status)}"
+														>
+															{formatStatus(unit.rental_unit_status)}
+														</Badge>
+													{:else}
+														<span class="text-sm text-muted-foreground">{formatStatus(unit.rental_unit_status)}</span>
+													{/if}
+												</div>
+											</div>
+										</Accordion.Trigger>
+
+										<!-- Actions [02] with aria-labels -->
+										<div class="flex items-center gap-2 px-6">
+											<Button
+												variant="ghost"
+												size="icon"
+												class="h-9 w-9 text-gray-500 hover:text-blue-600 hover:bg-blue-50"
+												aria-label="Edit {unit.name}"
+												onclick={(e: MouseEvent) => {
+													e.stopPropagation();
+													handleEditClick(unit);
+												}}
+											>
+												<Pencil class="h-4 w-4" />
+											</Button>
+											<Button
+												variant="ghost"
+												size="icon"
+												class="h-9 w-9 text-gray-500 hover:text-red-600 hover:bg-red-50"
+												aria-label="Delete {unit.name}"
+												onclick={(e: MouseEvent) => {
+													e.stopPropagation();
+													handleDeleteClick(unit);
+												}}
+											>
+												<Trash2 class="h-4 w-4" />
+											</Button>
+										</div>
+									</div>
+
+									<Accordion.Content>
+										<div class="px-6 pb-6 pt-2 bg-gray-50/30">
+											<!-- [P1-8] Removed redundant Base Rate — already in list column -->
 										<div
-											class="bg-white border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-3 gap-6 shadow-sm"
-										>
-											<div class="flex items-start gap-3">
-												<div class="p-2 bg-blue-50 rounded-md text-blue-600">
-													<Users class="h-4 w-4" />
+												class="bg-white border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-6 shadow-sm"
+											>
+												<div class="flex items-start gap-3">
+													<div class="p-2 bg-blue-50 rounded-md text-blue-600">
+														<Users class="h-4 w-4" />
+													</div>
+													<div>
+														<p class="text-sm font-medium text-gray-900">Capacity</p>
+														<p class="text-sm text-muted-foreground">{unit.capacity} people</p>
+													</div>
 												</div>
-												<div>
-													<p class="text-sm font-medium text-gray-900">Capacity</p>
-													<p class="text-sm text-muted-foreground">{unit.capacity} people</p>
-												</div>
-											</div>
 
-											<div class="flex items-start gap-3">
-												<div class="p-2 bg-green-50 rounded-md text-green-600">
-													<Tag class="h-4 w-4" />
-												</div>
-												<div>
-													<p class="text-sm font-medium text-gray-900">Base Rate</p>
-													<p class="text-sm text-muted-foreground">
-														₱{unit.base_rate.toLocaleString()} / month
-													</p>
-												</div>
-											</div>
-
-											<div class="flex items-start gap-3">
-												<div class="p-2 bg-purple-50 rounded-md text-purple-600">
-													<List class="h-4 w-4" />
-												</div>
-												<div>
-													<p class="text-sm font-medium text-gray-900">Amenities</p>
-													<div class="flex flex-wrap gap-1 mt-1">
-														{#if Array.isArray(unit.amenities) && unit.amenities.length > 0}
-															{#each unit.amenities as amenity}
-																<span
-																	class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
-																>
-																	{amenity}
-																</span>
-															{/each}
-														{:else}
-															<span class="text-sm text-muted-foreground italic">None listed</span>
-														{/if}
+												<div class="flex items-start gap-3">
+													<div class="p-2 bg-purple-50 rounded-md text-purple-600">
+														<List class="h-4 w-4" />
+													</div>
+													<div>
+														<p class="text-sm font-medium text-gray-900">Amenities</p>
+														<div class="flex flex-wrap gap-1 mt-1">
+															{#if Array.isArray(unit.amenities) && unit.amenities.length > 0}
+																{#each unit.amenities as amenity}
+																	<span
+																		class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800"
+																	>
+																		{amenity}
+																	</span>
+																{/each}
+															{:else}
+																<span class="text-sm text-muted-foreground italic">None listed</span>
+															{/if}
+														</div>
 													</div>
 												</div>
 											</div>
 										</div>
-									</div>
-								</Accordion.Content>
-							</Accordion.Item>
-						{/each}
-					</Accordion.Root>
+									</Accordion.Content>
+								</Accordion.Item>
+							{/each}
+						</Accordion.Root>
+					</div>
+
+					<!-- Pagination Controls [11] -->
+					{#if totalPages > 1}
+						<div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+							<p class="text-sm text-muted-foreground tabular-nums">
+								Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRentalUnits.length)} of {filteredRentalUnits.length}
+							</p>
+							<div class="flex items-center gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={currentPage <= 1}
+									onclick={() => currentPage--}
+									class="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9"
+								>
+									<ChevronLeft class="w-4 h-4" />
+								</Button>
+								{#each Array(totalPages) as _, i (i)}
+									{#if totalPages <= 7 || i === 0 || i === totalPages - 1 || Math.abs(i + 1 - currentPage) <= 1}
+										<Button
+											variant={currentPage === i + 1 ? 'default' : 'outline'}
+											size="sm"
+											onclick={() => currentPage = i + 1}
+											class="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9"
+										>
+											{i + 1}
+										</Button>
+									{:else if i === 1 && currentPage > 3}
+										<span class="text-muted-foreground px-1">...</span>
+									{:else if i === totalPages - 2 && currentPage < totalPages - 2}
+										<span class="text-muted-foreground px-1">...</span>
+									{/if}
+								{/each}
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={currentPage >= totalPages}
+									onclick={() => currentPage++}
+									class="min-w-11 min-h-11 sm:min-w-9 sm:min-h-9"
+								>
+									<ChevronRight class="w-4 h-4" />
+								</Button>
+							</div>
+						</div>
+					{/if}
 				{/if}
 			</CardContent>
 		</Card>
@@ -457,6 +813,7 @@
 		<RentalUnitForm
 			data={formData_passthrough}
 			{editMode}
+			updatedAt={editUpdatedAt}
 			form={formData}
 			{errors}
 			{enhance}
@@ -477,7 +834,7 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel onclick={() => { showDeleteDialog = false; rentalUnitToDelete = null; }}>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={confirmDeleteRentalUnit}>Continue</AlertDialog.Action>
+			<AlertDialog.Action onclick={confirmDeleteRentalUnit} class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

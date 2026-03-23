@@ -69,8 +69,8 @@
 
 	// Format currency
 	function formatCurrency(amount?: number): string {
-		if (amount === undefined || amount === 0) return '₱0';
-		return `₱${amount.toLocaleString()}`;
+		if (amount === undefined || amount === 0) return '₱0.00';
+		return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
 	}
 
 	// Get a descriptive payment status based on the amounts
@@ -228,7 +228,7 @@
 												</Card.Description>
 											</Card.Header>
 											<Card.Content class="p-3 space-y-2">
-												<div class="space-y-1">
+												<div class="space-y-1 tabular-nums">
 													<div class="text-xs font-medium">Payment Summary</div>
 													<div class="text-xs flex justify-between">
 														<span>Total Paid:</span>
@@ -301,7 +301,7 @@
 														>{formatMonth(payment.month)} Payment Summary</Card.Title
 													>
 												</Card.Header>
-												<Card.Content class="p-3 space-y-3">
+												<Card.Content class="p-3 space-y-3 tabular-nums">
 													<div class="flex items-center justify-between mb-2">
 														<div class="text-xs font-medium">Legend</div>
 														<div class="flex gap-2">

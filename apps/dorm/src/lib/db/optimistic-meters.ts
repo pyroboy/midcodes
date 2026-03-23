@@ -25,13 +25,15 @@ export async function optimisticUpsertMeter(data: {
 	status: string;
 	notes?: string | null;
 	initial_reading?: string | null;
-}) {
+}): Promise<(() => Promise<void>) | null> {
 	console.log(`[Optimistic] meter #${data.id} → writing to RxDB...`);
 	syncStatus.addLog(`Optimistic: meter #${data.id} → writing to RxDB...`, 'info');
+	let snapshot: Record<string, any> | null = null;
 	try {
 		const db = await getDb();
 		const sid = String(data.id);
 		const existing = await db.meters.findOne(sid).exec();
+		snapshot = existing ? existing.toJSON(true) : null;
 		await db.meters.upsert({
 			id: sid,
 			name: data.name,
@@ -53,30 +55,54 @@ export async function optimisticUpsertMeter(data: {
 	} catch (err) {
 		console.warn('[Optimistic] Meter upsert failed, falling back to resync:', err);
 		syncStatus.addLog(`Optimistic: meter #${data.id} upsert failed — ${(err as Error)?.message || err}`, 'error');
+		bgResync('meters');
+		return null;
 	}
 	bgResync('meters');
+	const capturedSnapshot = snapshot;
+	const sid = String(data.id);
+	return async () => {
+		try {
+			const db = await getDb();
+			if (capturedSnapshot) {
+				await db.meters.upsert(capturedSnapshot);
+			} else {
+				const doc = await db.meters.findOne(sid).exec();
+				if (doc) await doc.incrementalPatch({ deleted_at: new Date().toISOString() });
+			}
+			syncStatus.addLog(`Optimistic: meter #${data.id} rolled back`, 'warn');
+		} catch (err) {
+			console.warn('[Optimistic] Meter rollback failed:', err);
+		}
+	};
 }
 
 /**
  * Optimistically delete a meter from RxDB.
  */
-export async function optimisticDeleteMeter(meterId: number) {
-	console.log(`[Optimistic] meter #${meterId} → soft-deleting in RxDB...`);
-	syncStatus.addLog(`Optimistic: meter #${meterId} → soft-deleting in RxDB...`, 'info');
+export async function optimisticDeleteMeter(meterId: number | string) {
+	const sid = String(meterId);
+	if (!sid || sid === 'undefined' || sid === 'null' || sid === 'NaN') {
+		console.warn(`[Optimistic] Meter delete skipped — invalid id: ${meterId}`);
+		syncStatus.addLog(`Optimistic: meter delete skipped — invalid id: ${meterId}`, 'warn');
+		return;
+	}
+	console.log(`[Optimistic] meter #${sid} → soft-deleting in RxDB...`);
+	syncStatus.addLog(`Optimistic: meter #${sid} → soft-deleting in RxDB...`, 'info');
 	try {
 		const db = await getDb();
-		const doc = await db.meters.findOne(String(meterId)).exec();
+		const doc = await db.meters.findOne(sid).exec();
 		if (doc) {
 			await doc.incrementalPatch({
 				deleted_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
 			});
 		}
-		console.log(`[Optimistic] meter #${meterId} soft-deleted ✓`);
-		syncStatus.addLog(`Optimistic: meter #${meterId} soft-deleted ✓`, 'success');
+		console.log(`[Optimistic] meter #${sid} soft-deleted ✓`);
+		syncStatus.addLog(`Optimistic: meter #${sid} soft-deleted ✓`, 'success');
 	} catch (err) {
 		console.warn('[Optimistic] Meter delete failed, falling back to resync:', err);
-		syncStatus.addLog(`Optimistic: meter #${meterId} delete failed — ${(err as Error)?.message || err}`, 'error');
+		syncStatus.addLog(`Optimistic: meter #${sid} delete failed — ${(err as Error)?.message || err}`, 'error');
 	}
 	bgResync('meters');
 }

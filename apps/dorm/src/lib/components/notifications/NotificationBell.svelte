@@ -48,8 +48,10 @@
 <div class="relative" bind:this={panelRef}>
 	<button
 		onclick={togglePanel}
-		class="relative inline-flex items-center justify-center rounded-md p-2 hover:bg-muted transition-colors"
+		class="relative inline-flex items-center justify-center rounded-md p-2 {showPanel ? 'bg-muted ring-1 ring-border' : 'hover:bg-muted'} transition-colors"
 		aria-label="Notifications"
+		aria-expanded={showPanel}
+		aria-haspopup="true"
 	>
 		<Bell class="h-5 w-5 text-muted-foreground" />
 		{#if unreadCount > 0}

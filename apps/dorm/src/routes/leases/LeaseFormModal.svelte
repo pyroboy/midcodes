@@ -7,6 +7,7 @@
 		DialogDescription
 	} from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Select from '$lib/components/ui/select';
@@ -16,8 +17,10 @@
 	import { format } from 'date-fns';
 	import { leaseStatusEnum } from './formSchema';
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { optimisticUpsertLease } from '$lib/db/optimistic-leases';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
+	import FormProgressIndicator from '$lib/components/ui/FormProgressIndicator.svelte';
 
 	let {
 		lease = null,
@@ -84,6 +87,40 @@
 		selectedTenants: getTenantIds(lease)
 	}))());
 
+	// [07] Progress indicator section tracking
+	let activeSection = $state(0);
+	const sectionIds = ['section-basic-info', 'section-tenants', 'section-notes'];
+
+	function scrollToSection(index: number) {
+		const el = document.getElementById(sectionIds[index]);
+		if (el) {
+			el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			activeSection = index;
+		}
+	}
+
+	// [14] Auto-fill rent from unit's base_rate when rental unit changes (only for new leases)
+	let previousUnitId = $state(0);
+	$effect(() => {
+		const unitId = formData.rental_unit_id;
+		if (unitId && unitId !== 0 && unitId !== previousUnitId) {
+			previousUnitId = unitId;
+			// Only auto-fill if not in edit mode OR if rent is still 0
+			if (!editMode || formData.rent_amount === 0) {
+				const unit = rentalUnits?.find((r: any) => r.id === unitId);
+				if (unit?.base_rate) {
+					const rate = parseFloat(unit.base_rate);
+					if (!isNaN(rate) && rate > 0) {
+						formData.rent_amount = rate;
+					}
+				}
+			}
+		}
+	});
+
+	// [05] Zero rent warning state
+	let showZeroRentWarning = $state(false);
+
 	// Auto-calculate end_date when start_date or terms change
 	$effect(() => {
 		if (formData.start_date && Number(formData.terms_month) > 0) {
@@ -132,9 +169,21 @@
 		});
 	});
 
+	// Unsaved changes confirmation dialog state
+	let showUnsavedDialog = $state(false);
+
+	// Track form changes to prevent accidental exits
+	let initialFormData = $state<string>('');
+	let hasUnsavedChanges = $derived.by(() => {
+		if (!open) return false;
+		const currentData = JSON.stringify(formData);
+		return initialFormData !== '' && currentData !== initialFormData;
+	});
+
 	// Validation
 	let validationErrors = $state<Record<string, string>>({});
 	let isFormValid = $state(false);
+	let showErrors = $state(false);
 
 	// Updated validation
 	$effect(() => {
@@ -174,8 +223,9 @@
 
 	// Get rental unit display name
 	let selectedRentalUnit = $derived.by(() => {
+		if (!formData.rental_unit_id || formData.rental_unit_id === 0) return 'Select a rental unit...';
 		const unit = rentalUnits?.find((r: any) => r.id === formData.rental_unit_id);
-		if (!unit) return 'Select a unit';
+		if (!unit) return 'Select a rental unit...';
 		const unitName = unit.name ?? 'Unnamed Unit';
 		const propertyName = unit.property?.name ?? 'No property';
 		return `${unitName} - ${propertyName}`;
@@ -196,9 +246,16 @@
 		return formData.selectedTenants.includes(tenantId);
 	}
 
+	// Capture form data before submission (needed because form may reset before onResult)
+	let savedFormData: (typeof formData & { _seq?: number }) | null = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
+
 	// Form submission with use:enhance
 	const handleFormSubmit = () => {
 		if (!isFormValid) {
+			showErrors = true;
 			toast.error('Please fix the validation errors before submitting');
 			return;
 		}
@@ -223,11 +280,34 @@
 				selectedTenants: tenantIds
 			};
 			searchTerm = '';
+			showErrors = false;
+			showZeroRentWarning = false;
+			activeSection = 0;
+			previousUnitId = lease?.rental_unit?.id || 0;
+
+			// Set initial form data after form is populated
+			setTimeout(() => {
+				initialFormData = JSON.stringify(formData);
+			}, 100);
 		}
 	});
+
+	// Handle modal close with unsaved changes check
+	function handleModalClose(shouldClose: boolean) {
+		if (!shouldClose && hasUnsavedChanges) {
+			showUnsavedDialog = true;
+			return;
+		}
+		onOpenChange(false);
+	}
+
+	function confirmDiscardChanges() {
+		showUnsavedDialog = false;
+		onOpenChange(false);
+	}
 </script>
 
-<Dialog {open} onOpenChange={(open) => !open && onOpenChange(false)}>
+<Dialog {open} onOpenChange={(isOpen) => !isOpen && handleModalClose(false)}>
 	<DialogContent class="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
 		<DialogHeader>
 			<div class="flex items-center gap-2">
@@ -245,22 +325,95 @@
 			</DialogDescription>
 		</DialogHeader>
 
+		<FormProgressIndicator
+			sections={['Basic Info', 'Tenants', 'Notes']}
+			currentSection={activeSection}
+			onSectionClick={scrollToSection}
+		/>
+
 		<form
 			method="POST"
 			action={editMode ? '?/updateLease' : '?/create'}
 			use:enhance={() => {
+				// [05] Check for zero rent and show warning (non-blocking)
+				if (Number(formData.rent_amount) === 0) {
+					showZeroRentWarning = true;
+					// If this is the first time seeing the warning, show it but don't block
+					toast.warning('Monthly rent is set to 0. Verify this is intentional.', { duration: 4000 });
+				}
+
+				// Capture form snapshot before potential reset
+				submitSeq++;
+				savedFormData = { ...formData, _seq: submitSeq };
+				savedEditMode = editMode;
+
+				// Close modal immediately + show in-progress toast
+				onOpenChange(false);
+				toast.info(savedEditMode ? 'Saving lease...' : 'Creating lease...');
+
+				// For updates where ID is known, write optimistically right away
+				if (savedEditMode && lease?.id && savedFormData) {
+					const fd = savedFormData;
+					optimisticUpsertLease({
+						id: lease.id,
+						rental_unit_id: fd.rental_unit_id,
+						name: fd.name,
+						start_date: fd.start_date,
+						end_date: fd.end_date,
+						rent_amount: fd.rent_amount,
+						notes: fd.notes,
+						terms_month: fd.terms_month,
+						status: fd.status
+					}).then((rb) => { rollback = rb; }).catch(() => {/* non-critical */});
+				}
+
 				return async ({ result }) => {
+					// Ignore if a newer submission has already overwritten
+					if (!savedFormData || savedFormData._seq !== submitSeq) return;
+
 					if (result.type === 'success') {
-						toast.success(editMode ? 'Lease updated successfully' : 'Lease created successfully');
-						onOpenChange(false);
-						// Use the onDataChange callback to refresh data
-						if (onDataChange) {
-							await onDataChange();
+						// Prefer server data (has real ID for creates), fall back to saved snapshot
+						const serverData = (result as any).data?.form?.data;
+						const leaseResult = (result as any).data?.lease;
+						const fd = savedFormData;
+						const leaseId = serverData?.id ?? leaseResult?.id ?? (savedEditMode ? lease?.id : null);
+
+						rollback = null; // Success — discard snapshot
+						toast.success(savedEditMode ? 'Lease updated successfully' : 'Lease created successfully');
+
+						if (leaseId && fd) {
+							// For creates: apply optimistic upsert now that we have the real server ID
+							if (!savedEditMode) {
+								optimisticUpsertLease({
+									id: leaseId,
+									rental_unit_id: fd.rental_unit_id,
+									name: fd.name,
+									start_date: fd.start_date,
+									end_date: fd.end_date,
+									rent_amount: fd.rent_amount,
+									notes: fd.notes,
+									terms_month: fd.terms_month,
+									status: fd.status
+								}).catch(() => {/* non-critical */});
+							}
 						} else {
-							await invalidateAll();
+							// Fallback: no ID available — pull from server
+							bgResync('leases');
 						}
+
+						// Also resync lease_tenants since tenant assignments changed
+						bgResync('lease_tenants');
+						savedFormData = null;
 					} else if (result.type === 'failure') {
-						toast.error(editMode ? 'Failed to update lease' : 'Failed to create lease');
+						if ((result.data as any)?.conflict) {
+							toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+						} else {
+							toast.error(savedEditMode ? 'Failed to update lease' : 'Failed to create lease');
+						}
+						// Instant rollback, then confirm with resync
+						if (rollback) { await rollback(); rollback = null; }
+						bgResync('leases');
+						savedFormData = null;
 					}
 				};
 			}}
@@ -269,6 +422,7 @@
 			<!-- Hidden form fields for server action -->
 			{#if editMode}
 				<input type="hidden" name="id" value={lease?.id} />
+				<input type="hidden" name="_updated_at" value={lease?.updated_at ?? ''} />
 			{/if}
 			<input type="hidden" name="name" bind:value={formData.name} />
 			<input type="hidden" name="start_date" bind:value={formData.start_date} />
@@ -281,7 +435,7 @@
 			<input type="hidden" name="tenantIds" value={JSON.stringify(formData.selectedTenants)} />
 
 			<!-- Basic Information -->
-			<div class="space-y-4">
+			<div id="section-basic-info" class="space-y-4">
 				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
 					<Calendar class="w-4 h-4 text-slate-500" />
 					<h3 class="text-sm font-semibold text-slate-700">Basic Information</h3>
@@ -289,16 +443,16 @@
 
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<div class="space-y-2">
-						<Label for="name">Lease Name</Label>
+						<Label for="name">Lease Name <span class="text-red-500">*</span></Label>
 						<Input
 							id="name"
 							name="name"
 							type="text"
 							bind:value={formData.name}
-							class={validationErrors.name ? 'border-red-500' : ''}
+							class={showErrors && validationErrors.name ? 'border-red-500' : ''}
 							required
 						/>
-						{#if validationErrors.name}
+						{#if showErrors && validationErrors.name}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.name}
@@ -307,9 +461,9 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="rental_unit">Rental Unit</Label>
+						<Label for="rental_unit">Rental Unit <span class="text-red-500">*</span></Label>
 						<Select.Root type="single" bind:value={formData.rental_unit_id}>
-							<Select.Trigger class={validationErrors.rental_unit ? 'border-red-500' : ''}>
+							<Select.Trigger class={showErrors && validationErrors.rental_unit ? 'border-red-500' : ''}>
 								{selectedRentalUnit}
 							</Select.Trigger>
 							<Select.Content>
@@ -320,7 +474,7 @@
 								{/each}
 							</Select.Content>
 						</Select.Root>
-						{#if validationErrors.rental_unit}
+						{#if showErrors && validationErrors.rental_unit}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.rental_unit}
@@ -329,7 +483,7 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label for="rent_amount">Monthly Rent Amount</Label>
+						<Label for="rent_amount">Monthly Rent Amount <span class="text-red-500">*</span></Label>
 						<Input
 							id="rent_amount"
 							name="rent_amount"
@@ -338,9 +492,15 @@
 							min="0"
 							step="0.01"
 							placeholder="0.00"
-							class={validationErrors.rent_amount ? 'border-red-500' : ''}
+							class="{showErrors && validationErrors.rent_amount ? 'border-red-500' : ''} {Number(formData.rent_amount) === 0 && showZeroRentWarning ? 'border-amber-500' : ''}"
 						/>
-						{#if validationErrors.rent_amount}
+						{#if Number(formData.rent_amount) === 0}
+							<p class="text-xs text-amber-600 flex items-center gap-1">
+								<AlertCircle class="w-3 h-3" />
+								Rent is currently set to 0
+							</p>
+						{/if}
+						{#if showErrors && validationErrors.rent_amount}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.rent_amount}
@@ -359,7 +519,7 @@
 							id="start_date"
 							name="start_date"
 						/>
-						{#if validationErrors.start_date}
+						{#if showErrors && validationErrors.start_date}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.start_date}
@@ -376,9 +536,9 @@
 							bind:value={formData.terms_month}
 							min="1"
 							max="60"
-							class={validationErrors.terms_month ? 'border-red-500' : ''}
+							class={showErrors && validationErrors.terms_month ? 'border-red-500' : ''}
 						/>
-						{#if validationErrors.terms_month}
+						{#if showErrors && validationErrors.terms_month}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.terms_month}
@@ -395,7 +555,7 @@
 							name="end_date"
 						/>
 						<p class="text-xs text-gray-500">Automatically calculated from start date and terms</p>
-						{#if validationErrors.end_date}
+						{#if showErrors && validationErrors.end_date}
 							<p class="text-sm text-red-500 flex items-center gap-1">
 								<AlertCircle class="w-4 h-4" />
 								{validationErrors.end_date}
@@ -422,11 +582,11 @@
 			</div>
 
 			<!-- Tenant Management -->
-			<div class="space-y-2">
+			<div id="section-tenants" class="space-y-2">
 				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
 					<Users class="w-4 h-4 text-slate-500" />
 					<h3 class="text-sm font-semibold text-slate-700">
-						Tenant Management - selected ({formData.selectedTenants.length})
+						Tenant Management <span class="text-red-500">*</span> - selected ({formData.selectedTenants.length})
 					</h3>
 				</div>
 
@@ -444,7 +604,7 @@
 					/>
 				</div>
 				<div
-					class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3"
+					class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-80 overflow-y-auto border rounded-md p-3"
 				>
 					{#if filteredTenants.length === 0}
 						<div class="col-span-2 text-center py-8 text-gray-500">
@@ -485,7 +645,7 @@
 						{/each}
 					{/if}
 				</div>
-				{#if validationErrors.tenants}
+				{#if showErrors && validationErrors.tenants}
 					<p class="text-sm text-red-500 flex items-center gap-1">
 						<AlertCircle class="w-4 h-4" />
 						{validationErrors.tenants}
@@ -494,7 +654,7 @@
 			</div>
 
 			<!-- Notes -->
-			<div class="space-y-2">
+			<div id="section-notes" class="space-y-2">
 				<Label for="notes">Notes</Label>
 				<textarea
 					id="notes"
@@ -506,7 +666,7 @@
 			</div>
 
 			<div class="flex justify-end gap-2 pt-4">
-				<Button type="button" variant="outline" onclick={() => onOpenChange(false)}>Cancel</Button>
+				<Button type="button" variant="outline" onclick={() => handleModalClose(false)}>Cancel</Button>
 				<Button type="submit" disabled={!isFormValid}>
 					{editMode ? 'Save Changes' : 'Create Lease'}
 				</Button>
@@ -514,3 +674,19 @@
 		</form>
 	</DialogContent>
 </Dialog>
+
+<!-- Unsaved Changes Confirmation Dialog -->
+<AlertDialog.Root bind:open={showUnsavedDialog}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Unsaved Changes</AlertDialog.Title>
+			<AlertDialog.Description>
+				You have unsaved changes. Are you sure you want to close without saving?
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel onclick={() => (showUnsavedDialog = false)}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDiscardChanges}>Discard Changes</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

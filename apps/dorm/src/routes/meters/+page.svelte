@@ -18,12 +18,13 @@
 		type MeterFormData,
 		meterFormSchema
 	} from './formSchema';
-	import { Loader2, Plus, Gauge } from 'lucide-svelte';
+	import { Loader2, Plus, Gauge, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-svelte';
 	import MeterForm from './MeterForm.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { defaults } from 'sveltekit-superforms';
 	import { zodClient, zod } from 'sveltekit-superforms/adapters';
 	import { toast } from 'svelte-sonner';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		metersStore,
 		propertiesStore,
@@ -32,6 +33,8 @@
 		readingsStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertMeter } from '$lib/db/optimistic-meters';
+	import { bgResync, bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
+	import { getStatusClasses, formatEnumLabel } from '$lib/utils/format';
 
 	// Type definitions
 	interface Property {
@@ -140,43 +143,72 @@
 		...p, id: Number(p.id)
 	})));
 
-	let floorsData = $derived(floorsStore.value.map((f: any) => {
-		const property = propertiesStore.value.find((p: any) => String(p.id) === String(f.property_id));
-		return {
-			...f,
-			id: Number(f.id),
-			propertyId: f.property_id,
-			floorNumber: f.floor_number,
-			property: property ? { id: Number(property.id), name: property.name } : null
-		};
-	}));
+	// [P1] Map lookups for O(1) property/floor resolution
+	let floorsData = $derived.by(() => {
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+		return floorsStore.value.map((f: any) => {
+			const property = propMap.get(String(f.property_id));
+			return {
+				...f,
+				id: Number(f.id),
+				propertyId: f.property_id,
+				floorNumber: f.floor_number,
+				property: property ? { id: Number(property.id), name: property.name } : null
+			};
+		});
+	});
 
-	let rentalUnitData = $derived(rentalUnitsStore.value.map((u: any) => {
-		const floor = floorsStore.value.find((f: any) => String(f.id) === String(u.floor_id));
-		const floorProperty = floor ? propertiesStore.value.find((p: any) => String(p.id) === String(floor.property_id)) : null;
-		return {
-			...u,
-			id: Number(u.id),
-			floorId: u.floor_id ? Number(u.floor_id) : null,
-			propertyId: u.property_id ? Number(u.property_id) : null,
-			rentalUnitStatus: u.rental_unit_status,
-			floor: floor ? {
-				id: Number(floor.id),
-				floor_number: floor.floor_number,
-				wing: floor.wing,
-				property: floorProperty ? { id: Number(floorProperty.id), name: floorProperty.name } : null
-			} : null
-		};
-	}));
+	let rentalUnitData = $derived.by(() => {
+		const floorMap = new Map<string, any>();
+		for (const f of floorsStore.value) floorMap.set(String(f.id), f);
+		const propMap = new Map<string, any>();
+		for (const p of propertiesStore.value) propMap.set(String(p.id), p);
+		return rentalUnitsStore.value.map((u: any) => {
+			const floor = floorMap.get(String(u.floor_id));
+			const floorProperty = floor ? propMap.get(String(floor.property_id)) : null;
+			return {
+				...u,
+				id: Number(u.id),
+				floorId: u.floor_id ? Number(u.floor_id) : null,
+				propertyId: u.property_id ? Number(u.property_id) : null,
+				rentalUnitStatus: u.rental_unit_status,
+				floor: floor ? {
+					id: Number(floor.id),
+					floor_number: floor.floor_number,
+					wing: floor.wing,
+					property: floorProperty ? { id: Number(floorProperty.id), name: floorProperty.name } : null
+				} : null
+			};
+		});
+	});
 
 	let isLoading = $derived(!metersStore.initialized);
+
+	// Capture form data before superForm resets it
+	let savedFormData: any = null;
+	let savedEditMode = false;
+	let submitSeq = 0;
+	let rollback: (() => Promise<void>) | null = null;
+
+	// Pagination
+	const PAGE_SIZE = 24;
+	let currentPage = $state(1);
 
 	let selectedMeter = $state<ExtendedMeterFormData | undefined>(undefined);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let selectedType = $state('');
 	let selectedStatus = $state('');
+	let searchInput = $state('');
 	let searchQuery = $state('');
+	// [P1] 300ms search debounce
+	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => {
+		if (searchTimeout) clearTimeout(searchTimeout);
+		const val = searchInput;
+		searchTimeout = setTimeout(() => { searchQuery = val; }, 300);
+	});
 	let sortBy = $state<'name' | 'type' | 'status' | 'reading'>('name');
 	let sortOrder = $state<'asc' | 'desc'>('asc');
 	let editMode = $state(false);
@@ -243,26 +275,66 @@
 
 	let filteredMeters = $derived(filterMeters());
 
-	// Group filtered meters by property
+	// Reset to page 1 when filters change
+	$effect(() => {
+		// Touch dependencies to track
+		searchQuery; selectedType; selectedStatus; sortBy; sortOrder;
+		currentPage = 1;
+	});
+
+	// Pagination
+	let totalPages = $derived(Math.max(1, Math.ceil(filteredMeters.length / PAGE_SIZE)));
+	let paginatedMeters = $derived(filteredMeters.slice(0, currentPage * PAGE_SIZE));
+
+	// Badge suppression: hide when all meters have same type/status
+	let allSameType = $derived.by(() => {
+		if (filteredMeters.length <= 1) return true;
+		const first = filteredMeters[0]?.type;
+		return filteredMeters.every(m => m.type === first);
+	});
+	let allSameStatus = $derived.by(() => {
+		if (filteredMeters.length <= 1) return true;
+		const first = filteredMeters[0]?.status;
+		return filteredMeters.every(m => m.status === first);
+	});
+
+	// O(1) lookup Maps for grouping and location display
+	let propertyMap = $derived.by(() => {
+		const map = new Map<number, any>();
+		for (const p of propertiesData) map.set(p.id, p);
+		return map;
+	});
+	let floorMap = $derived.by(() => {
+		const map = new Map<number, any>();
+		for (const f of floorsData) map.set(f.id, f);
+		return map;
+	});
+	let unitMap = $derived.by(() => {
+		const map = new Map<number, any>();
+		for (const u of rentalUnitData) map.set(u.id, u);
+		return map;
+	});
+
+	// Group filtered meters by property (using Maps)
 	const groupMeters = (): MeterGroup[] => {
 		const grouped: Record<string, MeterGroup> = {};
 
-		filteredMeters.forEach((meter) => {
+		paginatedMeters.forEach((meter) => {
 			let propertyId: number | null = null;
 			let propertyName = 'Unknown Property';
 
 			if (meter.location_type === 'PROPERTY' && meter.property_id) {
 				propertyId = meter.property_id;
-				const property = propertiesData?.find((p) => p.id === propertyId);
+				const property = propertyMap.get(meter.property_id);
 				propertyName = property?.name || 'Unknown Property';
 			} else if (meter.location_type === 'FLOOR' && meter.floor_id) {
-				const floor = floorsData?.find((f) => f.id === meter.floor_id);
+				const floor = floorMap.get(meter.floor_id);
 				if (floor?.property) {
 					propertyId = floor.property.id;
 					propertyName = floor.property.name;
 				}
 			} else if (meter.location_type === 'RENTAL_UNIT' && meter.rental_unit_id) {
-				const unit = rentalUnitData?.find((r) => r.id === meter.rental_unit_id);
+				const unit = unitMap.get(meter.rental_unit_id);
 				if (unit?.floor?.property) {
 					propertyId = unit.floor.property.id;
 					propertyName = unit.floor.property.name;
@@ -291,47 +363,102 @@
 	const { form, enhance, errors, constraints, submitting, reset, message } = superForm(defaults(zod(meterFormSchema)), {
 		id: 'meter-form',
 		validators: zodClient(meterFormSchema),
-		validationMethod: 'oninput',
+		validationMethod: 'onsubmit',
 		dataType: 'json',
 		taintedMessage: null,
 		resetForm: true,
-		onSubmit: () => {
+		onSubmit: async () => {
 			loading = true;
+			submitSeq++;
+			savedFormData = { ...$form, _seq: submitSeq };
+			savedEditMode = editMode;
+
+			// Close modal immediately for snappy UX
+			editMode = false;
+			selectedMeter = undefined;
+			showModal = false;
+
+			toast.info(savedEditMode ? 'Saving meter...' : 'Creating meter...');
+
+			// For updates where we already know the ID, run the optimistic write immediately
+			if (savedEditMode && savedFormData?.id) {
+				const fd = savedFormData;
+				rollback = await optimisticUpsertMeter({
+					id: fd.id,
+					name: fd.name,
+					location_type: fd.location_type,
+					property_id: fd.property_id,
+					floor_id: fd.floor_id,
+					rental_unit_id: fd.rental_unit_id,
+					type: fd.type,
+					is_active: fd.status === 'ACTIVE',
+					status: fd.status,
+					notes: fd.notes,
+					initial_reading: String(fd.initial_reading)
+				});
+			}
 		},
-		onError: ({ result }) => {
+		onError: async ({ result }) => {
 			toast.error('Error saving meter');
 			error = result.error?.message || 'An error occurred during submission';
 			loading = false;
+			// Instant rollback, then confirm with resync
+			if (rollback) { await rollback(); rollback = null; }
+			bgResync('meters');
 		},
 		onResult: async ({ result }) => {
 			loading = false;
 
-			if (result.type === 'success') {
-				toast.success(editMode ? 'Meter updated' : 'Meter created');
-				error = null;
+			// Ignore if a newer submission has already overwritten
+			if (!savedFormData || savedFormData._seq !== submitSeq) return;
 
-				// Optimistic upsert into RxDB
-				if ($form.id) {
-					await optimisticUpsertMeter({
-						id: $form.id,
-						name: $form.name,
-						location_type: $form.location_type,
-						property_id: $form.property_id,
-						floor_id: $form.floor_id,
-						rental_unit_id: $form.rental_unit_id,
-						type: $form.type,
-						is_active: $form.status === 'ACTIVE',
-						status: $form.status,
-						notes: $form.notes,
-						initial_reading: String($form.initial_reading)
-					});
+			if (result.type === 'failure' && (result.data as any)?.conflict) {
+				toast.error(CONFLICT_MESSAGE, { duration: 6000 });
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('meters');
+				savedFormData = null;
+				return;
+			}
+
+			if (result.type === 'success') {
+				const serverData = (result as any).data?.form?.data;
+				error = null;
+				rollback = null; // Success — discard snapshot
+
+				if (!savedEditMode) {
+					// Create: server assigned a new ID — upsert with the real ID
+					const fd = serverData ?? savedFormData;
+					if (fd?.id) {
+						await optimisticUpsertMeter({
+							id: fd.id,
+							name: fd.name,
+							location_type: fd.location_type,
+							property_id: fd.property_id,
+							floor_id: fd.floor_id,
+							rental_unit_id: fd.rental_unit_id,
+							type: fd.type,
+							is_active: fd.status === 'ACTIVE',
+							status: fd.status,
+							notes: fd.notes,
+							initial_reading: String(fd.initial_reading)
+						});
+					} else {
+						bgResync('meters');
+					}
+					toast.success(`${savedFormData?.name || 'Meter'} created`);
+				} else {
+					// Update: optimistic write already ran in onSubmit; confirm with success toast
+					toast.success(`${savedFormData?.name || 'Meter'} updated`);
 				}
 
-				// Reset the form state and close modal
-				editMode = false;
-				selectedMeter = undefined;
-				showModal = false;
+				savedFormData = null;
 				reset();
+			} else if (result.type === 'failure' || result.type === 'error') {
+				toast.error('Failed to save meter');
+				// Instant rollback, then confirm with resync
+				if (rollback) { await rollback(); rollback = null; }
+				bgResync('meters');
+				savedFormData = null;
 			}
 		}
 	});
@@ -359,9 +486,12 @@
 		selectedStatus = value;
 	}
 
+	let editUpdatedAt = $state<string | null>(null);
+
 	function handleEdit(meter: ExtendedMeterFormData) {
 		editMode = true;
 		selectedMeter = meter;
+		editUpdatedAt = (meter as any).updated_at ?? null;
 
 		// Make sure to copy all properties to the form
 		$form = {
@@ -374,30 +504,34 @@
 	}
 
 	function clearFilters() {
+		searchInput = '';
 		searchQuery = '';
 		selectedType = '';
 		selectedStatus = '';
 	}
 
-	// Utility functions
+	// Utility functions — use Map lookups for O(1) resolution
 	function getLocationDetails(meter: ExtendedMeterFormData): string {
 		if (!meter || !meter.location_type) return 'Unknown Location';
 
 		try {
 			switch (meter.location_type) {
-				case 'PROPERTY':
-					const property = propertiesData?.find((p: Property) => p.id === meter.property_id);
+				case 'PROPERTY': {
+					const property = meter.property_id ? propertyMap.get(meter.property_id) : null;
 					return property ? `Property: ${property.name}` : 'Unknown Property';
-				case 'FLOOR':
-					const floor = floorsData?.find((f: Floor) => f.id === meter.floor_id);
+				}
+				case 'FLOOR': {
+					const floor = meter.floor_id ? floorMap.get(meter.floor_id) : null;
 					return floor
 						? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
 						: 'Unknown Floor';
-				case 'RENTAL_UNIT':
-					const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
+				}
+				case 'RENTAL_UNIT': {
+					const unit = meter.rental_unit_id ? unitMap.get(meter.rental_unit_id) : null;
 					return unit
-						? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
-						: 'Unknown Rental_unit';
+						? `Unit ${unit.name || unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
+						: 'Unknown Unit';
+				}
 				default:
 					return 'Unknown Location';
 			}
@@ -413,14 +547,16 @@
 			switch (meter.location_type) {
 				case 'PROPERTY':
 					return '';
-				case 'FLOOR':
-					const floor = floorsData?.find((f: Floor) => f.id === meter.floor_id);
+				case 'FLOOR': {
+					const floor = meter.floor_id ? floorMap.get(meter.floor_id) : null;
 					return floor
 						? `Floor ${floor.floor_number}${floor.wing ? `, Wing ${floor.wing}` : ''}`
 						: '';
-				case 'RENTAL_UNIT':
-					const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
-					return unit ? `Rental_unit ${unit.number}` : '';
+				}
+				case 'RENTAL_UNIT': {
+					const unit = meter.rental_unit_id ? unitMap.get(meter.rental_unit_id) : null;
+					return unit ? `Unit ${unit.name || unit.number}` : '';
+				}
 				default:
 					return '';
 			}
@@ -442,19 +578,6 @@
 		}
 	}
 
-	function getStatusColor(status: string): string {
-		switch (status) {
-			case 'ACTIVE':
-				return 'bg-green-100 text-green-800';
-			case 'INACTIVE':
-				return 'bg-gray-100 text-gray-800';
-			case 'MAINTENANCE':
-				return 'bg-yellow-100 text-yellow-800';
-			default:
-				return 'bg-gray-100 text-gray-800';
-		}
-	}
-
 	function formatReading(value: number): string {
 		return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 	}
@@ -467,24 +590,32 @@
 			sortOrder = 'asc';
 		}
 	}
+
+	// [Fix 09] Build structured aria-label for screen readers
+	function getMeterAriaLabel(meter: ExtendedMeterFormData): string {
+		const parts = [
+			meter.name,
+			`${formatEnumLabel(meter.type)} meter`,
+			formatEnumLabel(meter.status)
+		];
+		const location = getDetailedLocationInfo(meter);
+		if (location) parts.push(location);
+		if (meter.latest_reading) {
+			parts.push(`reading ${formatReading(meter.latest_reading.value)} on ${new Date(meter.latest_reading.date).toLocaleDateString()}`);
+		} else {
+			parts.push('no readings yet');
+		}
+		return parts.join(', ');
+	}
 </script>
 
 <div class="space-y-6">
-	<!-- Error / Success Alerts -->
+	<SyncErrorBanner collections={['meters', 'readings', 'properties', 'floors', 'rental_units']} />
+	<!-- Error Alert (removed duplicate $message alert — [Fix 05/C5] toasts handle success) -->
 	{#if error}
 		<Alert.Root variant="destructive" class="fixed top-4 right-4 z-50 max-w-md">
 			<Alert.Title>Error</Alert.Title>
 			<Alert.Description>{error}</Alert.Description>
-		</Alert.Root>
-	{/if}
-
-	{#if $message && !error}
-		<Alert.Root
-			variant="default"
-			class="fixed top-4 right-4 z-50 max-w-md bg-green-50 border-green-200"
-		>
-			<Alert.Title class="text-green-800">Success</Alert.Title>
-			<Alert.Description class="text-green-700">{$message}</Alert.Description>
 		</Alert.Root>
 	{/if}
 
@@ -499,7 +630,8 @@
 				<p class="text-sm text-muted-foreground">Manage utility meters and readings</p>
 			</div>
 		</div>
-		<Button onclick={handleAddMeter} class="shadow-sm">
+		<!-- Desktop Add Meter button (hidden on mobile — FAB below) -->
+		<Button onclick={handleAddMeter} class="shadow-sm hidden sm:inline-flex">
 			<Plus class="w-4 h-4 mr-2" />
 			Add Meter
 		</Button>
@@ -529,14 +661,14 @@
 					<Input
 						type="text"
 						placeholder="Search by name or location"
-						bind:value={searchQuery}
+						bind:value={searchInput}
 						class="pl-10"
 					/>
 				</div>
 				<div>
 					<Select.Root type="single" value={selectedType} onValueChange={handleTypeChange}>
 						<Select.Trigger>
-							<span>{selectedType || 'All Types'}</span>
+							<span>{selectedType ? formatEnumLabel(selectedType) : 'All Types'}</span>
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="">All Types</Select.Item>
@@ -546,7 +678,7 @@
 										<span
 											class={`w-3 h-3 rounded-full mr-2 ${type === 'ELECTRICITY' ? 'bg-blue-500' : type === 'WATER' ? 'bg-cyan-500' : 'bg-purple-500'}`}
 										></span>
-										{type}
+										{formatEnumLabel(type)}
 									</div>
 								</Select.Item>
 							{/each}
@@ -556,7 +688,7 @@
 				<div>
 					<Select.Root type="single" value={selectedStatus} onValueChange={handleStatusChange}>
 						<Select.Trigger>
-							<span>{selectedStatus || 'All Statuses'}</span>
+							<span>{selectedStatus ? formatEnumLabel(selectedStatus) : 'All Statuses'}</span>
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Item value="">All Statuses</Select.Item>
@@ -572,7 +704,7 @@
 														: 'bg-yellow-500'
 											}`}
 										></span>
-										{status}
+										{formatEnumLabel(status)}
 									</div>
 								</Select.Item>
 							{/each}
@@ -595,64 +727,77 @@
 
 	<!-- Sort Buttons -->
 	<div class="flex items-center justify-between text-sm text-gray-500 px-2">
-		<div class="flex space-x-4">
-			<button
-				class={`${sortBy === 'name' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('name')}
-			>
-				Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'type' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('type')}
-			>
-				Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'status' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('status')}
-			>
-				Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
-			<button
-				class={`${sortBy === 'reading' ? 'text-black font-medium' : ''}`}
-				onclick={() => handleSort('reading')}
-			>
-				Reading {sortBy === 'reading' && (sortOrder === 'asc' ? '↑' : '↓')}
-			</button>
+		<div class="flex space-x-1">
+			{#each [{ key: 'name', label: 'Name' }, { key: 'type', label: 'Type' }, { key: 'status', label: 'Status' }, { key: 'reading', label: 'Reading' }] as { key, label }}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="min-h-[44px] sm:min-h-0 {sortBy === key ? 'text-black font-medium bg-muted' : ''}"
+					aria-sort={sortBy === key ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+					onclick={() => handleSort(key as typeof sortBy)}
+				>
+					{label}
+					{#if sortBy === key}
+						{#if sortOrder === 'asc'}<ChevronUp class="h-4 w-4 ml-1" />{:else}<ChevronDown class="h-4 w-4 ml-1" />{/if}
+					{/if}
+				</Button>
+			{/each}
 		</div>
 	</div>
 
 	<!-- Content -->
 	{#if isLoading}
-		<div class="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-lg">
-			<Loader2 class="w-8 h-8 animate-spin text-gray-400 mb-3" />
-			<p class="text-center text-gray-500">Loading meters...</p>
+		<div class="space-y-2">
+			{#each Array(4) as _}
+				<Card.Root>
+					<Card.Content class="p-3">
+						<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2 animate-pulse">
+							<div class="flex flex-col gap-2">
+								<div class="flex items-center gap-2">
+									<div class="h-4 w-32 bg-gray-200 rounded"></div>
+									<div class="h-5 w-16 bg-gray-200 rounded-full"></div>
+								</div>
+								<div class="h-3 w-24 bg-gray-100 rounded"></div>
+							</div>
+							<div class="flex flex-col items-end gap-1">
+								<div class="h-4 w-20 bg-gray-200 rounded"></div>
+								<div class="h-3 w-16 bg-gray-100 rounded"></div>
+							</div>
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{/each}
 		</div>
 	{:else if groupedMeters.length === 0}
-		<div class="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-lg">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				width="40"
-				height="40"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				class="text-gray-400 mb-3"
-			>
-				<path d="M10.3 8.2c.7-.3 1.5-.4 2.3-.4h1.2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.5" />
-				<path d="M2.5 10a2.5 2.5 0 0 1 5 0c0 .5-.1 1-.3 1.5" />
-				<path
-					d="M7.8 15.2a5 5 0 0 0-2.3.4 2.5 2.5 0 0 0 3.4 1c.7-.3 1.5-.4 2.3-.4h1.2c.8 0 1.6.1 2.3.4a2.5 2.5 0 0 0 3.4-1 2.5 2.5 0 0 0-1-3.4 5 5 0 0 0-2.3-.4h-5.6z"
-				/>
-				<path d="M21.7 16.2a2.5 2.5 0 0 0-3.2-3.4" />
-			</svg>
-			<p class="text-center text-gray-500">No meters found</p>
+		<!-- [Fix 06] Empty state with guidance CTA -->
+		<div class="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-lg">
+			<Gauge class="w-10 h-10 text-gray-300 mb-4" />
+			{#if searchQuery || selectedType || selectedStatus}
+				<p class="text-center text-gray-500 mb-1">No meters match your filters</p>
+				<p class="text-center text-sm text-gray-400 mb-4">Try adjusting your search or clearing filters</p>
+				<Button variant="outline" size="sm" onclick={clearFilters}>Clear Filters</Button>
+			{:else}
+				<p class="text-center text-gray-500 mb-1">No meters found</p>
+				<p class="text-center text-sm text-gray-400 mb-4">Add your first meter to start tracking utility readings</p>
+				<Button onclick={handleAddMeter} size="sm">
+					<Plus class="w-4 h-4 mr-2" />
+					Add Meter
+				</Button>
+			{/if}
 		</div>
 	{:else}
+		<!-- Summary when badges are suppressed -->
+		{#if allSameType || allSameStatus}
+			<p class="text-xs text-muted-foreground px-2">
+				{#if allSameType && allSameStatus}
+					All {formatEnumLabel(filteredMeters[0].type)} — {formatEnumLabel(filteredMeters[0].status)}
+				{:else if allSameType}
+					All {formatEnumLabel(filteredMeters[0].type)}
+				{:else}
+					All {formatEnumLabel(filteredMeters[0].status)}
+				{/if}
+			</p>
+		{/if}
 		<div class="space-y-6">
 			{#each groupedMeters as group}
 				<div>
@@ -662,9 +807,11 @@
 							<Card.Root
 								class="hover:bg-gray-50 transition-colors"
 							>
+								<!-- [Fix 09] Structured aria-label for screen readers -->
 								<button
 									type="button"
 									class="w-full text-left cursor-pointer"
+									aria-label={getMeterAriaLabel(meter)}
 									onclick={() => handleEdit(meter)}
 								>
 									<Card.Content class="p-3">
@@ -672,12 +819,16 @@
 											<div class="flex flex-col">
 												<div class="flex items-center gap-2 mb-1">
 													<span class="font-medium">{meter.name}</span>
-													<Badge variant={getTypeVariant(meter.type)} class="text-xs px-2 py-0.5">
-														{meter.type}
-													</Badge>
-													<Badge class={`text-xs px-2 py-0.5 ${getStatusColor(meter.status)}`}>
-														{meter.status}
-													</Badge>
+													{#if !allSameType}
+														<Badge variant={getTypeVariant(meter.type)} class="text-xs px-2 py-0.5">
+															{formatEnumLabel(meter.type)}
+														</Badge>
+													{/if}
+													{#if !allSameStatus}
+														<Badge class={`text-xs px-2 py-0.5 ${getStatusClasses(meter.status)}`}>
+															{formatEnumLabel(meter.status)}
+														</Badge>
+													{/if}
 												</div>
 												{#if getDetailedLocationInfo(meter)}
 													<span class="text-sm text-gray-500"
@@ -689,7 +840,7 @@
 											<div class="text-right">
 												{#if meter.latest_reading}
 													<div class="flex flex-col items-end">
-														<span class="font-medium"
+														<span class="font-medium tabular-nums"
 															>{formatReading(meter.latest_reading.value)}</span
 														>
 														<span class="text-xs text-gray-500">
@@ -715,8 +866,27 @@
 				</div>
 			{/each}
 		</div>
+
+		<!-- Load More pagination -->
+		{#if currentPage < totalPages}
+			<div class="flex justify-center pt-4">
+				<Button variant="outline" onclick={() => { currentPage++; }}>
+					Load more ({filteredMeters.length - paginatedMeters.length} remaining)
+				</Button>
+			</div>
+		{/if}
 	{/if}
 </div>
+
+<!-- Mobile FAB — floating "Add Meter" button in thumb zone -->
+<button
+	type="button"
+	class="fixed bottom-6 right-6 z-40 sm:hidden flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-transform"
+	aria-label="Add Meter"
+	onclick={handleAddMeter}
+>
+	<Plus class="w-6 h-6" />
+</button>
 
 <!-- Meter Form Modal -->
 <Dialog bind:open={showModal}>
@@ -728,8 +898,10 @@
 			</DialogDescription>
 		</DialogHeader>
 
+		<!-- [Fix 10] callback prop instead of on:cancel -->
 		<MeterForm
 			{editMode}
+			updatedAt={editUpdatedAt}
 			data={{
 				properties: propertiesData,
 				floors: floorsData,
@@ -741,7 +913,7 @@
 			{enhance}
 			{constraints}
 			{submitting}
-			on:cancel={handleCancel}
+			oncancel={handleCancel}
 		/>
 	</DialogContent>
 </Dialog>

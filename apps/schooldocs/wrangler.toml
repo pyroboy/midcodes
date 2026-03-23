@@ -1,0 +1,22 @@
+name = "schooldocs"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+# ── Secrets ────────────────────────────────────────────────────────────────────
+# DO NOT put actual secret values here. Set them via:
+#   wrangler pages secret put NEON_DATABASE_URL --project-name schooldocs
+#   wrangler pages secret put BETTER_AUTH_SECRET --project-name schooldocs
+#   wrangler pages secret put ABLY_API_KEY --project-name schooldocs
+#
+# Or in the Cloudflare Dashboard:
+#   Pages → schooldocs → Settings → Environment variables
+
+# ── Build config ───────────────────────────────────────────────────────────────
+# [build]
+# command = "pnpm build"
+# Not needed for Cloudflare Pages — it reads package.json scripts automatically
+
+# ── Dev preview (wrangler pages dev) ──────────────────────────────────────────
+# [dev]
+# port = 8788

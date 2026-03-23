@@ -137,6 +137,48 @@ Not every item applies to every topology. A pull-only app doesn't need conflict 
 - [ ] PK changes are handled correctly (re-derive composite IDs, accept delete+re-insert cost)
 - [ ] Thin clients can skip non-critical migrations (selective sync for priority collections)
 
+#### 14. Ease-of-Life Enhancements
+Operational polish that reduces user friction without architectural changes. Score each: **PASS** / **WARN** / **FAIL** / **N/A** — same as all other categories.
+
+##### Sync Accuracy & Ordering
+- [ ] Post-sync document counts reflect actual collection size (not hardcoded or stale values)
+- [ ] "Changed since" or equivalent endpoint exists to skip redundant pulls on warm startup
+- [ ] Parent/structural collections sync before dependent/child collections (respects foreign key graph)
+- [ ] Explicit collection dependency graph enforced so cascading resyncs pull in correct order
+- [ ] Checkpoint integrity validated on startup (detect corrupted/stale checkpoints that cause loops or missed records)
+
+##### Sync UX
+- [ ] Per-collection retry available in sync UI (not just global "Resync All")
+- [ ] Optimistic rollback shows user-facing feedback (toast/banner) when server rejects a write, instead of silent revert
+- [ ] Per-page data freshness shown based on the specific collections that page depends on (not global last-sync)
+- [ ] Sync progress shows docs-pulled count per collection during initial sync (not just collection count)
+- [ ] Pending mutations indicator shows count of unsynced local changes waiting to push
+- [ ] Sync pause/resume available for metered or low-bandwidth connections
+
+##### Startup & Performance
+- [ ] Low-priority collections deferred until user navigates to their routes (lazy sync on demand)
+- [ ] Warm startup skips full pull when all checkpoints are recent (configurable staleness threshold)
+- [ ] Cached data rendered immediately on startup; fresh data updates reactively as sync completes (incremental hydration)
+- [ ] Critical-path vs background-loadable collections explicitly identified and prioritized
+
+##### Offline Resilience
+- [ ] Connectivity-aware form UX queues submissions with pending state when offline, instead of failing
+- [ ] Data scoping filters collections by active context (e.g., org, branch, property) to avoid pulling unrelated records
+- [ ] Graceful feature degradation — features requiring server show "requires connection" instead of crashing
+- [ ] Failed server mutation retry queue persists across page reloads
+
+##### Diagnostics & Debuggability
+- [ ] Exportable diagnostic dump available in UI (sync state, errors, checkpoints, collection sizes, environment info)
+- [ ] Structured sync event log with timestamps (queryable/filterable, not just console.log)
+- [ ] Collection-level health summary accessible (last synced, doc count, error state, checkpoint age)
+- [ ] App/RxDB version and storage engine included in diagnostic output for support tickets
+
+##### Data Hygiene
+- [ ] Orphan record detection exists (child records referencing deleted/non-existent parents)
+- [ ] Tombstone accumulation monitored (soft-deleted records don't grow unbounded)
+- [ ] Storage usage trend surfaced to user (growing, stable, or shrinking)
+- [ ] Stale checkpoint detection (checkpoints that haven't advanced in a configurable period trigger alert or full resync)
+
 ### Phase 3: Deep Dive (Beyond the Checklist)
 
 The checklist catches structural issues. This phase catches the subtle bugs and cost leaks that only emerge from tracing actual code paths. These are the findings that make an audit genuinely valuable.
@@ -216,7 +258,7 @@ This is the #1 source of data integrity bugs in RxDB systems.
 
 ### Phase 4: Generate the Report
 
-Save as `RXDB_AUDIT_REPORT.md` in the target app's directory.
+Save as `RXDB_AUDIT_REPORT_<YYYY-MM-DD>.md` in the target app's directory (e.g., `RXDB_AUDIT_REPORT_2026-03-19.md`). **Never overwrite a previous audit file** — each audit is a dated snapshot so progress can be tracked over time. If multiple audits run on the same day, append a counter (e.g., `RXDB_AUDIT_REPORT_2026-03-19_2.md`).
 
 ```markdown
 # RxDB Audit Report
@@ -242,6 +284,7 @@ Save as `RXDB_AUDIT_REPORT.md` in the target app's directory.
 | 11. Conflict Resolution | | | | |
 | 12. Storage Persistence & Recovery | | | | |
 | 13. Schema Migrations | | | | |
+| 14. Ease-of-Life Enhancements | | | | |
 | **Total** | | | | |
 
 **Overall Score:** [X / Y applicable] ([%])

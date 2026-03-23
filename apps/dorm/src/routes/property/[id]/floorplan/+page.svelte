@@ -1,24 +1,44 @@
 <script lang="ts">
 	import { floorLayoutItemsStore } from '$lib/stores/collections.svelte';
-	import { floorsStore, rentalUnitsStore } from '$lib/stores/collections.svelte';
+	import { floorsStore, rentalUnitsStore, tenantsStore, leasesStore, leaseTenantsStore } from '$lib/stores/collections.svelte';
 	import {
 		optimisticUpsertFloorLayoutItem,
 		optimisticDeleteFloorLayoutItem
 	} from '$lib/db/optimistic-floor-layout';
-	import { bufferedMutation } from '$lib/db/optimistic-utils';
+	import { bufferedMutation, CONFLICT_MESSAGE } from '$lib/db/optimistic-utils';
+	import { resyncCollection } from '$lib/db/replication';
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
 	import FloorGrid from './FloorGrid.svelte';
 	import ItemSidebar from './ItemSidebar.svelte';
 	import FloorViewer3D from './FloorViewer3D.svelte';
-	import { Save, Undo2, Redo2, Loader2 } from 'lucide-svelte';
+	import { Save, Undo2, Redo2, Loader2, RefreshCw, Pencil } from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import type { FloorLayoutItemType, DrawTool } from './types';
-	import { parseEdgeKey, itemsToWallSet, parseWallMeta, serializeWallMeta, type WallEdge, type WallStorageItem, type WallMeta } from './wallEngine';
+	import { parseEdgeKey, itemsToWallSet, detectRooms, parseWallMeta, serializeWallMeta, type WallEdge, type WallStorageItem, type WallMeta } from './wallEngine';
+
+	import { page } from '$app/stores';
+
+	/** Extract plain layout fields from an RxDB doc proxy, stripping _rev, _meta etc. (H3 fix) */
+	function cleanItem(doc: any): { id: number; floor_id: number; rental_unit_id: number | null; item_type: string; grid_x: number; grid_y: number; grid_w: number; grid_h: number; label: string | null; color: string | null } {
+		return {
+			id: parseInt(doc.id, 10),
+			floor_id: parseInt(doc.floor_id, 10),
+			rental_unit_id: doc.rental_unit_id ? parseInt(doc.rental_unit_id, 10) : null,
+			item_type: doc.item_type,
+			grid_x: doc.grid_x,
+			grid_y: doc.grid_y,
+			grid_w: doc.grid_w,
+			grid_h: doc.grid_h,
+			label: doc.label ?? null,
+			color: doc.color ?? null
+		};
+	}
 
 	let { data } = $props();
 	let propertyId = $derived(data.propertyId);
 
-	let viewMode = $state<'2d' | '3d'>('2d');
+	// Default to 3D if ?view=3d is in the URL (from top bar quick access)
+	let viewMode = $state<'2d' | '3d'>($page.url.searchParams.get('view') === '3d' ? '3d' : '2d');
 	let selectedFloorId = $state<string | null>(null);
 	let drawTool = $state<DrawTool>('select');
 
@@ -68,6 +88,29 @@
 		propertyUnits.filter((u: any) => u.floor_id === selectedFloorId).length
 	);
 
+	// Build rental_unit_id → tenant names map (for 3D popup)
+	let unitTenantsMap = $derived.by(() => {
+		const map = new Map<string, { name: string; status: string }[]>();
+		// Build lease_id → rental_unit_id
+		const leaseUnitMap = new Map<string, string>();
+		for (const lease of leasesStore.value) {
+			if (lease.rental_unit_id) leaseUnitMap.set(String(lease.id), String(lease.rental_unit_id));
+		}
+		// Build tenant_id → tenant
+		const tenantMap = new Map<string, any>();
+		for (const t of tenantsStore.value) tenantMap.set(String(t.id), t);
+		// Link via lease_tenants
+		for (const lt of leaseTenantsStore.value) {
+			const unitId = leaseUnitMap.get(String(lt.lease_id));
+			if (!unitId) continue;
+			const tenant = tenantMap.get(String(lt.tenant_id));
+			if (!tenant) continue;
+			if (!map.has(unitId)) map.set(unitId, []);
+			map.get(unitId)!.push({ name: tenant.name, status: tenant.status ?? 'active' });
+		}
+		return map;
+	});
+
 	// Use timestamp-based temp IDs to avoid collisions across page navigations
 	let tempIdCounter = $state(-Date.now());
 
@@ -84,6 +127,9 @@
 	let pendingChanges = $state<PendingChange[]>([]);
 	let isSaving = $state(false);
 	let isDirty = $derived(pendingChanges.length > 0);
+
+	let brokenRooms = $state<{ id: string; label: string }[]>([]);
+	let showBrokenConfirm = $state(false);
 
 	// ─── Undo / Redo ─────────────────────────────────────────────────
 
@@ -289,6 +335,50 @@
 		// Only real IDs (positive) need server calls; temp IDs are local-only
 		const realIds = matchedIds.filter((id) => parseInt(id, 10) > 0).map((id) => parseInt(id, 10));
 		pendingChanges = [...pendingChanges, { type: 'wall_remove', ids: realIds }];
+
+		checkBrokenRooms();
+	}
+
+	function checkBrokenRooms() {
+		const assignments = currentFloorItems.filter((i: any) => i.item_type !== 'WALL');
+		if (assignments.length === 0) return;
+
+		const wallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const wallSet = itemsToWallSet(wallItems as unknown as WallStorageItem[]);
+		const rooms = detectRooms(wallSet, 60, 60);
+
+		const existingBounds = new Set(
+			rooms.map(
+				(r) =>
+					`${r.bounds.minQ},${r.bounds.minR},${r.bounds.maxQ - r.bounds.minQ},${r.bounds.maxR - r.bounds.minR}`
+			)
+		);
+
+		const broken: { id: string; label: string }[] = [];
+		for (const a of assignments) {
+			const key = `${a.grid_x},${a.grid_y},${a.grid_w},${a.grid_h}`;
+			if (!existingBounds.has(key)) {
+				broken.push({ id: a.id, label: a.label || a.item_type });
+			}
+		}
+
+		if (broken.length > 0) {
+			brokenRooms = broken;
+			showBrokenConfirm = true;
+		}
+	}
+
+	async function confirmUnassignBrokenSingle(id: string) {
+		await optimisticDeleteFloorLayoutItem(parseInt(id, 10));
+		pendingChanges = [...pendingChanges, { type: 'delete', id }];
+		brokenRooms = brokenRooms.filter((b) => b.id !== id);
+		if (brokenRooms.length === 0) showBrokenConfirm = false;
+		toast.info('Unassigned broken room');
+	}
+
+	function dismissBrokenConfirm() {
+		showBrokenConfirm = false;
+		brokenRooms = [];
 	}
 
 	async function handleRoomAssign(assignment: {
@@ -326,10 +416,33 @@
 		pendingChanges = [...pendingChanges, { type: 'upsert', item }];
 	}
 
+	async function handleAreaUpdate(update: { id: string; grid_x: number; grid_y: number; grid_w: number; grid_h: number; cells?: string[] }) {
+		pushUndo(captureSnapshot());
+		const item = currentFloorItems.find((i: any) => i.id === update.id);
+		if (!item) return;
+
+		const updated = {
+			id: parseInt(update.id, 10),
+			floor_id: parseInt(selectedFloorId!, 10),
+			rental_unit_id: item.rental_unit_id ? parseInt(item.rental_unit_id, 10) : null,
+			item_type: item.item_type,
+			grid_x: update.grid_x,
+			grid_y: update.grid_y,
+			grid_w: update.grid_w,
+			grid_h: update.grid_h,
+			label: item.label ?? null,
+			color: update.cells ? update.cells.join(';') : (item.color ?? null)
+		};
+
+		await optimisticUpsertFloorLayoutItem(updated);
+		pendingChanges = [...pendingChanges, { type: 'upsert', item: updated }];
+	}
+
 	async function handleRoomClear(roomId: string) {
 		pushUndo(captureSnapshot());
-		const nonWallItems = currentFloorItems.filter((i: any) => i.item_type !== 'WALL');
-		for (const item of nonWallItems) {
+		// Delete only the specific area item, not all non-wall items
+		const item = currentFloorItems.find((i: any) => i.id === roomId && i.item_type !== 'WALL');
+		if (item) {
 			await optimisticDeleteFloorLayoutItem(parseInt(item.id, 10));
 			pendingChanges = [...pendingChanges, { type: 'delete', id: item.id }];
 		}
@@ -369,15 +482,33 @@
 			} else {
 				// Toggle on: add window, also remove door if present
 				const { door: _d, swing: _s, ...rest } = currentMeta;
-				newMeta = { ...rest, window: 'standard', sill: 0.9 };
+				newMeta = { ...rest, window: 'fixed', sill: 0.9 };
 			}
 		}
 
 		const newLabel = serializeWallMeta(newMeta);
-		const updated = { ...match, label: newLabel };
+		const updated = { ...cleanItem(match), label: newLabel };
 
 		await optimisticUpsertFloorLayoutItem(updated);
 		pendingChanges = [...pendingChanges, { type: 'upsert', item: updated }];
+	}
+
+	async function handleWallMetaUpdate(edge: WallEdge, newMeta: WallMeta) {
+		const wallItems = currentFloorItems.filter((i: any) => i.item_type === 'WALL');
+		const match = wallItems.find((i: any) => {
+			if (edge.dir === 'N') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_w === 0;
+			if (edge.dir === 'W') return i.grid_x === edge.q && i.grid_y === edge.r && i.grid_h === 0;
+			return false;
+		});
+		if (!match) return;
+
+		pushUndo(captureSnapshot());
+
+		const updatedLabel = serializeWallMeta(newMeta);
+		const updatedItem = { ...cleanItem(match), label: updatedLabel };
+
+		await optimisticUpsertFloorLayoutItem(updatedItem);
+		pendingChanges = [...pendingChanges, { type: 'upsert', item: updatedItem }];
 	}
 
 	// ─── Feature 7: Wall Color Change ────────────────────────────────
@@ -403,7 +534,7 @@
 		}
 
 		const newLabel = serializeWallMeta(newMeta);
-		const updated = { ...match, label: newLabel };
+		const updated = { ...cleanItem(match), label: newLabel };
 
 		await optimisticUpsertFloorLayoutItem(updated);
 		pendingChanges = [...pendingChanges, { type: 'upsert', item: updated }];
@@ -414,6 +545,9 @@
 	async function handleSave() {
 		if (!isDirty || isSaving) return;
 		isSaving = true;
+
+		let hadConflict = false;
+		let hadError = false;
 
 		try {
 			// Consolidate wall adds and removes
@@ -445,53 +579,75 @@
 				const fd = new FormData();
 				fd.set('payload', JSON.stringify({ add: allWallAdds, removeIds: allWallRemoveIds }));
 
-				await bufferedMutation({
-					label: `Save ${allWallAdds.length} walls, remove ${allWallRemoveIds.length}`,
-					collection: 'floor_layout_items',
-					type: 'create',
-					serverAction: async () => {
-						const res = await fetch('?/batchWalls', { method: 'POST', body: fd });
-						if (!res.ok) throw new Error(`Wall batch save failed: ${res.status}`);
-						return res;
-					}
-				});
+				try {
+					const res = await fetch('?/batchWalls', { method: 'POST', body: fd });
+					if (!res.ok) throw new Error(`Wall batch save failed: ${res.status}`);
+				} catch (err: any) {
+					hadError = true;
+					toast.error('Wall save failed', { description: err?.message || 'Server error' });
+					// Rollback: resync from server to get correct state
+					await resyncCollection('floor_layout_items');
+					return;
+				}
 			}
 
-			// 2. Room upserts
+			// 2. Room upserts — send _updated_at for optimistic locking on existing items
 			for (const item of upserts) {
 				const fd = buildItemFormData(item);
-				await bufferedMutation({
-					label: `Save ${item.item_type}`,
-					collection: 'floor_layout_items',
-					type: item.id > 0 ? 'update' : 'create',
-					serverAction: async () => {
-						const res = await fetch('?/upsertItem', { method: 'POST', body: fd });
-						if (!res.ok) throw new Error(`Upsert failed: ${res.status}`);
-						return res;
+				// Include updated_at for optimistic locking on existing items
+				if (item.id > 0) {
+					const existingItem = currentFloorItems.find((i: any) => i.id === String(item.id));
+					if (existingItem?.updated_at) {
+						fd.set('_updated_at', existingItem.updated_at);
 					}
-				});
+				}
+
+				try {
+					const res = await fetch('?/upsertItem', { method: 'POST', body: fd });
+					if (!res.ok) {
+						if (res.status === 409) {
+							hadConflict = true;
+							toast.error(CONFLICT_MESSAGE);
+						} else {
+							throw new Error(`Upsert failed: ${res.status}`);
+						}
+					}
+				} catch (err: any) {
+					if (!hadConflict) {
+						hadError = true;
+						toast.error('Save failed', { description: err?.message || 'Server error' });
+					}
+					// On any failure, resync to restore server truth and abort remaining
+					await resyncCollection('floor_layout_items');
+					return;
+				}
 			}
 
 			// 3. Deletes
 			for (const id of deletes) {
 				const fd = new FormData();
 				fd.set('id', id);
-				await bufferedMutation({
-					label: 'Delete item',
-					collection: 'floor_layout_items',
-					type: 'delete',
-					serverAction: async () => {
-						const res = await fetch('?/deleteItem', { method: 'POST', body: fd });
-						if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
-						return res;
-					}
-				});
+				try {
+					const res = await fetch('?/deleteItem', { method: 'POST', body: fd });
+					if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+				} catch (err: any) {
+					hadError = true;
+					toast.error('Delete failed', { description: err?.message || 'Server error' });
+					await resyncCollection('floor_layout_items');
+					return;
+				}
 			}
 
+			// All steps succeeded — clear pending and resync to get real IDs
 			pendingChanges = [];
+			undoStack = [];
+			redoStack = [];
+			await resyncCollection('floor_layout_items');
 			toast.success('Floor plan saved');
 		} catch (err: any) {
 			toast.error('Save failed', { description: err?.message || 'Server error' });
+			// Resync on unexpected error to restore consistent state
+			await resyncCollection('floor_layout_items').catch(() => {});
 		} finally {
 			isSaving = false;
 		}
@@ -500,8 +656,9 @@
 	async function handleDiscard() {
 		if (!isDirty) return;
 		pendingChanges = [];
+		undoStack = [];
+		redoStack = [];
 		// Resync from server to revert local changes
-		const { resyncCollection } = await import('$lib/db/replication');
 		await resyncCollection('floor_layout_items');
 		toast.info('Changes discarded');
 	}
@@ -532,15 +689,40 @@
 	}
 </script>
 
+<svelte:head>
+	<style>
+		/* Override root layout: kill main scroll + padding so floorplan owns the full space */
+		main#main-content {
+			overflow: hidden !important;
+			padding: 0 !important;
+		}
+		main#main-content > div {
+			height: 100% !important;
+			max-width: none !important;
+		}
+	</style>
+</svelte:head>
+
 <svelte:window on:beforeunload={handleBeforeUnload} on:keydown={handleUndoKeydown} />
 
-<div class="flex flex-col h-screen overflow-hidden">
+<div class="flex flex-col h-full overflow-hidden">
 	<!-- Header -->
-	<div class="flex items-center gap-4 px-6 py-3 border-b bg-background">
-		<a href="/properties" class="text-muted-foreground hover:text-foreground text-sm">
-			&larr; Properties
-		</a>
-		<h1 class="text-lg font-semibold">Floor Plan</h1>
+	<div class="flex items-center gap-4 px-6 py-3 border-b bg-background shrink-0">
+		{#if viewMode === '3d'}
+			<button
+				onclick={() => (viewMode = '2d')}
+				class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
+				title="Switch to 2D Editor"
+			>
+				<Pencil class="w-3.5 h-3.5" />
+				Edit
+			</button>
+		{:else}
+			<a href="/properties" class="text-muted-foreground hover:text-foreground text-sm">
+				&larr; Properties
+			</a>
+		{/if}
+		<h1 class="text-lg font-semibold">{viewMode === '3d' ? '3D View' : 'Floor Plan'}</h1>
 
 		{#if propertyFloors.length > 0}
 			<div class="flex gap-1 ml-4">
@@ -641,7 +823,7 @@
 				onToolChange={(t) => (drawTool = t)}
 			/>
 
-			<div class="flex-1 overflow-hidden">
+			<div class="flex-1 min-h-0 overflow-hidden flex flex-col">
 				{#if !floorLayoutItemsStore.initialized}
 					<div class="h-full flex items-center justify-center text-muted-foreground">
 						Loading floor plan...
@@ -658,7 +840,9 @@
 						onRoomAssign={handleRoomAssign}
 						onRoomClear={handleRoomClear}
 						onWallMetaToggle={handleWallMetaToggle}
+						onWallMetaUpdate={handleWallMetaUpdate}
 						onWallColorChange={handleWallColorChange}
+						onAreaUpdate={handleAreaUpdate}
 						onToolToggle={() => (drawTool = drawTool === 'draw' ? 'erase' : 'draw')}
 					/>
 				{:else}
@@ -668,11 +852,12 @@
 				{/if}
 			</div>
 		{:else}
-			<div class="flex-1 overflow-hidden">
+			<div class="flex-1 overflow-hidden min-h-0" style="height: 100%;">
 				<FloorViewer3D
 					floors={propertyFloors}
 					allItems={floorLayoutItemsStore.value}
 					rentalUnits={propertyUnits}
+					{unitTenantsMap}
 					{selectedFloorId}
 					onUnitClick={(unitId) => {
 						console.log('Unit clicked:', unitId);
@@ -681,4 +866,36 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if showBrokenConfirm && brokenRooms.length > 0}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+			<div class="bg-background rounded-lg shadow-xl p-5 max-w-sm mx-4 space-y-3">
+				<h3 class="text-sm font-semibold">Room assignments broken</h3>
+				<p class="text-xs text-muted-foreground">
+					Removing walls broke {brokenRooms.length} room assignment{brokenRooms.length !== 1 ? 's' : ''}. These rooms are no longer enclosed:
+				</p>
+				<ul class="text-xs space-y-1.5 max-h-40 overflow-y-auto">
+					{#each brokenRooms as b (b.id)}
+						<li class="flex items-center justify-between gap-2 px-2 py-1.5 bg-red-50 rounded border border-red-200">
+							<span class="text-red-700 truncate">{b.label}</span>
+							<button
+								class="shrink-0 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-medium hover:bg-red-700"
+								onclick={() => confirmUnassignBrokenSingle(b.id)}
+							>
+								Unassign
+							</button>
+						</li>
+					{/each}
+				</ul>
+				<div class="flex justify-end">
+					<button
+						class="px-3 py-1.5 rounded border text-xs hover:bg-secondary"
+						onclick={dismissBrokenConfirm}
+					>
+						Keep all
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

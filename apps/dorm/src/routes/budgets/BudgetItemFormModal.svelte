@@ -8,6 +8,12 @@
 	import { Tag, CircleDollarSign, Hash, Settings2, AlertCircle } from 'lucide-svelte';
 	import type { BudgetItem } from './types';
 	import { budgetItemTypes } from './schema';
+	import { formatCurrency as sharedFormatCurrency } from '$lib/utils/format';
+
+	// Humanize enum labels
+	function humanizeEnum(value: string): string {
+		return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\bAnd\b/g, 'and');
+	}
 
 	// Props using Svelte 5 $props rune
 	let { item, editMode = false } = $props<{
@@ -113,17 +119,10 @@
 		}
 	}
 
-	// Format currency
-	function formatCurrency(amount: number): string {
-		if (amount === null || amount === undefined || isNaN(amount)) {
-			return '₱0.00';
-		}
-
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP',
-			minimumFractionDigits: 2
-		}).format(amount);
+	// Use shared formatCurrency with NaN guard
+	function formatCurrencySafe(amount: number): string {
+		if (amount === null || amount === undefined || isNaN(amount)) return '₱0.00';
+		return sharedFormatCurrency(amount);
 	}
 
 	// Calculate total
@@ -191,15 +190,13 @@
 						<Select.Trigger
 							class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
 						>
-							<span>{formData.type || 'Select item type'}</span>
+							<span>{formData.type ? humanizeEnum(formData.type) : 'Select item type'}</span>
 						</Select.Trigger>
 						<Select.Content>
 							<Select.Group>
 								{#each budgetItemTypes as type}
 									<Select.Item value={type}>
-										{type.replace('_', ' ').replace(/\w\S*/g, (txt) => {
-											return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-										})}
+										{humanizeEnum(type)}
 									</Select.Item>
 								{/each}
 							</Select.Group>
@@ -217,6 +214,7 @@
 						<Input
 							id="cost"
 							type="number"
+							inputmode="decimal"
 							value={formData.cost}
 							onchange={(e) => handleChange('cost', parseFloat(e.currentTarget.value))}
 							min="0"
@@ -242,6 +240,7 @@
 						<Input
 							id="quantity"
 							type="number"
+							inputmode="numeric"
 							value={formData.quantity}
 							onchange={(e) => handleChange('quantity', parseFloat(e.currentTarget.value))}
 							min="1"
@@ -263,7 +262,7 @@
 				<div class="p-4 rounded-lg bg-blue-50 border border-blue-100">
 					<div class="text-sm font-medium text-blue-800 mb-1">Total Cost</div>
 					<div class="text-2xl font-bold text-gray-800">
-						{formatCurrency(total)}
+						{formatCurrencySafe(total)}
 					</div>
 				</div>
 			</div>

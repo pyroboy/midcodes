@@ -5,7 +5,7 @@ import type { Actions, RequestEvent } from './$types';
 import { rental_unitSchema } from '../../rental-unit/formSchema';
 import { db } from '$lib/server/db';
 import { rentalUnit } from '$lib/server/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { cache } from '$lib/services/cache';
 
 export const actions: Actions = {
@@ -20,7 +20,8 @@ export const actions: Actions = {
 				and(
 					eq(rentalUnit.propertyId, form.data.property_id!),
 					eq(rentalUnit.floorId, form.data.floor_id!),
-					eq(rentalUnit.number, form.data.number)
+					eq(rentalUnit.number, form.data.number),
+					isNull(rentalUnit.deletedAt)
 				)
 			)
 			.limit(1);
@@ -31,7 +32,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db.insert(rentalUnit).values({
+			const [inserted] = await db.insert(rentalUnit).values({
 				name: form.data.name,
 				number: form.data.number,
 				type: form.data.type,
@@ -42,7 +43,8 @@ export const actions: Actions = {
 				floorId: form.data.floor_id || 0,
 				amenities: form.data.amenities || [],
 				updatedAt: new Date()
-			});
+			}).returning({ id: rentalUnit.id });
+			form.data.id = inserted.id;
 		} catch (err: any) {
 			console.error('Error creating rental unit:', err);
 			return fail(500, { form });

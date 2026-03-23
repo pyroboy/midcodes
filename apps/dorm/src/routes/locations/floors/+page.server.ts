@@ -5,7 +5,7 @@ import type { Actions, RequestEvent } from './$types';
 import { floorSchema } from '../../floors/formSchema';
 import { db } from '$lib/server/db';
 import { floors } from '$lib/server/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, isNull } from 'drizzle-orm';
 
 export const actions: Actions = {
 	floorCreate: async ({ request }: RequestEvent) => {
@@ -18,7 +18,8 @@ export const actions: Actions = {
 			.where(
 				and(
 					eq(floors.propertyId, form.data.property_id),
-					eq(floors.floorNumber, form.data.floor_number)
+					eq(floors.floorNumber, form.data.floor_number),
+					isNull(floors.deletedAt)
 				)
 			)
 			.limit(1);
@@ -29,13 +30,14 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db.insert(floors).values({
+			const [inserted] = await db.insert(floors).values({
 				propertyId: form.data.property_id,
 				floorNumber: form.data.floor_number,
 				wing: form.data.wing || null,
 				status: form.data.status || 'ACTIVE',
 				updatedAt: new Date()
-			});
+			}).returning({ id: floors.id });
+			form.data.id = inserted.id;
 		} catch (err: any) {
 			console.error('Error creating floor:', err);
 			return fail(500, { form });
@@ -55,7 +57,8 @@ export const actions: Actions = {
 				and(
 					eq(floors.propertyId, form.data.property_id),
 					eq(floors.floorNumber, form.data.floor_number),
-					ne(floors.id, form.data.id!)
+					ne(floors.id, form.data.id!),
+					isNull(floors.deletedAt)
 				)
 			)
 			.limit(1);

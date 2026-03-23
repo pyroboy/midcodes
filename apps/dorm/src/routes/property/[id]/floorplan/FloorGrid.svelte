@@ -3,6 +3,7 @@
 	import type { FloorLayoutItem, FloorLayoutItemType, WallDrawState, GridIntersection, RoomAssignmentTarget, DrawTool } from './types';
 	import { ITEM_TYPE_LABELS, ROOM_TYPES, ROOM_FILL_COLORS } from './types';
 	import { itemsToWallSet, edgesToLines, lineToEdges, detectRooms, edgeKey, buildWallMetaMap, type WallEdge, type WallStorageItem, type DetectedRoom, type WallMeta } from './wallEngine';
+	import DoorWindowPopup from './DoorWindowPopup.svelte';
 
 	let {
 		items,
@@ -16,7 +17,9 @@
 		onRoomClear,
 		onToolToggle,
 		onWallMetaToggle,
-		onWallColorChange
+		onWallMetaUpdate,
+		onWallColorChange,
+		onAreaUpdate
 	}: {
 		items: FloorLayoutItem[];
 		floorId: number;
@@ -29,13 +32,78 @@
 		onRoomClear: (roomId: string) => void;
 		onToolToggle?: () => void;
 		onWallMetaToggle: (edge: WallEdge, kind: 'door' | 'window') => void;
+		onWallMetaUpdate?: (edge: WallEdge, meta: WallMeta) => void;
 		onWallColorChange: (edge: WallEdge, color: string | null) => void;
+		onAreaUpdate?: (item: { id: string; grid_x: number; grid_y: number; grid_w: number; grid_h: number; cells?: string[] }) => void;
 	} = $props();
 
-	let cellSize = $state(48);
-	let gridCols = $state(20);
-	let gridRows = $state(16);
+	// Persist grid dimensions per floor
+	function loadGridState() {
+		try {
+			const saved = localStorage.getItem(`floorplan-grid-${floorId}`);
+			if (saved) return JSON.parse(saved) as { cellSize: number; gridCols: number; gridRows: number };
+		} catch {}
+		return null;
+	}
+	const savedGrid = loadGridState();
+	let cellSize = $state(savedGrid?.cellSize ?? 48);
+	let gridCols = $state(savedGrid?.gridCols ?? 20);
+	let gridRows = $state(savedGrid?.gridRows ?? 16);
 	let cellSizeMeters = 1.0; // 1 cell = 1 meter
+
+	// Auto-expand grid to fit all existing items (walls + areas)
+	$effect(() => {
+		let maxCol = gridCols;
+		let maxRow = gridRows;
+		for (const item of items) {
+			if (item.deleted_at !== null) continue;
+			const right = item.grid_x + Math.max(item.grid_w, 1);
+			const bottom = item.grid_y + Math.max(item.grid_h, 1);
+			// Also check stored cells for cell-based areas
+			const cells = parseAreaCells(item);
+			if (cells) {
+				for (const key of cells) {
+					const [q, r] = key.split(',').map(Number);
+					if (q + 1 > maxCol - 2) maxCol = q + 4;
+					if (r + 1 > maxRow - 2) maxRow = r + 4;
+				}
+			}
+			if (right > maxCol - 2) maxCol = right + 4;
+			if (bottom > maxRow - 2) maxRow = bottom + 4;
+		}
+		if (maxCol > gridCols) gridCols = maxCol;
+		if (maxRow > gridRows) gridRows = maxRow;
+	});
+
+	// Save grid state on changes
+	$effect(() => {
+		try {
+			localStorage.setItem(`floorplan-grid-${floorId}`, JSON.stringify({ cellSize, gridCols, gridRows }));
+		} catch {}
+	});
+
+	// ─── Area cell helpers ──────────────────────────────────────────
+	function parseAreaCells(item: FloorLayoutItem): string[] | null {
+		if (!item.color || item.color.startsWith('#')) return null;
+		return item.color.split(';');
+	}
+
+	/** Find the cell nearest to the bounding box center that's actually in the shape */
+	function labelCellPos(cellKeys: string[], gx: number, gy: number, gw: number, gh: number): { x: number; y: number } {
+		const cx = gx + gw / 2;
+		const cy = gy + gh / 2;
+		let bestKey = cellKeys[0];
+		let bestDist = Infinity;
+		for (const key of cellKeys) {
+			const [q, r] = key.split(',').map(Number);
+			const dx = (q + 0.5) - cx;
+			const dy = (r + 0.5) - cy;
+			const d = dx * dx + dy * dy;
+			if (d < bestDist) { bestDist = d; bestKey = key; }
+		}
+		const [bq, br] = bestKey.split(',').map(Number);
+		return { x: (bq + 0.5) * cellSize, y: (br + 0.5) * cellSize };
+	}
 
 	// ─── Feature 4: Thick wall rendering ──────────────────────────────
 	let WALL_HALF_THICK = $derived(Math.max(3, cellSize * 0.08));
@@ -83,6 +151,32 @@
 		return map;
 	});
 
+	// Cells occupied by assigned areas — for overlap-based suppression of detected rooms
+	let occupiedCells = $derived.by(() => {
+		const cells = new Set<string>();
+		for (const item of items) {
+			if (item.item_type === 'WALL' || item.deleted_at !== null) continue;
+			const stored = parseAreaCells(item);
+			if (stored) {
+				for (const key of stored) cells.add(key);
+			} else {
+				for (let q = item.grid_x; q < item.grid_x + item.grid_w; q++) {
+					for (let r = item.grid_y; r < item.grid_y + item.grid_h; r++) {
+						cells.add(`${q},${r}`);
+					}
+				}
+			}
+		}
+		return cells;
+	});
+
+	function roomOverlapsAssigned(room: DetectedRoom): boolean {
+		for (const cell of room.cells) {
+			if (occupiedCells.has(`${cell.q},${cell.r}`)) return true;
+		}
+		return false;
+	}
+
 	function getAssignment(room: DetectedRoom): FloorLayoutItem | null {
 		const key = `${room.bounds.minQ},${room.bounds.minR},${room.bounds.maxQ - room.bounds.minQ},${room.bounds.maxR - room.bounds.minR}`;
 		return assignmentMap.get(key) ?? null;
@@ -123,6 +217,250 @@
 	let selectedWallEdges = $state<WallEdge[]>([]);
 	let selPopupPos = $state<{ x: number; y: number } | null>(null);
 
+	// ─── Selected area (for click-to-manage room assignments) ──────
+	let selectedAreaId = $state<string | null>(null);
+	let areaPopupPos = $state<{ x: number; y: number } | null>(null);
+
+	// ─── Area drag & resize ───────────────────────────────────────
+	let areaDrag = $state<{ id: string; startPx: { x: number; y: number }; origX: number; origY: number } | null>(null);
+	let areaResize = $state<{ id: string; startPx: { x: number; y: number }; origW: number; origH: number; origX: number; origY: number; corner: 'br' | 'bl' | 'tr' | 'tl' | 'r' | 'l' | 't' | 'b' } | null>(null);
+	// Live preview of area bounds during drag/resize
+	let areaPreview = $state<{ id: string; grid_x: number; grid_y: number; grid_w: number; grid_h: number } | null>(null);
+
+	// ─── Edit Area Mode (cell-by-cell painting) ──────────────────
+	let editAreaMode = $state(false);
+	let editAreaId = $state<string | null>(null);
+	let editAreaTool = $state<'add' | 'remove'>('add');
+	let editAreaCells = $state<Set<string>>(new Set()); // "q,r" keys
+	let editAreaPaintingActive = $state(false);
+	let editAreaHoverCell = $state<{ q: number; r: number } | null>(null);
+
+	function isAdjacentToArea(q: number, r: number): boolean {
+		return editAreaCells.has(`${q - 1},${r}`) || editAreaCells.has(`${q + 1},${r}`) ||
+			editAreaCells.has(`${q},${r - 1}`) || editAreaCells.has(`${q},${r + 1}`);
+	}
+
+	function editAreaToggleCell(q: number, r: number) {
+		const key = `${q},${r}`;
+		if (editAreaTool === 'add') {
+			if (editAreaCells.size === 0 || isAdjacentToArea(q, r)) {
+				editAreaCells = new Set([...editAreaCells, key]);
+			}
+		} else {
+			if (editAreaCells.has(key)) {
+				const next = new Set(editAreaCells);
+				next.delete(key);
+				editAreaCells = next;
+			}
+		}
+	}
+
+	function handleEditAreaMouseMove(e: MouseEvent) {
+		if (!editAreaPaintingActive) return;
+		const { px, py } = getGridOffset(e);
+		const { q, r } = cellFromPixel(px, py);
+		editAreaToggleCell(q, r);
+	}
+
+	function handleEditAreaMouseUp() {
+		editAreaPaintingActive = false;
+		window.removeEventListener('mousemove', handleEditAreaMouseMove);
+		window.removeEventListener('mouseup', handleEditAreaMouseUp);
+	}
+
+	function commitEditArea() {
+		if (!editAreaId || editAreaCells.size === 0) { cancelEditArea(); return; }
+		let minQ = Infinity, minR = Infinity, maxQ = -Infinity, maxR = -Infinity;
+		for (const key of editAreaCells) {
+			const [q, r] = key.split(',').map(Number);
+			minQ = Math.min(minQ, q); minR = Math.min(minR, r);
+			maxQ = Math.max(maxQ, q + 1); maxR = Math.max(maxR, r + 1);
+		}
+		onAreaUpdate?.({
+			id: editAreaId,
+			grid_x: minQ, grid_y: minR,
+			grid_w: maxQ - minQ, grid_h: maxR - minR,
+			cells: Array.from(editAreaCells)
+		});
+		cancelEditArea();
+	}
+
+	function cancelEditArea() {
+		editAreaMode = false;
+		editAreaId = null;
+		editAreaCells = new Set();
+		editAreaPaintingActive = false;
+		editAreaHoverCell = null;
+	}
+
+	function handleAreaDragStart(id: string, e: MouseEvent) {
+		e.stopPropagation();
+		e.preventDefault();
+		const item = items.find((i) => i.id === id);
+		if (!item) return;
+		areaDrag = { id, startPx: { x: e.clientX, y: e.clientY }, origX: item.grid_x, origY: item.grid_y };
+		areaPreview = { id, grid_x: item.grid_x, grid_y: item.grid_y, grid_w: item.grid_w, grid_h: item.grid_h };
+		areaPopupPos = null; // hide popup while dragging
+		window.addEventListener('mousemove', handleAreaMouseMove);
+		window.addEventListener('mouseup', handleAreaMouseUp);
+	}
+
+	function handleAreaResizeStart(id: string, corner: 'br' | 'bl' | 'tr' | 'tl' | 'r' | 'l' | 't' | 'b', e: MouseEvent) {
+		e.stopPropagation();
+		e.preventDefault();
+		const item = items.find((i) => i.id === id);
+		if (!item) return;
+		areaResize = { id, startPx: { x: e.clientX, y: e.clientY }, origW: item.grid_w, origH: item.grid_h, origX: item.grid_x, origY: item.grid_y, corner };
+		areaPreview = { id, grid_x: item.grid_x, grid_y: item.grid_y, grid_w: item.grid_w, grid_h: item.grid_h };
+		areaPopupPos = null;
+		window.addEventListener('mousemove', handleAreaMouseMove);
+		window.addEventListener('mouseup', handleAreaMouseUp);
+	}
+
+	function handleAreaMouseMove(e: MouseEvent) {
+		if (areaDrag) {
+			const dx = Math.round((e.clientX - areaDrag.startPx.x) / cellSize);
+			const dy = Math.round((e.clientY - areaDrag.startPx.y) / cellSize);
+			const item = items.find((i) => i.id === areaDrag!.id);
+			if (item) {
+				areaPreview = {
+					id: areaDrag.id,
+					grid_x: Math.max(0, areaDrag.origX + dx),
+					grid_y: Math.max(0, areaDrag.origY + dy),
+					grid_w: item.grid_w,
+					grid_h: item.grid_h
+				};
+			}
+		} else if (areaResize) {
+			const dx = Math.round((e.clientX - areaResize.startPx.x) / cellSize);
+			const dy = Math.round((e.clientY - areaResize.startPx.y) / cellSize);
+			const c = areaResize.corner;
+			let gx = areaResize.origX, gy = areaResize.origY;
+			let gw = areaResize.origW, gh = areaResize.origH;
+			if (c === 'br') { gw = Math.max(1, gw + dx); gh = Math.max(1, gh + dy); }
+			else if (c === 'bl') { gx = Math.min(gx + gw - 1, gx + dx); gw = Math.max(1, gw - dx); gh = Math.max(1, gh + dy); }
+			else if (c === 'tr') { gy = Math.min(gy + gh - 1, gy + dy); gw = Math.max(1, gw + dx); gh = Math.max(1, gh - dy); }
+			else if (c === 'tl') { gx = Math.min(gx + gw - 1, gx + dx); gy = Math.min(gy + gh - 1, gy + dy); gw = Math.max(1, gw - dx); gh = Math.max(1, gh - dy); }
+			else if (c === 'r') { gw = Math.max(1, gw + dx); }
+			else if (c === 'l') { gx = Math.min(gx + gw - 1, gx + dx); gw = Math.max(1, gw - dx); }
+			else if (c === 'b') { gh = Math.max(1, gh + dy); }
+			else if (c === 't') { gy = Math.min(gy + gh - 1, gy + dy); gh = Math.max(1, gh - dy); }
+			areaPreview = { id: areaResize.id, grid_x: Math.max(0, gx), grid_y: Math.max(0, gy), grid_w: gw, grid_h: gh };
+		}
+	}
+
+	function handleAreaMouseUp() {
+		window.removeEventListener('mousemove', handleAreaMouseMove);
+		window.removeEventListener('mouseup', handleAreaMouseUp);
+
+		if (areaPreview && onAreaUpdate) {
+			const item = items.find((i) => i.id === areaPreview!.id);
+			if (item && (
+				item.grid_x !== areaPreview.grid_x ||
+				item.grid_y !== areaPreview.grid_y ||
+				item.grid_w !== areaPreview.grid_w ||
+				item.grid_h !== areaPreview.grid_h
+			)) {
+				const storedCells = parseAreaCells(item);
+				let newCells: string[] | undefined;
+
+				if (storedCells) {
+					if (areaDrag) {
+						// Move: translate all cells by delta
+						const dq = areaPreview.grid_x - item.grid_x;
+						const dr = areaPreview.grid_y - item.grid_y;
+						newCells = storedCells.map((key) => {
+							const [q, r] = key.split(',').map(Number);
+							return `${q + dq},${r + dr}`;
+						});
+					} else if (areaResize) {
+						// Resize: clip to new bounds, then snake-extend edge cells into expanded area
+						const ox = item.grid_x, oy = item.grid_y;
+						const ow = item.grid_w, oh = item.grid_h;
+						const nx = areaPreview.grid_x, ny = areaPreview.grid_y;
+						const nw = areaPreview.grid_w, nh = areaPreview.grid_h;
+
+						// Start with existing cells clipped to new bounds
+						const cellSet = new Set(
+							storedCells.filter((key) => {
+								const [q, r] = key.split(',').map(Number);
+								return q >= nx && q < nx + nw && r >= ny && r < ny + nh;
+							})
+						);
+
+						// Snake-extend: extrude edge cells in each expanded direction
+						const oldRight = ox + ow - 1, oldBottom = oy + oh - 1;
+						const oldLeft = ox, oldTop = oy;
+
+						// Right expansion
+						if (nx + nw > ox + ow) {
+							for (const key of storedCells) {
+								const [q, r] = key.split(',').map(Number);
+								if (q === oldRight && r >= ny && r < ny + nh) {
+									for (let eq = oldRight + 1; eq < nx + nw; eq++) cellSet.add(`${eq},${r}`);
+								}
+							}
+						}
+
+						// Left expansion
+						if (nx < ox) {
+							for (const key of storedCells) {
+								const [q, r] = key.split(',').map(Number);
+								if (q === oldLeft && r >= ny && r < ny + nh) {
+									for (let eq = nx; eq < oldLeft; eq++) cellSet.add(`${eq},${r}`);
+								}
+							}
+						}
+
+						// Down expansion (uses current cellSet so corner fills from right/left)
+						if (ny + nh > oy + oh) {
+							const snap = [...cellSet];
+							for (const key of snap) {
+								const [q, r] = key.split(',').map(Number);
+								if (r === oldBottom && q >= nx && q < nx + nw) {
+									for (let er = oldBottom + 1; er < ny + nh; er++) cellSet.add(`${q},${er}`);
+								}
+							}
+						}
+
+						// Up expansion (uses current cellSet so corner fills from right/left)
+						if (ny < oy) {
+							const snap = [...cellSet];
+							for (const key of snap) {
+								const [q, r] = key.split(',').map(Number);
+								if (r === oldTop && q >= nx && q < nx + nw) {
+									for (let er = ny; er < oldTop; er++) cellSet.add(`${q},${er}`);
+								}
+							}
+						}
+
+						newCells = [...cellSet];
+						if (newCells.length === 0) newCells = undefined;
+					}
+				}
+
+				onAreaUpdate({
+					id: areaPreview.id,
+					grid_x: areaPreview.grid_x,
+					grid_y: areaPreview.grid_y,
+					grid_w: areaPreview.grid_w,
+					grid_h: areaPreview.grid_h,
+					cells: newCells
+				});
+			}
+			// Re-show popup at new position
+			selectedAreaId = areaPreview.id;
+			areaPopupPos = {
+				x: areaPreview.grid_x * cellSize + (areaPreview.grid_w * cellSize) / 2,
+				y: (areaPreview.grid_y + areaPreview.grid_h) * cellSize + 8
+			};
+		}
+
+		areaDrag = null;
+		areaResize = null;
+		areaPreview = null;
+	}
+
 	let selRect = $derived.by(() => {
 		if (!selStart || !selEnd) return null;
 		return {
@@ -154,6 +492,8 @@
 		selPopupPos = null;
 		selStart = null;
 		selEnd = null;
+		selectedAreaId = null;
+		areaPopupPos = null;
 	}
 
 	function deleteSelectedWalls() {
@@ -172,6 +512,14 @@
 	// ─── Feature 7: Wall color picker ─────────────────────────────────
 	let selectedWallForColor = $state<{ edge: WallEdge; anchorPx: { x: number; y: number } } | null>(null);
 	let selectedWallColor = $state('#334155');
+
+	// ─── Door/Window properties popup ─────────────────────────────────
+	let dwPopup = $state<{
+		kind: 'door' | 'window';
+		edge: WallEdge;
+		meta: WallMeta;
+		anchorPx: { x: number; y: number };
+	} | null>(null);
 
 	// ─── Grid auto-expand ──────────────────────────────────────────────
 	$effect(() => {
@@ -242,6 +590,18 @@
 		if (assignTarget) return;
 		if (e.button === 2) return;
 
+		// Edit area mode: paint cells
+		if (editAreaMode) {
+			e.preventDefault();
+			const { px, py } = getGridOffset(e);
+			const { q, r } = cellFromPixel(px, py);
+			editAreaToggleCell(q, r);
+			editAreaPaintingActive = true;
+			window.addEventListener('mousemove', handleEditAreaMouseMove);
+			window.addEventListener('mouseup', handleEditAreaMouseUp);
+			return;
+		}
+
 		const { px, py } = getGridOffset(e);
 
 		// Select tool: start bounding box
@@ -273,6 +633,7 @@
 		cursorSnap = snapToIntersection(px, py);
 		const { q, r } = cellFromPixel(px, py);
 		hoveredRoomId = cellRoomMap.get(`${q},${r}`)?.id ?? null;
+		if (editAreaMode) editAreaHoverCell = { q, r };
 	}
 
 	function handleWindowMouseMove(e: MouseEvent) {
@@ -319,20 +680,80 @@
 					selectedWallEdges = edges;
 					selPopupPos = { x: rect.x + rect.w / 2, y: rect.y + rect.h + 8 };
 				} else {
+					// No walls in selection → treat as area assignment (Prison Architect style)
 					clearSelection();
+					const minQ = Math.floor(rect.x / cellSize);
+					const minR = Math.floor(rect.y / cellSize);
+					const maxQ = Math.ceil((rect.x + rect.w) / cellSize);
+					const maxR = Math.ceil((rect.y + rect.h) / cellSize);
+
+					if (maxQ > minQ && maxR > minR) {
+						const cells: { q: number; r: number }[] = [];
+						for (let q = minQ; q < maxQ; q++) {
+							for (let r = minR; r < maxR; r++) {
+								cells.push({ q, r });
+							}
+						}
+						assignTarget = {
+							roomId: `area-${minQ},${minR}`,
+							cells,
+							bounds: { minQ, minR, maxQ, maxR },
+							anchorPx: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }
+						};
+						const existingKey = `${minQ},${minR},${maxQ - minQ},${maxR - minR}`;
+						const existing = assignmentMap.get(existingKey);
+						if (existing) {
+							assignType = existing.item_type as FloorLayoutItemType;
+							assignUnitId = existing.rental_unit_id ?? '';
+						} else {
+							assignType = 'RENTAL_UNIT';
+							assignUnitId = '';
+						}
+					}
 				}
 			} else {
-				// Single click (no drag): open wall color picker if near a wall
+				// Single click (no drag): check room first, then wall color
 				clearSelection();
 				const { px, py } = getGridOffset(e);
-				const nearEdge = findNearestWallEdge(px, py, cellSize * 0.6);
-				if (nearEdge) {
-					const key = edgeKey(nearEdge.q, nearEdge.r, nearEdge.dir);
-					const meta = wallMetaMap.get(key) ?? {};
-					selectedWallColor = meta.color ?? '#334155';
-					selectedWallForColor = { edge: nearEdge, anchorPx: { x: px, y: py } };
+				const { q, r } = cellFromPixel(px, py);
+				const room = cellRoomMap.get(`${q},${r}`);
+
+				if (room) {
+					// Clicked inside a detected room → open assignment popup
+					assignTarget = {
+						roomId: room.id,
+						cells: room.cells,
+						bounds: room.bounds,
+						anchorPx: { x: px, y: py }
+					};
+					const existing = getAssignment(room);
+					if (existing) {
+						assignType = existing.item_type as FloorLayoutItemType;
+						assignUnitId = existing.rental_unit_id ?? '';
+					} else {
+						assignType = 'RENTAL_UNIT';
+						assignUnitId = '';
+					}
 				} else {
-					selectedWallForColor = null;
+					// Not in a room → check if clicking a wall with door/window or plain wall
+					const nearEdge = findNearestWallEdge(px, py, cellSize * 0.6);
+					if (nearEdge) {
+						const key = edgeKey(nearEdge.q, nearEdge.r, nearEdge.dir);
+						const meta = wallMetaMap.get(key) ?? {};
+						if (meta.door) {
+							// Wall has a door → open door properties popup
+							dwPopup = { kind: 'door', edge: nearEdge, meta, anchorPx: { x: px, y: py } };
+						} else if (meta.window) {
+							// Wall has a window → open window properties popup
+							dwPopup = { kind: 'window', edge: nearEdge, meta, anchorPx: { x: px, y: py } };
+						} else {
+							// Plain wall → open color picker
+							selectedWallColor = meta.color ?? '#334155';
+							selectedWallForColor = { edge: nearEdge, anchorPx: { x: px, y: py } };
+						}
+					} else {
+						selectedWallForColor = null;
+					}
 				}
 			}
 			selStart = null;
@@ -360,11 +781,20 @@
 		} else if (!dragged && drawState) {
 			// Click without drag
 			if (tool === 'door' || tool === 'window') {
-				// Door/window tool click → toggle meta on nearest wall
+				// Door/window tool click → open properties popup if already has one, otherwise toggle
 				const { px, py } = getGridOffset(e);
 				const nearEdge = findNearestWallEdge(px, py, cellSize * 0.6);
 				if (nearEdge) {
-					onWallMetaToggle(nearEdge, tool);
+					const key = edgeKey(nearEdge.q, nearEdge.r, nearEdge.dir);
+					const existingMeta = wallMetaMap.get(key) ?? {};
+					const hasMeta = (tool === 'door' && existingMeta.door) || (tool === 'window' && existingMeta.window);
+					if (hasMeta) {
+						// Already has door/window → open properties popup
+						dwPopup = { kind: tool, edge: nearEdge, meta: existingMeta, anchorPx: { x: px, y: py } };
+					} else {
+						// No door/window yet → place one (toggle)
+						onWallMetaToggle(nearEdge, tool);
+					}
 				}
 			} else if (eraseMode) {
 				// Erase mode click → delete nearest wall segment
@@ -434,6 +864,11 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		if (editAreaMode) {
+			if (e.key === 'Escape') cancelEditArea();
+			if (e.key === 'Enter') commitEditArea();
+			return;
+		}
 		if (e.key === 'Escape') {
 			if (drawState) {
 				window.removeEventListener('mousemove', handleWindowMouseMove);
@@ -444,6 +879,7 @@
 			assignTarget = null;
 			dragStartPx = null;
 			selectedWallForColor = null;
+			dwPopup = null;
 			clearSelection();
 		}
 		if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -496,43 +932,69 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="relative overflow-auto flex-1 bg-muted/30"
+	class="relative flex-1 min-h-0 bg-muted/30 overflow-hidden"
 	onkeydown={handleKeydown}
 	tabindex="-1"
 >
-	<!-- Zoom + Export -->
-	<div class="absolute top-2 right-2 z-20 flex gap-1">
-		<button
-			class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary disabled:opacity-40"
-			disabled={isExporting}
-			onclick={async () => {
-				if (!svgEl) return;
-				isExporting = true;
-				try {
-					const { exportFloorPlanPng } = await import('./exportPng');
-					await exportFloorPlanPng(svgEl, `floor-${floorId}.png`);
-				} finally {
-					isExporting = false;
-				}
-			}}
-		>
-			{isExporting ? 'Exporting...' : 'Export PNG'}
-		</button>
-		<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
-			onclick={() => (cellSize = Math.max(24, cellSize - 8))}>-</button>
-		<span class="px-2 py-1 text-xs text-muted-foreground">{cellSize}px</span>
-		<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
-			onclick={() => (cellSize = Math.min(96, cellSize + 8))}>+</button>
+	<!-- Overlay controls (absolute on non-scrolling parent — stays pinned) -->
+	<div class="absolute inset-x-0 top-0 z-30 pointer-events-none">
+		<!-- Zoom + Export -->
+		<div class="absolute top-2 right-2 pointer-events-auto flex gap-1">
+			<button
+				class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary disabled:opacity-40"
+				disabled={isExporting}
+				onclick={async () => {
+					if (!svgEl) return;
+					isExporting = true;
+					try {
+						const { exportFloorPlanPng } = await import('./exportPng');
+						await exportFloorPlanPng(svgEl, `floor-${floorId}.png`);
+					} finally {
+						isExporting = false;
+					}
+				}}
+			>
+				{isExporting ? 'Exporting...' : 'Export PNG'}
+			</button>
+			<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
+				onclick={() => (cellSize = Math.max(24, cellSize - 8))}>-</button>
+			<span class="px-2 py-1 text-xs text-muted-foreground">{cellSize}px</span>
+			<button class="px-2 py-1 rounded bg-background border text-xs hover:bg-secondary"
+				onclick={() => (cellSize = Math.min(96, cellSize + 8))}>+</button>
+		</div>
+
+		<!-- Edit Area Mode banner -->
+		{#if editAreaMode}
+			<div class="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-auto flex items-center gap-2 bg-background/95 backdrop-blur border rounded-lg shadow-lg px-4 py-2">
+				<span class="text-sm font-semibold">Edit Area</span>
+				<div class="flex rounded-md border overflow-hidden">
+					<button
+						class="px-2.5 py-1 text-xs font-medium transition-colors {editAreaTool === 'add' ? 'bg-green-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}"
+						onclick={() => (editAreaTool = 'add')}
+					>+ Add</button>
+					<button
+						class="px-2.5 py-1 text-xs font-medium transition-colors {editAreaTool === 'remove' ? 'bg-red-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}"
+						onclick={() => (editAreaTool = 'remove')}
+					>&minus; Remove</button>
+				</div>
+				<span class="text-xs text-muted-foreground">{editAreaCells.size} cells</span>
+				<button class="px-3 py-1 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90" onclick={commitEditArea}>Done</button>
+				<button class="px-3 py-1 rounded border text-xs hover:bg-secondary" onclick={cancelEditArea}>Cancel</button>
+			</div>
+		{/if}
 	</div>
+
+	<!-- Scrollable grid area (both axes) -->
+	<div class="overflow-scroll h-full w-full">
 
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		bind:this={gridEl}
 		class="relative"
-		class:cursor-crosshair={(tool === 'draw' || tool === 'door' || tool === 'window') && (!hoveredRoomId || drawState)}
-		class:cursor-pointer={tool === 'draw' && hoveredRoomId && !drawState}
-		class:cursor-cell={tool === 'erase'}
-		class:cursor-default={tool === 'select'}
+		class:cursor-crosshair={!editAreaMode && (tool === 'draw' || tool === 'door' || tool === 'window') && (!hoveredRoomId || drawState)}
+		class:cursor-pointer={!editAreaMode && tool === 'draw' && hoveredRoomId && !drawState}
+		class:cursor-cell={editAreaMode || tool === 'erase'}
+		class:cursor-default={!editAreaMode && tool === 'select'}
 		style="width: {gridCols * cellSize}px; height: {gridRows * cellSize}px; min-width: 100%; min-height: 100%;"
 		onmousedown={handleMouseDown}
 		onmousemove={handleLocalMouseMove}
@@ -549,16 +1011,18 @@
 					stroke="currentColor" stroke-opacity="0.06" stroke-width="1" />
 			{/each}
 
-			<!-- Room fills -->
+			<!-- Room fills (only unassigned — assigned areas use their own overlay) -->
 			{#each detectedRooms as room (room.id)}
 				{@const fill = roomFillColor(room)}
+			{#if !roomOverlapsAssigned(room)}
 				{#each room.cells as cell (`${cell.q},${cell.r}`)}
 					<rect
-						x={cell.q * cellSize + 1} y={cell.r * cellSize + 1}
-						width={cellSize - 2} height={cellSize - 2}
+						x={cell.q * cellSize} y={cell.r * cellSize}
+						width={cellSize} height={cellSize}
 						{fill} opacity="0.4"
 					/>
 				{/each}
+			{/if}
 			{/each}
 
 			<!-- Hover highlight -->
@@ -574,6 +1038,49 @@
 					{/each}
 				{/if}
 			{/if}
+
+			<!-- Edit Area Mode: cell overlays -->
+			{#if editAreaMode}
+				{#each Array.from(editAreaCells) as cellKey (cellKey)}
+					{@const [cq, cr] = cellKey.split(',').map(Number)}
+					<rect
+						x={cq * cellSize + 1} y={cr * cellSize + 1}
+						width={cellSize - 2} height={cellSize - 2}
+						fill="#22c55e" opacity="0.35"
+					/>
+				{/each}
+				<!-- Hover preview cell -->
+				{#if editAreaHoverCell}
+					{@const hq = editAreaHoverCell.q}
+					{@const hr = editAreaHoverCell.r}
+					<rect
+						x={hq * cellSize} y={hr * cellSize}
+						width={cellSize} height={cellSize}
+						fill={editAreaTool === 'add' ? '#22c55e' : '#ef4444'}
+						opacity="0.15"
+					/>
+				{/if}
+			{/if}
+
+			<!-- Area cell fills (custom shapes from edit area mode) -->
+			{#each items.filter((i) => i.item_type !== 'WALL' && i.deleted_at === null) as areaItem (`acf-${areaItem.id}`)}
+				{@const areaCells = parseAreaCells(areaItem)}
+				{#if areaCells}
+					{@const aFill = ROOM_FILL_COLORS[areaItem.item_type] ?? ROOM_FILL_COLORS._unassigned}
+					{@const dragDx = areaPreview?.id === areaItem.id ? (areaPreview.grid_x - areaItem.grid_x) * cellSize : 0}
+					{@const dragDy = areaPreview?.id === areaItem.id ? (areaPreview.grid_y - areaItem.grid_y) * cellSize : 0}
+					<g transform="translate({dragDx},{dragDy})">
+					{#each areaCells as cellKey (`acf-${areaItem.id}-${cellKey}`)}
+						{@const [cq, cr] = cellKey.split(',').map(Number)}
+						<rect
+							x={cq * cellSize} y={cr * cellSize}
+							width={cellSize} height={cellSize}
+							fill={aFill} opacity="0.4"
+						/>
+					{/each}
+					</g>
+				{/if}
+			{/each}
 
 			<!-- Alignment guides (Feature 8) -->
 			{#if alignGuides.x !== null}
@@ -644,49 +1151,132 @@
 				{@const ht = isSelected ? WALL_HALF_THICK + 2 : WALL_HALF_THICK}
 
 				{#if meta.door}
-					<!-- Door: two half-wall segments with gap + arc swing -->
+					<!-- Door: type-aware rendering with swing direction -->
 					{@const midX = (x1 + x2) / 2}
 					{@const midY = (y1 + y2) / 2}
 					{@const doorW = cellSize * 0.8}
+					{@const swLeft = (meta.swing ?? 'left') === 'left'}
+					{@const inward = (meta.openDir ?? 'inward') === 'inward'}
+					{@const dType = meta.door}
+
+					<!-- Wall flanks around gap -->
 					{#if isHoriz}
 						<polygon points={wallLineToRect(x1, y1, midX - doorW / 2, y1, ht)} fill={wallColor} />
 						<polygon points={wallLineToRect(midX + doorW / 2, y1, x2, y1, ht)} fill={wallColor} />
-						<path
-							d="M {midX - doorW / 2} {y1} A {doorW} {doorW} 0 0 1 {midX} {y1 + doorW}"
-							stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 2" fill="none" />
-						<line x1={midX - doorW / 2} y1={y1} x2={midX} y2={y1 + doorW}
-							stroke="#64748b" stroke-width="1.5" />
 					{:else}
 						<polygon points={wallLineToRect(x1, y1, x1, midY - doorW / 2, ht)} fill={wallColor} />
 						<polygon points={wallLineToRect(x1, midY + doorW / 2, x1, y2, ht)} fill={wallColor} />
-						<path
-							d="M {x1} {midY - doorW / 2} A {doorW} {doorW} 0 0 1 {x1 + doorW} {midY}"
-							stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 2" fill="none" />
-						<line x1={x1} y1={midY - doorW / 2} x2={x1 + doorW} y2={midY}
-							stroke="#64748b" stroke-width="1.5" />
 					{/if}
+
+					{#if dType === 'single' || dType === 'french'}
+						{#if isHoriz}
+							{@const hx = swLeft ? midX - doorW / 2 : midX + doorW / 2}
+							{@const dy = inward ? doorW * 0.7 : -doorW * 0.7}
+							<line x1={hx} y1={y1} x2={hx + (swLeft ? doorW * 0.5 : -doorW * 0.5)} y2={y1 + dy} stroke="#64748b" stroke-width="1.5" />
+							<path d="M {hx} {y1} A {doorW * 0.7} {doorW * 0.7} 0 0 {(swLeft && inward) || (!swLeft && !inward) ? 1 : 0} {hx + (swLeft ? doorW * 0.5 : -doorW * 0.5)} {y1 + dy}" stroke="#64748b" stroke-width="1" stroke-dasharray="3 2" fill="none" />
+						{:else}
+							{@const hy = swLeft ? midY - doorW / 2 : midY + doorW / 2}
+							{@const dx = inward ? doorW * 0.7 : -doorW * 0.7}
+							<line x1={x1} y1={hy} x2={x1 + dx} y2={hy + (swLeft ? doorW * 0.5 : -doorW * 0.5)} stroke="#64748b" stroke-width="1.5" />
+							<path d="M {x1} {hy} A {doorW * 0.7} {doorW * 0.7} 0 0 {(swLeft && inward) || (!swLeft && !inward) ? 0 : 1} {x1 + dx} {hy + (swLeft ? doorW * 0.5 : -doorW * 0.5)}" stroke="#64748b" stroke-width="1" stroke-dasharray="3 2" fill="none" />
+						{/if}
+					{:else if dType === 'double'}
+						{#if isHoriz}
+							{@const dy = inward ? doorW * 0.5 : -doorW * 0.5}
+							<line x1={midX - doorW / 2} y1={y1} x2={midX} y2={y1 + dy} stroke="#64748b" stroke-width="1.5" />
+							<line x1={midX + doorW / 2} y1={y1} x2={midX} y2={y1 + dy} stroke="#64748b" stroke-width="1.5" />
+							<path d="M {midX - doorW / 2} {y1} A {doorW * 0.5} {doorW * 0.5} 0 0 {inward ? 1 : 0} {midX} {y1 + dy}" stroke="#64748b" stroke-width="1" stroke-dasharray="3 2" fill="none" />
+							<path d="M {midX + doorW / 2} {y1} A {doorW * 0.5} {doorW * 0.5} 0 0 {inward ? 0 : 1} {midX} {y1 + dy}" stroke="#64748b" stroke-width="1" stroke-dasharray="3 2" fill="none" />
+						{:else}
+							{@const dx = inward ? doorW * 0.5 : -doorW * 0.5}
+							<line x1={x1} y1={midY - doorW / 2} x2={x1 + dx} y2={midY} stroke="#64748b" stroke-width="1.5" />
+							<line x1={x1} y1={midY + doorW / 2} x2={x1 + dx} y2={midY} stroke="#64748b" stroke-width="1.5" />
+							<path d="M {x1} {midY - doorW / 2} A {doorW * 0.5} {doorW * 0.5} 0 0 {inward ? 0 : 1} {x1 + dx} {midY}" stroke="#64748b" stroke-width="1" stroke-dasharray="3 2" fill="none" />
+							<path d="M {x1} {midY + doorW / 2} A {doorW * 0.5} {doorW * 0.5} 0 0 {inward ? 1 : 0} {x1 + dx} {midY}" stroke="#64748b" stroke-width="1" stroke-dasharray="3 2" fill="none" />
+						{/if}
+					{:else if dType === 'sliding'}
+						{#if isHoriz}
+							<rect x={midX - doorW / 2} y={y1 - 3} width={doorW * 0.55} height={6} fill="#94a3b8" rx="1" />
+							<rect x={midX - doorW * 0.05} y={y1 - 3} width={doorW * 0.55} height={6} fill="#64748b" rx="1" />
+							<polygon points="{midX + doorW * 0.35},{y1 + 6} {midX + doorW * 0.35},{y1 + 12} {midX + doorW * 0.45},{y1 + 9}" fill="#334155" />
+						{:else}
+							<rect x={x1 - 3} y={midY - doorW / 2} width={6} height={doorW * 0.55} fill="#94a3b8" rx="1" />
+							<rect x={x1 - 3} y={midY - doorW * 0.05} width={6} height={doorW * 0.55} fill="#64748b" rx="1" />
+							<polygon points="{x1 + 6},{midY + doorW * 0.35} {x1 + 12},{midY + doorW * 0.35} {x1 + 9},{midY + doorW * 0.45}" fill="#334155" />
+						{/if}
+					{:else if dType === 'pocket'}
+						{#if isHoriz}
+							<rect x={midX - doorW * 0.1} y={y1 - 3} width={doorW * 0.4} height={6} fill="#94a3b8" rx="1" />
+							<rect x={midX - doorW / 2} y={y1 - 2} width={doorW * 0.35} height={4} fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2" rx="1" />
+						{:else}
+							<rect x={x1 - 3} y={midY - doorW * 0.1} width={6} height={doorW * 0.4} fill="#94a3b8" rx="1" />
+							<rect x={x1 - 2} y={midY - doorW / 2} width={4} height={doorW * 0.35} fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2" rx="1" />
+						{/if}
+					{:else if dType === 'bifold'}
+						{#if isHoriz}
+							{@const dy = inward ? doorW * 0.4 : -doorW * 0.4}
+							<line x1={midX - doorW / 2} y1={y1} x2={midX} y2={y1 + dy} stroke="#64748b" stroke-width="1.5" />
+							<line x1={midX} y1={y1 + dy} x2={midX + doorW / 2} y2={y1} stroke="#64748b" stroke-width="1.5" />
+							<circle cx={midX} cy={y1 + dy} r="2" fill="#94a3b8" />
+						{:else}
+							{@const dx = inward ? doorW * 0.4 : -doorW * 0.4}
+							<line x1={x1} y1={midY - doorW / 2} x2={x1 + dx} y2={midY} stroke="#64748b" stroke-width="1.5" />
+							<line x1={x1 + dx} y1={midY} x2={x1} y2={midY + doorW / 2} stroke="#64748b" stroke-width="1.5" />
+							<circle cx={x1 + dx} cy={midY} r="2" fill="#94a3b8" />
+						{/if}
+					{/if}
+
 				{:else if meta.window}
-					<!-- Window: full wall with glass pane overlay -->
+					<!-- Window: type-aware rendering -->
+					{@const wMid = isHoriz ? (x1 + x2) / 2 : (y1 + y2) / 2}
+					{@const paneSize = cellSize * 0.6}
+					{@const wType = meta.window}
 					<polygon points={wallLineToRect(x1, y1, x2, y2, ht)} fill={wallColor} />
-					{#if isHoriz}
-						{@const wMidX = (x1 + x2) / 2}
-						{@const paneW = cellSize * 0.6}
-						<line x1={wMidX - paneW / 2} y1={y1 - 6} x2={wMidX + paneW / 2} y2={y1 - 6}
-							stroke="#7dd3fc" stroke-width="2" />
-						<line x1={wMidX - paneW / 2} y1={y1 + 6} x2={wMidX + paneW / 2} y2={y1 + 6}
-							stroke="#7dd3fc" stroke-width="2" />
-						<rect x={wMidX - paneW / 2} y={y1 - 6} width={paneW} height={12}
-							fill="#bae6fd" opacity="0.5" />
-					{:else}
-						{@const wMidY = (y1 + y2) / 2}
-						{@const paneH = cellSize * 0.6}
-						<line x1={x1 - 6} y1={wMidY - paneH / 2} x2={x1 - 6} y2={wMidY + paneH / 2}
-							stroke="#7dd3fc" stroke-width="2" />
-						<line x1={x1 + 6} y1={wMidY - paneH / 2} x2={x1 + 6} y2={wMidY + paneH / 2}
-							stroke="#7dd3fc" stroke-width="2" />
-						<rect x={x1 - 6} y={wMidY - paneH / 2} width={12} height={paneH}
-							fill="#bae6fd" opacity="0.5" />
+
+					{#if wType === 'fixed'}
+						{#if isHoriz}
+							<rect x={wMid - paneSize / 2} y={y1 - 6} width={paneSize} height={12} fill="#bae6fd" opacity="0.5" rx="1" />
+							<line x1={wMid} y1={y1 - 6} x2={wMid} y2={y1 + 6} stroke="#334155" stroke-width="0.7" />
+							<line x1={wMid - paneSize / 2} y1={y1} x2={wMid + paneSize / 2} y2={y1} stroke="#334155" stroke-width="0.7" />
+						{:else}
+							<rect x={x1 - 6} y={wMid - paneSize / 2} width={12} height={paneSize} fill="#bae6fd" opacity="0.5" rx="1" />
+							<line x1={x1 - 6} y1={wMid} x2={x1 + 6} y2={wMid} stroke="#334155" stroke-width="0.7" />
+							<line x1={x1} y1={wMid - paneSize / 2} x2={x1} y2={wMid + paneSize / 2} stroke="#334155" stroke-width="0.7" />
+						{/if}
+					{:else if wType === 'sliding'}
+						{#if isHoriz}
+							<rect x={wMid - paneSize / 2} y={y1 - 5} width={paneSize * 0.55} height={10} fill="#bae6fd" stroke="#334155" stroke-width="0.8" rx="1" />
+							<rect x={wMid - paneSize * 0.05} y={y1 - 5} width={paneSize * 0.55} height={10} fill="#93c5fd" stroke="#334155" stroke-width="0.8" rx="1" />
+						{:else}
+							<rect x={x1 - 5} y={wMid - paneSize / 2} width={10} height={paneSize * 0.55} fill="#bae6fd" stroke="#334155" stroke-width="0.8" rx="1" />
+							<rect x={x1 - 5} y={wMid - paneSize * 0.05} width={10} height={paneSize * 0.55} fill="#93c5fd" stroke="#334155" stroke-width="0.8" rx="1" />
+						{/if}
+					{:else if wType === 'casement'}
+						{#if isHoriz}
+							<rect x={wMid - paneSize / 2} y={y1 - 6} width={paneSize} height={12} fill="#bae6fd" opacity="0.5" rx="1" />
+							<path d="M {wMid - paneSize / 2} {y1 + 6} L {wMid - paneSize * 0.1} {y1 - 4} L {wMid - paneSize / 2} {y1 - 6}" stroke="#64748b" stroke-width="0.8" fill="none" stroke-dasharray="2 2" />
+						{:else}
+							<rect x={x1 - 6} y={wMid - paneSize / 2} width={12} height={paneSize} fill="#bae6fd" opacity="0.5" rx="1" />
+							<path d="M {x1 + 6} {wMid - paneSize / 2} L {x1 - 4} {wMid - paneSize * 0.1} L {x1 + 6} {wMid - paneSize / 2}" stroke="#64748b" stroke-width="0.8" fill="none" stroke-dasharray="2 2" />
+						{/if}
+					{:else if wType === 'awning'}
+						{#if isHoriz}
+							<rect x={wMid - paneSize / 2} y={y1 - 6} width={paneSize} height={12} fill="#bae6fd" opacity="0.5" rx="1" />
+							<line x1={wMid - paneSize / 2} y1={y1 - 6} x2={wMid} y2={y1 + 4} stroke="#64748b" stroke-width="0.8" stroke-dasharray="2 2" />
+							<line x1={wMid + paneSize / 2} y1={y1 - 6} x2={wMid} y2={y1 + 4} stroke="#64748b" stroke-width="0.8" stroke-dasharray="2 2" />
+						{:else}
+							<rect x={x1 - 6} y={wMid - paneSize / 2} width={12} height={paneSize} fill="#bae6fd" opacity="0.5" rx="1" />
+							<line x1={x1 - 6} y1={wMid - paneSize / 2} x2={x1 + 4} y2={wMid} stroke="#64748b" stroke-width="0.8" stroke-dasharray="2 2" />
+							<line x1={x1 - 6} y1={wMid + paneSize / 2} x2={x1 + 4} y2={wMid} stroke="#64748b" stroke-width="0.8" stroke-dasharray="2 2" />
+						{/if}
+					{:else if wType === 'bay'}
+						{#if isHoriz}
+							<polygon points="{wMid - paneSize / 2},{y1} {wMid - paneSize * 0.3},{y1 + 10} {wMid + paneSize * 0.3},{y1 + 10} {wMid + paneSize / 2},{y1}" fill="#bae6fd" fill-opacity="0.4" stroke="#334155" stroke-width="1" />
+						{:else}
+							<polygon points="{x1},{wMid - paneSize / 2} {x1 + 10},{wMid - paneSize * 0.3} {x1 + 10},{wMid + paneSize * 0.3} {x1},{wMid + paneSize / 2}" fill="#bae6fd" fill-opacity="0.4" stroke="#334155" stroke-width="1" />
+						{/if}
 					{/if}
+
 				{:else}
 					<!-- Plain wall -->
 					<polygon points={wallLineToRect(x1, y1, x2, y2, ht)} fill={wallColor} />
@@ -725,39 +1315,170 @@
 				/>
 			{/if}
 
-			<!-- SVG text labels for rooms (visible in PNG export) -->
-			{#each detectedRooms as room (`label-${room.id}`)}
-				{@const info = roomLabel(room)}
-				{@const cx = ((room.bounds.minQ + room.bounds.maxQ) / 2) * cellSize}
-				{@const cy = ((room.bounds.minR + room.bounds.maxR) / 2) * cellSize}
-				{@const rw = (room.bounds.maxQ - room.bounds.minQ) * cellSize}
-				{@const rh = (room.bounds.maxR - room.bounds.minR) * cellSize}
-				{#if rw > 36 && rh > 24}
-					<text
-						x={cx} y={cy - 4}
-						text-anchor="middle" dominant-baseline="middle"
-						font-size="11" font-family="system-ui, sans-serif"
-						fill={info.assigned ? '#1e293b' : '#94a3b8'}
-						font-weight={info.assigned ? '600' : '400'}
-					>
-						{info.text}
-					</text>
-					<text
-						x={cx} y={cy + 10}
-						text-anchor="middle" dominant-baseline="middle"
-						font-size="9" font-family="system-ui, sans-serif"
-						fill="#64748b"
-					>
-						{info.area}
-					</text>
-				{/if}
-			{/each}
 		</svg>
 
-		<!-- Room labels -->
+		<!-- Assigned area overlays -->
+		{#each items.filter((i) => i.item_type !== 'WALL' && i.deleted_at === null) as areaItem (areaItem.id)}
+			{@const preview = areaPreview?.id === areaItem.id ? areaPreview : null}
+			{@const ax = (preview?.grid_x ?? areaItem.grid_x) * cellSize}
+			{@const ay = (preview?.grid_y ?? areaItem.grid_y) * cellSize}
+			{@const aw = (preview?.grid_w ?? areaItem.grid_w) * cellSize}
+			{@const ah = (preview?.grid_h ?? areaItem.grid_h) * cellSize}
+			{@const aFill = ROOM_FILL_COLORS[areaItem.item_type] ?? ROOM_FILL_COLORS._unassigned}
+			{@const hasCells = parseAreaCells(areaItem) !== null}
+			{@const isSelected = selectedAreaId === areaItem.id}
+			{@const aLabel = areaItem.item_type === 'RENTAL_UNIT' && areaItem.rental_unit_id
+				? (rentalUnitsMap.get(areaItem.rental_unit_id)?.name ?? 'Rental Unit')
+				: (areaItem.label ?? ITEM_TYPE_LABELS[areaItem.item_type] ?? areaItem.item_type)}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				role="button"
+				tabindex="0"
+				class="absolute rounded-sm transition-all {isSelected ? 'ring-2 ring-blue-500 ring-offset-1 z-10' : 'cursor-pointer'}"
+				style="left: {ax}px; top: {ay}px; width: {aw}px; height: {ah}px;
+					background: {hasCells ? 'transparent' : aFill + (isSelected ? '80' : '4d')};
+					border: {hasCells && !isSelected ? 'none' : `2px ${isSelected ? 'solid' : 'dashed'} ${aFill}`};"
+				onclick={(e) => {
+					e.stopPropagation();
+					if (selectedAreaId === areaItem.id) {
+						clearSelection();
+					} else {
+						clearSelection();
+						selectedAreaId = areaItem.id;
+						areaPopupPos = { x: ax + aw / 2, y: ay + ah + 8 };
+					}
+				}}
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						if (selectedAreaId === areaItem.id) {
+							clearSelection();
+						} else {
+							clearSelection();
+							selectedAreaId = areaItem.id;
+							areaPopupPos = { x: ax + aw / 2, y: ay + ah + 8 };
+						}
+					}
+				}}
+				onmousedown={(e) => {
+					e.stopPropagation();
+					if (isSelected) {
+						handleAreaDragStart(areaItem.id, e);
+					}
+				}}
+			>
+				{#if aw > 36 && ah > 24}
+					{@const areaCellKeys = parseAreaCells(areaItem)}
+					{#if areaCellKeys}
+						{@const lp = labelCellPos(areaCellKeys, preview?.grid_x ?? areaItem.grid_x, preview?.grid_y ?? areaItem.grid_y, preview?.grid_w ?? areaItem.grid_w, preview?.grid_h ?? areaItem.grid_h)}
+						<div
+							class="absolute pointer-events-none flex items-center justify-center"
+							style="left: {lp.x - ax}px; top: {lp.y - ay}px; transform: translate(-50%, -50%);"
+						>
+							<span class="px-2 py-0.5 rounded-md text-xs font-semibold leading-tight truncate shadow-sm bg-white/90 text-slate-800 border border-slate-200 whitespace-nowrap">
+								{aLabel}
+							</span>
+						</div>
+					{:else}
+						<div class="w-full h-full flex items-center justify-center p-1 pointer-events-none">
+							<span class="px-2 py-0.5 rounded-md text-xs font-semibold leading-tight truncate max-w-full shadow-sm bg-white/90 text-slate-800 border border-slate-200">
+								{aLabel}
+							</span>
+						</div>
+					{/if}
+				{/if}
+
+				<!-- Resize handles (all 4 corners) -->
+				{#if isSelected}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 rounded-tl cursor-se-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 'br', e)}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-0 left-0 w-4 h-4 bg-blue-500 rounded-br cursor-nw-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 'tl', e)}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-0 right-0 w-4 h-4 bg-blue-500 rounded-bl cursor-ne-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 'tr', e)}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute bottom-0 left-0 w-4 h-4 bg-blue-500 rounded-tr cursor-sw-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 'bl', e)}></div>
+					<!-- Edge handles -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-1/2 right-0 -translate-y-1/2 w-2 h-6 bg-blue-500 rounded-l cursor-e-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 'r', e)}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-1/2 left-0 -translate-y-1/2 w-2 h-6 bg-blue-500 rounded-r cursor-w-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 'l', e)}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute bottom-0 left-1/2 -translate-x-1/2 h-2 w-6 bg-blue-500 rounded-t cursor-s-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 'b', e)}></div>
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute top-0 left-1/2 -translate-x-1/2 h-2 w-6 bg-blue-500 rounded-b cursor-n-resize hover:bg-blue-600 transition-colors"
+						onmousedown={(e) => handleAreaResizeStart(areaItem.id, 't', e)}></div>
+				{/if}
+			</div>
+		{/each}
+
+		<!-- Area action popup -->
+		{#if selectedAreaId && areaPopupPos}
+			{@const selArea = items.find((i) => i.id === selectedAreaId)}
+			{#if selArea}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="absolute z-30 bg-background border rounded-lg shadow-lg px-3 py-2 flex items-center gap-2"
+					style="left: {Math.max(8, areaPopupPos.x - 120)}px; top: {areaPopupPos.y}px;"
+					onmousedown={(e) => e.stopPropagation()}
+				>
+					<span class="text-xs text-muted-foreground font-medium truncate max-w-[100px]">
+						{selArea.label ?? ITEM_TYPE_LABELS[selArea.item_type] ?? selArea.item_type}
+					</span>
+					<button
+						class="px-2.5 py-1 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+						onclick={() => {
+							// Enter edit area mode — seed from stored cells or fall back to bounds
+							editAreaMode = true;
+							editAreaId = selectedAreaId;
+							editAreaTool = 'add';
+							const a = selArea;
+							const storedCells = parseAreaCells(a);
+							if (storedCells) {
+								editAreaCells = new Set(storedCells);
+							} else {
+								const cells = new Set<string>();
+								for (let q = a.grid_x; q < a.grid_x + a.grid_w; q++) {
+									for (let r = a.grid_y; r < a.grid_y + a.grid_h; r++) {
+										cells.add(`${q},${r}`);
+									}
+								}
+								editAreaCells = cells;
+							}
+							selectedAreaId = null;
+							areaPopupPos = null;
+						}}
+					>
+						Edit
+					</button>
+					<button
+						class="px-2.5 py-1 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700 transition-colors"
+						onclick={() => { onRoomClear(selectedAreaId!); clearSelection(); }}
+					>
+						Delete
+					</button>
+					<button
+						class="px-2 py-1 rounded border text-xs hover:bg-secondary transition-colors text-muted-foreground"
+						onclick={clearSelection}
+					>
+						&times;
+					</button>
+				</div>
+			{/if}
+		{/if}
+
+		<!-- Room labels (unassigned detected rooms only — assigned areas use their own overlay) -->
 		{#each detectedRooms as room (room.id)}
 			{@const info = roomLabel(room)}
 			{@const a = getAssignment(room)}
+			{#if !roomOverlapsAssigned(room)}
 			{@const rw = (room.bounds.maxQ - room.bounds.minQ) * cellSize}
 			{@const rh = (room.bounds.maxR - room.bounds.minR) * cellSize}
 			{#if rw > 36 && rh > 24}
@@ -776,17 +1497,9 @@
 					</span>
 					<!-- Area display -->
 					<span class="text-[10px] text-slate-500 leading-tight">{info.area}</span>
-					{#if info.assigned && a}
-						{#if a.item_type === 'RENTAL_UNIT' && a.rental_unit_id}
-							{@const unit = rentalUnitsMap.get(a.rental_unit_id)}
-							{#if unit && rh > 56}
-								<span class="px-1.5 py-0.5 rounded bg-blue-100/80 text-[10px] text-blue-700 font-medium leading-tight truncate max-w-full">
-									cap. {unit.capacity} · {unit.type}
-								</span>
-							{/if}
-						{/if}
-					{/if}
+
 				</div>
+			{/if}
 			{/if}
 		{/each}
 
@@ -912,5 +1625,26 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Door/Window properties popup -->
+		{#if dwPopup}
+			<DoorWindowPopup
+				kind={dwPopup.kind}
+				meta={dwPopup.meta}
+				anchorPx={dwPopup.anchorPx}
+				gridWidth={gridCols * cellSize}
+				gridHeight={gridRows * cellSize}
+				onUpdate={(newMeta) => {
+					if (onWallMetaUpdate) onWallMetaUpdate(dwPopup!.edge, newMeta);
+				}}
+				onDelete={() => {
+					// Remove the door/window by toggling it off
+					onWallMetaToggle(dwPopup!.edge, dwPopup!.kind);
+					dwPopup = null;
+				}}
+				onClose={() => (dwPopup = null)}
+			/>
+		{/if}
+	</div>
 	</div>
 </div>

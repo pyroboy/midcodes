@@ -25,6 +25,7 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
+	import SyncErrorBanner from '$lib/components/sync/SyncErrorBanner.svelte';
 	import {
 		tenantsStore,
 		leaseTenantsStore,
@@ -33,6 +34,9 @@
 		propertiesStore
 	} from '$lib/stores/collections.svelte';
 	import { optimisticUpsertTenant, optimisticDeleteTenant } from '$lib/db/optimistic';
+	import { bufferedMutation } from '$lib/db/optimistic-utils';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 
 	// Enrich tenants with lease relationships using Map lookups (O(1) per join)
 	let tenants = $derived.by(() => {
@@ -97,8 +101,14 @@
 	let searchTerm = $state('');
 	let debouncedSearch = $state('');
 	let selectedStatus = $state('');
-	let viewMode = $state<'card' | 'list'>('card');
-	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('active');
+	let viewMode = $state<'card' | 'list'>(
+		typeof window !== 'undefined'
+			? ((localStorage.getItem('tenants-view-mode') as 'card' | 'list') ?? 'card')
+			: 'card'
+	);
+	// Read initial filter from URL params for persistence
+	const initialFilter = $page.url.searchParams.get('filter') as 'all' | 'active' | 'inactive' | 'pending' | 'blacklisted' | null;
+	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>(initialFilter ?? 'active');
 	let currentPage = $state(1);
 	const PAGE_SIZE = 24;
 
@@ -109,6 +119,18 @@
 		clearTimeout(searchTimer);
 		searchTimer = setTimeout(() => { debouncedSearch = term; }, 300);
 		return () => clearTimeout(searchTimer);
+	});
+
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			localStorage.setItem('tenants-view-mode', viewMode);
+		}
+	});
+
+	$effect(() => {
+		if (selectedStatus) {
+			activeFilter = 'all';
+		}
 	});
 
 	// Reset page when filters change
@@ -174,9 +196,15 @@
 
 	function handleFilterClick(filter: 'all' | 'active' | 'inactive' | 'pending' | 'blacklisted') {
 		activeFilter = filter;
-		if (filter !== 'all') {
-			selectedStatus = '';
+		selectedStatus = '';
+		// Persist filter to URL for back-button support and bookmarking
+		const url = new URL($page.url);
+		if (filter === 'active') {
+			url.searchParams.delete('filter');
+		} else {
+			url.searchParams.set('filter', filter);
 		}
+		goto(url.toString(), { replaceState: true, keepFocus: true });
 	}
 
 	// Called by TenantFormModal after successful create/update.
@@ -196,36 +224,32 @@
 		showDeleteDialog = false;
 		tenantToDelete = null;
 
-		// Optimistic: remove from UI immediately
-		await optimisticDeleteTenant(tenant.id);
-
 		const formData = new FormData();
 		formData.append('id', String(tenant.id));
 		formData.append('reason', 'User initiated deletion');
 
-		try {
-			const result = await fetch('?/delete', {
-				method: 'POST',
-				body: formData
-			});
-			const response = await result.json();
-
-			if (result.ok) {
-				toast.success(
-					`Tenant "${tenant.name}" has been successfully archived. All data has been preserved for audit purposes.`
-				);
-			} else {
-				console.error('Delete failed:', response);
-				toast.error(response.error || response.message || 'Failed to delete tenant');
-				const { resyncCollection } = await import('$lib/db/replication');
-				resyncCollection('tenants');
+		await bufferedMutation({
+			label: `Delete Tenant: ${tenant.name}`,
+			collection: 'tenants',
+			type: 'delete',
+			optimisticWrite: async () => {
+				await optimisticDeleteTenant(tenant.id);
+			},
+			serverAction: async () => {
+				const result = await fetch('?/delete', {
+					method: 'POST',
+					body: formData
+				});
+				if (!result.ok) {
+					const response = await result.json();
+					throw new Error(response.error || response.message || 'Failed to delete tenant');
+				}
+				return result;
+			},
+			onSuccess: async () => {
+				toast.success(`Tenant "${tenant.name}" has been archived.`);
 			}
-		} catch (error) {
-			console.error('Error deleting tenant:', error);
-			toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			const { resyncCollection } = await import('$lib/db/replication');
-			resyncCollection('tenants');
-		}
+		});
 	}
 
 	function handleModalClose(open: boolean) {
@@ -237,7 +261,14 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Tenants{!isLoading ? ` (${stats.total})` : ''} | Dorm</title>
+</svelte:head>
+
 <div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+	<div class="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+		<SyncErrorBanner collections={['tenants', 'leases', 'lease_tenants']} />
+	</div>
 	<!-- Header Section with Integrated Stats -->
 	<div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
@@ -254,14 +285,14 @@
 				</div>
 
 				<!-- Enhanced Stats Overview - Now Clickable -->
-				<div class="flex items-center gap-3 text-xs sm:text-sm">
+				<div class="flex items-center gap-3 text-xs sm:text-sm overflow-x-auto flex-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 					<button
 						onclick={() => handleFilterClick('active')}
 						aria-pressed={activeFilter === 'active'}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter ===
 						'active'
 							? 'bg-green-100 ring-2 ring-green-500'
-							: 'bg-green-50 hover:bg-green-100'}"
+							: 'bg-green-50 hover:bg-green-100'} {stats.active === 0 && activeFilter !== 'active' ? 'opacity-50' : ''}"
 					>
 						{#if isLoading}
 							<Skeleton class="h-4 w-6" />
@@ -274,10 +305,10 @@
 					<button
 						onclick={() => handleFilterClick('all')}
 						aria-pressed={activeFilter === 'all'}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
 						'all'
 							? 'bg-blue-100 ring-2 ring-blue-500'
-							: 'bg-blue-50 hover:bg-blue-100'}"
+							: 'bg-blue-50 hover:bg-blue-100'} {stats.total === 0 && activeFilter !== 'all' ? 'opacity-50' : ''}"
 					>
 						{#if isLoading}
 							<Skeleton class="h-4 w-6" />
@@ -290,10 +321,10 @@
 					<button
 						onclick={() => handleFilterClick('inactive')}
 						aria-pressed={activeFilter === 'inactive'}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 {activeFilter ===
 						'inactive'
 							? 'bg-gray-100 ring-2 ring-gray-500'
-							: 'bg-gray-50 hover:bg-gray-100'}"
+							: 'bg-gray-50 hover:bg-gray-100'} {stats.inactive === 0 && activeFilter !== 'inactive' ? 'opacity-50' : ''}"
 					>
 						{#if isLoading}
 							<Skeleton class="h-4 w-6" />
@@ -306,10 +337,10 @@
 					<button
 						onclick={() => handleFilterClick('pending')}
 						aria-pressed={activeFilter === 'pending'}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 {activeFilter ===
 						'pending'
 							? 'bg-yellow-100 ring-2 ring-yellow-500'
-							: 'bg-yellow-50 hover:bg-yellow-100'}"
+							: 'bg-yellow-50 hover:bg-yellow-100'} {stats.pending === 0 && activeFilter !== 'pending' ? 'opacity-50' : ''}"
 					>
 						{#if isLoading}
 							<Skeleton class="h-4 w-6" />
@@ -322,17 +353,17 @@
 					<button
 						onclick={() => handleFilterClick('blacklisted')}
 						aria-pressed={activeFilter === 'blacklisted'}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter ===
+						class="flex-shrink-0 flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter ===
 						'blacklisted'
 							? 'bg-red-100 ring-2 ring-red-500'
-							: 'bg-red-50 hover:bg-red-100'}"
+							: 'bg-red-50 hover:bg-red-100'} {stats.blacklisted === 0 && activeFilter !== 'blacklisted' ? 'opacity-50' : ''}"
 					>
 						{#if isLoading}
 							<Skeleton class="h-4 w-6" />
 						{:else}
 							<span class="text-red-600 font-medium">{stats.blacklisted}</span>
 						{/if}
-						<span class="text-slate-600">Blacklisted</span>
+						<span class="text-slate-600"><span class="hidden sm:inline">Blacklisted</span><span class="sm:hidden">Blocked</span></span>
 					</button>
 				</div>
 
@@ -349,39 +380,6 @@
 
 	<!-- Main Content Area -->
 	<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-		<!-- Active Filter Display -->
-		{#if activeFilter !== 'all'}
-			<div class="mb-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<span class="text-sm font-medium text-slate-600">Showing:</span>
-						<span
-							class="px-2 py-1 rounded-md text-sm font-medium {activeFilter === 'active'
-								? 'bg-green-100 text-green-700'
-								: activeFilter === 'inactive'
-									? 'bg-gray-100 text-gray-700'
-									: activeFilter === 'pending'
-										? 'bg-yellow-100 text-yellow-700'
-										: activeFilter === 'blacklisted'
-											? 'bg-red-100 text-red-700'
-											: 'bg-blue-100 text-blue-700'}"
-						>
-							{activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Tenants
-						</span>
-						<span class="text-sm text-slate-500"
-							>({filteredTenants.length} of {tenants.length})</span
-						>
-					</div>
-					<button
-						onclick={() => handleFilterClick('all')}
-						class="text-sm text-slate-600 hover:text-slate-800 underline"
-					>
-						Show All
-					</button>
-				</div>
-			</div>
-		{/if}
-
 		<!-- Search and Filter Section -->
 		<div
 			class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-6 mb-6"
@@ -414,7 +412,7 @@
 					</Select>
 
 					<!-- View Toggle Buttons -->
-					<div class="flex border border-slate-200 rounded-md bg-white">
+					<div class="flex flex-shrink-0 border border-slate-200 rounded-md bg-white">
 						<Button
 							variant={viewMode === 'card' ? 'default' : 'ghost'}
 							size="sm"
@@ -440,7 +438,7 @@
 		<div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm">
 			<div class="p-6">
 				<h2 class="text-lg font-semibold text-slate-800 mb-4">
-					Tenant List {isLoading ? '' : `(${filteredTenants.length})`}
+					Tenants
 				</h2>
 
 				{#if isLoading}
@@ -466,19 +464,25 @@
 						{/each}
 					</div>
 				{:else if filteredTenants.length === 0}
-					<div class="text-center py-12">
-						<Users class="w-12 h-12 mx-auto mb-4 text-gray-400" />
-						<p class="text-gray-500 text-lg font-medium">
-							{searchTerm || selectedStatus || activeFilter !== 'all'
-								? 'No tenants found matching your criteria'
-								: 'No tenants found'}
-						</p>
-						<p class="text-gray-400 text-sm mt-2">
-							{searchTerm || selectedStatus || activeFilter !== 'all'
-								? 'Try adjusting your search or filter criteria'
-								: 'Get started by adding your first tenant'}
-						</p>
-						{#if !searchTerm && !selectedStatus && activeFilter === 'all'}
+					<div class="flex flex-col items-center justify-center py-16 px-4">
+						{#if searchTerm || selectedStatus || activeFilter !== 'all'}
+							<UserX class="w-12 h-12 mb-4 text-muted-foreground" />
+							<p class="text-muted-foreground text-lg font-medium">
+								{#if debouncedSearch}
+									No tenants found
+								{:else if activeFilter !== 'all'}
+									No {activeFilter} tenants
+								{:else}
+									No tenants found
+								{/if}
+							</p>
+							<p class="text-muted-foreground/60 text-sm mt-2">
+								Try adjusting your filters or search terms
+							</p>
+						{:else}
+							<Users class="w-12 h-12 mb-4 text-muted-foreground" />
+							<p class="text-muted-foreground text-lg font-medium">No tenants found</p>
+							<p class="text-muted-foreground/60 text-sm mt-2">Get started by adding your first tenant</p>
 							<Button onclick={handleAddTenant} class="mt-4">
 								<Plus class="w-4 h-4 mr-2" />
 								Add First Tenant
@@ -496,8 +500,8 @@
 					<!-- List View (Table) -->
 					<TenantTable
 						tenants={paginatedTenants}
-						on:edit={(e) => handleEdit(e.detail)}
-						on:delete={(e) => handleDeleteTenant(e.detail)}
+						onEdit={(tenant) => handleEdit(tenant)}
+						onDelete={(tenant) => handleDeleteTenant(tenant)}
 					/>
 				{/if}
 

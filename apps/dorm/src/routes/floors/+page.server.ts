@@ -5,7 +5,8 @@ import { floorSchema } from './formSchema';
 import type { Actions, RequestEvent } from './$types';
 import { db } from '$lib/server/db';
 import { floors } from '$lib/server/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, isNull } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 // Declare - Actions
 
@@ -18,14 +19,15 @@ export const actions: Actions = {
 			return fail(400, { form });
 		}
 
-		// Check for duplicate floor number in the same property
+		// Check for duplicate floor number in the same property (exclude soft-deleted)
 		const existingFloor = await db
 			.select({ id: floors.id })
 			.from(floors)
 			.where(
 				and(
 					eq(floors.propertyId, form.data.property_id),
-					eq(floors.floorNumber, form.data.floor_number)
+					eq(floors.floorNumber, form.data.floor_number),
+					isNull(floors.deletedAt)
 				)
 			)
 			.limit(1);
@@ -39,13 +41,15 @@ export const actions: Actions = {
 		console.log('Creating floor with data:', form.data);
 
 		try {
-			await db.insert(floors).values({
+			const [inserted] = await db.insert(floors).values({
 				propertyId: form.data.property_id,
 				floorNumber: form.data.floor_number,
 				wing: form.data.wing || null,
 				status: form.data.status || 'ACTIVE',
 				updatedAt: new Date()
-			});
+			}).returning({ id: floors.id });
+			// Attach new ID so client can do an optimistic write immediately
+			form.data.id = inserted.id;
 		} catch (err: any) {
 			console.error('Error creating floor:', err);
 			return fail(500, { form });
@@ -55,14 +59,16 @@ export const actions: Actions = {
 	},
 
 	update: async ({ request }: RequestEvent) => {
-		const form = await superValidate(request, zod(floorSchema));
+		const rawFormData = await request.formData();
+		const lockTs = extractLockTimestamp(rawFormData);
+		const form = await superValidate(rawFormData, zod(floorSchema));
 
 		if (!form.valid) {
 			console.error('Form validation failed:', form.errors);
 			return fail(400, { form });
 		}
 
-		// Check for duplicate floor number in the same property (excluding current floor)
+		// Check for duplicate floor number in the same property (excluding current floor + soft-deleted)
 		const existingFloor = await db
 			.select({ id: floors.id })
 			.from(floors)
@@ -70,7 +76,8 @@ export const actions: Actions = {
 				and(
 					eq(floors.propertyId, form.data.property_id),
 					eq(floors.floorNumber, form.data.floor_number),
-					ne(floors.id, form.data.id!)
+					ne(floors.id, form.data.id!),
+					isNull(floors.deletedAt)
 				)
 			)
 			.limit(1);
@@ -84,16 +91,19 @@ export const actions: Actions = {
 		console.log('Updating floor with data:', form.data);
 
 		try {
-			await db
-				.update(floors)
-				.set({
+			const result = await optimisticLockUpdate(
+				db, floors, floors.id, form.data.id!, floors.updatedAt, lockTs,
+				{
 					propertyId: form.data.property_id,
 					floorNumber: form.data.floor_number,
 					wing: form.data.wing || null,
 					status: form.data.status || 'ACTIVE',
 					updatedAt: new Date()
-				})
-				.where(eq(floors.id, form.data.id!));
+				}
+			);
+			if (result.conflict) {
+				return fail(409, { form, conflict: true, message: result.message });
+			}
 		} catch (err: any) {
 			console.error('Error updating floor:', err);
 			return fail(500, { form });

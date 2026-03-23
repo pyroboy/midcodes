@@ -6,6 +6,7 @@ import type { Actions } from './$types';
 import { db } from '$lib/server/db';
 import { budgets } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
+import { extractLockTimestamp, optimisticLockUpdate } from '$lib/server/optimistic-lock';
 
 export const actions: Actions = {
 	upsert: async ({ request, locals }) => {
@@ -14,7 +15,9 @@ export const actions: Actions = {
 			throw error(401, 'Unauthorized');
 		}
 
-		const form = await superValidate(request, zod(budgetSchema));
+		const rawFormData = await request.formData();
+		const lockTs = extractLockTimestamp(rawFormData);
+		const form = await superValidate(rawFormData, zod(budgetSchema));
 
 		if (!form.valid) {
 			console.error('Form validation error:', form.errors);
@@ -50,10 +53,9 @@ export const actions: Actions = {
 			};
 
 			if (id) {
-				const result = await db
-					.update(budgets)
-					.set({
-						id: Date.now(),
+				const lockResult = await optimisticLockUpdate(
+					db, budgets, budgets.id, id, budgets.updatedAt, lockTs,
+					{
 						propertyId: formattedData.property_id,
 						projectName: formattedData.project_name,
 						projectDescription: formattedData.project_description,
@@ -66,11 +68,13 @@ export const actions: Actions = {
 						startDate: formattedData.start_date ? new Date(formattedData.start_date) : null,
 						endDate: formattedData.end_date ? new Date(formattedData.end_date) : null,
 						updatedAt: new Date()
-					})
-					.where(eq(budgets.id, id))
-					.returning();
+					}
+				);
+				if (lockResult.conflict) {
+					return fail(409, { form, conflict: true, message: lockResult.message });
+				}
 
-				return { form, success: true, operation: 'update', budget: result?.[0] };
+				return { form, success: true, operation: 'update', budget: lockResult.rows?.[0] };
 			} else {
 				const result = await db
 					.insert(budgets)

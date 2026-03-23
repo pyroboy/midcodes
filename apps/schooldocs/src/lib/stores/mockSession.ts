@@ -1,53 +1,33 @@
+/**
+ * Dev-only mock session for rapid UI prototyping.
+ * Uses Better Auth types instead of Supabase types.
+ * In production, session comes from hooks.server.ts via Better Auth.
+ */
 import { writable } from 'svelte/store';
-import type { GetSessionResult } from '../../app';
 
-// Initial mock session state
-const initialSession: GetSessionResult = {
-  session: {
-    access_token: 'mock_access_token',
-    token_type: 'bearer',
-    expires_in: 3600,
-    refresh_token: 'mock_refresh_token',
-    user: {
-      id: 'mock_user_id',
-      aud: 'authenticated',
-      role: 'authenticated',
-      email: 'mock@example.com',
-      email_confirmed_at: new Date().toISOString(),
-      phone: '',
-      confirmed_at: new Date().toISOString(),
-      last_sign_in_at: new Date().toISOString(),
-      app_metadata: { provider: 'email' },
-      user_metadata: {},
-      identities: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-  },
-  error: null,
-  user: {
-    id: 'mock_user_id',
-    aud: 'authenticated',
-    role: 'authenticated',
-    email: 'mock@example.com',
-    email_confirmed_at: new Date().toISOString(),
-    phone: '',
-    confirmed_at: new Date().toISOString(),
-    last_sign_in_at: new Date().toISOString(),
-    app_metadata: { provider: 'email' },
-    user_metadata: {},
-    identities: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
+export type MockUser = {
+	id: string;
+	name: string;
+	email: string;
+	role: 'super_admin' | 'admin' | 'staff' | 'finance' | 'registrar' | null;
+	emailVerified: boolean;
+	createdAt: Date;
+	updatedAt: Date;
 };
 
-// Create a writable store with the initial mock session
-export const mockSession = writable<GetSessionResult>(initialSession);
+const mockUser: MockUser = {
+	id: 'dev-user-id',
+	name: 'Dev User',
+	email: 'dev@schooldocs.app',
+	role: 'admin',
+	emailVerified: true,
+	createdAt: new Date(),
+	updatedAt: new Date()
+};
 
-// Helper functions to simulate auth actions
+export const mockSession = writable<{ user: MockUser | null }>({ user: mockUser });
+
 export const mockAuth = {
-  signIn: () => mockSession.set(initialSession),
-  signOut: () => mockSession.set({ session: null, error: null, user: null }),
-  // Add more mock auth methods as needed
+	signIn: () => mockSession.set({ user: mockUser }),
+	signOut: () => mockSession.set({ user: null })
 };

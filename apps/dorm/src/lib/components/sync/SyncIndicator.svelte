@@ -1,72 +1,53 @@
 <script lang="ts">
 	import { syncStatus } from '$lib/stores/sync-status.svelte';
-	import { Database, CheckCircle, AlertCircle, Loader2 } from 'lucide-svelte';
+	import { CheckCircle, AlertCircle, Loader2, ArrowUpFromLine, ChevronDown, Pause, CircleDot } from 'lucide-svelte';
 	import SyncDetailModal from './SyncDetailModal.svelte';
 
 	let showModal = $state(false);
 
-	let indicatorColor = $derived.by(() => {
-		switch (syncStatus.phase) {
-			case 'syncing':
-			case 'initializing':
-				return 'text-blue-500';
-			case 'complete':
-				return syncStatus.hasErrors ? 'text-amber-500' : 'text-emerald-500';
-			case 'error':
-				return 'text-red-500';
-			default:
-				return 'text-muted-foreground';
-		}
-	});
-
-	let pulseClass = $derived(
-		syncStatus.phase === 'syncing' || syncStatus.phase === 'initializing' ? 'animate-pulse' : ''
-	);
-
-	let tooltipText = $derived.by(() => {
-		switch (syncStatus.phase) {
-			case 'syncing':
-				return `Syncing ${syncStatus.syncedCount}/${syncStatus.totalCount}...`;
-			case 'complete':
-				return syncStatus.hasErrors
-					? `Synced with ${syncStatus.errorCollections.length} error(s)`
-					: 'All data synced';
-			case 'error':
-				return 'Sync error — click for details';
-			default:
-				return 'Offline data status';
-		}
-	});
-
-	let showDataAge = $derived(
-		syncStatus.dataAge !== null &&
-		syncStatus.dataAge !== 'just now' &&
-		(syncStatus.phase === 'error' || syncStatus.hasErrors)
-	);
+	// Use the single source of truth from syncStatus store
+	let status = $derived(syncStatus.statusLabel);
 </script>
 
 <button
 	onclick={() => (showModal = true)}
-	class="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-	title={tooltipText}
+	class="relative flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+	title={status.label}
+	aria-label="Open sync status details"
+	aria-haspopup="dialog"
 >
-	{#if syncStatus.phase === 'syncing' || syncStatus.phase === 'initializing'}
-		<Loader2 class="w-3.5 h-3.5 {indicatorColor} animate-spin" />
-		<span class="text-xs text-muted-foreground hidden sm:inline">
-			{syncStatus.syncedCount}/{syncStatus.totalCount}
-		</span>
-	{:else if syncStatus.phase === 'complete' && !syncStatus.hasErrors}
-		<CheckCircle class="w-3.5 h-3.5 {indicatorColor}" />
-	{:else if syncStatus.hasErrors || syncStatus.phase === 'error'}
-		<AlertCircle class="w-3.5 h-3.5 {indicatorColor}" />
-		{#if showDataAge}
-			<span class="text-xs text-muted-foreground hidden sm:inline">
-				Last sync: {syncStatus.dataAge}
-			</span>
+	{#if status.state === 'in-sync'}
+		<CheckCircle class="w-3.5 h-3.5 text-emerald-600" />
+		<span class="text-xs text-emerald-600 hidden sm:inline">{status.label}</span>
+	{:else if status.state === 'saving'}
+		<ArrowUpFromLine class="w-3.5 h-3.5 text-amber-700 animate-pulse" />
+		<span class="text-xs text-amber-700 hidden sm:inline">{status.label}</span>
+	{:else if status.state === 'syncing'}
+		<Loader2 class="w-3.5 h-3.5 text-blue-500 animate-spin" />
+		<span class="text-xs text-blue-500 hidden sm:inline">{status.label}</span>
+		{#if status.detail}
+			<span class="text-xs text-muted-foreground hidden sm:inline">{status.detail}</span>
 		{/if}
+	{:else if status.state === 'paused'}
+		<Pause class="w-3.5 h-3.5 text-amber-700" />
+		<span class="text-xs text-amber-700 hidden sm:inline">{status.label}</span>
+	{:else if status.state === 'error'}
+		<AlertCircle class="w-3.5 h-3.5 text-red-600" />
+		<span class="text-xs text-red-600 hidden sm:inline">{status.label}</span>
+	{:else if status.state === 'unsaved'}
+		<CircleDot class="w-3.5 h-3.5 text-orange-500" />
+		<span class="text-xs text-orange-500 hidden sm:inline">{status.label}</span>
+		{#if status.detail}
+			<span class="text-xs text-muted-foreground hidden sm:inline">{status.detail}</span>
+		{/if}
+	{:else if status.state === 'errors'}
+		<AlertCircle class="w-3.5 h-3.5 text-amber-700" />
+		<span class="text-xs text-amber-700 hidden sm:inline">{status.label}</span>
 	{:else}
-		<Database class="w-3.5 h-3.5 {indicatorColor} {pulseClass}" />
+		<Loader2 class="w-3.5 h-3.5 text-muted-foreground" />
+		<span class="text-xs text-muted-foreground hidden sm:inline">{status.label}</span>
 	{/if}
+	<ChevronDown class="w-3 h-3 text-muted-foreground" />
 </button>
 
 <SyncDetailModal bind:open={showModal} />

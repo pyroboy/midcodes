@@ -143,11 +143,20 @@ export interface WallStorageItem {
 
 // ─── Wall Metadata (Doors, Windows, Color) ────────────────────────────────
 
+export type DoorType = 'single' | 'double' | 'sliding' | 'pocket' | 'bifold' | 'french';
+export type WindowType = 'fixed' | 'sliding' | 'casement' | 'awning' | 'bay';
+export type SwingDir = 'left' | 'right' | 'both';
+export type OpenDir = 'inward' | 'outward';
+
 export interface WallMeta {
-	door?: 'single' | 'double' | 'sliding';
-	swing?: 'left' | 'right' | 'both';
-	window?: 'standard' | 'bay' | 'transom';
-	sill?: number;
+	door?: DoorType;
+	swing?: SwingDir;
+	openDir?: OpenDir;
+	doorWidth?: number;      // cm (default 80 single, 120 double)
+	window?: WindowType;
+	sill?: number;           // meters from floor (default 0.9)
+	windowWidth?: number;    // cm (default 100)
+	windowHeight?: number;   // cm (default 120)
 	color?: string;
 }
 

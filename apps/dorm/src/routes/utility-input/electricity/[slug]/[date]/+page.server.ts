@@ -24,6 +24,13 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	if (!propertySlug) errorDetails.push('Property slug is required');
 	if (!date) errorDetails.push('Date parameter is required');
 
+	// Validate date format before any new Date() calls (EC-P0-1)
+	if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+		errorDetails.push('Invalid date format. Expected YYYY-MM-DD.');
+	} else if (date && isNaN(new Date(date + 'T00:00:00Z').getTime())) {
+		errorDetails.push('Invalid date. The date does not exist.');
+	}
+
 	// Since Drizzle doesn't have RLS, we query directly (no service role needed)
 
 	// Fetch property details by slug
@@ -31,10 +38,12 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	if (propertySlug && !errorDetails.length) {
 		console.log(`Looking for property with slug: "${propertySlug}"`);
 
+		// Support both numeric ID and name-based lookup for URL consistency
+		const isNumericId = /^\d+$/.test(propertySlug);
 		const propertyResult = await db
 			.select({ id: properties.id, name: properties.name, status: properties.status })
 			.from(properties)
-			.where(eq(properties.name, propertySlug))
+			.where(isNumericId ? eq(properties.id, Number(propertySlug)) : eq(properties.name, propertySlug))
 			.limit(1);
 
 		const propertyData = propertyResult[0];
@@ -50,7 +59,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	}
 
 	// Helper function to generate future date links
-	function generateFutureDateLinks(propSlug: string, currentDate: string) {
+	function generateFutureDateLinks(propId: number, currentDate: string) {
 		const serverToday = new Date().toISOString().split('T')[0];
 		const todayObj = new Date(serverToday);
 
@@ -71,11 +80,11 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 		if (isCurrentViewingDate) {
 			futureDates.push(`${label} *(current)*`);
 		} else {
-			futureDates.push(`[${label}](/utility-input/electricity/${propSlug}/${tomorrowStr})`);
+			futureDates.push(`[${label}](/utility-input/electricity/${propId}/${tomorrowStr})`);
 		}
 
 		if (futureDates.length > 0) {
-			return `\n\n** Tomorrow's input:**\n${futureDates.join('')}`;
+			return `\n\nTomorrow's input:\n${futureDates.join('')}`;
 		}
 		return '';
 	}
@@ -112,7 +121,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 			existingReadingsCount = validReadings.length;
 
 			if (existingReadingsCount > 0) {
-				const futureDateLinks = generateFutureDateLinks(property.name, date);
+				const futureDateLinks = generateFutureDateLinks(property.id, date);
 				const displayDate = new Date(date).toLocaleDateString('en-US', {
 					weekday: 'long',
 					year: 'numeric',
@@ -120,7 +129,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 					day: 'numeric'
 				});
 
-				const successMessage = `Information:\n Existing Data Found\n\n**${displayDate}** already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nYou can view or update the existing readings below.${futureDateLinks}`;
+				const successMessage = `Information:\n Existing Data Found\n\n${displayDate} already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nTo enter new readings, navigate to a date without existing data.${futureDateLinks}`;
 
 				return {
 					meters: [],
@@ -248,7 +257,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 				const nextDayFormatted = nextDay.toLocaleDateString('en-US', {
 					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
-				const validDateUrl = `/utility-input/electricity/${propertySlug}/${dateString}`;
+				const validDateUrl = `/utility-input/electricity/${property!.id}/${dateString}`;
 				const validDateButton = `[Next Reading Date: ${nextDayFormatted}](${validDateUrl})`;
 
 				const today = new Date();
@@ -256,7 +265,7 @@ export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 				const todayFormatted = today.toLocaleDateString('en-US', {
 					weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
 				});
-				const todayButton = `[Today's Date: ${todayFormatted}](/utility-input/electricity/${propertySlug}/${todayString})`;
+				const todayButton = `[Today's Date: ${todayFormatted}](/utility-input/electricity/${property!.id}/${todayString})`;
 
 				errorDetails.push(
 					`Date Restriction\n\nYou requested: ${requestedFormatted}\nLast reading: ${lastReadingFormatted}\n\nCannot access dates before your most recent meter reading.\n\n${validDateButton}\n\n${todayButton}`
