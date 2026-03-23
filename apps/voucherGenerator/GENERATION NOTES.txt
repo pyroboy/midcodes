@@ -1,0 +1,17 @@
+== MAMA MALY'S ==
+
+prefix: malys-,tenant-,malys30-
+profile: Customer,Tenants,Monthly
+server: hotspot1
+
+== FIGARO ==
+
+prefix: coffee-
+profile: Customer , Employee
+server: hotspot1
+
+== PAENGS ==
+
+prefix: paengs-,fried-,roasted-
+profile: Customer, Employee , Admin
+server: hotspot1
