@@ -1,30 +1,30 @@
 {
-	"name": "transripts",
-	"version": "0.0.1",
+	"name": "schooldocs",
+	"version": "0.1.0",
 	"private": true,
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"serve:edge": "supabase functions serve role-emulation --env-file .env.local",
-		"deploy:edge": "supabase functions deploy role-emulation",
 		"build": "vite build",
 		"preview": "vite preview",
-		"test": "pnpm run test:integration && pnpm run test:unit",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"test:integration": "playwright test",
-		"test:unit": "vitest",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:push": "drizzle-kit push",
+		"db:studio": "drizzle-kit studio",
 		"clean": "rm -rf .svelte-kit build node_modules/.cache/turbo"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-vercel": "^5.5.0",
+		"@sveltejs/adapter-cloudflare": "^4.7.0",
 		"@sveltejs/kit": "^2.27.3",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@tailwindcss/typography": "^0.5.15",
 		"autoprefixer": "^10.4.20",
 		"clsx": "^2.1.1",
+		"drizzle-kit": "^0.31.8",
 		"postcss": "^8.4.40",
 		"prettier": "^3.1.1",
 		"prettier-plugin-svelte": "^3.2.6",
@@ -38,13 +38,17 @@
 		"typescript": "^5.5.0",
 		"vite": "^5.4.11",
 		"vitest": "^1.0.0",
-		"zod": "^3.23.8"
+		"zod": "^4.3.6"
 	},
 	"dependencies": {
-		"@supabase/ssr": "^0.5.2",
-		"@supabase/supabase-js": "^2.46.1",
+		"@neondatabase/serverless": "^1.0.2",
+		"ably": "^2.6.0",
+		"better-auth": "^1.5.0",
 		"class-variance-authority": "^0.7.0",
-		"echarts": "^5.4.3"
+		"drizzle-orm": "^0.45.1",
+		"echarts": "^5.4.3",
+		"rxdb": "^16.21.1",
+		"zod": "^4.3.6"
 	},
 	"engines": {
 		"node": ">=20.0.0"
